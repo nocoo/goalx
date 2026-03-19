@@ -1,0 +1,21 @@
+name: http-health
+description: HTTP health check — start service, probe endpoint, measure response
+command: |
+  {{.StartCommand}} &
+  PID=$!
+  sleep {{.WarmupSeconds}}
+  RESULT=$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' {{.HealthURL}})
+  kill $PID 2>/dev/null
+  echo "http_code: $(echo $RESULT | cut -d' ' -f1)"
+  echo "latency_ms: $(echo $RESULT | cut -d' ' -f2 | awk '{printf "%.1f", $1*1000}')"
+timeout: 1m
+metrics:
+  primary:
+    name: latency_ms
+    pattern: '^latency_ms:\s+([\d.]+)'
+    direction: minimize
+  constraints:
+    - name: http_code
+      pattern: '^http_code:\s+(\d+)'
+      op: "=="
+      threshold: 200

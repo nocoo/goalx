@@ -1,0 +1,9 @@
+name: command
+description: Generic command runner — specify your own command and metric patterns
+command: "{{.Command}}"
+timeout: "{{.Timeout}}"
+metrics:
+  primary:
+    name: "{{.PrimaryMetric}}"
+    pattern: "{{.PrimaryPattern}}"
+    direction: "{{.PrimaryDirection}}"

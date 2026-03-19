@@ -1,0 +1,9 @@
+name: go-test
+description: Go test runner with metric extraction from test output
+command: "go test -run {{.TestPattern}} -v -count=1 {{.TestPath}}"
+timeout: 3m
+metrics:
+  primary:
+    name: "{{.PrimaryMetric}}"
+    pattern: "{{.PrimaryPattern}}"
+    direction: "{{.PrimaryDirection}}"

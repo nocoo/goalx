@@ -1,0 +1,9 @@
+name: go-bench
+description: Go benchmark runner
+command: "go test -bench={{.BenchPattern}} -benchtime={{.BenchTime}} -count=1 {{.TestPath}}"
+timeout: 5m
+metrics:
+  primary:
+    name: ns_per_op
+    pattern: 'Benchmark\w+\s+\d+\s+([\d.]+)\s+ns/op'
+    direction: minimize
