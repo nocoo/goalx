@@ -1,275 +1,110 @@
 ---
-name: goalx
-description: Use when OpenClaw agent needs to manage GoalX runs over the HTTP API instead of local CLI access.
-allowed-tools: "Bash"
-metadata.openclaw: true
+name: goalx-remote
+description: Use when the user wants to manage GoalX research/develop runs on a remote dev server via HTTP API. Triggers when the user mentions goalx, research tasks, code investigation, starting/checking/stopping agent runs, managing project workspaces, or wants autonomous research on a remote machine. Even casual requests like "look into X on the dev server" or "start a research task" should trigger this skill.
 ---
 
-# GoalX HTTP for OpenClaw agent
+# GoalX Remote — HTTP API Skill
 
-GoalX runs on the `dev` host and is exposed over internal network.
-Use the HTTP API, not SSH.
-Every request needs a Bearer token.
-
-## Working Rules
-
-- Keep replies short and Lark-friendly.
-- Summarize results as `状态 / 关键信息 / 下一步`.
-- Do not dump large JSON unless the user asks for raw output.
-- Before mutating a run, say what you are about to change.
+Manage GoalX runs on a remote server via HTTP API. Browse projects, start research, check progress, change direction, manage configs — all through curl.
 
 ## Setup
 
-```bash
-export GOALX_PORT="18790"
-export GOALX_BASE="http://100.110.196.103:${GOALX_PORT}"
-export GOALX_TOKEN="REPLACE_ME"
-
-goalx_get() {
-  curl -fsS \
-    -H "Authorization: Bearer $GOALX_TOKEN" \
-    "$@"
-}
-
-goalx_post() {
-  curl -fsS -X POST \
-    -H "Authorization: Bearer $GOALX_TOKEN" \
-    -H "Content-Type: application/json" \
-    "$@"
-}
-
-goalx_put() {
-  curl -fsS -X PUT \
-    -H "Authorization: Bearer $GOALX_TOKEN" \
-    -H "Content-Type: application/json" \
-    "$@"
-}
-
-pretty() {
-  python3 -m json.tool
-}
-```
-
-If a request returns `401` or `403`, check the Bearer token first.
-
-## Fast Flows
-
-### 1. Browse projects
+The skill needs three environment variables. Set them in your OpenClaw agent config or export before use:
 
 ```bash
-goalx_get "$GOALX_BASE/projects" | pretty
-goalx_get "$GOALX_BASE/projects/my-project" | pretty
-goalx_get "$GOALX_BASE/runs" | pretty
+export GOALX_URL="http://YOUR_SERVER_IP:9800"
+export GOALX_TOKEN="your-bearer-token"
 ```
 
-### 2. Start a new research or develop run
+Helper functions (define once per session):
 
 ```bash
-goalx_post "$GOALX_BASE/projects/my-project/goalx/auto" \
-  -d '{
-    "objective": "Investigate the regression in the sync pipeline",
-    "mode": "research",
-    "parallel": 2,
-    "name": "sync-regression"
-  }' | pretty
+gx_get()  { curl -fsS -H "Authorization: Bearer $GOALX_TOKEN" "$@"; }
+gx_post() { curl -fsS -X POST -H "Authorization: Bearer $GOALX_TOKEN" -H "Content-Type: application/json" "$@"; }
+gx_put()  { curl -fsS -X PUT -H "Authorization: Bearer $GOALX_TOKEN" -H "Content-Type: application/json" "$@"; }
+gx_del()  { curl -fsS -X DELETE -H "Authorization: Bearer $GOALX_TOKEN" "$@"; }
+pj()      { python3 -m json.tool 2>/dev/null; }
 ```
 
-For a develop run, switch `mode` to `develop`.
+## What to Do When
 
+### "Show me all projects" / "What's running?"
 ```bash
-goalx_post "$GOALX_BASE/projects/my-project/goalx/init" \
-  -d '{
-    "objective": "Fix the regression and add tests",
-    "mode": "develop",
-    "parallel": 2,
-    "name": "sync-fix"
-  }' | pretty
-
-goalx_put "$GOALX_BASE/projects/my-project/goalx/config" \
-  -d '{
-    "target": {
-      "files": ["cli/", "config.go", "cmd/goalx/main.go", "skill/"]
-    },
-    "harness": {
-      "command": "go build ./... && go test ./... -count=1 && go vet ./..."
-    }
-  }' | pretty
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/start" \
-  -d '{"run":"sync-fix"}' | pretty
+gx_get "$GOALX_URL/projects" | pj
+gx_get "$GOALX_URL/runs" | pj
 ```
 
-Use `auto` when OpenClaw agent should run the whole flow.
-Use `init` + `config` + `start`
-when the run needs a manual config pass first.
-
-### 3. Watch progress
-
+### "Add this directory as a project"
 ```bash
-goalx_get "$GOALX_BASE/projects/my-project/goalx/status?run=sync-regression" | pretty
-goalx_get "$GOALX_BASE/projects/my-project/goalx/observe?run=sync-regression" | pretty
+gx_post "$GOALX_URL/workspaces" -d '{"name":"my-project","path":"/data/dev/my-project"}' | pj
 ```
+Auto git-inits if the directory isn't a git repo.
 
-Use `status` for a compact view.
-Use `observe`
-when you need the live master/session picture.
-
-### 4. Change direction mid-run
-
+### "Research X on project Y" / "Investigate..."
 ```bash
-goalx_post "$GOALX_BASE/projects/my-project/goalx/tell" \
-  -d '{
-    "run": "sync-regression",
-    "message": "Focus on API retries first, not database indexing.",
-    "session": "master"
-  }' | pretty
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/add" \
-  -d '{
-    "run": "sync-regression",
-    "direction": "Investigate whether rate limiting changed last week."
-  }' | pretty
+gx_post "$GOALX_URL/projects/Y/goalx/auto" \
+  -d '{"objective":"X","mode":"research","parallel":2}' | pj
 ```
 
-Use `tell` to redirect an existing run.
-Use `add`
-to add a new angle without stopping the current work.
-
-### 5. Read or update config
-
+### "Fix X on project Y" / "Implement..."
 ```bash
-goalx_get "$GOALX_BASE/projects/my-project/goalx/config" | pretty
-
-goalx_put "$GOALX_BASE/projects/my-project/goalx/config" \
-  -d '{
-    "objective": "Investigate retry failures in production",
-    "parallel": 3,
-    "target": {
-      "files": ["cli/", "config.go", "cmd/goalx/main.go", "skill/"]
-    }
-  }' | pretty
+gx_post "$GOALX_URL/projects/Y/goalx/init" \
+  -d '{"objective":"X","mode":"develop","parallel":2}' | pj
+# Then configure target files and harness:
+gx_put "$GOALX_URL/projects/Y/goalx/config" \
+  -d '{"target":{"files":["src/"]},"harness":{"command":"make test"}}' | pj
+gx_post "$GOALX_URL/projects/Y/goalx/start" | pj
 ```
 
-Keep config edits minimal.
-Change only the fields you intend to override.
-
-### 6. Stop, save, keep, or clean up
-
+### "How's the research going?" / "Check progress"
 ```bash
-goalx_post "$GOALX_BASE/projects/my-project/goalx/save" \
-  -d '{"run":"sync-regression"}' | pretty
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/keep" \
-  -d '{"run":"sync-regression","session":"session-1"}' | pretty
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/stop" \
-  -d '{"run":"sync-regression"}' | pretty
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/drop" \
-  -d '{"run":"sync-regression"}' | pretty
+gx_get "$GOALX_URL/projects/Y/goalx/observe?run=NAME" | pj
 ```
 
-Use `save` before `drop` if the results matter.
-Use `keep`
-when a specific session should be preserved or merged.
-
-## Full Endpoint Reference
-
-### Project discovery
-
+### "Change direction" / "Focus on Z instead"
 ```bash
-goalx_get "$GOALX_BASE/projects"
-goalx_get "$GOALX_BASE/projects/my-project"
-goalx_get "$GOALX_BASE/runs"
+gx_post "$GOALX_URL/projects/Y/goalx/tell" \
+  -d '{"message":"Focus on Z instead of current direction"}' | pj
 ```
 
-### GoalX actions
-
+### "Add another research angle"
 ```bash
-goalx_post "$GOALX_BASE/projects/my-project/goalx/init" \
-  -d '{
-    "objective": "Investigate the regression in the sync pipeline",
-    "mode": "research",
-    "parallel": 2,
-    "name": "sync-regression"
-  }'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/start" \
-  -d '{"run":"sync-regression"}'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/auto" \
-  -d '{
-    "objective": "Investigate the regression in the sync pipeline",
-    "mode": "research",
-    "parallel": 2,
-    "name": "sync-regression"
-  }'
-
-goalx_get "$GOALX_BASE/projects/my-project/goalx/observe?run=sync-regression"
-goalx_get "$GOALX_BASE/projects/my-project/goalx/status?run=sync-regression"
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/tell" \
-  -d '{
-    "run": "sync-regression",
-    "message": "Focus on API retries first, not database indexing.",
-    "session": "master"
-  }'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/add" \
-  -d '{
-    "run": "sync-regression",
-    "direction": "Investigate whether rate limiting changed last week."
-  }'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/stop" \
-  -d '{"run":"sync-regression"}'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/save" \
-  -d '{"run":"sync-regression"}'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/keep" \
-  -d '{"run":"sync-regression","session":"session-1"}'
-
-goalx_post "$GOALX_BASE/projects/my-project/goalx/drop" \
-  -d '{"run":"sync-regression"}'
-
-goalx_get "$GOALX_BASE/projects/my-project/goalx/config"
-
-goalx_put "$GOALX_BASE/projects/my-project/goalx/config" \
-  -d '{
-    "objective": "Investigate retry failures in production",
-    "mode": "develop",
-    "parallel": 3,
-    "target": {
-      "files": ["cli/", "config.go", "cmd/goalx/main.go", "skill/"]
-    },
-    "harness": {
-      "command": "go build ./... && go test ./... -count=1 && go vet ./..."
-    }
-  }'
+gx_post "$GOALX_URL/projects/Y/goalx/add" \
+  -d '{"direction":"Investigate from security perspective"}' | pj
 ```
 
-## Lark Output Template
-
-Use this shape after each important action:
-
-```text
-状态：已启动 / 进行中 / 已完成 / 已停止 / 失败
-关键信息：run、当前阶段、是否需要人工决策
-下一步：继续观察 / 改方向 / 保存 / keep / drop
+### "Modify the config"
+```bash
+gx_get "$GOALX_URL/projects/Y/goalx/config" | pj           # read
+gx_put "$GOALX_URL/projects/Y/goalx/config" -d '{...}' | pj  # update (partial)
 ```
 
-Good example:
-
-```text
-状态：进行中
-关键信息：run=sync-regression，master 已进入 research phase，2 个 session 都在工作
-下一步：5-10 分钟后再看 status；如果 heartbeat 不变，再发 tell
+### "Save / Stop / Clean up"
+```bash
+gx_post "$GOALX_URL/projects/Y/goalx/save" | pj
+gx_post "$GOALX_URL/projects/Y/goalx/stop" | pj
+gx_post "$GOALX_URL/projects/Y/goalx/keep" -d '{"session":"session-1"}' | pj
+gx_post "$GOALX_URL/projects/Y/goalx/drop" | pj
 ```
 
-## Safety Notes
+### "Remove a workspace"
+```bash
+gx_del "$GOALX_URL/workspaces/old-project" | pj
+```
 
-- Always send the Bearer token.
-- Prefer `status` before `observe`.
-- Prefer `save` before `drop`.
-- If the user asks for a redirect, use `tell` first; do not stop a healthy run unless asked.
+## Output Guidelines
+
+After each action, summarize concisely:
+
+```
+Status: started / in progress / complete / stopped / failed
+Key info: run name, current phase, active sessions
+Next step: observe later / redirect / save / keep / drop
+```
+
+## Safety
+
+- Always include Bearer token
+- `save` before `drop` if results matter
+- Use `tell` to redirect — don't `stop` a healthy run unless asked
+- `observe` before making decisions about a run's direction
