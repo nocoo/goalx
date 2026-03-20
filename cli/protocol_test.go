@@ -74,7 +74,7 @@ func TestRenderMasterProtocolIncludesAcceptanceChecklistInstructions(t *testing.
 	text := string(out)
 	for _, want := range []string{
 		"Before the first heartbeat",
-		"write an acceptance checklist",
+		"Write an acceptance checklist",
 		"/tmp/acceptance.md",
 		"Read the acceptance checklist first",
 	} {

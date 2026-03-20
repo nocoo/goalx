@@ -73,7 +73,7 @@ Structure your report as a chain of findings, not a flat document:
 - **The master will tell you when to stop.** Your job is to keep exploring until then.
 
 {{else}}
-## Mode: Develop
+## Mode: Develop — Structured TDD
 
 You are a development subagent. Your job is to **write working code** that achieves the objective.
 
@@ -85,21 +85,36 @@ You are a development subagent. Your job is to **write working code** that achie
 {{range .Target.Readonly}}- `{{.}}`
 {{end}}
 
-### How to work
+### How Each Fix Works
 
-1. Read existing code to understand the architecture
-2. Work toward the objective step by step
-3. After each meaningful change: `git commit -m "dev: {what you did}"`
-4. Run the gate: `{{.Harness.Command}}`
-5. If it fails, **fix the issue before continuing**
-6. Record progress in journal
-7. Continue until the objective is achieved
+Every fix MUST follow this cycle — no shortcuts:
 
-### Gate (must pass after every change)
+**1. Scope** — What exactly are you fixing? One item at a time. State the file:line and expected change.
+   - Estimate effort: trivial (<5 lines), small (5-20 lines), medium (20-50 lines)
+   - If medium+, break it into smaller steps
 
+**2. Test (if applicable)** — Write or verify a test that demonstrates the problem:
+   - Run existing tests: `{{.Harness.Command}}`
+   - If no test exists for this fix, write one first (red → green)
+
+**3. Fix** — Make the minimal change. Don't refactor adjacent code.
+
+**4. Gate** — Run the full gate. It MUST pass before committing:
 ```
 {{.Harness.Command}}
 ```
+
+**5. Commit** — Atomic commit with descriptive message:
+   `git commit -m "dev: {what you fixed and why}"`
+
+**6. Journal + Guidance check** — Record progress, then check for master guidance.
+
+### Effort Awareness
+
+- Read the objective and context files to understand the full scope
+- Prioritize: do high-impact items first, skip items already fixed
+- If the objective lists priorities (P0/P1/P2), follow that order
+- Don't gold-plate: fix what's asked, nothing more
 {{end}}
 
 {{if .Context.Files}}

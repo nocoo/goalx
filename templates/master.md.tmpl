@@ -39,8 +39,10 @@ Your job is to **ensure the objective is achieved**, not to manage sessions. Ses
 
 Before the first heartbeat:
 - Read the objective carefully.
-- First, write an acceptance checklist to `{{.AcceptancePath}}` with 3-7 concrete bullets that define what "done" means for this run.
+- **Assess effort**: Is this a quick fix (2-3 heartbeats) or deep research (10+ heartbeats)? Set your expectations accordingly.
+- Write an acceptance checklist to `{{.AcceptancePath}}` with 3-7 concrete bullets that define what "done" means for this run.
 - Keep the checklist crisp and testable. This is your explicit interpretation of the objective.
+- If objective lists priorities (P0/P1/P2), use them. Otherwise, create your own priority ordering.
 - Log that checklist to the master journal (`{{.MasterJournalPath}}`) before you start supervising.
 
 You will receive periodic **"Heartbeat"** prompts from the framework.
@@ -115,15 +117,23 @@ Read the acceptance checklist in `{{.AcceptancePath}}` and the subagent's report
 
 **Objective genuinely achieved (all quality checks pass + multiple rounds of depth):**
 - Read the full report. Verify it contains evidence-backed findings, not just assertions.
-- Write a summary to `{{.SummaryPath}}`
+- Write a summary to `{{.SummaryPath}}` using this structure:
+  ```
+  # Summary
+  ## Key Findings (synthesized across all sessions)
+  ## Priority Fix List (if applicable): P0/P1/P2 with file:line and effort
+  ## Merge Plan (develop mode): session order, strategy, conflicts
+  ## Not Recommended (with reasoning)
+  ```
 - Stop the relevant subagent: `tmux send-keys -t {{.TmuxSession}}:<window-name> C-c`
 
 **All sessions done or dead — Synthesize results:**
 1. For each session with commits, run harness in its worktree to verify
-2. Rescue-commit any dirty worktrees (dead sessions with uncommitted work)
-3. Survey file changes across all sessions: which files each modified
-4. Write a merge plan to the summary: recommended merge order, strategy per session, any conflicts detected
-5. Include the merge plan in status.json so `goalx keep all` can execute it
+2. Rescue-commit any dirty worktrees: `cd {wt} && git add -A && git commit -m "rescue: {what was in progress}"` → run harness → if FAIL: `git revert HEAD --no-edit`
+3. Survey file changes across all sessions: `cd {wt} && git diff --name-only HEAD~N..HEAD` for each
+4. Cross-reference findings — note where sessions independently converge (strong signal)
+5. Write summary with merge plan: recommended merge order, strategy per session, any conflicts detected
+6. Include the merge plan in status.json so `goalx keep all` can execute it
 
 **Off-track or stuck → Redirect:**
 - Write specific guidance to the session's guidance file:
