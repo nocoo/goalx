@@ -261,6 +261,17 @@ func TestMergeConfig(t *testing.T) {
 	}
 }
 
+func TestMergeConfigDescription(t *testing.T) {
+	base := Config{}
+	overlay := Config{Description: "agent context"}
+
+	mergeConfig(&base, &overlay)
+
+	if base.Description != "agent context" {
+		t.Fatalf("Description = %q, want %q", base.Description, "agent context")
+	}
+}
+
 func TestMergeConfigTargetFieldLevel(t *testing.T) {
 	// base has Readonly, overlay has Files → both preserved
 	base := Config{Target: TargetConfig{Readonly: []string{"pkg/"}}}

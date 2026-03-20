@@ -429,6 +429,9 @@ func mergeConfig(base, overlay *Config) {
 	if overlay.Objective != "" {
 		base.Objective = overlay.Objective
 	}
+	if overlay.Description != "" {
+		base.Description = overlay.Description
+	}
 	if overlay.Preset != "" {
 		base.Preset = overlay.Preset
 	}
