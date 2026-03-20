@@ -81,9 +81,61 @@ func TestMergeWorktreeAllowsLocalAutoresearchFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, ".autoresearch", "config.yaml"), []byte("parallel: 1\n"), 0o644); err != nil {
 		t.Fatalf("write .autoresearch/config.yaml: %v", err)
 	}
+	if err := os.MkdirAll(filepath.Join(repo, ".claude"), 0o755); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".claude", "settings.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("write .claude/settings.json: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, ".codex"), 0o755); err != nil {
+		t.Fatalf("mkdir .codex: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".codex", "config.toml"), []byte("model = \"gpt-5.4\"\n"), 0o644); err != nil {
+		t.Fatalf("write .codex/config.toml: %v", err)
+	}
 
 	if err := MergeWorktree(repo, "feature"); err != nil {
 		t.Fatalf("expected MergeWorktree to allow local autoresearch files, got: %v", err)
+	}
+}
+
+func TestHasDirtyWorktreeIgnoresClaudeDir(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	if err := os.MkdirAll(filepath.Join(repo, ".claude"), 0o755); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".claude", "settings.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("write .claude/settings.json: %v", err)
+	}
+
+	dirty, err := hasDirtyWorktree(repo)
+	if err != nil {
+		t.Fatalf("hasDirtyWorktree: %v", err)
+	}
+	if dirty {
+		t.Fatal("expected .claude dir to be ignored by dirty worktree check")
+	}
+}
+
+func TestHasDirtyWorktreeIgnoresCodexDir(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	if err := os.MkdirAll(filepath.Join(repo, ".codex"), 0o755); err != nil {
+		t.Fatalf("mkdir .codex: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".codex", "config.toml"), []byte("model = \"gpt-5.4\"\n"), 0o644); err != nil {
+		t.Fatalf("write .codex/config.toml: %v", err)
+	}
+
+	dirty, err := hasDirtyWorktree(repo)
+	if err != nil {
+		t.Fatalf("hasDirtyWorktree: %v", err)
+	}
+	if dirty {
+		t.Fatal("expected .codex dir to be ignored by dirty worktree check")
 	}
 }
 
