@@ -24,6 +24,7 @@ type ProtocolData struct {
 	SummaryPath       string
 	AcceptancePath    string
 	MasterJournalPath string
+	StatusPath        string // .goalx/status.json for external progress reporting
 	EngineCommand     string // resolved master engine command
 
 	// Subagent-specific (used in program.md.tmpl)

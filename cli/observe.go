@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	ar "github.com/vonbai/autoresearch"
@@ -32,6 +34,14 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
+
+	// Show status.json summary if available
+	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	if data, err := os.ReadFile(statusPath); err == nil && len(data) > 0 {
+		fmt.Println("### Status (from master)")
+		fmt.Println(strings.TrimSpace(string(data)))
+		fmt.Println()
+	}
 
 	// Master
 	fmt.Println("### master")

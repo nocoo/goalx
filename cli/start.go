@@ -65,6 +65,7 @@ func Start(projectRoot string, args []string) error {
 		filepath.Join(runDir, "journals"),
 		filepath.Join(runDir, "guidance"),
 		filepath.Join(runDir, "worktrees"),
+		filepath.Join(projectRoot, ".goalx"),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
@@ -106,10 +107,11 @@ func Start(projectRoot string, args []string) error {
 		if err != nil {
 			return fmt.Errorf("session-%d engine: %w", num, err)
 		}
-		// Subagents don't need slash commands/skills — disable to prevent
-		// skill permission popups that block unattended operation.
+		// Subagents don't need skills — disable slash commands AND the Skill
+		// tool itself (plugins inject skills via system prompt, bypassing
+		// --disable-slash-commands; --disallowedTools Skill blocks invocation).
 		if sEngine == "claude-code" {
-			engineCmd += " --disable-slash-commands"
+			engineCmd += " --disable-slash-commands --disallowedTools Skill"
 		}
 
 		protocolPath := filepath.Join(runDir, fmt.Sprintf("program-%d.md", num))
@@ -176,6 +178,7 @@ func Start(projectRoot string, args []string) error {
 		SummaryPath:       filepath.Join(runDir, "summary.md"),
 		AcceptancePath:    acceptancePath,
 		MasterJournalPath: filepath.Join(runDir, "master.jsonl"),
+		StatusPath:        filepath.Join(projectRoot, ".goalx", "status.json"),
 		EngineCommand:     masterCmd,
 	}
 	if err := RenderMasterProtocol(masterData, runDir); err != nil {

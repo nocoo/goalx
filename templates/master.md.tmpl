@@ -125,6 +125,13 @@ Restart command for **{{.Name}}**: `tmux send-keys -t {{$.TmuxSession}}:{{.Windo
 {{- if gt (len .Sessions) 1}}
 - **Multiple sessions: keep them independent.** Do NOT relay one session's findings to another. You may use one session's gaps to craft questions for the other, but never share specific conclusions.
 {{- end}}
+- **After every check cycle**, update the external status file so the user can see progress without attaching to tmux:
+  ```bash
+  cat > {{.StatusPath}} << 'STATUSEOF'
+  {"run":"current","heartbeat":N,"sessions":[{"name":"session-1","status":"working|idle|done","rounds":N,"report_lines":N}],"phase":"checking|guiding|complete"}
+  STATUSEOF
+  ```
+  Replace values with actual data from the check. This file is read by `goalx observe` and the `/goalx` skill.
 - Log every check to the master journal at `{{.MasterJournalPath}}`:
   ```bash
   echo '{"ts":"...","session":"session-1","action":"check|guide|push|stop","finding":"..."}' >> {{.MasterJournalPath}}

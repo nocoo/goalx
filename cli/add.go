@@ -59,7 +59,7 @@ func Add(projectRoot string, args []string) error {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
 	if engine == "claude-code" {
-		engineCmd += " --disable-slash-commands"
+		engineCmd += " --disable-slash-commands --disallowedTools Skill"
 	}
 
 	// Create worktree
