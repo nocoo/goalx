@@ -45,7 +45,6 @@ func ensureCodexTrusted(path string) error {
 
 	section := `[projects."` + escapeTOMLString(path) + `"]`
 	text = upsertTOMLKey(text, section, `trust_level = "trusted"`)
-	text = upsertTOMLKey(text, section, `sandbox_mode = "danger-full-access"`)
 	if err := writeFilePreserveMode(cfgPath, []byte(text), 0o600); err != nil {
 		return fmt.Errorf("write codex config: %w", err)
 	}
@@ -95,11 +94,6 @@ func ensureClaudeTrusted(path string) error {
 }
 
 func upsertTOMLKey(text, section, keyLine string) string {
-	key := strings.TrimSpace(keyLine)
-	if idx := strings.Index(key, "="); idx >= 0 {
-		key = strings.TrimSpace(key[:idx])
-	}
-
 	lines := strings.Split(text, "\n")
 	start := -1
 	for i, line := range lines {
@@ -127,7 +121,7 @@ func upsertTOMLKey(text, section, keyLine string) string {
 	}
 
 	for i := start + 1; i < end; i++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[i]), key) {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "trust_level") {
 			lines[i] = keyLine
 			return strings.Join(lines, "\n")
 		}
