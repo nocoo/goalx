@@ -1,7 +1,8 @@
 ---
-name: goalx-mochi
-description: Use when Mochi needs to control GoalX from OpenClaw over the Tailscale-only HTTP API instead of local CLI access.
-allowed-tools: Bash
+name: goalx
+description: Use when Mochi needs to manage GoalX runs over the Tailscale-only HTTP API instead of local CLI access.
+allowed-tools: "Bash"
+metadata.openclaw: true
 ---
 
 # GoalX HTTP for Mochi
@@ -20,7 +21,8 @@ Every request needs a Bearer token.
 ## Setup
 
 ```bash
-export GOALX_BASE="http://100.110.196.103:18790"
+export GOALX_PORT="18790"
+export GOALX_BASE="http://100.110.196.103:${GOALX_PORT}"
 export GOALX_TOKEN="REPLACE_ME"
 
 goalx_get() {
@@ -61,7 +63,7 @@ goalx_get "$GOALX_BASE/projects/my-project" | pretty
 goalx_get "$GOALX_BASE/runs" | pretty
 ```
 
-### 2. Start a new research run
+### 2. Start a new research or develop run
 
 ```bash
 goalx_post "$GOALX_BASE/projects/my-project/goalx/auto" \
@@ -73,8 +75,34 @@ goalx_post "$GOALX_BASE/projects/my-project/goalx/auto" \
   }' | pretty
 ```
 
-Use `auto` when Mochi should kick off the full pipeline.
-Use `init` + `start` when you want to edit config between steps.
+For a develop run, switch `mode` to `develop`.
+
+```bash
+goalx_post "$GOALX_BASE/projects/my-project/goalx/init" \
+  -d '{
+    "objective": "Fix the regression and add tests",
+    "mode": "develop",
+    "parallel": 2,
+    "name": "sync-fix"
+  }' | pretty
+
+goalx_put "$GOALX_BASE/projects/my-project/goalx/config" \
+  -d '{
+    "target": {
+      "files": ["cli/", "config.go", "cmd/goalx/main.go", "skill/"]
+    },
+    "harness": {
+      "command": "go build ./... && go test ./... -count=1 && go vet ./..."
+    }
+  }' | pretty
+
+goalx_post "$GOALX_BASE/projects/my-project/goalx/start" \
+  -d '{"run":"sync-fix"}' | pretty
+```
+
+Use `auto` when Mochi should run the whole flow.
+Use `init` + `config` + `start`
+when the run needs a manual config pass first.
 
 ### 3. Watch progress
 
@@ -84,7 +112,8 @@ goalx_get "$GOALX_BASE/projects/my-project/goalx/observe?run=sync-regression" | 
 ```
 
 Use `status` for a compact view.
-Use `observe` when you need to inspect what master and sessions are doing right now.
+Use `observe`
+when you need the live master/session picture.
 
 ### 4. Change direction mid-run
 
@@ -104,7 +133,8 @@ goalx_post "$GOALX_BASE/projects/my-project/goalx/add" \
 ```
 
 Use `tell` to redirect an existing run.
-Use `add` to add a new angle without stopping the current work.
+Use `add`
+to add a new angle without stopping the current work.
 
 ### 5. Read or update config
 
@@ -141,7 +171,8 @@ goalx_post "$GOALX_BASE/projects/my-project/goalx/drop" \
 ```
 
 Use `save` before `drop` if the results matter.
-Use `keep` when a specific session should be preserved or merged.
+Use `keep`
+when a specific session should be preserved or merged.
 
 ## Full Endpoint Reference
 
@@ -208,7 +239,14 @@ goalx_get "$GOALX_BASE/projects/my-project/goalx/config"
 goalx_put "$GOALX_BASE/projects/my-project/goalx/config" \
   -d '{
     "objective": "Investigate retry failures in production",
-    "parallel": 3
+    "mode": "develop",
+    "parallel": 3,
+    "target": {
+      "files": ["cli/", "config.go", "cmd/goalx/main.go", "skill/"]
+    },
+    "harness": {
+      "command": "go build ./... && go test ./... -count=1 && go vet ./..."
+    }
   }'
 ```
 
