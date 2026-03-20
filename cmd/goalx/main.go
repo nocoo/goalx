@@ -29,6 +29,7 @@ Usage:
   goalx add     "direction" [--run NAME] Add new subagent to running run
   goalx observe [NAME]                 Capture live output from all tmux windows
   goalx auto    "objective" [flags]   Full pipeline: research → debate → implement
+  goalx serve                         Start the GoalX HTTP control server
   goalx next                           Show next pipeline step
 
 Run 'goalx <command> --help' for details.`
@@ -88,6 +89,8 @@ func main() {
 		err = cli.Add(cwd, args)
 	case "observe":
 		err = cli.Observe(cwd, args)
+	case "serve":
+		err = cli.Serve(cwd, args)
 	case "next":
 		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":
