@@ -219,6 +219,73 @@ func TestValidateConfigSessionsConflict(t *testing.T) {
 	}
 }
 
+func TestLoadConfigMergesServeConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+	userCfg := []byte(strings.TrimSpace(`
+defaults:
+  serve:
+    bind: 100.110.196.103:18790
+    token: user-token
+    workspaces:
+      - /srv/user
+    notification_url: http://user.example/hook
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+
+	projectRoot := t.TempDir()
+	projectGoalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(projectGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte(strings.TrimSpace(`
+serve:
+  token: project-token
+  workspaces:
+    - /srv/project
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	runCfg := []byte(strings.TrimSpace(`
+name: demo
+objective: ship it
+target:
+  files: [README.md]
+harness:
+  command: go test ./...
+serve:
+  notification_url: http://run.example/hook
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+
+	cfg, _, err := LoadConfig(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Serve.Bind != "100.110.196.103:18790" {
+		t.Fatalf("serve.bind = %q, want 100.110.196.103:18790", cfg.Serve.Bind)
+	}
+	if cfg.Serve.Token != "project-token" {
+		t.Fatalf("serve.token = %q, want project-token", cfg.Serve.Token)
+	}
+	if len(cfg.Serve.Workspaces) != 1 || cfg.Serve.Workspaces[0] != "/srv/project" {
+		t.Fatalf("serve.workspaces = %#v, want [/srv/project]", cfg.Serve.Workspaces)
+	}
+	if cfg.Serve.NotificationURL != "http://run.example/hook" {
+		t.Fatalf("serve.notification_url = %q, want http://run.example/hook", cfg.Serve.NotificationURL)
+	}
+}
+
 func TestValidateConfigRejectsOldCodexModels(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
