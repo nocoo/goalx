@@ -408,23 +408,9 @@ func validateServeBind(bind string) error {
 		return fmt.Errorf("serve.bind host must be an IP address, got %q", host)
 	}
 	if ip.IsUnspecified() {
-		return fmt.Errorf("serve.bind must not bind all interfaces")
-	}
-	if !isTailscaleIP(ip) {
-		return fmt.Errorf("serve.bind must use a Tailscale IP, got %q", host)
+		return fmt.Errorf("serve.bind must not bind 0.0.0.0 — use a specific IP")
 	}
 	return nil
-}
-
-func isTailscaleIP(ip net.IP) bool {
-	ip4 := ip.To4()
-	if ip4 == nil {
-		return false
-	}
-	if ip4[0] != 100 {
-		return false
-	}
-	return ip4[1]&0xC0 == 0x40
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
