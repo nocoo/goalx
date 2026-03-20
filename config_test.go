@@ -99,7 +99,7 @@ func TestResolveEngineCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd != "claude --model claude-opus-4-6 --permission-mode auto --disable-slash-commands" {
+	if cmd != "claude --model claude-opus-4-6 --permission-mode auto" {
 		t.Errorf("cmd = %q", cmd)
 	}
 }
@@ -109,7 +109,7 @@ func TestResolveEngineCommandCodex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd != "codex -m gpt-5.4 --full-auto" {
+	if cmd != "codex -m gpt-5.4 -a never -s danger-full-access" {
 		t.Errorf("cmd = %q", cmd)
 	}
 }
@@ -119,7 +119,7 @@ func TestResolveEngineCommandLiteralModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd != "codex -m gpt-5.2 --full-auto" {
+	if cmd != "codex -m gpt-5.2 -a never -s danger-full-access" {
 		t.Errorf("literal model: cmd = %q", cmd)
 	}
 }

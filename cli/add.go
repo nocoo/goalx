@@ -58,6 +58,9 @@ func Add(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
+	if engine == "claude-code" {
+		engineCmd += " --disable-slash-commands"
+	}
 
 	// Create worktree
 	absProjectRoot, _ := filepath.Abs(projectRoot)

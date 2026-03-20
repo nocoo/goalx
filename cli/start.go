@@ -106,6 +106,11 @@ func Start(projectRoot string, args []string) error {
 		if err != nil {
 			return fmt.Errorf("session-%d engine: %w", num, err)
 		}
+		// Subagents don't need slash commands/skills — disable to prevent
+		// skill permission popups that block unattended operation.
+		if sEngine == "claude-code" {
+			engineCmd += " --disable-slash-commands"
+		}
 
 		protocolPath := filepath.Join(runDir, fmt.Sprintf("program-%d.md", num))
 		prompt := ar.ResolvePrompt(engines, sEngine, protocolPath)

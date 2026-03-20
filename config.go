@@ -107,7 +107,7 @@ var Presets = map[string]struct {
 // BuiltinEngines are the default engine definitions.
 var BuiltinEngines = map[string]EngineConfig{
 	"claude-code": {
-		Command: "claude --model {model_id} --permission-mode auto --disable-slash-commands",
+		Command: "claude --model {model_id} --permission-mode auto",
 		Prompt:  "Read {protocol} and follow it exactly.",
 		Models: map[string]string{
 			"opus":   "claude-opus-4-6",
@@ -116,7 +116,7 @@ var BuiltinEngines = map[string]EngineConfig{
 		},
 	},
 	"codex": {
-		Command: "codex -m {model_id} --full-auto",
+		Command: "codex -m {model_id} -a never -s danger-full-access",
 		Prompt:  "Read {protocol} and follow it exactly.",
 		Models: map[string]string{
 			"codex":    "gpt-5.4",
