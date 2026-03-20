@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -35,16 +34,6 @@ Usage:
 
 Run 'goalx <command> --help' for details.`
 
-var serveCommand = cli.Serve
-
-type unknownCommandError struct {
-	name string
-}
-
-func (e unknownCommandError) Error() string {
-	return fmt.Sprintf("unknown command: %s", e.name)
-}
-
 func main() {
 	if os.Getenv("HOME") == "" {
 		fmt.Fprintln(os.Stderr, "fatal: HOME is not set")
@@ -63,65 +52,58 @@ func main() {
 	args := os.Args[2:]
 	cmd := os.Args[1]
 
-	err = dispatch(cwd, cmd, args)
-	if err != nil {
-		var unknownErr unknownCommandError
-		if errors.As(err, &unknownErr) {
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usage)
-			os.Exit(1)
-		}
-		fmt.Fprintf(os.Stderr, "goalx %s: %v\n", cmd, err)
-		os.Exit(1)
-	}
-}
-
-func dispatch(cwd, cmd string, args []string) error {
 	switch cmd {
 	case "start":
-		return cli.Start(cwd, args)
+		err = cli.Start(cwd, args)
 	case "auto":
-		return cli.Auto(cwd, args)
+		err = cli.Auto(cwd, args)
 	case "init":
-		return cli.Init(cwd, args)
+		err = cli.Init(cwd, args)
 	case "list":
-		return cli.List(cwd, args)
+		err = cli.List(cwd, args)
 	case "status":
-		return cli.Status(cwd, args)
+		err = cli.Status(cwd, args)
 	case "attach":
-		return cli.Attach(cwd, args)
+		err = cli.Attach(cwd, args)
 	case "stop":
-		return cli.Stop(cwd, args)
+		err = cli.Stop(cwd, args)
 	case "review":
-		return cli.Review(cwd, args)
+		err = cli.Review(cwd, args)
 	case "diff":
-		return cli.Diff(cwd, args)
+		err = cli.Diff(cwd, args)
 	case "keep":
-		return cli.Keep(cwd, args)
+		err = cli.Keep(cwd, args)
 	case "archive":
-		return cli.Archive(cwd, args)
+		err = cli.Archive(cwd, args)
 	case "save":
-		return cli.Save(cwd, args)
+		err = cli.Save(cwd, args)
 	case "drop":
-		return cli.Drop(cwd, args)
+		err = cli.Drop(cwd, args)
 	case "report":
-		return cli.Report(cwd, args)
+		err = cli.Report(cwd, args)
 	case "debate":
-		return cli.Debate(cwd, args)
+		err = cli.Debate(cwd, args)
 	case "implement":
-		return cli.Implement(cwd, args)
+		err = cli.Implement(cwd, args)
 	case "add":
-		return cli.Add(cwd, args)
+		err = cli.Add(cwd, args)
 	case "observe":
-		return cli.Observe(cwd, args)
+		err = cli.Observe(cwd, args)
 	case "serve":
-		return serveCommand(cwd, args)
+		err = cli.Serve(cwd, args)
 	case "next":
-		return cli.Next(cwd, args)
+		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":
 		fmt.Println(usage)
-		return nil
+		return
 	default:
-		return unknownCommandError{name: cmd}
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n", cmd)
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "goalx %s: %v\n", cmd, err)
+		os.Exit(1)
 	}
 }
