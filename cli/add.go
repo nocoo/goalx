@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	ar "github.com/vonbai/autoresearch"
+	"gopkg.in/yaml.v3"
 )
 
 // Add creates a new subagent session in a running run.
@@ -118,7 +119,9 @@ func Add(projectRoot string, args []string) error {
 
 	// Update config snapshot with new session count
 	rc.Config.Parallel = newNum
-	// Note: we don't rewrite the snapshot - master was notified directly
+	if cfgYAML, err := yaml.Marshal(&rc.Config); err == nil {
+		_ = os.WriteFile(filepath.Join(rc.RunDir, "goalx.yaml"), cfgYAML, 0644)
+	}
 
 	fmt.Printf("Added %s to run '%s'\n", sName, rc.Name)
 	fmt.Printf("  window: %s\n", windowName)
