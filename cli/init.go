@@ -80,7 +80,9 @@ func Init(projectRoot string, args []string) error {
 
 	cfg.Budget = ar.BudgetConfig{MaxDuration: 6 * time.Hour}
 
-	outPath := filepath.Join(projectRoot, "goalx.yaml")
+	goalxDir := filepath.Join(projectRoot, ".goalx")
+	os.MkdirAll(goalxDir, 0755)
+	outPath := filepath.Join(goalxDir, "goalx.yaml")
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
 		return err

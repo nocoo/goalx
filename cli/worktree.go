@@ -82,7 +82,7 @@ func parsePorcelainPath(line string) string {
 }
 
 func isAllowedLocalConfigPath(path string) bool {
-	return path == "goalx.yaml" || path == ".autoresearch" || strings.HasPrefix(path, ".autoresearch/")
+	return path == ".goalx" || strings.HasPrefix(path, ".goalx/") || path == ".autoresearch" || strings.HasPrefix(path, ".autoresearch/")
 }
 
 // hasDirtyWorktree returns true if the project has uncommitted changes

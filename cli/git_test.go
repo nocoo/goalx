@@ -71,8 +71,9 @@ func TestMergeWorktreeAllowsLocalAutoresearchFiles(t *testing.T) {
 	writeAndCommit(t, repo, "feature.txt", "feature", "feature commit")
 	runGit(t, repo, "checkout", "-")
 
-	if err := os.WriteFile(filepath.Join(repo, "goalx.yaml"), []byte("name: demo\n"), 0o644); err != nil {
-		t.Fatalf("write ar.yaml: %v", err)
+	os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755)
+	if err := os.WriteFile(filepath.Join(repo, ".goalx", "goalx.yaml"), []byte("name: demo\n"), 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(repo, ".autoresearch"), 0o755); err != nil {
 		t.Fatalf("mkdir .autoresearch: %v", err)

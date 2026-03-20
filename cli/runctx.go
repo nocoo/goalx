@@ -20,7 +20,7 @@ type RunContext struct {
 // projectRoot to get the name.
 func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 	if runName == "" {
-		cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, "goalx.yaml"))
+		cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 		if err != nil {
 			return nil, fmt.Errorf("load goalx.yaml: %w", err)
 		}

@@ -206,8 +206,8 @@ func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
 		return nil, nil, err
 	}
 
-	// Layer 4: run config (goalx.yaml)
-	runCfg, err := LoadYAML[Config](filepath.Join(projectRoot, "goalx.yaml"))
+	// Layer 4: run config (.goalx/goalx.yaml)
+	runCfg, err := LoadYAML[Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 	if err != nil {
 		return nil, nil, fmt.Errorf("goalx.yaml: %w", err)
 	}

@@ -78,7 +78,9 @@ func Implement(projectRoot string, args []string) error {
 	}
 	ar.ApplyPreset(&cfg)
 
-	outPath := filepath.Join(projectRoot, "goalx.yaml")
+	goalxDir := filepath.Join(projectRoot, ".goalx")
+	os.MkdirAll(goalxDir, 0755)
+	outPath := filepath.Join(goalxDir, "goalx.yaml")
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
 		return err
