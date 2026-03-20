@@ -124,6 +124,9 @@ Read the acceptance checklist in `{{.AcceptancePath}}` and the subagent's report
   ## Priority Fix List (if applicable): P0/P1/P2 with file:line and effort
   ## Merge Plan (develop mode): session order, strategy, conflicts
   ## Not Recommended (with reasoning)
+  ## Recommendation
+  One of: debate | implement | done | more-research
+  Reason: {why this is the right next step}
   ```
 - Stop the relevant subagent: `tmux send-keys -t {{.TmuxSession}}:<window-name> C-c`
 
@@ -175,10 +178,10 @@ Restart command for **{{.Name}}**: `tmux send-keys -t {{$.TmuxSession}}:{{.Windo
 - **After every check cycle**, update the external status file so the user can see progress without attaching to tmux:
   ```bash
   cat > {{.StatusPath}} << 'STATUSEOF'
-  {"run":"current","heartbeat":N,"sessions":[{"name":"session-1","status":"working|idle|done|dead","rounds":N,"report_lines":N}],"phase":"checking|guiding|synthesizing|complete","merge_plan":null}
+  {"run":"current","heartbeat":N,"sessions":[{"name":"session-1","status":"working|idle|done|dead","rounds":N,"report_lines":N}],"phase":"checking|guiding|synthesizing|complete","recommendation":"debate|implement|done|more-research","merge_plan":null}
   STATUSEOF
   ```
-  Replace values with actual data from the check. This file is read by `goalx observe` and the `/goalx` skill.
+  Replace values with actual data from the check. Set `recommendation` only when `phase` is `complete`; use `null` during `checking`, `guiding`, or `synthesizing`. This file is read by `goalx observe` and the `/goalx` skill.
 - Log every check to the master journal at `{{.MasterJournalPath}}`:
   ```bash
   echo '{"ts":"...","session":"session-1","action":"check|guide|push|rescue|synthesize|stop","finding":"..."}' >> {{.MasterJournalPath}}

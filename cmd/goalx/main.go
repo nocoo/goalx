@@ -28,6 +28,7 @@ Usage:
   goalx report  [--run NAME]           Generate markdown report from journal
   goalx add     "direction" [--run NAME] Add new subagent to running run
   goalx observe [NAME]                 Capture live output from all tmux windows
+  goalx auto    "objective" [flags]   Full pipeline: research → debate → implement
   goalx next                           Show next pipeline step
 
 Run 'goalx <command> --help' for details.`
@@ -53,6 +54,8 @@ func main() {
 	switch cmd {
 	case "start":
 		err = cli.Start(cwd, args)
+	case "auto":
+		err = cli.Auto(cwd, args)
 	case "init":
 		err = cli.Init(cwd, args)
 	case "list":
