@@ -53,7 +53,11 @@ func Review(projectRoot string, args []string) error {
 
 		// Mode-specific output
 		if rc.Config.Mode == ar.ModeResearch {
-			reportPath := filepath.Join(wtPath, "report.md")
+			reportFile := "report.md"
+			if len(rc.Config.Target.Files) > 0 && rc.Config.Target.Files[0] != "" {
+				reportFile = rc.Config.Target.Files[0]
+			}
+			reportPath := filepath.Join(wtPath, reportFile)
 			printFirstLines(reportPath, 20)
 		} else {
 			out, err := exec.Command("git", "-C", wtPath, "diff", "--stat", "HEAD~5").Output()
