@@ -26,6 +26,7 @@ Usage:
   goalx implement                      Generate develop config from consensus
   goalx drop    [--run NAME]           Cleanup branch + worktree
   goalx report  [--run NAME]           Generate markdown report from journal
+  goalx add     "direction" [--run NAME] Add new subagent to running run
   goalx next                           Show next pipeline step
 
 Run 'goalx <command> --help' for details.`
@@ -79,6 +80,8 @@ func main() {
 		err = cli.Debate(cwd, args)
 	case "implement":
 		err = cli.Implement(cwd, args)
+	case "add":
+		err = cli.Add(cwd, args)
 	case "next":
 		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":

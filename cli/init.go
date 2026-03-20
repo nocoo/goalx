@@ -45,17 +45,17 @@ func Init(projectRoot string, args []string) error {
 			Readonly: []string{"."},
 		}
 		cfg.Harness = ar.HarnessConfig{Command: "test -s report.md && echo 'ok'"}
-		// Auto-assign research strategies for parallel sessions
-		if parallel >= 2 {
-			strategies := []string{
-				"Depth-first: Pick the single most impactful area and go as deep as possible. Run experiments, measure things, trace code paths end-to-end. Prefer one thoroughly verified finding over five shallow ones.",
-				"Breadth-first + adversarial: Scan all dimensions quickly, then focus on finding problems, bugs, design flaws, and counter-examples. Challenge the project's assumptions. Look for what could go wrong.",
+		// Apply research strategies
+		if len(opts.Strategies) > 0 {
+			hints, err := ar.ResolveStrategies(opts.Strategies)
+			if err != nil {
+				return err
 			}
-			if parallel <= len(strategies) {
-				cfg.DiversityHints = strategies[:parallel]
-			} else {
-				cfg.DiversityHints = strategies
-			}
+			cfg.DiversityHints = hints
+		} else if parallel >= 2 {
+			defaults := ar.DefaultStrategies(parallel)
+			hints, _ := ar.ResolveStrategies(defaults)
+			cfg.DiversityHints = hints
 		}
 	} else {
 		if len(cfg.Target.Files) == 0 {
@@ -66,6 +66,15 @@ func Init(projectRoot string, args []string) error {
 		if cfg.Harness.Command == "" {
 			cfg.Harness = ar.HarnessConfig{Command: "TODO: build + test command"}
 		}
+	}
+
+	// Apply context from --context flag
+	if len(opts.ContextPaths) > 0 {
+		contextFiles, err := DiscoverContextFiles(opts.ContextPaths)
+		if err != nil {
+			return fmt.Errorf("discover context: %w", err)
+		}
+		cfg.Context = ar.ContextConfig{Files: contextFiles}
 	}
 
 	cfg.Budget = ar.BudgetConfig{MaxDuration: 6 * time.Hour}

@@ -9,10 +9,12 @@ import (
 )
 
 type startInitOptions struct {
-	Objective string
-	Mode      ar.Mode
-	Parallel  int
-	Name      string
+	Objective    string
+	Mode         ar.Mode
+	Parallel     int
+	Name         string
+	ContextPaths []string
+	Strategies   []string
 }
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {
@@ -47,6 +49,18 @@ func parseStartInitArgs(args []string) (startInitOptions, error) {
 			}
 			i++
 			opts.Name = args[i]
+		case "--context":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --context")
+			}
+			i++
+			opts.ContextPaths = strings.Split(args[i], ",")
+		case "--strategy":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --strategy")
+			}
+			i++
+			opts.Strategies = strings.Split(args[i], ",")
 		default:
 			return opts, fmt.Errorf("unknown flag %q", args[i])
 		}
