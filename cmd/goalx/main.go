@@ -27,6 +27,7 @@ Usage:
   goalx drop    [--run NAME]           Cleanup branch + worktree
   goalx report  [--run NAME]           Generate markdown report from journal
   goalx add     "direction" [--run NAME] Add new subagent to running run
+  goalx observe [NAME]                 Capture live output from all tmux windows
   goalx next                           Show next pipeline step
 
 Run 'goalx <command> --help' for details.`
@@ -82,6 +83,8 @@ func main() {
 		err = cli.Implement(cwd, args)
 	case "add":
 		err = cli.Add(cwd, args)
+	case "observe":
+		err = cli.Observe(cwd, args)
 	case "next":
 		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":
