@@ -103,7 +103,7 @@ func Start(projectRoot string, args []string) error {
 		if sModel == "" {
 			sModel = cfg.Model
 		}
-		engineCmd, err := ar.ResolveSubagentCommand(engines, sEngine, sModel)
+		engineCmd, err := ar.ResolveEngineCommand(engines, sEngine, sModel)
 		if err != nil {
 			return fmt.Errorf("session-%d engine: %w", num, err)
 		}
