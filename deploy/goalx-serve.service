@@ -1,0 +1,14 @@
+[Unit]
+Description=GoalX HTTP API Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/goalx serve
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/root
+Environment=HOME=/root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+# ~/.goalx/config.yaml — GoalX global configuration
+#
+# This file configures goalx for all projects on this machine.
+# Copy to ~/.goalx/config.yaml and edit.
+
+# HTTP API server (goalx serve)
+serve:
+  bind: "127.0.0.1:9800"    # bind to internal IP, not 0.0.0.0
+  token: "your-secret-token-here"  # Bearer token for API auth
+  workspaces:
+    myproject: /data/dev/myproject
+    services: /data/services
+  notification_url: ""  # Webhook URL called on auto completion (optional)
+
+# Engine presets
+# Uncomment to override built-in defaults
+# engines:
+#   claude-code:
+#     command: "claude --model {model_id} --permission-mode auto"
+#     models:
+#       opus: claude-opus-4-6
+#       sonnet: claude-sonnet-4-6

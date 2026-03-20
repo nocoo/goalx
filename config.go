@@ -89,6 +89,7 @@ type EngineConfig struct {
 type UserConfig struct {
 	Defaults Config                  `yaml:"defaults,omitempty"`
 	Engines  map[string]EngineConfig `yaml:"engines,omitempty"`
+	Serve    ServeConfig             `yaml:"serve,omitempty"`
 }
 
 // Presets — Claude does brain, Codex does hands.
@@ -185,6 +186,10 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 		return Config{}, nil, fmt.Errorf("user config: %w", err)
 	}
 	mergeConfig(&cfg, &userCfg.Defaults)
+	// Merge serve config from user level
+	if userCfg.Serve.Bind != "" {
+		cfg.Serve = userCfg.Serve
+	}
 	for k, v := range userCfg.Engines {
 		engines[k] = v
 	}

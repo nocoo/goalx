@@ -1,13 +1,13 @@
 ---
 name: goalx
-description: Use when Mochi needs to manage GoalX runs over the Tailscale-only HTTP API instead of local CLI access.
+description: Use when OpenClaw agent needs to manage GoalX runs over the HTTP API instead of local CLI access.
 allowed-tools: "Bash"
 metadata.openclaw: true
 ---
 
-# GoalX HTTP for Mochi
+# GoalX HTTP for OpenClaw agent
 
-GoalX runs on the `dev` host and is exposed over Tailscale only.
+GoalX runs on the `dev` host and is exposed over internal network.
 Use the HTTP API, not SSH.
 Every request needs a Bearer token.
 
@@ -51,7 +51,6 @@ pretty() {
 ```
 
 If a request returns `401` or `403`, check the Bearer token first.
-If a request times out, confirm you are on Tailscale and the server is bound to `100.110.196.103`, not `0.0.0.0`.
 
 ## Fast Flows
 
@@ -100,7 +99,7 @@ goalx_post "$GOALX_BASE/projects/my-project/goalx/start" \
   -d '{"run":"sync-fix"}' | pretty
 ```
 
-Use `auto` when Mochi should run the whole flow.
+Use `auto` when OpenClaw agent should run the whole flow.
 Use `init` + `config` + `start`
 when the run needs a manual config pass first.
 
@@ -270,7 +269,6 @@ Good example:
 
 ## Safety Notes
 
-- Use the Tailscale address, not a public IP.
 - Always send the Bearer token.
 - Prefer `status` before `observe`.
 - Prefer `save` before `drop`.

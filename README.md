@@ -151,16 +151,45 @@ Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goa
 | turbo | claude/sonnet | claude/haiku | codex/gpt-5.4-mini |
 | deep | claude/opus | claude/opus | codex/gpt-5.4 |
 
+## HTTP API & Remote Management
+
+GoalX includes a lightweight HTTP server for remote management:
+
+```bash
+goalx serve    # starts on configured bind address
+```
+
+API endpoints:
+- `GET /projects` — list all configured workspaces
+- `POST /projects/:name/goalx/start` — start a run
+- `GET /projects/:name/goalx/observe` — check agent progress
+- `POST /projects/:name/goalx/tell` — send instructions to master
+- `PUT /projects/:name/goalx/config` — modify run configuration
+- `POST /workspaces` — add project directory (auto git-init if needed)
+- `GET /runs` — all active runs across all projects
+
+Bearer token auth + IP binding. See [deploy/](deploy/) for config example and systemd unit.
+
+## OpenClaw Integration
+
+GoalX can be managed by an [OpenClaw](https://github.com/openclaw/openclaw) agent via Lark, Telegram, or Web UI:
+
+```bash
+cp -r skill/openclaw-skill /path/to/openclaw/workspace/skills/goalx
+```
+
+The OpenClaw agent calls GoalX HTTP API to start research, check progress, and manage tasks across all projects. See [deploy/README.md](deploy/README.md) for setup guide.
+
 ## Claude Code Skill
 
-GoalX includes a Claude Code skill for interactive use:
+For local interactive use in Claude Code:
 
 ```bash
 mkdir -p ~/.claude/skills/goalx
 cp skill/SKILL.md ~/.claude/skills/goalx/SKILL.md
 ```
 
-Then in Claude Code: `/goalx observe`, `/goalx auto "objective"`, etc.
+Then: `/goalx observe`, `/goalx auto "objective"`, etc.
 
 ## License
 
