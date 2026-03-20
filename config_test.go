@@ -99,7 +99,7 @@ func TestResolveEngineCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd != "claude --model claude-opus-4-6 --permission-mode auto" {
+	if cmd != "claude --model claude-opus-4-6 --permission-mode auto --disable-slash-commands" {
 		t.Errorf("cmd = %q", cmd)
 	}
 }
