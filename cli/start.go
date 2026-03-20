@@ -110,11 +110,12 @@ func Start(projectRoot string, args []string) error {
 		if err != nil {
 			return fmt.Errorf("session-%d engine: %w", num, err)
 		}
-		// Subagents don't need skills — disable slash commands AND the Skill
-		// tool itself (plugins inject skills via system prompt, bypassing
-		// --disable-slash-commands; --disallowedTools Skill blocks invocation).
+		// Subagents don't need skills — disable slash commands. The Skill
+		// tool is denied via project-level .claude/settings.json (written by
+		// ensureSubagentRestrictions) to avoid --disallowedTools eating the
+		// next positional argument.
 		if sEngine == "claude-code" {
-			engineCmd += " --disable-slash-commands --disallowedTools Skill"
+			engineCmd += " --disable-slash-commands"
 		}
 
 		protocolPath := filepath.Join(runDir, fmt.Sprintf("program-%d.md", num))
@@ -152,6 +153,13 @@ func Start(projectRoot string, args []string) error {
 
 		if err := EnsureEngineTrusted(sEngine, wtPath); err != nil {
 			return fmt.Errorf("trust bootstrap %s: %w", sName, err)
+		}
+
+		// Deny Skill tool via project-level settings.json
+		if sEngine == "claude-code" {
+			if err := ensureSubagentRestrictions(wtPath); err != nil {
+				return fmt.Errorf("subagent restrictions %s: %w", sName, err)
+			}
 		}
 	}
 

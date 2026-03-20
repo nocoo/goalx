@@ -59,7 +59,7 @@ func Add(projectRoot string, args []string) error {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
 	if engine == "claude-code" {
-		engineCmd += " --disable-slash-commands --disallowedTools Skill"
+		engineCmd += " --disable-slash-commands"
 	}
 
 	// Create worktree
@@ -82,6 +82,13 @@ func Add(projectRoot string, args []string) error {
 	}
 	if err := EnsureEngineTrusted(engine, wtPath); err != nil {
 		return fmt.Errorf("trust bootstrap: %w", err)
+	}
+
+	// Deny Skill tool via project-level settings.json
+	if engine == "claude-code" {
+		if err := ensureSubagentRestrictions(wtPath); err != nil {
+			return fmt.Errorf("subagent restrictions: %w", err)
+		}
 	}
 
 	// Render protocol
