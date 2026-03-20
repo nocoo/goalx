@@ -95,6 +95,7 @@ func main() {
 		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":
 		fmt.Println(usage)
+		return
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", cmd)
 		fmt.Fprintln(os.Stderr, usage)
