@@ -186,6 +186,7 @@ func Start(projectRoot string, args []string) error {
 		Harness:        cfg.Harness,
 		Budget:         cfg.Budget,
 		Target:         cfg.Target,
+		Context:        cfg.Context,
 		TmuxSession:    tmuxSess,
 		ProjectRoot:       absProjectRoot,
 		SummaryPath:       filepath.Join(runDir, "summary.md"),

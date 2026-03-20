@@ -49,7 +49,8 @@ type HarnessConfig struct {
 }
 
 type ContextConfig struct {
-	Files []string `yaml:"files,omitempty"`
+	Files []string `yaml:"files,omitempty"` // backward compat
+	Refs  []string `yaml:"refs,omitempty"`  // any: paths, URLs, notes
 }
 
 type BudgetConfig struct {
@@ -459,7 +460,7 @@ func mergeConfig(base, overlay *Config) {
 	if overlay.Harness.Command != "" {
 		base.Harness = overlay.Harness
 	}
-	if len(overlay.Context.Files) > 0 {
+	if len(overlay.Context.Files) > 0 || len(overlay.Context.Refs) > 0 {
 		base.Context = overlay.Context
 	}
 	if overlay.Budget.MaxDuration > 0 {

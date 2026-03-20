@@ -117,11 +117,12 @@ Every fix MUST follow this cycle — no shortcuts:
 - Don't gold-plate: fix what's asked, nothing more
 {{end}}
 
-{{if .Context.Files}}
+{{if or .Context.Files .Context.Refs}}
 ## Context
 
-Read these files for background:
+Use these references for background (files: `cat`, URLs: fetch, text: read as-is):
 {{range .Context.Files}}- `{{.}}`
+{{end}}{{range .Context.Refs}}- {{.}}
 {{end}}
 {{end}}
 

@@ -6,7 +6,15 @@ Your subagents are your primary means, but if they fail, YOU finish the job.
 ## Objective
 
 {{.Objective}}
+{{if or .Context.Files .Context.Refs}}
+## Context
 
+References for this objective (files: `cat`, URLs: fetch, text: read as-is):
+{{range .Context.Files}}- `{{.}}`
+{{end}}{{range .Context.Refs}}- {{.}}
+{{end}}
+Distribute relevant context to subagents via guidance when they need it.
+{{end}}
 ## Your Subagents
 
 {{range .Sessions}}
