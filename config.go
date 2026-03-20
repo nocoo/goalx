@@ -141,7 +141,7 @@ var BuiltinDefaults = Config{
 	Mode:     ModeDevelop,
 	Parallel: 1,
 	Master: MasterConfig{
-		CheckInterval: 5 * time.Minute,
+		CheckInterval: 2 * time.Minute,
 	},
 	Budget: BudgetConfig{
 		MaxDuration: 8 * time.Hour,

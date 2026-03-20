@@ -155,6 +155,20 @@ If the file is empty or doesn't exist, continue your current work.
 
 **Master guidance takes priority over your current direction.** Master sees the bigger picture.
 
+## When You Complete All Known Tasks
+
+After finishing all items in your assignment:
+
+1. Check guidance one final time: `cat {{.GuidancePath}}`
+2. If guidance has content → follow it (master may have new work)
+3. If guidance is empty → append to journal:
+   ```json
+   {"round":N,"commit":"...","desc":"all assigned tasks complete, awaiting master","confidence":"HIGH","status":"idle"}
+   ```
+4. Then wait. Master will either send new guidance or stop you.
+
+**Do NOT exit or stop on your own.** Master decides when the run is complete.
+
 ## Important Constraints
 
 - **Do NOT invoke any slash commands or skills** (e.g. `/ares`, `/goalx`, `/commit`, etc.). You are a subagent — focus only on the objective above.

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -55,7 +56,11 @@ func MergeWorktree(projectRoot, branch string) error {
 
 	out, err := exec.Command("git", "-C", projectRoot, "merge", "--ff-only", branch).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%w: %s", err, out)
+		fmt.Fprintf(os.Stderr, "note: fast-forward not possible, creating merge commit\n")
+		out, err = exec.Command("git", "-C", projectRoot, "merge", "--no-ff", branch).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%w: %s", err, out)
+		}
 	}
 	return nil
 }

@@ -96,7 +96,10 @@ Read the acceptance checklist in `{{.AcceptancePath}}` and the subagent's report
   - What's wrong with the current direction
   - A concrete new question to investigate
   - Suggested method (what to measure/run/compare)
-- Do NOT restart. The subagent will read guidance at its next checkpoint.
+- After writing guidance, **immediately notify the subagent** so it reads the guidance without waiting:
+  `tmux send-keys -t {{.TmuxSession}}:<window-name> "Master wrote new guidance. Read <guidance-path> now and follow it." Enter`
+  (Use the window name and guidance path from the subagent list above.)
+- Do NOT restart. The subagent will read guidance promptly after the notification.
 
 **Dead or unresponsive (2+ heartbeats with no progress):**
 - Write accumulated context to guidance file.
@@ -118,6 +121,7 @@ Restart command for **{{.Name}}**: `tmux send-keys -t {{$.TmuxSession}}:{{.Windo
 - **Guide first, restart last.** Writing guidance preserves subagent context.
 - When restarting, always write context to the guidance file first.
 - **Use guidance proactively** — don't just wait for problems. Suggest new angles, challenge conclusions, demand quantification.
+- **Always use absolute paths** when writing files. Do NOT use `~` — use the full path from the template variables above.
 {{- if gt (len .Sessions) 1}}
 - **Multiple sessions: keep them independent.** Do NOT relay one session's findings to another. You may use one session's gaps to craft questions for the other, but never share specific conclusions.
 {{- end}}

@@ -44,7 +44,7 @@ func TestMergeWorktreeRejectsDirtyTree(t *testing.T) {
 	}
 }
 
-func TestMergeWorktreeRejectsNonFastForward(t *testing.T) {
+func TestMergeWorktreeFallsBackToNoFF(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 
@@ -53,8 +53,13 @@ func TestMergeWorktreeRejectsNonFastForward(t *testing.T) {
 	runGit(t, repo, "checkout", "-")
 	writeAndCommit(t, repo, "main.txt", "main", "main commit")
 
-	if err := MergeWorktree(repo, "feature"); err == nil {
-		t.Fatal("expected MergeWorktree to reject non-fast-forward merge")
+	if err := MergeWorktree(repo, "feature"); err != nil {
+		t.Fatalf("expected MergeWorktree to succeed with non-ff fallback, got: %v", err)
+	}
+
+	// Verify the feature file is present after merge.
+	if _, err := os.Stat(filepath.Join(repo, "feature.txt")); err != nil {
+		t.Fatal("feature.txt should exist after merge")
 	}
 }
 
