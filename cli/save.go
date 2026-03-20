@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Save copies run artifacts (reports, summary, config snapshot) to .goalx/runs/<name>/.
@@ -53,7 +53,7 @@ func Save(projectRoot string, args []string) error {
 	}
 
 	// Copy session reports
-	sessions := ar.ExpandSessions(rc.Config)
+	sessions := goalx.ExpandSessions(rc.Config)
 	for i := range sessions {
 		num := i + 1
 		wtPath := WorktreePath(rc.RunDir, rc.Config.Name, num)

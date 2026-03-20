@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/vonbai/autoresearch/cli"
+	"github.com/vonbai/goalx/cli"
 )
 
 const usage = `goalx — autonomous research CLI

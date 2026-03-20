@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // List scans all runs for the current project and prints a table.
 func List(projectRoot string, _ []string) error {
 	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".autoresearch", "runs", ar.ProjectID(projectRoot))
+	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
 
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
@@ -31,13 +31,13 @@ func List(projectRoot string, _ []string) error {
 			continue
 		}
 		name := e.Name()
-		cfg, err := ar.LoadYAML[ar.Config](filepath.Join(runsDir, name, "goalx.yaml"))
+		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runsDir, name, "goalx.yaml"))
 		if err != nil {
 			continue
 		}
 
 		status := "completed"
-		tmuxSess := ar.TmuxSessionName(projectRoot, name)
+		tmuxSess := goalx.TmuxSessionName(projectRoot, name)
 		if SessionExists(tmuxSess) {
 			status = "active"
 		}

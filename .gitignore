@@ -1,3 +1,25 @@
+# Build artifacts
 bin/
-ar
+*.exe
+
+# GoalX local state
 .goalx/
+
+# Docs (internal specs, research artifacts)
+docs/
+
+# AI agent configs (user-specific)
+CLAUDE.md
+.claude/
+.factory/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

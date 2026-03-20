@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,10 +43,10 @@ func Add(projectRoot string, args []string) error {
 	windowName := sessionWindowName(rc.Config.Name, newNum)
 
 	// Resolve engine
-	_, engines, err := ar.LoadConfig(projectRoot)
+	_, engines, err := goalx.LoadConfig(projectRoot)
 	if err != nil {
 		// Fallback: try base config
-		_, engines, err = ar.LoadRawBaseConfig(projectRoot)
+		_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
 		if err != nil {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
@@ -54,7 +54,7 @@ func Add(projectRoot string, args []string) error {
 
 	engine := rc.Config.Engine
 	model := rc.Config.Model
-	engineCmd, err := ar.ResolveEngineCommand(engines, engine, model)
+	engineCmd, err := goalx.ResolveEngineCommand(engines, engine, model)
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
@@ -111,7 +111,7 @@ func Add(projectRoot string, args []string) error {
 	}
 
 	// Launch in tmux
-	prompt := ar.ResolvePrompt(engines, engine, protocolPath)
+	prompt := goalx.ResolvePrompt(engines, engine, protocolPath)
 	if err := NewWindow(rc.TmuxSession, windowName, wtPath); err != nil {
 		return fmt.Errorf("create tmux window: %w", err)
 	}
@@ -129,7 +129,7 @@ func Add(projectRoot string, args []string) error {
 
 	// Update config snapshot with new session count
 	if len(rc.Config.Sessions) > 0 {
-		rc.Config.Sessions = append(rc.Config.Sessions, ar.SessionConfig{Hint: hint})
+		rc.Config.Sessions = append(rc.Config.Sessions, goalx.SessionConfig{Hint: hint})
 	} else {
 		rc.Config.Parallel = newNum
 	}

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestCreateWorktreeDoesNotDeleteExistingBranch(t *testing.T) {
@@ -75,11 +75,11 @@ func TestMergeWorktreeAllowsLocalAutoresearchFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, ".goalx", "goalx.yaml"), []byte("name: demo\n"), 0o644); err != nil {
 		t.Fatalf("write goalx.yaml: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(repo, ".autoresearch"), 0o755); err != nil {
-		t.Fatalf("mkdir .autoresearch: %v", err)
+	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, ".autoresearch", "config.yaml"), []byte("parallel: 1\n"), 0o644); err != nil {
-		t.Fatalf("write .autoresearch/config.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(repo, ".goalx", "config.yaml"), []byte("parallel: 1\n"), 0o644); err != nil {
+		t.Fatalf("write .goalx/config.yaml: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(repo, ".claude"), 0o755); err != nil {
 		t.Fatalf("mkdir .claude: %v", err)
@@ -95,7 +95,7 @@ func TestMergeWorktreeAllowsLocalAutoresearchFiles(t *testing.T) {
 	}
 
 	if err := MergeWorktree(repo, "feature"); err != nil {
-		t.Fatalf("expected MergeWorktree to allow local autoresearch files, got: %v", err)
+		t.Fatalf("expected MergeWorktree to allow local goalx files, got: %v", err)
 	}
 }
 
@@ -147,7 +147,7 @@ func TestDropRemovesRunDirectoryAndBranch(t *testing.T) {
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 
 	runName := "drop-run"
-	runDir := ar.RunDir(repo, runName)
+	runDir := goalx.RunDir(repo, runName)
 	if err := os.MkdirAll(filepath.Join(runDir, "worktrees"), 0o755); err != nil {
 		t.Fatalf("mkdir worktrees: %v", err)
 	}

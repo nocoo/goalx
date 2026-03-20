@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Review shows a comparative summary of all sessions in a run.
@@ -32,7 +32,7 @@ func Review(projectRoot string, args []string) error {
 	fmt.Printf("=== Review: %s (%s) ===\n", rc.Name, rc.Config.Mode)
 	fmt.Printf("Objective: %s\n\n", rc.Config.Objective)
 
-	sessions := ar.ExpandSessions(rc.Config)
+	sessions := goalx.ExpandSessions(rc.Config)
 	for i := range sessions {
 		num := i + 1
 		sName := SessionName(num)
@@ -48,11 +48,11 @@ func Review(projectRoot string, args []string) error {
 
 		// Journal summary
 		jPath := JournalPath(rc.RunDir, sName)
-		entries, _ := ar.LoadJournal(jPath)
-		fmt.Printf("Journal: %s\n", ar.Summary(entries))
+		entries, _ := goalx.LoadJournal(jPath)
+		fmt.Printf("Journal: %s\n", goalx.Summary(entries))
 
 		// Mode-specific output
-		if rc.Config.Mode == ar.ModeResearch {
+		if rc.Config.Mode == goalx.ModeResearch {
 			reportFile := "report.md"
 			if len(rc.Config.Target.Files) > 0 && rc.Config.Target.Files[0] != "" {
 				reportFile = rc.Config.Target.Files[0]

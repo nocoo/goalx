@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,18 +17,18 @@ func TestReviewUsesConfiguredResearchTargetFile(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	runName := "demo"
-	runDir := ar.RunDir(projectRoot, runName)
+	runDir := goalx.RunDir(projectRoot, runName)
 	wtPath := WorktreePath(runDir, runName, 1)
 	if err := os.MkdirAll(wtPath, 0o755); err != nil {
 		t.Fatalf("mkdir worktree: %v", err)
 	}
 
-	cfg := ar.Config{
+	cfg := goalx.Config{
 		Name:      runName,
-		Mode:      ar.ModeResearch,
+		Mode:      goalx.ModeResearch,
 		Objective: "inspect",
 		Parallel:  1,
-		Target: ar.TargetConfig{
+		Target: goalx.TargetConfig{
 			Files: []string{"notes.md"},
 		},
 	}

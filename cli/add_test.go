@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestAddExtendsExplicitSessionsSnapshot(t *testing.T) {
@@ -23,7 +23,7 @@ func TestAddExtendsExplicitSessionsSnapshot(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	runName := "add-run"
-	runDir := ar.RunDir(repo, runName)
+	runDir := goalx.RunDir(repo, runName)
 	for _, dir := range []string{
 		runDir,
 		filepath.Join(runDir, "journals"),
@@ -57,7 +57,7 @@ harness:
 		t.Fatalf("Add: %v", err)
 	}
 
-	cfg, err := ar.LoadYAML[ar.Config](filepath.Join(runDir, "goalx.yaml"))
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("load updated snapshot: %v", err)
 	}

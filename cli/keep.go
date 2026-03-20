@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Keep merges or preserves a specific session from a run.
@@ -37,7 +37,7 @@ func Keep(projectRoot string, args []string) error {
 
 	branch := fmt.Sprintf("goalx/%s/%d", rc.Config.Name, idx)
 
-	if rc.Config.Mode == ar.ModeDevelop {
+	if rc.Config.Mode == goalx.ModeDevelop {
 		fmt.Printf("Merging branch %s into current branch...\n", branch)
 		if err := MergeWorktree(rc.ProjectRoot, branch); err != nil {
 			return fmt.Errorf("merge %s: %w", branch, err)

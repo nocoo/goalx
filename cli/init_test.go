@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
@@ -14,11 +14,11 @@ func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(projectRoot, ".autoresearch"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
 	projectCfg := []byte("target:\n  files: [\"README.md\"]\nharness:\n  command: \"test -f README.md\"\n")
-	if err := os.WriteFile(filepath.Join(projectRoot, ".autoresearch", "config.yaml"), projectCfg, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), projectCfg, 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
 
@@ -26,7 +26,7 @@ func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
 		t.Fatalf("Init: %v", err)
 	}
 
-	cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
@@ -43,11 +43,11 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(projectRoot, ".autoresearch"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
 	projectCfg := []byte("master:\n  engine: claude-code\n  model: sonnet\n")
-	if err := os.WriteFile(filepath.Join(projectRoot, ".autoresearch", "config.yaml"), projectCfg, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), projectCfg, 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 		t.Fatalf("Init: %v", err)
 	}
 
-	cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}

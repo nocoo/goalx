@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,7 +17,7 @@ import (
 func Debate(projectRoot string, args []string) error {
 	// Find the latest saved research run
 	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
-	run, runDir, err := findLatestSavedRun(savesDir, ar.ModeResearch)
+	run, runDir, err := findLatestSavedRun(savesDir, goalx.ModeResearch)
 	if err != nil {
 		return fmt.Errorf("no saved research run found in .goalx/runs/: %w", err)
 	}
@@ -37,9 +37,9 @@ func Debate(projectRoot string, args []string) error {
 	}
 
 	// Generate debate config
-	cfg := ar.Config{
+	cfg := goalx.Config{
 		Name:      "debate",
-		Mode:      ar.ModeResearch,
+		Mode:      goalx.ModeResearch,
 		Objective: fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单", run),
 		Preset:    "default",
 		Parallel:  2,
@@ -47,15 +47,15 @@ func Debate(projectRoot string, args []string) error {
 			"你支持 session-1 的观点。用代码证据辩护 session-1 报告中的结论，挑战 session-2 的结论。如果对方证据更强，愿意让步。最终输出共识清单。",
 			"你支持 session-2 的观点。用代码证据辩护 session-2 报告中的结论，挑战 session-1 的结论。如果对方证据更强，愿意让步。最终输出共识清单。",
 		},
-		Context: ar.ContextConfig{Files: contextFiles},
-		Target: ar.TargetConfig{
+		Context: goalx.ContextConfig{Files: contextFiles},
+		Target: goalx.TargetConfig{
 			Files:    []string{"report.md"},
 			Readonly: []string{"."},
 		},
-		Harness: ar.HarnessConfig{Command: "test -s report.md && echo 'ok'"},
-		Budget:  ar.BudgetConfig{MaxDuration: 2 * 3600_000_000_000},
+		Harness: goalx.HarnessConfig{Command: "test -s report.md && echo 'ok'"},
+		Budget:  goalx.BudgetConfig{MaxDuration: 2 * 3600_000_000_000},
 	}
-	ar.ApplyPreset(&cfg)
+	goalx.ApplyPreset(&cfg)
 
 	goalxDir := filepath.Join(projectRoot, ".goalx")
 	os.MkdirAll(goalxDir, 0755)
@@ -77,7 +77,7 @@ func Debate(projectRoot string, args []string) error {
 }
 
 // findLatestSavedRun finds the most recently modified saved run with the given mode.
-func findLatestSavedRun(savesDir string, mode ar.Mode) (string, string, error) {
+func findLatestSavedRun(savesDir string, mode goalx.Mode) (string, string, error) {
 	entries, err := os.ReadDir(savesDir)
 	if err != nil {
 		return "", "", err
@@ -95,7 +95,7 @@ func findLatestSavedRun(savesDir string, mode ar.Mode) (string, string, error) {
 			continue
 		}
 		dir := filepath.Join(savesDir, e.Name())
-		cfg, err := ar.LoadYAML[ar.Config](filepath.Join(dir, "goalx.yaml"))
+		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(dir, "goalx.yaml"))
 		if err != nil {
 			continue
 		}

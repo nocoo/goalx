@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 type startInitOptions struct {
 	Objective    string
-	Mode         ar.Mode
+	Mode         goalx.Mode
 	Parallel     int
 	Name         string
 	ContextPaths []string
@@ -19,7 +19,7 @@ type startInitOptions struct {
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {
 	opts := startInitOptions{
-		Mode:     ar.ModeDevelop,
+		Mode:     goalx.ModeDevelop,
 		Parallel: 1,
 	}
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
@@ -30,9 +30,9 @@ func parseStartInitArgs(args []string) (startInitOptions, error) {
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
 		case "--research":
-			opts.Mode = ar.ModeResearch
+			opts.Mode = goalx.ModeResearch
 		case "--develop":
-			opts.Mode = ar.ModeDevelop
+			opts.Mode = goalx.ModeDevelop
 		case "--parallel":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --parallel")
@@ -107,7 +107,7 @@ func parseStatusArgs(args []string) (runName, sessionName string, err error) {
 	return runName, sessionName, nil
 }
 
-func sessionCount(cfg *ar.Config) int {
+func sessionCount(cfg *goalx.Config) int {
 	if len(cfg.Sessions) > 0 {
 		return len(cfg.Sessions)
 	}

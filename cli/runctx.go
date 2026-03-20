@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // RunContext holds resolved paths for a run.
@@ -13,14 +13,14 @@ type RunContext struct {
 	RunDir      string
 	TmuxSession string
 	ProjectRoot string
-	Config      *ar.Config
+	Config      *goalx.Config
 }
 
 // ResolveRun resolves run context. If runName is empty, reads goalx.yaml from
 // projectRoot to get the name.
 func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 	if runName == "" {
-		cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 		if err != nil {
 			return nil, fmt.Errorf("load goalx.yaml: %w", err)
 		}
@@ -30,8 +30,8 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 		runName = cfg.Name
 	}
 
-	runDir := ar.RunDir(projectRoot, runName)
-	snapshot, err := ar.LoadYAML[ar.Config](filepath.Join(runDir, "goalx.yaml"))
+	runDir := goalx.RunDir(projectRoot, runName)
+	snapshot, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("load run snapshot: %w", err)
 	}
@@ -42,7 +42,7 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 	return &RunContext{
 		Name:        runName,
 		RunDir:      runDir,
-		TmuxSession: ar.TmuxSessionName(projectRoot, runName),
+		TmuxSession: goalx.TmuxSessionName(projectRoot, runName),
 		ProjectRoot: projectRoot,
 		Config:      &snapshot,
 	}, nil

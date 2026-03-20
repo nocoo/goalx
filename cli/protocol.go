@@ -7,20 +7,20 @@ import (
 	"path/filepath"
 	"text/template"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // ProtocolData is passed to master.md.tmpl and program.md.tmpl.
 type ProtocolData struct {
 	Objective      string
 	Description    string
-	Mode           ar.Mode
+	Mode           goalx.Mode
 	Sessions       []SessionData
-	Master         ar.MasterConfig
-	Harness        ar.HarnessConfig
-	Budget         ar.BudgetConfig
-	Target         ar.TargetConfig
-	Context        ar.ContextConfig
+	Master         goalx.MasterConfig
+	Harness        goalx.HarnessConfig
+	Budget         goalx.BudgetConfig
+	Target         goalx.TargetConfig
+	Context        goalx.ContextConfig
 	TmuxSession    string
 	SummaryPath       string
 	AcceptancePath    string
@@ -63,8 +63,8 @@ func sessionName(idx int) string {
 }
 
 func renderTemplate(tmplPath, outPath string, data any) error {
-	// Use embedded templates from the autoresearch package
-	tmplContent, err := ar.Templates.ReadFile(tmplPath)
+	// Use embedded templates from the goalx package
+	tmplContent, err := goalx.Templates.ReadFile(tmplPath)
 	if err != nil {
 		return fmt.Errorf("embedded template %s: %w", tmplPath, err)
 	}

@@ -1,4 +1,4 @@
-// Package autoresearch provides an autonomous research framework.
+// Package goalx provides an autonomous research and development framework.
 //
 // Master/Subagent architecture. Claude does brain (judgment, research, guidance),
 // Codex does hands (coding, review). The framework only orchestrates
@@ -13,7 +13,6 @@
 //
 // # Inspiration
 //
-//   - karpathy/autoresearch: protocol + journal + unattended operation
 //   - lidangzzz/goal-driven: master/subagent + criteria verification + persistence
 //   - OpenClaw: framework-driven heartbeat for periodic agent checks
-package autoresearch
+package goalx

@@ -1,4 +1,4 @@
-package autoresearch
+package goalx
 
 import (
 	"os"
@@ -12,7 +12,7 @@ func TestSlugify(t *testing.T) {
 		in, want string
 	}{
 		{"event sourcing", "event-sourcing"},
-		{"/data/dev/quantos", "data-dev-quantos"},
+		{"/home/user/projects/myapp", "home-user-projects-myapp"},
 		{"Hello World!!! Test", "hello-world-test"},
 		{"已有event-sourcing方案", "event-sourcing"},
 		{"", ""},
@@ -26,24 +26,24 @@ func TestSlugify(t *testing.T) {
 }
 
 func TestProjectID(t *testing.T) {
-	id := ProjectID("/data/dev/quantos")
-	if id != "data-dev-quantos" {
-		t.Errorf("ProjectID = %q, want 'data-dev-quantos'", id)
+	id := ProjectID("/home/user/projects/myapp")
+	if id != "home-user-projects-myapp" {
+		t.Errorf("ProjectID = %q, want 'home-user-projects-myapp'", id)
 	}
 }
 
 func TestRunDir(t *testing.T) {
-	dir := RunDir("/data/dev/quantos", "event-sourcing")
+	dir := RunDir("/home/user/projects/myapp", "event-sourcing")
 	home, _ := os.UserHomeDir()
-	want := filepath.Join(home, ".autoresearch", "runs", "data-dev-quantos", "event-sourcing")
+	want := filepath.Join(home, ".goalx", "runs", "home-user-projects-myapp", "event-sourcing")
 	if dir != want {
 		t.Errorf("RunDir = %q, want %q", dir, want)
 	}
 }
 
 func TestTmuxSessionName(t *testing.T) {
-	name := TmuxSessionName("/data/dev/quantos", "event-sourcing")
-	if name != "goalx-data-dev-quantos-event-sourcing" {
+	name := TmuxSessionName("/home/user/projects/myapp", "event-sourcing")
+	if name != "goalx-home-user-projects-myapp-event-sourcing" {
 		t.Errorf("TmuxSessionName = %q", name)
 	}
 }

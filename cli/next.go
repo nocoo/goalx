@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Next detects the current pipeline state and suggests the next action.
 func Next(projectRoot string, _ []string) error {
 	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".autoresearch", "runs", ar.ProjectID(projectRoot))
+	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
 	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
 
 	// Check for active runs
@@ -46,12 +46,12 @@ func Next(projectRoot string, _ []string) error {
 			}
 			hasSaves = true
 			dir := filepath.Join(savesDir, e.Name())
-			cfg, err := ar.LoadYAML[ar.Config](filepath.Join(dir, "goalx.yaml"))
+			cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(dir, "goalx.yaml"))
 			if err != nil {
 				continue
 			}
 			latestName = e.Name()
-			if cfg.Mode == ar.ModeResearch {
+			if cfg.Mode == goalx.ModeResearch {
 				hasResearch = true
 				// Check if it looks like a debate (has "debate" or "consensus" in name/objective)
 				if e.Name() == "debate" || containsAny(cfg.Objective, "辩论", "debate", "共识", "consensus") {
@@ -103,7 +103,7 @@ func findActiveRun(projectRoot, runsDir string) string {
 		if !e.IsDir() {
 			continue
 		}
-		tmuxSess := ar.TmuxSessionName(projectRoot, e.Name())
+		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
 		if SessionExists(tmuxSess) {
 			return e.Name()
 		}
@@ -120,7 +120,7 @@ func findCompletedRun(projectRoot, runsDir string) string {
 		if !e.IsDir() {
 			continue
 		}
-		tmuxSess := ar.TmuxSessionName(projectRoot, e.Name())
+		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
 		if !SessionExists(tmuxSess) {
 			return e.Name()
 		}

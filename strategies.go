@@ -1,4 +1,4 @@
-package autoresearch
+package goalx
 
 import "fmt"
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Status shows the current progress for each session in a run.
@@ -25,14 +25,14 @@ func Status(projectRoot string, args []string) error {
 	fmt.Fprintln(w, "SESSION\tLAST_ROUND\tSTATUS\tSUMMARY")
 
 	// Session journals
-	sessions := ar.ExpandSessions(rc.Config)
+	sessions := goalx.ExpandSessions(rc.Config)
 	for i := range sessions {
 		sName := SessionName(i + 1)
 		if sessionFilter != "" && sName != sessionFilter {
 			continue
 		}
 		jPath := JournalPath(rc.RunDir, sName)
-		entries, _ := ar.LoadJournal(jPath)
+		entries, _ := goalx.LoadJournal(jPath)
 
 		lastRound := "-"
 		status := "pending"
@@ -46,14 +46,14 @@ func Status(projectRoot string, args []string) error {
 			}
 		}
 
-		summary := ar.Summary(entries)
+		summary := goalx.Summary(entries)
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sName, lastRound, status, summary)
 	}
 
 	// Master journal
 	masterPath := filepath.Join(rc.RunDir, "master.jsonl")
-	masterEntries, _ := ar.LoadJournal(masterPath)
-	masterSummary := ar.Summary(masterEntries)
+	masterEntries, _ := goalx.LoadJournal(masterPath)
+	masterSummary := goalx.Summary(masterEntries)
 	fmt.Fprintf(w, "master\t-\t-\t%s\n", masterSummary)
 
 	return w.Flush()

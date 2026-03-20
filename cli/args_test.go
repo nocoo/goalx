@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestExtractRunFlag(t *testing.T) {
@@ -39,8 +39,8 @@ func TestParseStartInitArgs(t *testing.T) {
 	if opts.Objective != "ship feature" {
 		t.Fatalf("objective = %q", opts.Objective)
 	}
-	if opts.Mode != ar.ModeResearch {
-		t.Fatalf("mode = %q, want %q", opts.Mode, ar.ModeResearch)
+	if opts.Mode != goalx.ModeResearch {
+		t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeResearch)
 	}
 	if opts.Parallel != 3 {
 		t.Fatalf("parallel = %d, want 3", opts.Parallel)
@@ -92,9 +92,9 @@ func TestParseSessionIndex(t *testing.T) {
 }
 
 func TestSessionCountPrefersExplicitSessions(t *testing.T) {
-	cfg := &ar.Config{
+	cfg := &goalx.Config{
 		Parallel: 1,
-		Sessions: []ar.SessionConfig{{Hint: "a"}, {Hint: "b"}},
+		Sessions: []goalx.SessionConfig{{Hint: "a"}, {Hint: "b"}},
 	}
 	if got := sessionCount(cfg); got != 2 {
 		t.Fatalf("sessionCount = %d, want 2", got)

@@ -1,4 +1,4 @@
-module github.com/vonbai/autoresearch
+module github.com/vonbai/goalx
 
 go 1.25.0
 

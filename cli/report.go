@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Report prints a formatted report of run progress from journals.
@@ -31,11 +31,11 @@ func Report(projectRoot string, args []string) error {
 	fmt.Printf("Objective: %s\n\n", rc.Config.Objective)
 
 	// Per-session progress
-	sessions := ar.ExpandSessions(rc.Config)
+	sessions := goalx.ExpandSessions(rc.Config)
 	for i := range sessions {
 		sName := SessionName(i + 1)
 		jPath := JournalPath(rc.RunDir, sName)
-		entries, _ := ar.LoadJournal(jPath)
+		entries, _ := goalx.LoadJournal(jPath)
 
 		fmt.Printf("--- %s ---\n", sName)
 		if len(entries) == 0 {
@@ -54,7 +54,7 @@ func Report(projectRoot string, args []string) error {
 
 	// Master summary
 	masterPath := filepath.Join(rc.RunDir, "master.jsonl")
-	masterEntries, _ := ar.LoadJournal(masterPath)
+	masterEntries, _ := goalx.LoadJournal(masterPath)
 	fmt.Println("--- master ---")
 	if len(masterEntries) == 0 {
 		fmt.Println("  No master entries.")

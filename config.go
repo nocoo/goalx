@@ -1,4 +1,4 @@
-package autoresearch
+package goalx
 
 import (
 	"fmt"
@@ -76,7 +76,7 @@ type EngineConfig struct {
 	Models  map[string]string `yaml:"models"`
 }
 
-// UserConfig is the top-level user config file (~/.autoresearch/config.yaml).
+// UserConfig is the top-level user config file (~/.goalx/config.yaml).
 type UserConfig struct {
 	Defaults Config                  `yaml:"defaults,omitempty"`
 	Engines  map[string]EngineConfig `yaml:"engines,omitempty"`
@@ -171,7 +171,7 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 
 	// Layer 2: user config
 	home, _ := os.UserHomeDir()
-	userCfg, err := LoadYAML[UserConfig](filepath.Join(home, ".autoresearch", "config.yaml"))
+	userCfg, err := LoadYAML[UserConfig](filepath.Join(home, ".goalx", "config.yaml"))
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("user config: %w", err)
 	}
@@ -181,7 +181,7 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 	}
 
 	// Layer 3: project config
-	projCfg, err := LoadYAML[Config](filepath.Join(projectRoot, ".autoresearch", "config.yaml"))
+	projCfg, err := LoadYAML[Config](filepath.Join(projectRoot, ".goalx", "config.yaml"))
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("project config: %w", err)
 	}
@@ -284,7 +284,7 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 
 	// Check harness
 	if cfg.Harness.Command == "" || strings.HasPrefix(cfg.Harness.Command, "TODO") {
-		return fmt.Errorf("harness.command is required (set in goalx.yaml or .autoresearch/config.yaml)")
+		return fmt.Errorf("harness.command is required (set in goalx.yaml or .goalx/config.yaml)")
 	}
 
 	// Check engine/model can resolve and won't block on known interactive prompts.
@@ -390,10 +390,10 @@ func ProjectID(projectRoot string) string {
 	return slugify(s)
 }
 
-// RunDir returns the run directory: ~/.autoresearch/runs/{projectID}/{name}
+// RunDir returns the run directory: ~/.goalx/runs/{projectID}/{name}
 func RunDir(projectRoot, name string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".autoresearch", "runs", ProjectID(projectRoot), name)
+	return filepath.Join(home, ".goalx", "runs", ProjectID(projectRoot), name)
 }
 
 // TmuxSessionName returns the tmux session name for a run.

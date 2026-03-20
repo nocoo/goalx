@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -21,24 +21,24 @@ func Start(projectRoot string, args []string) error {
 	}
 
 	// 1. Load config
-	cfg, engines, err := ar.LoadConfig(projectRoot)
+	cfg, engines, err := goalx.LoadConfig(projectRoot)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
 	// 2. Auto-generate name if missing
 	if cfg.Name == "" {
-		cfg.Name = ar.Slugify(cfg.Objective)
+		cfg.Name = goalx.Slugify(cfg.Objective)
 	}
 
 	// 3. Validate before any side effects
-	if err := ar.ValidateConfig(cfg, engines); err != nil {
+	if err := goalx.ValidateConfig(cfg, engines); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
 	}
 
 	// 4. Compute paths
-	runDir := ar.RunDir(projectRoot, cfg.Name)
-	tmuxSess := ar.TmuxSessionName(projectRoot, cfg.Name)
+	runDir := goalx.RunDir(projectRoot, cfg.Name)
+	tmuxSess := goalx.TmuxSessionName(projectRoot, cfg.Name)
 
 	// 5. Check conflicts
 	if _, err := os.Stat(runDir); err == nil {
@@ -57,7 +57,7 @@ func Start(projectRoot string, args []string) error {
 	}
 
 	// 6. Expand sessions
-	sessions := ar.ExpandSessions(cfg)
+	sessions := goalx.ExpandSessions(cfg)
 
 	// 7. Create run directory structure
 	dirs := []string{
@@ -106,7 +106,7 @@ func Start(projectRoot string, args []string) error {
 		if sModel == "" {
 			sModel = cfg.Model
 		}
-		engineCmd, err := ar.ResolveEngineCommand(engines, sEngine, sModel)
+		engineCmd, err := goalx.ResolveEngineCommand(engines, sEngine, sModel)
 		if err != nil {
 			return fmt.Errorf("session-%d engine: %w", num, err)
 		}
@@ -119,7 +119,7 @@ func Start(projectRoot string, args []string) error {
 		}
 
 		protocolPath := filepath.Join(runDir, fmt.Sprintf("program-%d.md", num))
-		prompt := ar.ResolvePrompt(engines, sEngine, protocolPath)
+		prompt := goalx.ResolvePrompt(engines, sEngine, protocolPath)
 
 		sessionDataList = append(sessionDataList, SessionData{
 			Name:          sName,
@@ -164,12 +164,12 @@ func Start(projectRoot string, args []string) error {
 	}
 
 	// 10. Resolve master engine command
-	masterCmd, err := ar.ResolveEngineCommand(engines, cfg.Master.Engine, cfg.Master.Model)
+	masterCmd, err := goalx.ResolveEngineCommand(engines, cfg.Master.Engine, cfg.Master.Model)
 	if err != nil {
 		return fmt.Errorf("master engine: %w", err)
 	}
 	masterProtocolPath := filepath.Join(runDir, "master.md")
-	masterPrompt := ar.ResolvePrompt(engines, cfg.Master.Engine, masterProtocolPath)
+	masterPrompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, masterProtocolPath)
 	acceptancePath := filepath.Join(runDir, "acceptance.md")
 
 	if err := EnsureEngineTrusted(cfg.Master.Engine, absProjectRoot); err != nil {

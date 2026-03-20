@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:    "ship it",
-		Mode:         ar.ModeDevelop,
-		Target:       ar.TargetConfig{Files: []string{"main.go"}},
-		Harness:      ar.HarnessConfig{Command: "go test ./..."},
+		Mode:         goalx.ModeDevelop,
+		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		SessionName:  "session-1",
 		JournalPath:  "/tmp/journal.jsonl",
 		GuidancePath: "/tmp/guidance.md",
@@ -47,7 +47,7 @@ func TestRenderMasterProtocolIncludesAcceptanceChecklistInstructions(t *testing.
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:      "ship it",
-		Mode:           ar.ModeDevelop,
+		Mode:           goalx.ModeDevelop,
 		TmuxSession:    "ar-demo",
 		SummaryPath:    "/tmp/summary.md",
 		AcceptancePath: "/tmp/acceptance.md",

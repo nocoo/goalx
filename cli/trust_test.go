@@ -54,7 +54,7 @@ func TestEnsureEngineTrustedClaudeWritesProjectTrust(t *testing.T) {
 	claudePath := filepath.Join(home, ".claude.json")
 	initial := map[string]any{
 		"projects": map[string]any{
-			"/data/dev": map[string]any{
+			"/home/user": map[string]any{
 				"hasTrustDialogAccepted": false,
 			},
 		},

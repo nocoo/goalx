@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	ar "github.com/vonbai/autoresearch"
+	goalx "github.com/vonbai/goalx"
 )
 
 // Observe captures live tmux pane output for all windows in a run.
@@ -53,7 +53,7 @@ func Observe(projectRoot string, args []string) error {
 	fmt.Println()
 
 	// Sessions
-	sessions := ar.ExpandSessions(rc.Config)
+	sessions := goalx.ExpandSessions(rc.Config)
 	for i := range sessions {
 		num := i + 1
 		windowName := sessionWindowName(rc.Config.Name, num)
@@ -125,7 +125,7 @@ func printPaneCapture(tmuxSession, window string) {
 // Returns error if zero or multiple active runs.
 func findSingleActiveRun(projectRoot string) (*RunContext, error) {
 	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".autoresearch", "runs", ar.ProjectID(projectRoot))
+	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		return nil, fmt.Errorf("no runs found")
@@ -135,7 +135,7 @@ func findSingleActiveRun(projectRoot string) (*RunContext, error) {
 		if !e.IsDir() {
 			continue
 		}
-		tmuxSess := ar.TmuxSessionName(projectRoot, e.Name())
+		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
 		if SessionExists(tmuxSess) {
 			active = append(active, e.Name())
 		}
