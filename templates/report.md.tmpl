@@ -1,31 +1,18 @@
-# AutoResearch Report: {{.Objective}}
+# AutoResearch Report: {{.Name}}
 
-**Generated:** {{.GeneratedAt}}
-**Branch:** `{{.Branch}}`
-**Engine:** {{.Engine}}
+**Objective:** {{.Objective}}
+**Mode:** {{.Mode}}
+**Sessions:** {{len .Sessions}}
 
-## Summary
+---
 
-| Metric | Baseline | Best | Improvement |
-|--------|----------|------|-------------|
-{{range .Metrics}}| {{.Name}} | {{.Baseline}} | {{.Best}} | {{.Delta}} |
+{{range .Sessions}}
+## {{.Name}}
+
+**Worktree:** `{{.WorktreePath}}`
+
+### Journal Summary
+{{.JournalSummary}}
+
+---
 {{end}}
-
-## Statistics
-
-- **Total rounds:** {{.TotalRounds}}
-- **Kept:** {{.Kept}} ({{.KeepRate}})
-- **Reverted:** {{.Reverted}}
-- **Crashed:** {{.Crashed}}
-- **Runtime:** {{.Runtime}}
-
-## Kept Experiments
-
-| # | Commit | {{.PrimaryMetric}} | Delta | Description |
-|---|--------|----|-------|-------------|
-{{range .KeptEntries}}| {{.Round}} | `{{.Commit}}` | {{.Primary}} | {{.Delta}} | {{.Description}} |
-{{end}}
-
-## Progress
-
-{{.ProgressChart}}

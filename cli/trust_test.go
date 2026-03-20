@@ -1,0 +1,94 @@
+package cli
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestEnsureEngineTrustedCodexExactPathIdempotent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfgDir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir codex dir: %v", err)
+	}
+	cfgPath := filepath.Join(cfgDir, "config.toml")
+	initial := "model = \"gpt-5.4\"\n"
+	if err := os.WriteFile(cfgPath, []byte(initial), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	worktree := filepath.Join(t.TempDir(), "worktree")
+	if err := EnsureEngineTrusted("codex", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted first: %v", err)
+	}
+	if err := EnsureEngineTrusted("codex", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted second: %v", err)
+	}
+
+	out, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	text := string(out)
+	header := `[projects."` + escapeTOMLString(worktree) + `"]`
+	if !strings.Contains(text, initial) {
+		t.Fatalf("original config lost:\n%s", text)
+	}
+	if strings.Count(text, header) != 1 {
+		t.Fatalf("expected one trust section for %s, got:\n%s", worktree, text)
+	}
+	if !strings.Contains(text, `trust_level = "trusted"`) {
+		t.Fatalf("trust level missing:\n%s", text)
+	}
+}
+
+func TestEnsureEngineTrustedClaudeWritesProjectTrust(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	claudePath := filepath.Join(home, ".claude.json")
+	initial := map[string]any{
+		"projects": map[string]any{
+			"/data/dev": map[string]any{
+				"hasTrustDialogAccepted": false,
+			},
+		},
+	}
+	raw, err := json.Marshal(initial)
+	if err != nil {
+		t.Fatalf("marshal initial json: %v", err)
+	}
+	if err := os.WriteFile(claudePath, raw, 0o644); err != nil {
+		t.Fatalf("write claude json: %v", err)
+	}
+
+	worktree := filepath.Join(t.TempDir(), "wt")
+	if err := EnsureEngineTrusted("claude-code", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted: %v", err)
+	}
+
+	out, err := os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatalf("read claude json: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("unmarshal claude json: %v", err)
+	}
+	projects := doc["projects"].(map[string]any)
+	entry := projects[worktree].(map[string]any)
+	if got := entry["hasTrustDialogAccepted"]; got != true {
+		t.Fatalf("hasTrustDialogAccepted = %#v, want true", got)
+	}
+	if got := entry["hasCompletedProjectOnboarding"]; got != true {
+		t.Fatalf("hasCompletedProjectOnboarding = %#v, want true", got)
+	}
+	if got := entry["projectOnboardingSeenCount"]; got != float64(1) {
+		t.Fatalf("projectOnboardingSeenCount = %#v, want 1", got)
+	}
+}

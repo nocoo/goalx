@@ -1,0 +1,64 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	ar "github.com/vonbai/autoresearch"
+)
+
+func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".autoresearch"), 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte("target:\n  files: [\"README.md\"]\nharness:\n  command: \"test -f README.md\"\n")
+	if err := os.WriteFile(filepath.Join(projectRoot, ".autoresearch", "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	if err := Init(projectRoot, []string{"ship it", "--develop", "--name", "demo"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if len(cfg.Target.Files) != 1 || cfg.Target.Files[0] != "README.md" {
+		t.Fatalf("target.files = %#v, want [README.md]", cfg.Target.Files)
+	}
+	if cfg.Harness.Command != "test -f README.md" {
+		t.Fatalf("harness.command = %q, want %q", cfg.Harness.Command, "test -f README.md")
+	}
+}
+
+func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".autoresearch"), 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte("master:\n  engine: claude-code\n  model: sonnet\n")
+	if err := os.WriteFile(filepath.Join(projectRoot, ".autoresearch", "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	if err := Init(projectRoot, []string{"investigate it", "--research", "--name", "demo"}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	cfg, err := ar.LoadYAML[ar.Config](filepath.Join(projectRoot, "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if cfg.Engine != "claude-code" || cfg.Model != "sonnet" {
+		t.Fatalf("subagent = %s/%s, want claude-code/sonnet", cfg.Engine, cfg.Model)
+	}
+}

@@ -1,26 +1,19 @@
 // Package autoresearch provides an autonomous research framework.
 //
-// AutoResearch has two personas:
-//
-//   - Level 1 (CLI tool): Pairs with AI coding agents (Claude Code, Codex, Aider)
-//     to run autonomous experiments on any project. Manages tmux sessions,
-//     generates research protocols, tracks results via journals.
-//
-//   - Level 2 (Embeddable SDK): Import into any Go project to add in-process
-//     autonomous research capabilities. Host provides Artifact/Executor/Proposer
-//     implementations; the SDK drives the propose→execute→measure→decide loop.
-//
-// Both levels share core abstractions: Experiment, Metric, Journal, Policy.
+// Master/Subagent architecture. Claude does brain (judgment, research, guidance),
+// Codex does hands (coding, review). The framework only orchestrates
+// (worktree, tmux, journal, heartbeat); all intelligence is in the protocol templates.
 //
 // # Design Philosophy
 //
-//   - Constraints enable autonomy: the framework only does what AI agents can't
-//   - Protocol is the engine: program.md is the soul, not Go code
-//   - Black-box targets: interact via files/commands/APIs, zero coupling
-//   - Elegant, not complex: ~1000 lines of Go + declarative configs/templates
+//   - Framework orchestrates, AI judges: Go code manages worktree/tmux/journal, AI decides if objective is met
+//   - Protocol is the engine: master.md + program.md are the soul, not Go code
+//   - Guide first, restart last: file-based guidance preserves subagent context
+//   - Heartbeat-driven: framework timer triggers master checks, not AI self-loop
 //
 // # Inspiration
 //
-//   - karpathy/autoresearch: autonomous experiment loop (propose→train→measure→keep/revert)
-//   - lidangzzz/goal-driven: goal-driven persistence with clear success criteria
+//   - karpathy/autoresearch: protocol + journal + unattended operation
+//   - lidangzzz/goal-driven: master/subagent + criteria verification + persistence
+//   - OpenClaw: framework-driven heartbeat for periodic agent checks
 package autoresearch

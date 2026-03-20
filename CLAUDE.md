@@ -1,190 +1,139 @@
+<coding_guidelines>
 # CLAUDE.md
 
 ## What Is This
 
-**AutoResearch** — 精巧的自主研究框架（Go）。配合 AI Coding Agent（Claude Code / Codex / Factory Droid / Aider）实现一键启动的自动化开发、测试、研究、优化。
+**AutoResearch** — 自主研究框架（Go）。Master/Subagent 架构，配合 AI Coding Agent 实现一键启动的无人值守调研和开发。
 
-灵感来源：[karpathy/autoresearch](https://github.com/karpathy/autoresearch) 的自主实验循环 + [lidangzzz/goal-driven](https://github.com/lidangzzz/goal-driven) 的目标驱动持久性。
+灵感来源：
+- [karpathy/autoresearch](https://github.com/karpathy/autoresearch)：protocol + journal + 无人值守
+- [lidangzzz/goal-driven](https://github.com/lidangzzz/goal-driven)：master/subagent + 持续运行 + AI 判断目标达成
+
+核心区别：框架只做编排（worktree/tmux/journal），所有判断都交给 AI agent。
 
 ## Principle
 
-个人开发工具，唯一用户是作者本人。不写兼容性代码，不留技术债务，不做无意义防御。
+个人开发工具，唯一用户是作者本人。
 
 ### 核心理念
 
 | 原则 | 含义 |
 |------|------|
-| 约束即自由 | 框架只做 AI agent 不擅长的事（init/journal/tmux/report），AI agent 做所有重活 |
-| 协议即引擎 | program.md 是真正的灵魂，不是 Go 代码。把正确的指令给正确的执行者 |
-| 黑盒目标 | 被研究的系统是黑盒，通过文件/命令/API 交互，零耦合 |
-| 精巧不复杂 | ~1000 行 Go + 声明式配置/模板，不多写一行 |
+| 框架做编排，agent 做判断 | Go 代码管 worktree/tmux/journal，AI 判断目标是否达成 |
+| 协议即引擎 | master.md + program.md 是灵魂 |
+| 有目标有终点 | master agent 判断目标达成即停 |
+| 持久运行 | subagent 偏了 → 引导；崩溃/卡住 → 重启 |
+| 并行探索 | 同一目标 N 个 subagent，master 监督 |
+| 精巧不复杂 | ~700 行 Go + 声明式配置 + protocol 模板 |
 
 ### 禁止事项
 
-- **不自己写 LLM 调用**：AI coding agent 本身就是 LLM engine
-- **不自己写文件编辑逻辑**：AI coding agent 天然具备
-- **不引入复杂抽象**：接口小而专，没有框架膨胀
-- **不静默回退**：harness 崩溃 = 记录 crash + 下一轮，不吞错误
-- **不留 TODO/FIXME/HACK**：每次提交即最优实现
+- **不自己写 LLM 调用**
+- **不自己写 criteria 验证逻辑**：objective 就是 criteria，master agent 理解和判断
+- **不引入复杂抽象**
+- **不留 TODO/FIXME/HACK**
 
 ## Architecture
 
-### 两层设计
+### Master / Subagent
 
 ```
-┌───────────────────────────────────────────────┐
-│  Level 1: CLI 开发工具 (ar)                    │
-│  ──────────────────────                        │
-│  配合 Claude Code / Codex，从外部对任何项目     │
-│  做自主研究。tmux 编排，config 驱动，一键启动。  │
-│                                                │
-│  ar start → init + tmux + AI agent             │
-│  ar status / ar attach / ar stop / ar report   │
-└───────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  goalx — CLI                                                 │
+│                                                           │
+│  goalx start → tmux (1 master + N subagent)                 │
+│  goalx status / goalx attach / goalx stop                          │
+│  goalx review / goalx keep / goalx archive / goalx drop               │
+└──────────────────────────────────────────────────────────┘
 
-┌───────────────────────────────────────────────┐
-│  Level 2: 可嵌入 SDK                           │
-│  ──────────────────────                        │
-│  import 到任何 Go 项目，在进程内跑自主研究循环。 │
-│  宿主系统提供 Artifact/Executor/Proposer 实现。  │
-│                                                │
-│  Engine → Propose → Execute → Measure → Decide │
-└───────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────┐
-│  Shared Core                                   │
-│  ──────────────────────                        │
-│  Experiment / Metric / Journal / Policy        │
-│  两层共享，统一数据模型                         │
-└───────────────────────────────────────────────┘
+tmux session "autoresearch":
+  window "master":    Claude opus 交互模式，framework heartbeat 驱动检查循环
+  window "session-1": AI subagent 干活（Claude/Codex 交互模式）
+  window "session-2": AI subagent 干活（另一条路）
+  + heartbeat goroutine: 每 check_interval send-keys → master
 ```
+
+### 两种模式
+
+| mode | subagent 输出 | 改代码？ |
+|------|--------------|---------|
+| research | 方案报告 | 不改，代码全 readonly |
+| develop | 可工作的代码 | 改 |
 
 ### 数据流
 
 ```
-Level 1 (外部研究):
-  config.yaml → ar start → tmux session → AI agent 读 program.md → 自主循环
-  AI agent: 改文件 → 跑命令 → 看结果 → keep/revert → 记 journal → repeat
+goalx init "objective" [--research|--develop] [--parallel N]
+  → 继承 config → 生成 goalx.yaml
 
-Level 2 (内部研究):
-  宿主系统 → Engine.Run() → Proposer.Propose() → Executor.Execute() → Policy.Decide()
-  → Journal.Record() → repeat
+goalx start [或 goalx start "objective" 合一]
+  → ~/.autoresearch/runs/{project-id}/{name}/ (运行状态)
+  → N worktree (branch: goalx/{name}/{i}) + engine adapter + tmux
+  → heartbeat goroutine 定时触发 master 检查
+  → master 监督 subagent → guidance 引导/重启/停止
+  → 人类醒来: goalx review → keep / archive / drop
 ```
 
 ## Package Layout
 
 ```
 autoresearch/
-├── go.mod                     # module github.com/vonbai/autoresearch
-│
-│  # ── Shared Core ──────────────
-├── experiment.go              # Experiment / ExperimentResult
-├── metric.go                  # Metric / MetricSet / Direction
-├── journal.go                 # Journal (TSV read/write/query)
-├── policy.go                  # Policy: Simple / Pareto / Threshold
-├── config.go                  # ar.yaml 解析
-│
-│  # ── Level 2: SDK ─────────────
-├── engine.go                  # In-process research loop
-├── artifact.go                # Artifact interface
-├── executor.go                # Executor interface
-├── proposer.go                # Proposer interface
-├── session.go                 # Session state machine
-├── report.go                  # Report generation
-│
-│  # ── Level 1: CLI ─────────────
-├── cmd/ar/main.go             # CLI entry: ar start|stop|status|attach|report
+├── go.mod
+├── config.go              # Config / Preset / Engine / Validate / Merge / Slugify
+├── journal.go             # Journal (JSONL)
+├── templates.go           # embed templates/*.tmpl
+├── cmd/goalx/main.go      # CLI entry (12 commands)
 ├── cli/
-│   ├── start.go               # init + tmux + launch
-│   ├── stop.go                # graceful shutdown
-│   ├── status.go              # journal progress display
-│   ├── attach.go              # tmux attach
-│   ├── report.go              # markdown report generation
-│   ├── protocol.go            # program.md template rendering
-│   ├── harness.go             # harness YAML parsing
-│   ├── tmux.go                # tmux session/window management
-│   └── worktree.go            # git worktree create/cleanup
-│
-│  # ── 声明式配置 ────────────────
-├── harnesses/                 # 内置 harness 定义
-│   ├── go-test.yaml
-│   ├── go-bench.yaml
-│   ├── command.yaml
-│   └── http-health.yaml
-├── adapters/                  # AI agent 适配器模板
-│   ├── claude-code.md.tmpl
-│   └── codex.md.tmpl
+│   ├── start.go           # goalx start (full workflow)
+│   ├── init.go            # goalx init (scaffold goalx.yaml)
+│   ├── args.go            # 参数解析（--run, --research, --parallel 等）
+│   ├── runctx.go          # ResolveRun（run 上下文解析）
+│   ├── tmux.go            # tmux 操作封装
+│   ├── worktree.go        # git worktree + merge (ff-only, dirty check)
+│   ├── adapter.go         # engine adapter (claude hooks)
+│   ├── trust.go           # workspace trust 引导 (claude .claude.json / codex config.toml)
+│   ├── heartbeat.go       # heartbeat 命令生成
+│   ├── protocol.go        # 模板渲染 (embedded)
+│   ├── list.go / status.go / attach.go / stop.go
+│   ├── review.go / diff.go / keep.go / archive.go / drop.go / report.go
+│   └── harness.go
 └── templates/
-    ├── program.md.tmpl        # 核心协议模板（框架灵魂）
-    └── report.md.tmpl         # 报告模板
+    ├── master.md.tmpl     # master protocol (heartbeat + acceptance checklist)
+    ├── program.md.tmpl    # subagent protocol (resume-first + guidance)
+    └── report.md.tmpl
 ```
 
-## Key Abstractions
-
-### Shared Core
+## Config Hierarchy
 
 ```
-Experiment:  一次实验（hypothesis + changes + result + verdict）
-Metric:      命名数值 + 方向（minimize/maximize）+ 可选约束
-MetricSet:   一组指标（primary + secondary + constraints）
-Journal:     append-only TSV 实验日志
-Policy:      keep/revert 决策规则（Simple/Pareto/Threshold）
-Verdict:     keep | revert | crash | constraint_violated
+Built-in defaults → ~/.autoresearch/config.yaml → .autoresearch/config.yaml → goalx.yaml → CLI flags
 ```
 
-### Level 2 SDK Interfaces
+### Presets — Claude 做大脑，Codex 做双手
 
-```
-Artifact:    被修改的对象 → Snapshot() / Restore() / Describe()
-Executor:    实验执行器 → Execute(artifact, budget) → ExperimentResult
-Proposer:    假设生成器 → Propose(journal, artifact) → Proposal
-Engine:      主循环编排 → propose → execute → measure → decide → record
-Session:     状态机 → INIT → BASELINE → RUNNING → CONVERGED/STOPPED
-```
+| preset | master | research sub | develop sub |
+|--------|--------|-------------|-------------|
+| default | claude/opus | claude/sonnet | codex/gpt-5.4 |
+| turbo | claude/sonnet | claude/haiku | codex/gpt-5.4-mini |
+| deep | claude/opus | claude/opus | codex/gpt-5.4 |
 
-### Level 1 CLI Concepts
-
-```
-Config:      ar.yaml — 声明式研究定义（单会话或多会话）
-Harness:     实验执行方式 — command + timeout + metric extraction patterns
-Engine:      AI agent 类型 — claude-code / codex / aider / custom
-Adapter:     把 program.md 翻译成 AI agent 能理解的格式
-```
-
-## Config Examples
-
-### 单会话
+gpt-5.3-codex/gpt-5.2 在 codex CLI 触发交互迁移提示，不可用。统一 gpt-5.4。
 
 ```yaml
-objective: "优化动量因子IC"
-engine: claude-code
+# .autoresearch/config.yaml — 项目级（配一次，可选 commit）
 harness:
-  command: "go test -run TestFactorEval -v -count=1 ./..."
-  timeout: 3m
-  metrics:
-    primary: { name: ic_mean, pattern: '^ic_mean:\s+([\d.]+)', direction: maximize }
-target:
-  files: ["factors/momentum.yaml"]
-  readonly: ["factors/eval/"]
-budget:
-  max_rounds: 100
-  convergence: 10
-  target: "ic_mean >= 0.08"
+  command: "go build ./quant_agent/... && go test ./quant_agent/... -count=1"
+target: { readonly: ["pkg/", "cmd/"] }
+
+# goalx.yaml — run 级（只写本次独有的）
+name: event-sourcing
+mode: research
+objective: "调研 event sourcing"
+parallel: 3
+# preset/engine/model 全部继承
 ```
 
-### 多会话并行
-
-```yaml
-sessions:
-  - name: factor-ic
-    objective: "优化动量因子IC"
-    engine: claude-code
-    harness: { ... }
-  - name: scheduler-perf
-    objective: "优化scheduler吞吐量"
-    engine: codex
-    harness: { ... }
-```
+运行状态全在 `~/.autoresearch/runs/`，项目目录零侵入。
 
 ## Commands
 
@@ -192,27 +141,19 @@ sessions:
 go build ./...                    # build
 go test ./... -v                  # test
 go vet ./...                      # lint
-go build -o bin/ar ./cmd/ar       # build CLI binary
+go build -o bin/goalx ./cmd/goalx  # build CLI binary
 ```
 
 ## Conventions
 
 - **Go 100%**
-- Commits: `feat(core|sdk|cli):` / `fix|test|docs|refactor:`
+- Commits: `feat(core|cli):` / `fix|test|docs|refactor:`
 - 文件大小 ≤ 500 行
-- 零技术债务：不留 TODO/FIXME/HACK
+- 零技术债务
 
-## Integration: QuantOS (第一个集成项目)
+## Integration: QuantOS (第一客户)
 
-QuantOS 通过两种方式使用 autoresearch：
-
-1. **Level 1 外部**: 开发者用 `ar start` 从外部研究 QuantOS（改代码、跑测试、看结果）
-2. **Level 2 内部**: QuantOS 的 `quant_agent/autoresearch/` bridge 导入 SDK，让 Agent 在进程内做因子/策略研究
-
-```
-/data/dev/quantos/quant_agent/autoresearch/
-  ├── bridge.go              # SDK → Agent 桥接
-  ├── factor_artifact.go     # Artifact 实现
-  ├── backtest_executor.go   # Executor 实现
-  └── agent_proposer.go      # Proposer 实现（用 Agent 的 LLM）
-```
+用 `goalx start` 驱动 AI agent 研发 QuantOS：
+- research: master 监督 subagent 调研架构方案
+- develop: master 监督 subagent 实施代码改造
+</coding_guidelines>

@@ -1,0 +1,124 @@
+package cli
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	ar "github.com/vonbai/autoresearch"
+)
+
+type startInitOptions struct {
+	Objective string
+	Mode      ar.Mode
+	Parallel  int
+	Name      string
+}
+
+func parseStartInitArgs(args []string) (startInitOptions, error) {
+	opts := startInitOptions{
+		Mode:     ar.ModeDevelop,
+		Parallel: 1,
+	}
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return opts, fmt.Errorf("usage: goalx start \"objective\" [--research|--develop] [--parallel N] [--name NAME]")
+	}
+
+	opts.Objective = args[0]
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--research":
+			opts.Mode = ar.ModeResearch
+		case "--develop":
+			opts.Mode = ar.ModeDevelop
+		case "--parallel":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --parallel")
+			}
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n < 1 {
+				return opts, fmt.Errorf("invalid --parallel value %q", args[i])
+			}
+			opts.Parallel = n
+		case "--name":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --name")
+			}
+			i++
+			opts.Name = args[i]
+		default:
+			return opts, fmt.Errorf("unknown flag %q", args[i])
+		}
+	}
+
+	return opts, nil
+}
+
+func extractRunFlag(args []string) (string, []string, error) {
+	var runName string
+	rest := make([]string, 0, len(args))
+
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--run" {
+			if i+1 >= len(args) {
+				return "", nil, fmt.Errorf("missing value for --run")
+			}
+			runName = args[i+1]
+			i++
+			continue
+		}
+		rest = append(rest, args[i])
+	}
+
+	return runName, rest, nil
+}
+
+func parseStatusArgs(args []string) (runName, sessionName string, err error) {
+	runName, rest, err := extractRunFlag(args)
+	if err != nil {
+		return "", "", err
+	}
+	// Allow positional run name: "goalx status myrun" without --run flag
+	if runName == "" && len(rest) >= 1 {
+		runName = rest[0]
+		rest = rest[1:]
+	}
+	if len(rest) > 1 {
+		return "", "", fmt.Errorf("usage: goalx status [NAME] [session-N]")
+	}
+	if len(rest) == 1 {
+		sessionName = rest[0]
+	}
+	return runName, sessionName, nil
+}
+
+func sessionCount(cfg *ar.Config) int {
+	if len(cfg.Sessions) > 0 {
+		return len(cfg.Sessions)
+	}
+	if cfg.Parallel > 0 {
+		return cfg.Parallel
+	}
+	return 1
+}
+
+func sessionWindowName(runName string, idx int) string {
+	return fmt.Sprintf("%s-%d", runName, idx)
+}
+
+func resolveWindowName(runName, name string) (string, error) {
+	if name == "" || name == "master" || name == "heartbeat" {
+		if name == "" {
+			return "master", nil
+		}
+		return name, nil
+	}
+
+	idx, err := parseSessionIndex(name)
+	if err != nil {
+		return "", fmt.Errorf("invalid window %q (expected master, heartbeat, or session-N)", name)
+	}
+	return sessionWindowName(runName, idx), nil
+}
+
