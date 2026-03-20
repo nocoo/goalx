@@ -21,8 +21,12 @@ Usage:
   goalx diff    [--run NAME] <a> [b]   Diff session code/reports
   goalx keep    [--run NAME] <session> Merge/preserve session
   goalx archive [--run NAME] <session> Git tag + preserve
+  goalx save    [--run NAME]           Save run artifacts to .goalx/runs/<name>/
+  goalx debate                         Generate debate config from latest research
+  goalx implement                      Generate develop config from consensus
   goalx drop    [--run NAME]           Cleanup branch + worktree
   goalx report  [--run NAME]           Generate markdown report from journal
+  goalx next                           Show next pipeline step
 
 Run 'goalx <command> --help' for details.`
 
@@ -65,10 +69,18 @@ func main() {
 		err = cli.Keep(cwd, args)
 	case "archive":
 		err = cli.Archive(cwd, args)
+	case "save":
+		err = cli.Save(cwd, args)
 	case "drop":
 		err = cli.Drop(cwd, args)
 	case "report":
 		err = cli.Report(cwd, args)
+	case "debate":
+		err = cli.Debate(cwd, args)
+	case "implement":
+		err = cli.Implement(cwd, args)
+	case "next":
+		err = cli.Next(cwd, args)
 	case "--help", "-h", "help":
 		fmt.Println(usage)
 	default:
