@@ -66,17 +66,10 @@ type MasterConfig struct {
 }
 
 type ServeConfig struct {
-<<<<<<< HEAD
 	Bind            string            `yaml:"bind,omitempty"`
 	Token           string            `yaml:"token,omitempty"`
 	Workspaces      map[string]string `yaml:"workspaces,omitempty"`
 	NotificationURL string            `yaml:"notification_url,omitempty"`
-=======
-	Bind            string   `yaml:"bind,omitempty"`
-	Token           string   `yaml:"token,omitempty"`
-	Workspaces      []string `yaml:"workspaces,omitempty"`
-	NotificationURL string   `yaml:"notification_url,omitempty"`
->>>>>>> goalx/serve-impl/2
 }
 
 type SessionConfig struct {
@@ -500,11 +493,7 @@ func mergeConfig(base, overlay *Config) {
 		base.Serve.Token = overlay.Serve.Token
 	}
 	if len(overlay.Serve.Workspaces) > 0 {
-<<<<<<< HEAD
 		base.Serve.Workspaces = overlay.Serve.Workspaces
-=======
-		base.Serve.Workspaces = append([]string(nil), overlay.Serve.Workspaces...)
->>>>>>> goalx/serve-impl/2
 	}
 	if overlay.Serve.NotificationURL != "" {
 		base.Serve.NotificationURL = overlay.Serve.NotificationURL

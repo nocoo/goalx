@@ -1,6 +1,5 @@
 package cli
 
-<<<<<<< HEAD
 import (
 	"bytes"
 	"encoding/json"
@@ -608,11 +607,4 @@ func captureServeOutput(fn func() error) (string, error) {
 	}
 
 	return output, runErr
-=======
-import "fmt"
-
-// Serve is a placeholder until the HTTP server lands in this worktree.
-func Serve(projectRoot string, args []string) error {
-	return fmt.Errorf("serve is not implemented yet")
->>>>>>> goalx/serve-impl/2
 }

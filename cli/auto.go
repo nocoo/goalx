@@ -221,40 +221,4 @@ func pollUntilComplete(statusPath string, interval, timeout time.Duration) (*sta
 	return nil, fmt.Errorf("timeout after %v waiting for completion", timeout)
 }
 
-func notifyAutoCompletion(projectRoot string, status *statusJSON) error {
-	cfg, _, err := goalx.LoadConfig(projectRoot)
-	if err != nil {
-		return fmt.Errorf("load config for notification: %w", err)
-	}
-	if cfg.Serve.NotificationURL == "" {
-		return nil
-	}
-
-	payload := map[string]any{
-		"event":          "auto_complete",
-		"run":            cfg.Name,
-		"objective":      cfg.Objective,
-		"phase":          status.Phase,
-		"recommendation": status.Recommendation,
-		"acceptance_met": status.AcceptanceMet,
-		"keep_session":   status.KeepSession,
-		"next_objective": status.NextObjective,
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal notification payload: %w", err)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Post(cfg.Serve.NotificationURL, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("post notification: %w", err)
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("notification webhook returned %s", resp.Status)
-	}
-
-	return nil
-}
+// duplicate removed — kept first declaration above

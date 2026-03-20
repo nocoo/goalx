@@ -233,7 +233,7 @@ defaults:
     bind: 100.110.196.103:18790
     token: user-token
     workspaces:
-      - /srv/user
+      user: /srv/user
     notification_url: http://user.example/hook
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
@@ -249,7 +249,7 @@ defaults:
 serve:
   token: project-token
   workspaces:
-    - /srv/project
+    project: /srv/project
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
@@ -278,8 +278,8 @@ serve:
 	if cfg.Serve.Token != "project-token" {
 		t.Fatalf("serve.token = %q, want project-token", cfg.Serve.Token)
 	}
-	if len(cfg.Serve.Workspaces) != 1 || cfg.Serve.Workspaces[0] != "/srv/project" {
-		t.Fatalf("serve.workspaces = %#v, want [/srv/project]", cfg.Serve.Workspaces)
+	if len(cfg.Serve.Workspaces) != 1 || cfg.Serve.Workspaces["project"] != "/srv/project" {
+		t.Fatalf("serve.workspaces = %#v, want {project:/srv/project}", cfg.Serve.Workspaces)
 	}
 	if cfg.Serve.NotificationURL != "http://run.example/hook" {
 		t.Fatalf("serve.notification_url = %q, want http://run.example/hook", cfg.Serve.NotificationURL)
