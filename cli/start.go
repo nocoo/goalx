@@ -148,6 +148,7 @@ func Start(projectRoot string, args []string) (err error) {
 		Budget:            cfg.Budget,
 		Target:            cfg.Target,
 		Context:           cfg.Context,
+		Preferences:       cfg.Preferences,
 		TmuxSession:       tmuxSess,
 		ProjectRoot:       absProjectRoot,
 		SummaryPath:       filepath.Join(runDir, "summary.md"),

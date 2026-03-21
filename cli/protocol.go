@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	goalx "github.com/vonbai/goalx"
@@ -26,6 +27,7 @@ type ProtocolData struct {
 	Budget            goalx.BudgetConfig
 	Target            goalx.TargetConfig
 	Context           goalx.ContextConfig
+	Preferences       goalx.PreferencesConfig
 	TmuxSession       string
 	ProjectRoot       string
 	SummaryPath       string
@@ -87,7 +89,9 @@ func renderTemplate(tmplPath, outPath string, data any) error {
 		return fmt.Errorf("embedded template %s: %w", tmplPath, err)
 	}
 
-	t, err := template.New(filepath.Base(tmplPath)).Parse(string(tmplContent))
+	t, err := template.New(filepath.Base(tmplPath)).Funcs(template.FuncMap{
+		"join": strings.Join,
+	}).Parse(string(tmplContent))
 	if err != nil {
 		return err
 	}

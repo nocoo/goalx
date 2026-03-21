@@ -246,3 +246,117 @@ esac
 		t.Fatalf("start log missing master session creation:\n%s", logText)
 	}
 }
+
+func TestStartRendersMasterPreferences(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+
+	goalxDir := filepath.Join(repo, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "demo",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Engine:    "codex",
+		Model:     "codex",
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "codex",
+		},
+		Preferences: goalx.PreferencesConfig{
+			Research: goalx.PreferencePolicy{
+				Engines:  []string{"claude-code/opus", "codex/gpt-5.4"},
+				Strategy: "multi-perspective",
+			},
+			Develop: goalx.PreferencePolicy{
+				Engines:  []string{"codex/gpt-5.4"},
+				Strategy: "speed",
+			},
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	binDir := t.TempDir()
+	stateDir := t.TempDir()
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+state="${GOALX_FAKE_TMUX_STATE:?}"
+mkdir -p "$state"
+log="$state/log"
+cmd="$1"
+shift
+echo "$cmd $*" >> "$log"
+case "$cmd" in
+  has-session)
+    target="$2"
+    if [ -f "$state/session_$target" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  new-session)
+    name=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "-s" ]; then
+        shift
+        name="$1"
+        break
+      fi
+      shift
+    done
+    : > "$state/session_$name"
+    exit 0
+    ;;
+  kill-session)
+    target="$2"
+    rm -f "$state/session_$target"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
+
+	if err := Start(repo, nil); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, cfg.Name)
+	masterProtocol, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read master.md: %v", err)
+	}
+	text := string(masterProtocol)
+	for _, want := range []string{
+		"## User Preferences",
+		"| Research | claude-code/opus, codex/gpt-5.4 | multi-perspective |",
+		"| Develop | codex/gpt-5.4 | speed |",
+		"CLI overrides take precedence.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("master.md missing %q:\n%s", want, text)
+		}
+	}
+}
