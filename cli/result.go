@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -22,12 +23,21 @@ func Result(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if runName == "" && len(rest) == 1 {
-		runName = rest[0]
-		rest = nil
+	full := false
+	var positional []string
+	for _, arg := range rest {
+		if arg == "--full" {
+			full = true
+			continue
+		}
+		positional = append(positional, arg)
 	}
-	if len(rest) > 0 {
-		return fmt.Errorf("usage: goalx result [NAME]")
+	if runName == "" && len(positional) == 1 {
+		runName = positional[0]
+		positional = nil
+	}
+	if len(positional) > 0 {
+		return fmt.Errorf("usage: goalx result [NAME] [--full]")
 	}
 
 	runDir, err := resolveSavedRunDir(projectRoot, runName)
@@ -45,7 +55,11 @@ func Result(projectRoot string, args []string) error {
 		if err != nil {
 			return fmt.Errorf("read summary: %w", err)
 		}
-		fmt.Print(string(data))
+		if full {
+			fmt.Print(string(data))
+			return nil
+		}
+		printResearchResult(data)
 		return nil
 	}
 
@@ -67,6 +81,95 @@ func Result(projectRoot string, args []string) error {
 	}
 	fmt.Print(string(diffOut))
 	return nil
+}
+
+func parseSections(data []byte) map[string]string {
+	sections := make(map[string]string)
+	var current string
+	var body []string
+
+	flush := func() {
+		if current == "" {
+			return
+		}
+		sections[current] = strings.TrimSpace(strings.Join(body, "\n"))
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "## ") {
+			flush()
+			current = strings.TrimSpace(strings.TrimPrefix(line, "## "))
+			body = body[:0]
+			continue
+		}
+		if current != "" {
+			body = append(body, line)
+		}
+	}
+	flush()
+	return sections
+}
+
+func printResearchResult(data []byte) {
+	fmt.Println("=== Research Result ===")
+	fmt.Print(renderResearchSummary(data))
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("Full report: goalx result --full")
+}
+
+func renderResearchSummary(data []byte) string {
+	sections := parseSections(data)
+	var parts []string
+
+	if recommendation := firstNonEmptyLine(sections["Recommendation"]); recommendation != "" {
+		parts = append(parts, "Recommendation: "+recommendation)
+	}
+
+	if findings := summarizeSectionLines(sections["Key Findings"], 5); findings != "" {
+		parts = append(parts, "Key Findings:\n"+findings)
+	}
+
+	if fixes := strings.TrimSpace(sections["Priority Fix List"]); fixes != "" {
+		parts = append(parts, "Priority Fix List:\n"+fixes)
+	}
+
+	if len(parts) == 0 {
+		return strings.TrimSpace(string(data))
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func firstNonEmptyLine(section string) string {
+	for _, line := range strings.Split(section, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func summarizeSectionLines(section string, limit int) string {
+	if limit < 1 {
+		return ""
+	}
+
+	var lines []string
+	for _, line := range strings.Split(section, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	if len(lines) <= limit {
+		return strings.Join(lines, "\n")
+	}
+	return strings.Join(append(lines[:limit], fmt.Sprintf("... (%d more lines)", len(lines)-limit)), "\n")
 }
 
 func resolveSavedRunDir(projectRoot, runName string) (string, error) {

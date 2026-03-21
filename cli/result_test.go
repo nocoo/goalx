@@ -105,6 +105,98 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 	}
 }
 
+func TestResultPrintsSmartResearchSummaryByDefault(t *testing.T) {
+	projectRoot := t.TempDir()
+
+	writeSavedResultRun(t, projectRoot, "smart-run", goalx.Config{
+		Name: "smart-run",
+		Mode: goalx.ModeResearch,
+		Target: goalx.TargetConfig{
+			Files: []string{"report.md"},
+		},
+	}, map[string]string{
+		"summary.md": strings.TrimSpace(`
+# Summary
+
+## Key Findings
+- finding 1
+- finding 2
+- finding 3
+- finding 4
+- finding 5
+- finding 6
+
+## Priority Fix List
+- P0: config.go
+- P1: cli/result.go
+
+## Recommendation
+implement
+
+## Appendix
+hidden details
+`) + "\n",
+	})
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"smart-run"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"=== Research Result ===",
+		"Recommendation: implement",
+		"- finding 1",
+		"... (1 more lines)",
+		"- P0: config.go",
+		"Full report: goalx result --full",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("result output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "hidden details") {
+		t.Fatalf("smart result output should omit appendix details:\n%s", out)
+	}
+}
+
+func TestResultPrintsFullResearchSummaryWithFullFlag(t *testing.T) {
+	projectRoot := t.TempDir()
+
+	summary := strings.TrimSpace(`
+# Summary
+
+## Key Findings
+- finding 1
+
+## Recommendation
+done
+
+## Appendix
+hidden details
+`) + "\n"
+	writeSavedResultRun(t, projectRoot, "smart-run", goalx.Config{
+		Name: "smart-run",
+		Mode: goalx.ModeResearch,
+		Target: goalx.TargetConfig{
+			Files: []string{"report.md"},
+		},
+	}, map[string]string{
+		"summary.md": summary,
+	})
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"smart-run", "--full"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+
+	if out != summary {
+		t.Fatalf("full result output mismatch:\nwant:\n%s\ngot:\n%s", summary, out)
+	}
+}
+
 func writeSavedResultRun(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) string {
 	t.Helper()
 

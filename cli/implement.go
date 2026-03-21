@@ -49,11 +49,14 @@ func Implement(projectRoot string, args []string) error {
 
 	harness := baseCfg.Harness.Command
 	if harness == "" {
-		harness = "go build ./... && go test ./... -count=1 && go vet ./..."
+		harness = InferHarness(projectRoot)
+	}
+	if harness == "" {
+		harness = "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"
 	}
 	targetFiles := baseCfg.Target.Files
 	if len(targetFiles) == 0 {
-		targetFiles = []string{"."}
+		targetFiles = InferTarget(projectRoot)
 	}
 
 	// Read saved config for objective context

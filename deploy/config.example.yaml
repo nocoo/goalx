@@ -16,7 +16,7 @@ serve:
 # Uncomment to override built-in defaults
 # engines:
 #   claude-code:
-#     command: "claude --model {model_id} --permission-mode auto"
+#     command: "claude --model {model_id} --permission-mode bypassPermissions"
 #     models:
 #       opus: claude-opus-4-6
 #       sonnet: claude-sonnet-4-6
