@@ -26,6 +26,10 @@ func Debate(projectRoot string, args []string) error {
 	if preset == "" {
 		preset = "claude"
 	}
+	budget := savedCfg.Budget
+	if budget.MaxDuration == 0 {
+		budget.MaxDuration = 2 * 3600_000_000_000
+	}
 
 	// Collect report files (absolute paths for worktree access)
 	var contextFiles []string
@@ -85,7 +89,7 @@ func Debate(projectRoot string, args []string) error {
 			Readonly: []string{"."},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -s report.md && echo 'ok'"},
-		Budget:  goalx.BudgetConfig{MaxDuration: 2 * 3600_000_000_000},
+		Budget:  budget,
 	}
 	goalx.ApplyPreset(&cfg)
 
