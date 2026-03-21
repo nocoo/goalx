@@ -33,7 +33,7 @@ Usage:
   goalx result  [NAME]                 Show saved summary or merged result details
   goalx add     "direction" [--run NAME] Add a session to a running run
   goalx observe [NAME]                 Capture live output from all tmux windows
-  goalx auto    "objective" [flags]   Start one master-led run and wait for completion
+  goalx auto    "objective" [flags]   Init and start one master-led run, then exit
   goalx serve                         Start the GoalX HTTP control server
   goalx next                           Show next pipeline step
 

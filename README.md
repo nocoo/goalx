@@ -55,7 +55,7 @@ goalx start
 # Watch progress
 goalx observe
 
-# Full auto — research → debate → implement → keep
+# Start a master-led run in the background
 goalx auto "refactor the config system" --research --parallel 2
 ```
 
@@ -65,7 +65,7 @@ goalx auto "refactor the config system" --research --parallel 2
 |---------|-------------|
 | `goalx init` | Generate config from objective |
 | `goalx start` | Launch tmux session with the master only |
-| `goalx auto` | Start one master-led run and wait for completion |
+| `goalx auto` | Init and start one master-led run, then exit |
 | `goalx observe` | Live tmux capture from all agents |
 | `goalx status` | Journal-based progress summary |
 | `goalx add` | Add a session to a running run |

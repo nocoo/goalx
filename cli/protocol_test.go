@@ -181,6 +181,8 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 	}
 	text := string(out)
 	for _, want := range []string{
+		"## Mode",
+		"The user specified **develop** mode.",
 		"## Your Job",
 		"acceptance criteria",
 		"/tmp/acceptance.md",

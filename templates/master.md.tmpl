@@ -18,6 +18,12 @@ You are NOT a coach. Subagents are autonomous — they decide how to break down 
 {{end}}{{range .Context.Refs}}- {{.}}
 {{end}}
 {{- end}}
+{{if .Mode}}
+
+## Mode
+
+The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
+{{- end}}
 
 ## Sessions
 
