@@ -70,7 +70,7 @@ func TestImplementUsesInferredHarnessAndTargetWhenConfigIsEmpty(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Implement(projectRoot, nil); err != nil {
+	if err := Implement(projectRoot, nil, nil); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 

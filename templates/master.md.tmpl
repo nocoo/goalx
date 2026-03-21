@@ -22,6 +22,22 @@ Distribute relevant context to subagents via guidance when needed.
 - **{{.Name}}**: tmux `{{$.TmuxSession}}:{{.WindowName}}`, worktree `{{.WorktreePath}}`, journal `{{.JournalPath}}`, guidance `{{.GuidancePath}}`
 {{end}}
 
+{{if .Engines}}
+## Available Engines
+
+| Engine | Best For | Models |
+|--------|----------|--------|
+{{range $name, $ec := .Engines}}| {{$name}} | {{$ec.Description}} | {{range $alias, $id := $ec.Models}}{{$alias}} {{end}} |
+{{end}}
+
+## Current Configuration
+
+- Preset: {{.Preset}}
+- Master: {{.Master.Engine}}/{{.Master.Model}}
+{{range .Sessions}}- {{.Name}}: {{.Engine}}/{{.Model}}{{if .Hint}} ({{.Hint}}){{end}}
+{{end}}
+{{end}}
+
 ## Tools
 
 You have full bash access to all worktrees, tmux sessions, and the project root (`{{.ProjectRoot}}`).
@@ -91,9 +107,16 @@ When the objective is genuinely achieved:
    | `debate` | Sessions disagree and you need a structured debate round. | false |
    | `more-research` | Evidence is still insufficient; set `next_objective` and continue research. | false |
 
-2. Update `{{.StatusPath}}` with JSON: phase, recommendation, heartbeat count, acceptance_met, keep_session, next_objective
-   Example:
-   `{"phase":"complete","recommendation":"done","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}`
+2. Update `{{.StatusPath}}` with JSON:
+   ```json
+   {"phase":"complete","recommendation":"done","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}
+   ```
+   For `implement` or `debate`, you can optionally add `next_config` to override the next phase:
+   ```json
+   {"phase":"complete","recommendation":"implement","heartbeat":5,"acceptance_met":true,"next_config":{"parallel":3,"engine":"codex","model":"codex","diversity_hints":["P0 fixes","P1 fixes","verification"],"budget_seconds":7200}}
+   ```
+   Supported `next_config` keys: `parallel`, `engine`, `model`, `diversity_hints`, `budget_seconds`, `objective`.
+   If `next_config` is omitted, the framework uses defaults. Rules: parallel 1-10, engine from Available Engines, model must match the selected engine.
    Set `keep_session` when a develop-mode session should be merged after the run.
 3. **Verification before `done`**:
 {{if eq .Mode "develop"}}

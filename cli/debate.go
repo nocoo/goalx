@@ -14,12 +14,16 @@ import (
 // Debate generates a goalx.yaml for a debate round based on prior research.
 // It finds the latest research run in .goalx/runs/, reads its reports,
 // and creates a config with opposing diversity hints.
-func Debate(projectRoot string, args []string) error {
+func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	// Find the latest saved research run
 	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
 	run, runDir, err := findLatestSavedRun(savesDir, goalx.ModeResearch)
 	if err != nil {
 		return fmt.Errorf("no saved research run found in .goalx/runs/: %w", err)
+	}
+	_, engines, err := goalx.LoadRawBaseConfig(projectRoot)
+	if err != nil {
+		return fmt.Errorf("load base config: %w", err)
 	}
 	savedCfg, _ := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
 	preset := savedCfg.Preset
@@ -51,13 +55,13 @@ func Debate(projectRoot string, args []string) error {
 	}
 	sort.Strings(sessionNames)
 
-	var hints []string
+	var defaultHints []string
 	if len(sessionNames) <= 1 {
 		sessionName := "session-1"
 		if len(sessionNames) == 1 {
 			sessionName = sessionNames[0]
 		}
-		hints = []string{
+		defaultHints = []string{
 			fmt.Sprintf("你是倡导者。用代码证据支持 %s 报告的结论和方案。", sessionName),
 			fmt.Sprintf("你是批评者。用代码证据挑战 %s 报告的每一个结论，寻找遗漏和替代方案。", sessionName),
 		}
@@ -69,29 +73,41 @@ func Debate(projectRoot string, args []string) error {
 					others = append(others, other)
 				}
 			}
-			hints = append(hints, fmt.Sprintf(
+			defaultHints = append(defaultHints, fmt.Sprintf(
 				"你支持 %s 的观点。用代码证据辩护 %s 报告中的结论，挑战 %s 的结论。如果对方证据更强，愿意让步。最终输出共识清单。",
 				sessionName, sessionName, strings.Join(others, "、"),
 			))
 		}
 	}
 
+	defaults := goalx.Config{
+		Preset: preset,
+		Mode:   goalx.ModeResearch,
+		Engine: savedCfg.Engine,
+		Model:  savedCfg.Model,
+	}
+	goalx.ApplyPreset(&defaults)
+	parallel := nextConfigParallel(2, nc)
+	engine, model := resolveNextEngineModel(engines, defaults.Engine, defaults.Model, nc)
+
 	// Generate debate config
 	cfg := goalx.Config{
-		Name:      "debate",
-		Mode:      goalx.ModeResearch,
-		Objective: fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单", run),
-		Preset:    preset,
-		Parallel:  2,
-		DiversityHints: hints,
-		Context: goalx.ContextConfig{Files: contextFiles},
+		Name:           "debate",
+		Mode:           goalx.ModeResearch,
+		Objective:      nextConfigObjective(fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单", run), nc),
+		Preset:         preset,
+		Engine:         engine,
+		Model:          model,
+		Parallel:       parallel,
+		DiversityHints: nextConfigHints(defaultHints, parallel, nc),
+		Context:        goalx.ContextConfig{Files: contextFiles},
 		Target: goalx.TargetConfig{
 			Files:    []string{"report.md"},
 			Readonly: []string{"."},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -s report.md && echo 'ok'"},
 		Master:  master,
-		Budget:  budget,
+		Budget:  goalx.BudgetConfig{MaxDuration: nextConfigBudget(budget.MaxDuration, nc)},
 	}
 	goalx.ApplyPreset(&cfg)
 

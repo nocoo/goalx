@@ -245,6 +245,9 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 	data := ProtocolData{
 		Objective:      "ship it",
 		Mode:           goalx.ModeDevelop,
+		Preset:         "claude",
+		Engines:        goalx.BuiltinEngines,
+		Master:         goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:    "ar-demo",
 		SummaryPath:    "/tmp/summary.md",
 		AcceptancePath: "/tmp/acceptance.md",
@@ -257,6 +260,9 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 				WorktreePath: "/tmp/worktree",
 				JournalPath:  "/tmp/journal.jsonl",
 				GuidancePath: "/tmp/guidance.md",
+				Engine:       "codex",
+				Model:        "codex",
+				Hint:         "P0 fixes",
 			},
 		},
 	}
@@ -271,8 +277,13 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 	}
 	text := string(out)
 	for _, want := range []string{
+		"## Available Engines",
+		"## Current Configuration",
+		"- Preset: claude",
+		"- session-1: codex/codex (P0 fixes)",
 		"Write summary to `/tmp/summary.md`",
-		"Update `/tmp/status.json` with JSON: phase, recommendation, heartbeat count, acceptance_met, keep_session, next_objective",
+		"Supported `next_config` keys: `parallel`, `engine`, `model`, `diversity_hints`, `budget_seconds`, `objective`.",
+		`{"phase":"complete","recommendation":"implement","heartbeat":5,"acceptance_met":true,"next_config":{"parallel":3,"engine":"codex","model":"codex","diversity_hints":["P0 fixes","P1 fixes","verification"],"budget_seconds":7200}}`,
 		`{"phase":"complete","recommendation":"done","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}`,
 		"| `implement` | Acceptance criteria are met for this phase and the next step is code changes. | true |",
 		"Functional verification: for each acceptance checklist item, record concrete PASS/FAIL evidence beyond the gate.",

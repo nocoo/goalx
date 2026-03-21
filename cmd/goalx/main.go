@@ -116,9 +116,9 @@ func runCommand(cwd, cmd string, args []string) error {
 	case "result":
 		return cli.Result(cwd, args)
 	case "debate":
-		return cli.Debate(cwd, args)
+		return cli.Debate(cwd, args, nil)
 	case "implement":
-		return cli.Implement(cwd, args)
+		return cli.Implement(cwd, args, nil)
 	case "add":
 		return cli.Add(cwd, args)
 	case "observe":

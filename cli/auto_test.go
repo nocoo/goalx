@@ -360,6 +360,140 @@ func TestAutoSkipsInitAfterImplement(t *testing.T) {
 	}
 }
 
+func TestAutoRoutesNextConfigIntoImplement(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubAutoVerifyHarness(t, func(string) error { return nil })
+
+	projectRoot := t.TempDir()
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldImplement := autoImplement
+	oldPollUntilComplete := autoPollUntilComplete
+	autoInit = func(string, []string) error { return nil }
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	var gotNC *nextConfigJSON
+	autoImplement = func(_ string, _ []string, nc *nextConfigJSON) error {
+		gotNC = nc
+		return nil
+	}
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "implement",
+				NextConfig: &nextConfigJSON{
+					Parallel:       3,
+					Engine:         "codex",
+					Model:          "fast",
+					DiversityHints: []string{"P0", "P1", "verify"},
+					BudgetSeconds:  600,
+				},
+			}, nil
+		case 2:
+			return &statusJSON{Phase: "complete", Recommendation: "done", AcceptanceMet: true}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoImplement = oldImplement
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+	if gotNC == nil {
+		t.Fatal("implement next_config = nil, want forwarded payload")
+	}
+	if gotNC.Parallel != 3 || gotNC.Engine != "codex" || gotNC.Model != "fast" {
+		t.Fatalf("implement next_config = %#v, want forwarded values", gotNC)
+	}
+}
+
+func TestAutoRoutesNextConfigIntoDebate(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubAutoVerifyHarness(t, func(string) error { return nil })
+
+	projectRoot := t.TempDir()
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldDebate := autoDebate
+	oldPollUntilComplete := autoPollUntilComplete
+	autoInit = func(string, []string) error { return nil }
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	var gotNC *nextConfigJSON
+	autoDebate = func(_ string, _ []string, nc *nextConfigJSON) error {
+		gotNC = nc
+		return nil
+	}
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "debate",
+				NextConfig: &nextConfigJSON{
+					Parallel:       11,
+					Engine:         "codex",
+					Model:          "fast",
+					DiversityHints: []string{"for", "against"},
+				},
+			}, nil
+		case 2:
+			return &statusJSON{Phase: "complete", Recommendation: "done", AcceptanceMet: true}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoDebate = oldDebate
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+	if gotNC == nil {
+		t.Fatal("debate next_config = nil, want forwarded payload")
+	}
+	if gotNC.Parallel != 10 {
+		t.Fatalf("parallel = %d, want capped 10", gotNC.Parallel)
+	}
+}
+
 func TestAutoImplementContinuesWhenAcceptanceMetTrue(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -425,6 +559,31 @@ func TestAutoImplementContinuesWhenAcceptanceMetTrue(t *testing.T) {
 	}
 	if pollCalls != 2 {
 		t.Fatalf("poll calls = %d, want 2", pollCalls)
+	}
+}
+
+func TestValidateNextConfigRejectsInvalidFields(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	got := validateNextConfig(projectRoot, &nextConfigJSON{
+		Parallel:       99,
+		Engine:         "unknown-engine",
+		BudgetSeconds:  -1,
+		DiversityHints: []string{"a", "b"},
+	})
+	if got == nil {
+		t.Fatal("validateNextConfig returned nil")
+	}
+	if got.Parallel != 10 {
+		t.Fatalf("parallel = %d, want 10", got.Parallel)
+	}
+	if got.Engine != "" {
+		t.Fatalf("engine = %q, want empty", got.Engine)
+	}
+	if got.BudgetSeconds != 0 {
+		t.Fatalf("budget_seconds = %d, want 0", got.BudgetSeconds)
 	}
 }
 
@@ -802,6 +961,84 @@ func TestAutoMoreResearchPreservesOriginalFlags(t *testing.T) {
 	}()
 
 	if err := Auto(projectRoot, []string{"ship it", "--preset", "codex", "--parallel", "3"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+}
+
+func TestAutoMoreResearchUsesNextConfigOverrides(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubAutoVerifyHarness(t, func(string) error { return nil })
+
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir goalx dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "goalx.yaml"), []byte("name: demo\nobjective: ship it\ntarget:\n  files: [README.md]\nharness:\n  command: go test ./...\n"), 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	initCalls := 0
+	autoInit = func(_ string, args []string) error {
+		initCalls++
+		if initCalls == 2 {
+			want := []string{"investigate auth", "--research", "--parallel", "10", "--preset", "codex"}
+			if len(args) != len(want) {
+				return errors.New("more-research next_config args were not applied")
+			}
+			for i := range want {
+				if args[i] != want[i] {
+					return errors.New("more-research next_config args were not applied")
+				}
+			}
+		}
+		return nil
+	}
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "more-research",
+				NextObjective:  "investigate auth",
+				NextConfig: &nextConfigJSON{
+					Parallel: 99,
+					Preset:   "codex",
+				},
+			}, nil
+		case 2:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "done",
+				AcceptanceMet:  true,
+			}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
 		t.Fatalf("Auto: %v", err)
 	}
 }

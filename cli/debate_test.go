@@ -27,7 +27,7 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, nil); err != nil {
+	if err := Debate(projectRoot, nil, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -37,5 +37,54 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 	}
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
 		t.Fatalf("master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
+	}
+}
+
+func TestDebateAppliesNextConfigOverrides(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Preset:    "claude",
+		Parallel:  2,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	nc := &nextConfigJSON{
+		Parallel:       3,
+		Engine:         "codex",
+		Model:          "fast",
+		DiversityHints: []string{"angle A", "angle B", "angle C"},
+		BudgetSeconds:  900,
+		Objective:      "custom debate objective",
+	}
+	if err := Debate(projectRoot, nil, nc); err != nil {
+		t.Fatalf("Debate: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if cfg.Parallel != 3 {
+		t.Fatalf("parallel = %d, want 3", cfg.Parallel)
+	}
+	if cfg.Engine != "codex" || cfg.Model != "fast" {
+		t.Fatalf("engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+	}
+	if cfg.Objective != "custom debate objective" {
+		t.Fatalf("objective = %q, want custom debate objective", cfg.Objective)
+	}
+	if cfg.Budget.MaxDuration != 15*60*1_000_000_000 {
+		t.Fatalf("budget = %v, want 15m", cfg.Budget.MaxDuration)
+	}
+	if len(cfg.DiversityHints) != 3 || cfg.DiversityHints[2] != "angle C" {
+		t.Fatalf("diversity_hints = %#v, want next_config values", cfg.DiversityHints)
 	}
 }

@@ -86,9 +86,10 @@ type SessionConfig struct {
 
 // EngineConfig defines how to launch an AI engine.
 type EngineConfig struct {
-	Command string            `yaml:"command"`
-	Prompt  string            `yaml:"prompt"`
-	Models  map[string]string `yaml:"models"`
+	Description string            `yaml:"description,omitempty"`
+	Command     string            `yaml:"command"`
+	Prompt      string            `yaml:"prompt"`
+	Models      map[string]string `yaml:"models"`
 }
 
 // PresetConfig defines engine/model for master, research, and develop roles.
@@ -139,8 +140,9 @@ var Presets = map[string]PresetConfig{
 // BuiltinEngines are the default engine definitions.
 var BuiltinEngines = map[string]EngineConfig{
 	"claude-code": {
-		Command: "claude --model {model_id} --permission-mode auto",
-		Prompt:  "Read {protocol} and follow it exactly.",
+		Description: "Deep reasoning and long-form research synthesis.",
+		Command:     "claude --model {model_id} --permission-mode auto",
+		Prompt:      "Read {protocol} and follow it exactly.",
 		Models: map[string]string{
 			"opus":   "claude-opus-4-6",
 			"sonnet": "claude-sonnet-4-6",
@@ -148,8 +150,9 @@ var BuiltinEngines = map[string]EngineConfig{
 		},
 	},
 	"codex": {
-		Command: "codex -m {model_id} -a never -s danger-full-access",
-		Prompt:  "Read {protocol} and follow it exactly.",
+		Description: "Fast code editing, testing, and implementation work.",
+		Command:     "codex -m {model_id} -a never -s danger-full-access",
+		Prompt:      "Read {protocol} and follow it exactly.",
 		Models: map[string]string{
 			"codex":    "gpt-5.4",
 			"best":     "gpt-5.4",
@@ -158,8 +161,9 @@ var BuiltinEngines = map[string]EngineConfig{
 		},
 	},
 	"aider": {
-		Command: "aider --model {model_id} --no-auto-commits --yes",
-		Prompt:  "/read {protocol}",
+		Description: "Interactive multi-file editing with explicit diffs.",
+		Command:     "aider --model {model_id} --no-auto-commits --yes",
+		Prompt:      "/read {protocol}",
 		Models: map[string]string{
 			"opus":   "claude-opus-4-6",
 			"sonnet": "claude-sonnet-4-6",

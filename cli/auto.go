@@ -17,6 +17,7 @@ import (
 
 const maxAutoIterations = 5
 const maxHeartbeatStallPolls = 5
+const maxNextConfigParallel = 10
 
 var (
 	autoInit              = Init
@@ -24,6 +25,8 @@ var (
 	autoSave              = Save
 	autoKeep              = Keep
 	autoDrop              = Drop
+	autoDebate            = Debate
+	autoImplement         = Implement
 	autoPollUntilComplete = pollUntilComplete
 	autoVerifyHarness     = verifyHarness
 	autoHTTPClient        = &http.Client{Timeout: 10 * time.Second}
@@ -31,12 +34,25 @@ var (
 
 // statusJSON matches the structure master writes to .goalx/status.json
 type statusJSON struct {
-	Phase          string `json:"phase"`
-	Recommendation string `json:"recommendation"`
-	Heartbeat      int    `json:"heartbeat"`
-	AcceptanceMet  bool   `json:"acceptance_met"`
-	KeepSession    string `json:"keep_session"`
-	NextObjective  string `json:"next_objective"`
+	Phase          string          `json:"phase"`
+	Recommendation string          `json:"recommendation"`
+	Heartbeat      int             `json:"heartbeat"`
+	AcceptanceMet  bool            `json:"acceptance_met"`
+	KeepSession    string          `json:"keep_session"`
+	NextObjective  string          `json:"next_objective"`
+	NextConfig     *nextConfigJSON `json:"next_config,omitempty"`
+}
+
+type nextConfigJSON struct {
+	Parallel       int      `json:"parallel,omitempty"`
+	Engine         string   `json:"engine,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	Preset         string   `json:"preset,omitempty"`
+	DiversityHints []string `json:"diversity_hints,omitempty"`
+	Strategies     []string `json:"strategies,omitempty"`
+	BudgetSeconds  int      `json:"budget_seconds,omitempty"`
+	Objective      string   `json:"objective,omitempty"`
+	Harness        string   `json:"harness,omitempty"`
 }
 
 type autoCompletionPayload struct {
@@ -99,6 +115,7 @@ func Auto(projectRoot string, args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("poll (iter %d): %w", i, err)
 		}
+		status.NextConfig = validateNextConfig(projectRoot, status.NextConfig)
 		finalStatus = status
 
 		if status.Recommendation == "done" {
@@ -139,14 +156,14 @@ func Auto(projectRoot string, args []string) (err error) {
 		switch rec {
 		case "debate":
 			fmt.Println("Starting debate round...")
-			if err := Debate(projectRoot, nil); err != nil {
+			if err := autoDebate(projectRoot, nil, status.NextConfig); err != nil {
 				return fmt.Errorf("debate (iter %d): %w", i, err)
 			}
 			needsInit = false
 
 		case "implement":
 			fmt.Println("Starting implementation...")
-			if err := Implement(projectRoot, nil); err != nil {
+			if err := autoImplement(projectRoot, nil, status.NextConfig); err != nil {
 				return fmt.Errorf("implement (iter %d): %w", i, err)
 			}
 			needsInit = false
@@ -161,6 +178,12 @@ func Auto(projectRoot string, args []string) (err error) {
 			initArgs = []string{obj}
 			if len(originalArgs) > 1 {
 				initArgs = append(initArgs, originalArgs[1:]...)
+			}
+			if status.NextConfig != nil && status.NextConfig.Parallel > 0 {
+				initArgs = append(initArgs, "--parallel", fmt.Sprint(status.NextConfig.Parallel))
+			}
+			if status.NextConfig != nil && status.NextConfig.Preset != "" {
+				initArgs = append(initArgs, "--preset", status.NextConfig.Preset)
 			}
 			if !hasMode(initArgs) {
 				initArgs = append(initArgs, "--research")
@@ -318,6 +341,166 @@ func notifyAutoCompletion(projectRoot string, status *statusJSON) error {
 		return fmt.Errorf("status %s", resp.Status)
 	}
 	return fmt.Errorf("status %s: %s", resp.Status, string(msg))
+}
+
+func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON {
+	if nc == nil {
+		return nil
+	}
+
+	validated := *nc
+	validated.Engine = strings.TrimSpace(validated.Engine)
+	validated.Model = strings.TrimSpace(validated.Model)
+	validated.Preset = strings.TrimSpace(validated.Preset)
+	validated.Objective = strings.TrimSpace(validated.Objective)
+	validated.Harness = strings.TrimSpace(validated.Harness)
+	validated.DiversityHints = normalizeNextConfigHints(validated.DiversityHints, 0)
+
+	if validated.Parallel < 0 {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.parallel=%d (must be >= 0)\n", validated.Parallel)
+		validated.Parallel = 0
+	} else if validated.Parallel > maxNextConfigParallel {
+		fmt.Fprintf(os.Stderr, "warning: capping next_config.parallel=%d to %d\n", validated.Parallel, maxNextConfigParallel)
+		validated.Parallel = maxNextConfigParallel
+	}
+	if validated.BudgetSeconds < 0 {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.budget_seconds=%d (must be >= 0)\n", validated.BudgetSeconds)
+		validated.BudgetSeconds = 0
+	}
+	if len(validated.DiversityHints) > maxNextConfigParallel {
+		fmt.Fprintf(os.Stderr, "warning: truncating next_config.diversity_hints to %d entries\n", maxNextConfigParallel)
+		validated.DiversityHints = validated.DiversityHints[:maxNextConfigParallel]
+	}
+
+	engines := goalx.BuiltinEngines
+	if _, loadedEngines, err := goalx.LoadRawBaseConfig(projectRoot); err == nil && len(loadedEngines) > 0 {
+		engines = loadedEngines
+	}
+	if validated.Engine != "" {
+		if _, ok := engines[validated.Engine]; !ok {
+			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.engine=%q (unknown engine)\n", validated.Engine)
+			validated.Engine = ""
+		}
+	}
+
+	return &validated
+}
+
+func nextConfigParallel(fallback int, nc *nextConfigJSON) int {
+	if nc != nil && nc.Parallel > 0 {
+		return nc.Parallel
+	}
+	return fallback
+}
+
+func nextConfigObjective(fallback string, nc *nextConfigJSON) string {
+	if nc != nil && nc.Objective != "" {
+		return nc.Objective
+	}
+	return fallback
+}
+
+func nextConfigBudget(fallback time.Duration, nc *nextConfigJSON) time.Duration {
+	if nc != nil && nc.BudgetSeconds > 0 {
+		return time.Duration(nc.BudgetSeconds) * time.Second
+	}
+	return fallback
+}
+
+func nextConfigHints(fallback []string, parallel int, nc *nextConfigJSON) []string {
+	if nc == nil || len(nc.DiversityHints) == 0 {
+		return normalizeNextConfigHints(fallback, parallel)
+	}
+	return normalizeNextConfigHints(nc.DiversityHints, parallel)
+}
+
+func normalizeNextConfigHints(hints []string, parallel int) []string {
+	if len(hints) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, len(hints))
+	for i, hint := range hints {
+		normalized[i] = strings.TrimSpace(hint)
+	}
+	if parallel > 0 && len(normalized) > parallel {
+		return normalized[:parallel]
+	}
+	return normalized
+}
+
+func resolveNextEngineModel(engines map[string]goalx.EngineConfig, defaultEngine, defaultModel string, nc *nextConfigJSON) (string, string) {
+	if len(engines) == 0 {
+		engines = goalx.BuiltinEngines
+	}
+
+	engine := defaultEngine
+	model := defaultModel
+	if nc == nil {
+		return engine, model
+	}
+
+	if nc.Engine != "" {
+		if _, ok := engines[nc.Engine]; ok {
+			engine = nc.Engine
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.engine=%q (unknown engine)\n", nc.Engine)
+		}
+	}
+	if nc.Model != "" {
+		if err := validateNextConfigModel(engines, engine, nc.Model); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.model=%q for engine %q: %v\n", nc.Model, engine, err)
+		} else {
+			model = nc.Model
+		}
+	}
+
+	return engine, model
+}
+
+func validateNextConfigModel(engines map[string]goalx.EngineConfig, engine, model string) error {
+	if strings.TrimSpace(model) == "" {
+		return nil
+	}
+	if strings.TrimSpace(engine) == "" {
+		return fmt.Errorf("engine is required")
+	}
+	if modelAliasBelongsToOtherEngine(engines, engine, model) {
+		return fmt.Errorf("model alias belongs to a different engine")
+	}
+	if _, err := goalx.ResolveEngineCommand(engines, engine, model); err != nil {
+		return err
+	}
+
+	modelID := model
+	if ec, ok := engines[engine]; ok {
+		if resolved, ok := ec.Models[model]; ok {
+			modelID = resolved
+		}
+	}
+	if engine == "codex" && (modelID == "gpt-5.3-codex" || modelID == "gpt-5.2") {
+		return fmt.Errorf("model resolves to an interactive Codex migration target")
+	}
+	return nil
+}
+
+func modelAliasBelongsToOtherEngine(engines map[string]goalx.EngineConfig, engine, model string) bool {
+	ec, ok := engines[engine]
+	if !ok {
+		return false
+	}
+	if _, ok := ec.Models[model]; ok {
+		return false
+	}
+	for otherEngine, other := range engines {
+		if otherEngine == engine {
+			continue
+		}
+		if _, ok := other.Models[model]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func hasMode(args []string) bool {

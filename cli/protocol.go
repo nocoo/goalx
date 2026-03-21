@@ -16,6 +16,8 @@ type ProtocolData struct {
 	Description       string
 	Mode              goalx.Mode
 	Engine            string
+	Preset            string
+	Engines           map[string]goalx.EngineConfig
 	Sessions          []SessionData
 	Master            goalx.MasterConfig
 	Harness           goalx.HarnessConfig
@@ -47,6 +49,8 @@ type SessionData struct {
 	JournalPath   string
 	GuidancePath  string
 	Engine        string
+	Model         string
+	Hint          string
 	EngineCommand string
 	Prompt        string
 }
