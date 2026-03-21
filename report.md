@@ -203,4 +203,23 @@
 
 ---
 
-## Next: Round 2 will investigate the precise implementation — what should roster.md contain, how should the protocol template reference it, and what code changes are needed in start.go and add.go.
+## Finding 9: Implementation complete — Go data plumbing for shared context
+
+- **Confidence**: HIGH
+- **Evidence**:
+  - `cli/protocol.go:35`: Added `SessionIndex int` field to `ProtocolData` (0-based index for identifying this session in the roster)
+  - `cli/start.go:240,245-246,252`: Populated three new fields in subagent `subData`:
+    - `Sessions: sessionDataList` — full roster of all sessions with Name, WindowName, WorktreePath, JournalPath, GuidancePath
+    - `SessionIndex: i` — this session's position in the roster
+    - `AcceptancePath: acceptancePath` — path to master's acceptance checklist
+  - Gate passed: `go build ./...`, `go vet ./...`, `go test ./... -count=1` all green (3 packages, 0 failures)
+  - Commit: `4b86ee0`
+- **Counter-evidence**: None — the fields were already defined in `ProtocolData` but simply not populated for subagents. This is a pure wiring fix.
+- **Implication**: The template (`program.md.tmpl`, owned by session-2) can now access `{{.Sessions}}`, `{{.SessionIndex}}`, `{{len .Sessions}}`, and `{{.AcceptancePath}}` to render team context into subagent protocols. The data plumbing is complete; the template rendering is the remaining work.
+
+---
+
+## Next: Awaiting master for further direction. Potential remaining research angles:
+- How should `cli/add.go` handle updating the roster when a dynamic session is added?
+- What's the optimal roster rendering format in program.md.tmpl (minimal vs. detailed)?
+- Should subagent protocols include other sessions' diversity hints for self-differentiation?
