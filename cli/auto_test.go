@@ -1104,6 +1104,114 @@ func TestAutoMoreResearchUsesNextConfigOverrides(t *testing.T) {
 	}
 }
 
+func TestAutoMoreResearchAppliesFullNextConfigToGeneratedConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubAutoVerifyHarness(t, func(string) error { return nil })
+
+	projectRoot := t.TempDir()
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	initCalls := 0
+	startCalls := 0
+	autoInit = func(projectRoot string, args []string) error {
+		initCalls++
+		if initCalls == 1 {
+			return nil
+		}
+		return Init(projectRoot, args)
+	}
+	autoStart = func(projectRoot string, args []string) error {
+		startCalls++
+		if startCalls == 2 {
+			cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+			if err != nil {
+				t.Fatalf("load generated goalx.yaml: %v", err)
+			}
+			if cfg.Engine != "codex" || cfg.Model != "fast" {
+				t.Fatalf("engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+			}
+			if cfg.Parallel != 3 {
+				t.Fatalf("parallel = %d, want 3", cfg.Parallel)
+			}
+			if cfg.Objective != "overridden research objective" {
+				t.Fatalf("objective = %q, want overridden research objective", cfg.Objective)
+			}
+			if cfg.Budget.MaxDuration != 15*60*time.Second {
+				t.Fatalf("budget = %v, want 15m", cfg.Budget.MaxDuration)
+			}
+			if cfg.Harness.Command != "test -s report.md && echo overridden" {
+				t.Fatalf("harness = %q, want overridden harness", cfg.Harness.Command)
+			}
+			wantHints := []string{
+				goalx.BuiltinStrategies["depth"],
+				goalx.BuiltinStrategies["adversarial"],
+				"verification lane",
+			}
+			if len(cfg.DiversityHints) != len(wantHints) {
+				t.Fatalf("diversity_hints = %#v, want %#v", cfg.DiversityHints, wantHints)
+			}
+			for i := range wantHints {
+				if cfg.DiversityHints[i] != wantHints[i] {
+					t.Fatalf("diversity_hints[%d] = %q, want %q", i, cfg.DiversityHints[i], wantHints[i])
+				}
+			}
+		}
+		return nil
+	}
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "more-research",
+				NextObjective:  "investigate auth",
+				NextConfig: &nextConfigJSON{
+					Parallel:       3,
+					Engine:         "codex",
+					Model:          "fast",
+					Strategies:     []string{"depth", "adversarial"},
+					DiversityHints: []string{"verification lane"},
+					BudgetSeconds:  900,
+					Objective:      "overridden research objective",
+					Harness:        "test -s report.md && echo overridden",
+				},
+			}, nil
+		case 2:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "done",
+				AcceptanceMet:  true,
+			}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+}
+
 func TestPollUntilCompleteRequiresRecommendation(t *testing.T) {
 	statusPath := filepath.Join(t.TempDir(), "status.json")
 	writeStatus := func(raw string) {

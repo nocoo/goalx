@@ -95,3 +95,47 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 		t.Fatalf("diversity_hints = %#v, want next_config values", cfg.DiversityHints)
 	}
 }
+
+func TestImplementResolvesNextConfigStrategiesIntoHints(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
+		Name:      "debate",
+		Mode:      goalx.ModeResearch,
+		Objective: "consensus fixes",
+		Preset:    "claude",
+		Parallel:  2,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	nc := &nextConfigJSON{
+		Parallel:       3,
+		Strategies:     []string{"depth", "adversarial"},
+		DiversityHints: []string{"verification"},
+	}
+	if err := Implement(projectRoot, nil, nc); err != nil {
+		t.Fatalf("Implement: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	wantHints := []string{
+		goalx.BuiltinStrategies["depth"],
+		goalx.BuiltinStrategies["adversarial"],
+		"verification",
+	}
+	if len(cfg.DiversityHints) != len(wantHints) {
+		t.Fatalf("diversity_hints = %#v, want %#v", cfg.DiversityHints, wantHints)
+	}
+	for i := range wantHints {
+		if cfg.DiversityHints[i] != wantHints[i] {
+			t.Fatalf("diversity_hints[%d] = %q, want %q", i, cfg.DiversityHints[i], wantHints[i])
+		}
+	}
+}

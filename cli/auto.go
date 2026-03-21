@@ -13,6 +13,7 @@ import (
 	"time"
 
 	goalx "github.com/vonbai/goalx"
+	"gopkg.in/yaml.v3"
 )
 
 const maxAutoIterations = 5
@@ -87,6 +88,7 @@ func Auto(projectRoot string, args []string) (err error) {
 	var lastPhaseStartedAt time.Time
 	notified := false
 	activeTmuxSession := ""
+	var pendingInitConfig *nextConfigJSON
 	prevHeartbeatInterval := autoPollHeartbeatInterval
 	autoPollHeartbeatInterval = defaultHeartbeatCheckInterval
 
@@ -119,6 +121,10 @@ func Auto(projectRoot string, args []string) (err error) {
 			if err := autoInit(projectRoot, initArgs); err != nil {
 				return fmt.Errorf("init (iter %d): %w", i, err)
 			}
+			if err := applyGeneratedConfigNextConfig(projectRoot, pendingInitConfig); err != nil {
+				return fmt.Errorf("apply next_config (iter %d): %w", i, err)
+			}
+			pendingInitConfig = nil
 		}
 		if err := autoStart(projectRoot, nil); err != nil {
 			return fmt.Errorf("start (iter %d): %w", i, err)
@@ -219,6 +225,7 @@ func Auto(projectRoot string, args []string) (err error) {
 				initArgs = append(initArgs, "--research")
 			}
 			needsInit = true
+			pendingInitConfig = status.NextConfig
 
 		default:
 			return fmt.Errorf("unknown recommendation %q", rec)
@@ -385,6 +392,7 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.Objective = strings.TrimSpace(validated.Objective)
 	validated.Harness = strings.TrimSpace(validated.Harness)
 	validated.DiversityHints = normalizeNextConfigHints(validated.DiversityHints, 0)
+	validated.Strategies = normalizeNextConfigHints(validated.Strategies, 0)
 
 	if validated.Parallel < 0 {
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.parallel=%d (must be >= 0)\n", validated.Parallel)
@@ -401,6 +409,10 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		fmt.Fprintf(os.Stderr, "warning: truncating next_config.diversity_hints to %d entries\n", maxNextConfigParallel)
 		validated.DiversityHints = validated.DiversityHints[:maxNextConfigParallel]
 	}
+	if len(validated.Strategies) > maxNextConfigParallel {
+		fmt.Fprintf(os.Stderr, "warning: truncating next_config.strategies to %d entries\n", maxNextConfigParallel)
+		validated.Strategies = validated.Strategies[:maxNextConfigParallel]
+	}
 
 	engines := goalx.BuiltinEngines
 	if _, loadedEngines, err := goalx.LoadRawBaseConfig(projectRoot); err == nil && len(loadedEngines) > 0 {
@@ -410,6 +422,12 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		if _, ok := engines[validated.Engine]; !ok {
 			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.engine=%q (unknown engine)\n", validated.Engine)
 			validated.Engine = ""
+		}
+	}
+	if len(validated.Strategies) > 0 {
+		if _, err := goalx.ResolveStrategies(validated.Strategies); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.strategies: %v\n", err)
+			validated.Strategies = nil
 		}
 	}
 
@@ -438,10 +456,16 @@ func nextConfigBudget(fallback time.Duration, nc *nextConfigJSON) time.Duration 
 }
 
 func nextConfigHints(fallback []string, parallel int, nc *nextConfigJSON) []string {
-	if nc == nil || len(nc.DiversityHints) == 0 {
+	if nc == nil {
 		return normalizeNextConfigHints(fallback, parallel)
 	}
-	return normalizeNextConfigHints(nc.DiversityHints, parallel)
+	strategyHints := nextConfigStrategyHints(nc)
+	if len(strategyHints) == 0 && len(nc.DiversityHints) == 0 {
+		return normalizeNextConfigHints(fallback, parallel)
+	}
+	merged := append([]string(nil), strategyHints...)
+	merged = append(merged, nc.DiversityHints...)
+	return normalizeNextConfigHints(merged, parallel)
 }
 
 func normalizeNextConfigHints(hints []string, parallel int) []string {
@@ -449,14 +473,33 @@ func normalizeNextConfigHints(hints []string, parallel int) []string {
 		return nil
 	}
 
-	normalized := make([]string, len(hints))
-	for i, hint := range hints {
-		normalized[i] = strings.TrimSpace(hint)
+	normalized := make([]string, 0, len(hints))
+	for _, hint := range hints {
+		hint = strings.TrimSpace(hint)
+		if hint == "" {
+			continue
+		}
+		normalized = append(normalized, hint)
+	}
+	if len(normalized) == 0 {
+		return nil
 	}
 	if parallel > 0 && len(normalized) > parallel {
 		return normalized[:parallel]
 	}
 	return normalized
+}
+
+func nextConfigStrategyHints(nc *nextConfigJSON) []string {
+	if nc == nil || len(nc.Strategies) == 0 {
+		return nil
+	}
+	hints, err := goalx.ResolveStrategies(nc.Strategies)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.strategies: %v\n", err)
+		return nil
+	}
+	return hints
 }
 
 func resolveNextEngineModel(engines map[string]goalx.EngineConfig, defaultEngine, defaultModel string, nc *nextConfigJSON) (string, string) {
@@ -540,6 +583,45 @@ func hasMode(args []string) bool {
 		}
 	}
 	return false
+}
+
+func applyGeneratedConfigNextConfig(projectRoot string, nc *nextConfigJSON) error {
+	if nc == nil {
+		return nil
+	}
+
+	cfgPath := filepath.Join(projectRoot, ".goalx", "goalx.yaml")
+	cfg, err := goalx.LoadYAML[goalx.Config](cfgPath)
+	if err != nil {
+		return fmt.Errorf("load generated config: %w", err)
+	}
+
+	_, engines, err := goalx.LoadRawBaseConfig(projectRoot)
+	if err != nil {
+		return fmt.Errorf("load base config: %w", err)
+	}
+
+	if nc.Preset != "" {
+		cfg.Preset = nc.Preset
+		goalx.ApplyPreset(&cfg)
+	}
+	cfg.Parallel = nextConfigParallel(cfg.Parallel, nc)
+	cfg.Objective = nextConfigObjective(cfg.Objective, nc)
+	cfg.Budget.MaxDuration = nextConfigBudget(cfg.Budget.MaxDuration, nc)
+	if nc.Harness != "" {
+		cfg.Harness.Command = nc.Harness
+	}
+	cfg.DiversityHints = nextConfigHints(cfg.DiversityHints, cfg.Parallel, nc)
+	cfg.Engine, cfg.Model = resolveNextEngineModel(engines, cfg.Engine, cfg.Model, nc)
+
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("marshal generated config: %w", err)
+	}
+	if err := os.WriteFile(cfgPath, data, 0o644); err != nil {
+		return fmt.Errorf("write generated config: %w", err)
+	}
+	return nil
 }
 
 // pollUntilComplete reads status.json every interval until phase=complete or timeout.
