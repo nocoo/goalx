@@ -161,6 +161,10 @@ Read the acceptance checklist in `{{.AcceptancePath}}` and the subagent's report
   One of: debate | implement | done | more-research
   Reason: {why this is the right next step}
   ```
+- When you write the summary, also update `{{.StatusPath}}`.
+- Set `recommendation` to exactly one of: `debate`, `implement`, `done`, `more-research`.
+- Set `keep_session` when a develop-mode session should be merged after the run.
+- If you choose `more-research`, also set `next_objective` to the precise follow-up question.
 - Stop the relevant subagent: `tmux send-keys -t {{.TmuxSession}}:<window-name> C-c`
 
 **All sessions done or dead — Synthesize results:**

@@ -131,3 +131,45 @@ func TestRenderMasterProtocolIncludesResearchPreflightDimensionSelection(t *test
 		}
 	}
 }
+
+func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:      "ship it",
+		Mode:           goalx.ModeDevelop,
+		TmuxSession:    "ar-demo",
+		SummaryPath:    "/tmp/summary.md",
+		AcceptancePath: "/tmp/acceptance.md",
+		StatusPath:     "/tmp/status.json",
+		EngineCommand:  "claude --model claude-opus-4-6 --permission-mode auto",
+		Sessions: []SessionData{
+			{
+				Name:         "session-1",
+				WindowName:   "demo-1",
+				WorktreePath: "/tmp/worktree",
+				JournalPath:  "/tmp/journal.jsonl",
+				GuidancePath: "/tmp/guidance.md",
+			},
+		},
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"When you write the summary, also update `/tmp/status.json`.",
+		"Set `recommendation` to exactly one of: `debate`, `implement`, `done`, `more-research`.",
+		"Set `keep_session` when a develop-mode session should be merged after the run.",
+		"If you choose `more-research`, also set `next_objective` to the precise follow-up question.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
