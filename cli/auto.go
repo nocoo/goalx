@@ -53,6 +53,7 @@ type autoCompletionPayload struct {
 func Auto(projectRoot string, args []string) (err error) {
 	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
 	initArgs := args // first iteration uses the user's original args
+	needsInit := true
 	var finalStatus *statusJSON
 
 	defer func() {
@@ -68,8 +69,10 @@ func Auto(projectRoot string, args []string) (err error) {
 		fmt.Printf("\n=== auto iteration %d/%d ===\n", i+1, maxAutoIterations)
 
 		// Init + Start
-		if err := autoInit(projectRoot, initArgs); err != nil {
-			return fmt.Errorf("init (iter %d): %w", i, err)
+		if needsInit {
+			if err := autoInit(projectRoot, initArgs); err != nil {
+				return fmt.Errorf("init (iter %d): %w", i, err)
+			}
 		}
 		if err := autoStart(projectRoot, nil); err != nil {
 			return fmt.Errorf("start (iter %d): %w", i, err)
@@ -120,14 +123,14 @@ func Auto(projectRoot string, args []string) (err error) {
 			if err := Debate(projectRoot, nil); err != nil {
 				return fmt.Errorf("debate (iter %d): %w", i, err)
 			}
-			initArgs = nil // subsequent Start uses goalx.yaml as-is
+			needsInit = false
 
 		case "implement":
 			fmt.Println("Starting implementation...")
 			if err := Implement(projectRoot, nil); err != nil {
 				return fmt.Errorf("implement (iter %d): %w", i, err)
 			}
-			initArgs = nil
+			needsInit = false
 
 		case "more-research":
 			obj := status.NextObjective
@@ -137,6 +140,7 @@ func Auto(projectRoot string, args []string) (err error) {
 			}
 			fmt.Printf("Re-initializing with new objective: %s\n", obj)
 			initArgs = []string{"--research", obj}
+			needsInit = true
 
 		default:
 			fmt.Printf("Unknown recommendation %q. Stopping.\n", rec)

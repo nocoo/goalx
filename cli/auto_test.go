@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	goalx "github.com/vonbai/goalx"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAutoPostsCompletionWebhookWhenConfigured(t *testing.T) {
@@ -155,5 +159,158 @@ serve:
 
 	if err := Auto(projectRoot, []string{"ship it"}); err != nil {
 		t.Fatalf("Auto should ignore webhook failure, got: %v", err)
+	}
+}
+
+func TestAutoSkipsInitAfterDebate(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Preset:    "codex",
+		Parallel:  3,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	initCalls := 0
+	autoInit = func(string, []string) error {
+		initCalls++
+		if initCalls > 1 {
+			return errUnexpectedSecondInit
+		}
+		return nil
+	}
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{Phase: "complete", Recommendation: "debate"}, nil
+		case 2:
+			return &statusJSON{Phase: "complete", Recommendation: "done", AcceptanceMet: true}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+	if initCalls != 1 {
+		t.Fatalf("init calls = %d, want 1", initCalls)
+	}
+}
+
+func TestAutoSkipsInitAfterImplement(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
+		Name:      "debate",
+		Mode:      goalx.ModeResearch,
+		Objective: "consensus fixes",
+		Preset:    "codex",
+		Parallel:  2,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	initCalls := 0
+	autoInit = func(string, []string) error {
+		initCalls++
+		if initCalls > 1 {
+			return errUnexpectedSecondInit
+		}
+		return nil
+	}
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{Phase: "complete", Recommendation: "implement"}, nil
+		case 2:
+			return &statusJSON{Phase: "complete", Recommendation: "done", AcceptanceMet: true}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+	if initCalls != 1 {
+		t.Fatalf("init calls = %d, want 1", initCalls)
+	}
+}
+
+var errUnexpectedSecondInit = errors.New("unexpected second init")
+
+func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) {
+	t.Helper()
+
+	runDir := filepath.Join(projectRoot, ".goalx", "runs", runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(runDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
 	}
 }
