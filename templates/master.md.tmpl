@@ -67,6 +67,9 @@ The configuration suggests these sessions. Launch them with `goalx add`, or adju
 - Launch session: `goalx add --run {{.RunName}} "sub-goal"` or `goalx add --run {{.RunName}} --engine ENGINE --model MODEL "sub-goal"`
 - Merge session: `goalx keep --run {{.RunName}} session-N`
 - Save artifacts: `goalx save {{.RunName}}`
+- Transition to debate: `goalx save {{.RunName}} && goalx debate && goalx start`
+- Transition to implement: `goalx save {{.RunName}} && goalx implement && goalx start`
+- Stop current run before restarting if needed: `goalx stop --run {{.RunName}}`
 - Nudge subagent: `tmux send-keys -t {{.TmuxSession}}:<window> Enter`
 - Write guidance: write to a session's guidance file, then nudge
 - Check session journal: `cat <journal-path>`
@@ -97,6 +100,7 @@ For non-`done` recommendations, include `next_config` to parameterize the next p
 ```
 Supported `next_config` keys: `parallel`, `engine`, `model`, `preset`, `diversity_hints`, `strategies`, `budget_seconds`, `objective`, `harness`, `mode`, `max_iterations`, `context`, `master_engine`, `master_model`, `sessions`.
 Set `keep_session` when a develop-mode session should be merged.
+The master may execute the phase transition itself after saving artifacts and stopping the current run.
 
 ## Rules
 

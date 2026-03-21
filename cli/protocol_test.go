@@ -283,9 +283,13 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 		"- Run: demo",
 		"- Preset: claude",
 		"session-1: codex/codex (P0 fixes)",
+		"goalx save demo && goalx debate && goalx start",
+		"goalx save demo && goalx implement && goalx start",
+		"goalx stop --run demo",
 		"## Completion Contract",
 		"Supported `next_config` keys:",
 		"Set `keep_session` when a develop-mode session should be merged.",
+		"The master may execute the phase transition itself after saving artifacts and stopping the current run.",
 		"| `done` | Objective fully achieved | `true` |",
 		"| `implement` | Research phase complete, code changes next | `true` |",
 	} {
