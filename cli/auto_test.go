@@ -789,6 +789,58 @@ func TestAutoKillsTmuxSessionWhenPollFails(t *testing.T) {
 	}
 }
 
+func TestAutoPassesResolvedTmuxSessionIntoPoller(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubAutoVerifyHarness(t, func(string) error { return nil })
+
+	projectRoot := t.TempDir()
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	oldResolveRun := autoResolveRun
+	oldPollTmuxSession := autoPollTmuxSession
+	autoInit = func(string, []string) error { return nil }
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	autoResolveRun = func(projectRoot, runName string) (*RunContext, error) {
+		return &RunContext{
+			Name:        "demo",
+			RunDir:      filepath.Join(projectRoot, ".goalx", "runs", "demo"),
+			TmuxSession: "goalx-demo",
+			Config: &goalx.Config{
+				Master: goalx.MasterConfig{CheckInterval: 2 * time.Minute},
+				Budget: goalx.BudgetConfig{MaxDuration: time.Hour},
+			},
+		}, nil
+	}
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		if autoPollTmuxSession != "goalx-demo" {
+			t.Fatalf("poll tmux session = %q, want goalx-demo", autoPollTmuxSession)
+		}
+		return &statusJSON{Phase: "complete", Recommendation: "done", AcceptanceMet: true}, nil
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+		autoResolveRun = oldResolveRun
+		autoPollTmuxSession = oldPollTmuxSession
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+}
+
 func TestAutoMoreResearchPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -1257,6 +1309,29 @@ func TestPollUntilCompleteDetectsStalledHeartbeat(t *testing.T) {
 	}
 }
 
+func TestPollUntilCompleteFailsFastWhenTmuxSessionDies(t *testing.T) {
+	statusPath := filepath.Join(t.TempDir(), "status.json")
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":0}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+
+	oldSessionExists := autoSessionExists
+	autoSessionExists = func(session string) bool {
+		if session != "goalx-demo" {
+			t.Fatalf("session = %q, want goalx-demo", session)
+		}
+		return false
+	}
+	defer func() {
+		autoSessionExists = oldSessionExists
+	}()
+
+	_, err := pollUntilCompleteWithHeartbeatSession(statusPath, 2*time.Millisecond, 40*time.Millisecond, 10*time.Millisecond, "goalx-demo")
+	if err == nil || !strings.Contains(err.Error(), "tmux session goalx-demo exited") {
+		t.Fatalf("pollUntilComplete error = %v, want tmux exit", err)
+	}
+}
+
 func TestPollUntilCompleteGracePeriodBeforeSecondHeartbeat(t *testing.T) {
 	statusPath := filepath.Join(t.TempDir(), "status.json")
 	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":0}`), 0o644); err != nil {
@@ -1273,6 +1348,34 @@ func TestHeartbeatStallPollLimitScalesWithCheckInterval(t *testing.T) {
 	got := heartbeatStallPollLimit(2*time.Minute, 30*time.Second)
 	if got != 32 {
 		t.Fatalf("stall poll limit = %d, want 32", got)
+	}
+}
+
+func TestPollUntilCompleteLogsProgressWhileWaiting(t *testing.T) {
+	statusPath := filepath.Join(t.TempDir(), "status.json")
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":0}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+
+	go func() {
+		time.Sleep(14 * time.Millisecond)
+		if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","heartbeat":0}`), 0o644); err != nil {
+			t.Errorf("write completion status: %v", err)
+		}
+	}()
+
+	out := captureStdout(t, func() {
+		got, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 60*time.Millisecond, 10*time.Millisecond)
+		if err != nil {
+			t.Fatalf("pollUntilCompleteWithHeartbeat: %v", err)
+		}
+		if got.Recommendation != "done" {
+			t.Fatalf("recommendation = %q, want done", got.Recommendation)
+		}
+	})
+
+	if !strings.Contains(out, "polling progress -- phase: running") {
+		t.Fatalf("poll output missing progress log:\n%s", out)
 	}
 }
 

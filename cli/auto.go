@@ -20,6 +20,7 @@ const maxAutoIterations = 5
 const maxNextConfigParallel = 10
 const minHeartbeatStallPolls = 10
 const defaultHeartbeatCheckInterval = 2 * time.Minute
+const heartbeatProgressPollInterval = 5
 
 var (
 	autoInit              = Init
@@ -31,12 +32,14 @@ var (
 	autoImplement         = Implement
 	autoResolveRun        = ResolveRun
 	autoKillSession       = KillSession
+	autoSessionExists     = SessionExists
 	autoPollUntilComplete = func(statusPath string, interval, timeout time.Duration) (*statusJSON, error) {
-		return pollUntilCompleteWithHeartbeat(statusPath, interval, timeout, autoPollHeartbeatInterval)
+		return pollUntilCompleteWithHeartbeatSession(statusPath, interval, timeout, autoPollHeartbeatInterval, autoPollTmuxSession)
 	}
 	autoPollHeartbeatInterval = defaultHeartbeatCheckInterval
-	autoVerifyHarness     = verifyHarness
-	autoHTTPClient        = &http.Client{Timeout: 10 * time.Second}
+	autoPollTmuxSession       = ""
+	autoVerifyHarness         = verifyHarness
+	autoHTTPClient            = &http.Client{Timeout: 10 * time.Second}
 )
 
 // statusJSON matches the structure master writes to .goalx/status.json
@@ -90,7 +93,9 @@ func Auto(projectRoot string, args []string) (err error) {
 	activeTmuxSession := ""
 	var pendingInitConfig *nextConfigJSON
 	prevHeartbeatInterval := autoPollHeartbeatInterval
+	prevPollTmuxSession := autoPollTmuxSession
 	autoPollHeartbeatInterval = defaultHeartbeatCheckInterval
+	autoPollTmuxSession = ""
 
 	notifyCompletion := func() {
 		if notified || err != nil || finalStatus == nil {
@@ -104,6 +109,7 @@ func Auto(projectRoot string, args []string) (err error) {
 
 	defer func() {
 		autoPollHeartbeatInterval = prevHeartbeatInterval
+		autoPollTmuxSession = prevPollTmuxSession
 		if err != nil && activeTmuxSession != "" {
 			if killErr := autoKillSession(activeTmuxSession); killErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: cleanup tmux session %s: %v\n", activeTmuxSession, killErr)
@@ -145,7 +151,9 @@ func Auto(projectRoot string, args []string) (err error) {
 
 		// Poll until complete
 		fmt.Println("Waiting for run to complete...")
+		autoPollTmuxSession = activeTmuxSession
 		status, err := autoPollUntilComplete(statusPath, 30*time.Second, pollTimeout)
+		autoPollTmuxSession = ""
 		if err != nil {
 			return fmt.Errorf("poll (iter %d): %w", i, err)
 		}
@@ -630,13 +638,20 @@ func pollUntilComplete(statusPath string, interval, timeout time.Duration) (*sta
 }
 
 func pollUntilCompleteWithHeartbeat(statusPath string, interval, timeout, checkInterval time.Duration) (*statusJSON, error) {
+	return pollUntilCompleteWithHeartbeatSession(statusPath, interval, timeout, checkInterval, "")
+}
+
+func pollUntilCompleteWithHeartbeatSession(statusPath string, interval, timeout, checkInterval time.Duration, tmuxSession string) (*statusJSON, error) {
 	deadline := time.Now().Add(timeout)
 	lastHB := -1
 	stalledPolls := 0
 	heartbeatChanges := 0
 	stallLimit := heartbeatStallPollLimit(checkInterval, interval)
+	pollCount := 0
+	stallReported := false
 
 	for time.Now().Before(deadline) {
+		pollCount++
 		data, err := os.ReadFile(statusPath)
 		if err == nil && len(data) > 0 {
 			var s statusJSON
@@ -646,14 +661,32 @@ func pollUntilCompleteWithHeartbeat(statusPath string, interval, timeout, checkI
 					lastHB = s.Heartbeat
 					heartbeatChanges++
 					stalledPolls = 0
+					stallReported = false
 				} else if heartbeatChanges >= 2 {
 					stalledPolls++
 					if s.Phase != "complete" && stalledPolls >= stallLimit {
+						if tmuxSession != "" {
+							if !autoSessionExists(tmuxSession) {
+								return nil, fmt.Errorf("tmux session %s exited while waiting for completion", tmuxSession)
+							}
+							if !stallReported {
+								fmt.Printf("  heartbeat stalled at %d but tmux session %s is still alive; continuing to wait\n", s.Heartbeat, tmuxSession)
+								stallReported = true
+							}
+							time.Sleep(interval)
+							continue
+						}
 						return nil, fmt.Errorf("heartbeat stalled at %d while phase=%s", s.Heartbeat, s.Phase)
 					}
 				}
 				if s.Phase == "complete" && s.Recommendation != "" {
 					return &s, nil
+				}
+				if s.Phase != "complete" && pollCount%heartbeatProgressPollInterval == 0 {
+					fmt.Printf("  polling progress -- phase: %s heartbeat: %d stalled: %d/%d\n", s.Phase, s.Heartbeat, stalledPolls, stallLimit)
+				}
+				if tmuxSession != "" && s.Phase != "complete" && pollCount%heartbeatProgressPollInterval == 0 && !autoSessionExists(tmuxSession) {
+					return nil, fmt.Errorf("tmux session %s exited while waiting for completion", tmuxSession)
 				}
 			}
 		}
