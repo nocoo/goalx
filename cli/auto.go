@@ -16,6 +16,7 @@ import (
 )
 
 const maxAutoIterations = 5
+const maxHeartbeatStallPolls = 5
 
 var (
 	autoInit              = Init
@@ -290,6 +291,7 @@ func hasMode(args []string) bool {
 func pollUntilComplete(statusPath string, interval, timeout time.Duration) (*statusJSON, error) {
 	deadline := time.Now().Add(timeout)
 	lastHB := -1
+	stalledPolls := 0
 
 	for time.Now().Before(deadline) {
 		data, err := os.ReadFile(statusPath)
@@ -299,6 +301,12 @@ func pollUntilComplete(statusPath string, interval, timeout time.Duration) (*sta
 				if s.Heartbeat != lastHB {
 					fmt.Printf("  heartbeat %d -- phase: %s\n", s.Heartbeat, s.Phase)
 					lastHB = s.Heartbeat
+					stalledPolls = 0
+				} else {
+					stalledPolls++
+					if s.Phase != "complete" && stalledPolls >= maxHeartbeatStallPolls {
+						return nil, fmt.Errorf("heartbeat stalled at %d while phase=%s", s.Heartbeat, s.Phase)
+					}
 				}
 				if s.Phase == "complete" && s.Recommendation != "" {
 					return &s, nil

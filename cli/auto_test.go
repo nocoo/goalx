@@ -547,6 +547,18 @@ func TestPollUntilCompleteRequiresRecommendation(t *testing.T) {
 	}
 }
 
+func TestPollUntilCompleteDetectsStalledHeartbeat(t *testing.T) {
+	statusPath := filepath.Join(t.TempDir(), "status.json")
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":1}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+
+	_, err := pollUntilComplete(statusPath, 5*time.Millisecond, 200*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "heartbeat stalled") {
+		t.Fatalf("pollUntilComplete error = %v, want heartbeat stalled", err)
+	}
+}
+
 func TestAutoPrintsResearchResultsSummary(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
