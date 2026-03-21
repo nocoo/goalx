@@ -33,6 +33,10 @@ You have full access to all worktrees via bash commands. Specifically you CAN:
 - Detect file overlaps across sessions: `git diff --name-only` per branch
 - Run goalx CLI commands from the project root (`cd {{.ProjectRoot}}`):
   - `goalx add "direction"` — spawn a new subagent session mid-run
+  - `goalx add --engine claude-code --model opus "direction"` — choose engine/model based on task:
+    - Need creativity/deep analysis → claude-code/opus
+    - Need stable execution/audit → codex/gpt-5.4
+    - Quick scan → claude-code/sonnet
   - `goalx keep session-N` — merge a session's branch into main (develop mode)
   - `goalx save` — save run artifacts to .goalx/runs/
   - These are your tools. Use them when the objective requires it.

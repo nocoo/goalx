@@ -85,33 +85,43 @@ type EngineConfig struct {
 	Models  map[string]string `yaml:"models"`
 }
 
-// UserConfig is the top-level user config file (~/.goalx/config.yaml).
-type UserConfig struct {
-	Defaults Config                  `yaml:"defaults,omitempty"`
-	Engines  map[string]EngineConfig `yaml:"engines,omitempty"`
-	Serve    ServeConfig             `yaml:"serve,omitempty"`
+// PresetConfig defines engine/model for master, research, and develop roles.
+type PresetConfig struct {
+	Master   MasterConfig  `yaml:"master,omitempty"`
+	Research SessionConfig `yaml:"research,omitempty"`
+	Develop  SessionConfig `yaml:"develop,omitempty"`
 }
 
-// Presets — Claude does brain, Codex does hands.
-var Presets = map[string]struct {
-	Master   MasterConfig
-	Research SessionConfig
-	Develop  SessionConfig
-}{
-	"default": {
+// UserConfig is the top-level user config file (~/.goalx/config.yaml).
+type UserConfig struct {
+	Defaults   Config                  `yaml:"defaults,omitempty"`
+	Engines    map[string]EngineConfig `yaml:"engines,omitempty"`
+	Serve      ServeConfig             `yaml:"serve,omitempty"`
+	Presets    map[string]PresetConfig `yaml:"presets,omitempty"`
+	Strategies map[string]string       `yaml:"strategies,omitempty"`
+}
+
+// Presets — named engine/model combinations for different workflows.
+var Presets = map[string]PresetConfig{
+	"claude": {
 		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
 		Research: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
 	},
-	"turbo": {
-		Master:   MasterConfig{Engine: "claude-code", Model: "sonnet"},
-		Research: SessionConfig{Engine: "claude-code", Model: "haiku"},
-		Develop:  SessionConfig{Engine: "codex", Model: "fast"},
-	},
-	"deep": {
+	"claude-h": {
 		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
 		Research: SessionConfig{Engine: "claude-code", Model: "opus"},
-		Develop:  SessionConfig{Engine: "codex", Model: "best"},
+		Develop:  SessionConfig{Engine: "claude-code", Model: "opus"},
+	},
+	"codex": {
+		Master:   MasterConfig{Engine: "codex", Model: "codex"},
+		Research: SessionConfig{Engine: "codex", Model: "codex"},
+		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
+	},
+	"mixed": {
+		Master:   MasterConfig{Engine: "codex", Model: "codex"},
+		Research: SessionConfig{Engine: "claude-code", Model: "opus"},
+		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
 	},
 }
 
@@ -148,7 +158,7 @@ var BuiltinEngines = map[string]EngineConfig{
 
 // BuiltinDefaults are the hardcoded default values.
 var BuiltinDefaults = Config{
-	Preset:   "default",
+	Preset:   "claude",
 	Mode:     ModeDevelop,
 	Parallel: 1,
 	Master: MasterConfig{
@@ -192,6 +202,12 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 	}
 	for k, v := range userCfg.Engines {
 		engines[k] = v
+	}
+	for k, v := range userCfg.Presets {
+		Presets[k] = v
+	}
+	for k, v := range userCfg.Strategies {
+		BuiltinStrategies[k] = v
 	}
 
 	// Layer 3: project config
@@ -243,7 +259,7 @@ func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
 func applyPreset(cfg *Config) {
 	preset, ok := Presets[cfg.Preset]
 	if !ok {
-		preset = Presets["default"]
+		preset = Presets["claude"]
 	}
 
 	// Master

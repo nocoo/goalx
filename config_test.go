@@ -48,8 +48,8 @@ func TestTmuxSessionName(t *testing.T) {
 	}
 }
 
-func TestPresetDefault(t *testing.T) {
-	cfg := Config{Preset: "default", Mode: ModeDevelop}
+func TestPresetClaude(t *testing.T) {
+	cfg := Config{Preset: "claude", Mode: ModeDevelop}
 	applyPreset(&cfg)
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Errorf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
@@ -59,35 +59,49 @@ func TestPresetDefault(t *testing.T) {
 	}
 }
 
-func TestPresetResearch(t *testing.T) {
-	cfg := Config{Preset: "default", Mode: ModeResearch}
+func TestPresetClaudeResearch(t *testing.T) {
+	cfg := Config{Preset: "claude", Mode: ModeResearch}
 	applyPreset(&cfg)
 	if cfg.Engine != "claude-code" || cfg.Model != "sonnet" {
 		t.Errorf("research = %s/%s, want claude-code/sonnet", cfg.Engine, cfg.Model)
 	}
 }
 
-func TestPresetTurbo(t *testing.T) {
-	cfg := Config{Preset: "turbo", Mode: ModeDevelop}
+func TestPresetClaudeH(t *testing.T) {
+	cfg := Config{Preset: "claude-h", Mode: ModeDevelop}
 	applyPreset(&cfg)
-	if cfg.Master.Model != "sonnet" {
-		t.Errorf("turbo master model = %q, want sonnet", cfg.Master.Model)
+	if cfg.Master.Model != "opus" {
+		t.Errorf("claude-h master model = %q, want opus", cfg.Master.Model)
 	}
-	if cfg.Model != "fast" {
-		t.Errorf("turbo develop model = %q, want fast", cfg.Model)
+	if cfg.Engine != "claude-code" || cfg.Model != "opus" {
+		t.Errorf("claude-h develop = %s/%s, want claude-code/opus", cfg.Engine, cfg.Model)
 	}
 }
 
-func TestPresetDeep(t *testing.T) {
-	cfg := Config{Preset: "deep", Mode: ModeDevelop}
+func TestPresetCodex(t *testing.T) {
+	cfg := Config{Preset: "codex", Mode: ModeDevelop}
 	applyPreset(&cfg)
-	if cfg.Model != "best" {
-		t.Errorf("deep develop model = %q, want best", cfg.Model)
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
+		t.Errorf("codex master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Engine != "codex" || cfg.Model != "codex" {
+		t.Errorf("codex develop = %s/%s, want codex/codex", cfg.Engine, cfg.Model)
+	}
+}
+
+func TestPresetMixed(t *testing.T) {
+	cfg := Config{Preset: "mixed", Mode: ModeResearch}
+	applyPreset(&cfg)
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
+		t.Errorf("mixed master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Engine != "claude-code" || cfg.Model != "opus" {
+		t.Errorf("mixed research = %s/%s, want claude-code/opus", cfg.Engine, cfg.Model)
 	}
 }
 
 func TestPresetNoOverrideExplicit(t *testing.T) {
-	cfg := Config{Preset: "default", Mode: ModeDevelop, Engine: "aider", Model: "opus"}
+	cfg := Config{Preset: "claude", Mode: ModeDevelop, Engine: "aider", Model: "opus"}
 	applyPreset(&cfg)
 	if cfg.Engine != "aider" || cfg.Model != "opus" {
 		t.Errorf("explicit should not be overridden: %s/%s", cfg.Engine, cfg.Model)

@@ -89,7 +89,7 @@ description: "optional supplementary context for subagents"
 mode: research    # or develop
 
 # Engine + Model
-preset: default   # default(sonnet sub), deep(opus sub), turbo(haiku sub)
+preset: default   # claude (default), claude-h (all opus), codex (all gpt-5.4), mixed (codex master + claude sub)
 engine: claude-code  # or codex
 model: sonnet     # or opus
 
@@ -126,8 +126,32 @@ master:
 ```
 
 ### When to edit config vs use CLI flags:
-- **CLI flags**: quick, single-value settings (`--parallel 3`, `--strategy depth,web`)
+- **CLI flags**: quick, single-value settings (`--parallel 3`, `--strategy depth,web`, `--master codex/gpt-5.4`, `--auditor codex/gpt-5.4`)
 - **Edit yaml**: multi-line objective, context refs/URLs, custom diversity hints, harness command, target files
+
+### Session Orchestration
+
+For fine-grained control, edit `sessions:` in `.goalx/goalx.yaml`:
+
+```yaml
+sessions:
+  - engine: claude-code
+    model: opus
+    hint: "Deep exploration"
+  - engine: claude-code
+    model: opus
+    hint: "Creative alternatives"
+  - engine: codex
+    model: gpt-5.4
+    hint: "Audit and challenge"
+```
+
+Common patterns:
+- "3 opus + 1 codex auditor" → `--preset claude-h --parallel 3 --auditor codex/gpt-5.4`
+- "codex master + opus explorer" → `--preset mixed --parallel 2`
+- "all codex for dev" → `--preset codex --parallel 2`
+
+Presets: `claude` (default), `claude-h` (all opus), `codex` (all gpt-5.4), `mixed` (codex master + claude sub)
 
 ## Commands Reference
 

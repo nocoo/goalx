@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	goalx "github.com/vonbai/goalx"
@@ -38,6 +39,15 @@ func Init(projectRoot string, args []string) error {
 	cfg.DiversityHints = nil
 	goalx.ApplyPreset(&cfg)
 
+	// Override master engine/model from --master flag
+	if opts.Master != "" {
+		parts := strings.SplitN(opts.Master, "/", 2)
+		if len(parts) == 2 {
+			cfg.Master.Engine = parts[0]
+			cfg.Master.Model = parts[1]
+		}
+	}
+
 	// Mode-specific defaults
 	if mode == goalx.ModeResearch {
 		reportFile := "report.md"
@@ -66,6 +76,18 @@ func Init(projectRoot string, args []string) error {
 		}
 		if cfg.Harness.Command == "" {
 			cfg.Harness = goalx.HarnessConfig{Command: "TODO: build + test command"}
+		}
+	}
+
+	// Add auditor session from --auditor flag
+	if opts.Auditor != "" {
+		parts := strings.SplitN(opts.Auditor, "/", 2)
+		if len(parts) == 2 {
+			cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
+				Engine: parts[0],
+				Model:  parts[1],
+				Hint:   "Auditor: Review and challenge other sessions' work. Find flaws, missed edge cases, and incorrect assumptions.",
+			})
 		}
 	}
 

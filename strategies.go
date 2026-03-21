@@ -2,25 +2,25 @@ package goalx
 
 import "fmt"
 
-// BuiltinStrategies are named research approaches for diversity hints.
+// BuiltinStrategies are named goal dimensions for diversity hints.
 var BuiltinStrategies = map[string]string{
-	"depth":        "Depth-first: Pick the single most impactful area and go as deep as possible. Run experiments, measure things, trace code paths end-to-end. Prefer one thoroughly verified finding over five shallow ones.",
-	"breadth":      "Breadth-first: Scan all dimensions quickly to build a complete map, then prioritize the most surprising or impactful areas for deeper analysis. Cover every major component at least once.",
-	"adversarial":  "Adversarial: Your job is to find problems. Look for bugs, design flaws, security issues, race conditions, edge cases, and incorrect assumptions. Challenge every claim the code makes. If something looks fine, try harder to break it.",
-	"experimental": "Experimental: Quantify everything. Run benchmarks, measure build times, count lines/functions/dependencies, check test coverage, profile memory. Every finding must have a number attached. No opinions without data.",
-	"comparative":  "Comparative: Compare this codebase with industry best practices, similar open-source projects, and established patterns. Identify where it deviates and whether those deviations are intentional strengths or accidental weaknesses.",
-	"web":          "Web research: Search the internet for related projects, papers, blog posts, and discussions. Find how others have solved similar problems. Bring external knowledge and fresh perspectives that pure code reading cannot provide.",
-	"security":     "Security audit: Analyze from an attacker's perspective. Check for injection vulnerabilities, privilege escalation, unsafe input handling, secrets in code, dependency vulnerabilities, and OWASP top 10 issues.",
-	"performance":  "Performance analysis: Profile critical paths, identify bottlenecks, analyze algorithmic complexity, check for unnecessary allocations, measure latency, and find scaling limitations. Focus on what matters at production scale.",
+	"depth":       "Depth: Pick the single most impactful area and go as deep as possible. Trace code paths end-to-end. Prefer one thoroughly verified finding over five shallow ones.",
+	"breadth":     "Breadth: Scan all dimensions to build a complete map. Cover every major component. Find blind spots and unexpected connections.",
+	"creative":    "Creative: Think beyond conventional approaches. Propose non-obvious solutions. Challenge assumptions about what's possible. Look for elegant simplifications.",
+	"feasibility": "Feasibility: For every proposal, assess implementation cost, risk, dependencies, and timeline. Separate easy wins from heavy lifts. Be concrete about effort.",
+	"adversarial": "Adversarial: Your job is to find problems. Look for bugs, design flaws, edge cases, and incorrect assumptions. If something looks fine, try harder to break it.",
+	"evidence":    "Evidence: Quantify everything. Run benchmarks, measure build times, count lines/functions/dependencies, check test coverage. No opinions without data.",
+	"comparative": "Comparative: Compare with industry best practices, similar projects, and established patterns. Identify where deviations are intentional strengths or accidental weaknesses.",
+	"user":        "User perspective: Think from the end user's point of view. What's the experience like? What's confusing? What's missing? Focus on usability and developer ergonomics.",
 }
 
 // DefaultStrategies returns strategy names for a given parallel count.
 func DefaultStrategies(n int) []string {
 	switch {
 	case n >= 4:
-		return []string{"depth", "adversarial", "experimental", "comparative"}
+		return []string{"depth", "adversarial", "evidence", "comparative"}
 	case n == 3:
-		return []string{"depth", "adversarial", "experimental"}
+		return []string{"depth", "adversarial", "evidence"}
 	case n == 2:
 		return []string{"depth", "adversarial"}
 	default:
@@ -29,12 +29,25 @@ func DefaultStrategies(n int) []string {
 }
 
 // ResolveStrategies converts strategy names to hint strings.
-func ResolveStrategies(names []string) ([]string, error) {
+// It checks BuiltinStrategies (which may include user-defined entries merged at
+// config load time) and also accepts additional custom strategies passed in.
+func ResolveStrategies(names []string, custom ...map[string]string) ([]string, error) {
+	// Build merged lookup: builtins + any custom maps
+	merged := make(map[string]string, len(BuiltinStrategies))
+	for k, v := range BuiltinStrategies {
+		merged[k] = v
+	}
+	for _, m := range custom {
+		for k, v := range m {
+			merged[k] = v
+		}
+	}
+
 	hints := make([]string, 0, len(names))
 	for _, name := range names {
-		hint, ok := BuiltinStrategies[name]
+		hint, ok := merged[name]
 		if !ok {
-			return nil, fmt.Errorf("unknown strategy %q (available: depth, breadth, adversarial, experimental, comparative, web, security, performance)", name)
+			return nil, fmt.Errorf("unknown strategy %q", name)
 		}
 		hints = append(hints, hint)
 	}

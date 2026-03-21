@@ -15,6 +15,8 @@ type startInitOptions struct {
 	Name         string
 	ContextPaths []string
 	Strategies   []string
+	Master       string // "engine/model" format
+	Auditor      string // "engine/model" format
 }
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {
@@ -61,6 +63,18 @@ func parseStartInitArgs(args []string) (startInitOptions, error) {
 			}
 			i++
 			opts.Strategies = strings.Split(args[i], ",")
+		case "--master":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --master")
+			}
+			i++
+			opts.Master = args[i]
+		case "--auditor":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --auditor")
+			}
+			i++
+			opts.Auditor = args[i]
 		default:
 			return opts, fmt.Errorf("unknown flag %q", args[i])
 		}

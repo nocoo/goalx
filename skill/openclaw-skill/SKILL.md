@@ -56,6 +56,13 @@ gx_put "$GOALX_URL/projects/Y/goalx/config" \
 gx_post "$GOALX_URL/projects/Y/goalx/start" | pj
 ```
 
+### Configure sessions with mixed models
+```bash
+# Configure sessions with mixed models
+gx_put "$GOALX_URL/projects/my-project/goalx/config" \
+  -d '{"sessions":[{"engine":"claude-code","model":"opus","hint":"deep"},{"engine":"codex","model":"gpt-5.4","hint":"audit"}]}' | pj
+```
+
 ### "How's the research going?" / "Check progress"
 ```bash
 gx_get "$GOALX_URL/projects/Y/goalx/observe?run=NAME" | pj

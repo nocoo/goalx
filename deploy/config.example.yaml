@@ -20,3 +20,19 @@ serve:
 #     models:
 #       opus: claude-opus-4-6
 #       sonnet: claude-sonnet-4-6
+
+# Custom presets (extend built-in: claude, claude-h, codex, mixed)
+# presets:
+#   my-research:
+#     master: {engine: codex, model: gpt-5.4}
+#     research: {engine: claude-code, model: opus}
+#   my-dev:
+#     master: {engine: codex, model: gpt-5.4}
+#     develop: {engine: codex, model: gpt-5.4}
+
+# Custom goal dimensions (extend built-in: depth, breadth, creative, feasibility, adversarial, evidence, comparative, user)
+# strategies:
+#   architecture:
+#     "Architecture focus: evaluate system boundaries, coupling, cohesion, and extensibility"
+#   cost:
+#     "Cost analysis: estimate compute, API, infrastructure, and maintenance costs for each approach"

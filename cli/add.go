@@ -12,15 +12,37 @@ import (
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) error {
-	// Parse: goalx add "hint/direction" [--run NAME]
+	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL]
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
 	}
-	if len(rest) == 0 {
-		return fmt.Errorf("usage: goalx add \"research direction\" [--run NAME]")
+
+	// Extract --engine and --model flags from rest args
+	var flagEngine, flagModel string
+	var hintParts []string
+	for i := 0; i < len(rest); i++ {
+		switch rest[i] {
+		case "--engine":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --engine")
+			}
+			i++
+			flagEngine = rest[i]
+		case "--model":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --model")
+			}
+			i++
+			flagModel = rest[i]
+		default:
+			hintParts = append(hintParts, rest[i])
+		}
 	}
-	hint := strings.Join(rest, " ")
+	if len(hintParts) == 0 {
+		return fmt.Errorf("usage: goalx add \"research direction\" [--run NAME] [--engine ENGINE] [--model MODEL]")
+	}
+	hint := strings.Join(hintParts, " ")
 
 	rc, err := ResolveRun(projectRoot, runName)
 	if err != nil {
@@ -54,6 +76,12 @@ func Add(projectRoot string, args []string) error {
 
 	engine := rc.Config.Engine
 	model := rc.Config.Model
+	if flagEngine != "" {
+		engine = flagEngine
+	}
+	if flagModel != "" {
+		model = flagModel
+	}
 	engineCmd, err := goalx.ResolveEngineCommand(engines, engine, model)
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
@@ -128,8 +156,15 @@ func Add(projectRoot string, args []string) error {
 	SendKeys(rc.TmuxSession+":master", masterMsg)
 
 	// Update config snapshot with new session count
+	newSess := goalx.SessionConfig{Hint: hint}
+	if flagEngine != "" {
+		newSess.Engine = flagEngine
+	}
+	if flagModel != "" {
+		newSess.Model = flagModel
+	}
 	if len(rc.Config.Sessions) > 0 {
-		rc.Config.Sessions = append(rc.Config.Sessions, goalx.SessionConfig{Hint: hint})
+		rc.Config.Sessions = append(rc.Config.Sessions, newSess)
 	} else {
 		rc.Config.Parallel = newNum
 	}
