@@ -111,6 +111,79 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:    "investigate auth",
+		Mode:         goalx.ModeResearch,
+		Engine:       "codex",
+		Target:       goalx.TargetConfig{Files: []string{"report.md"}},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+		Context:      goalx.ContextConfig{Files: []string{"/tmp/context.md"}},
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	modeSection := sectionBetween(string(out), "## Mode: Research", "## Context")
+	for _, want := range []string{
+		"Quantify",
+		"Challenge your own conclusions",
+		"Each round should produce NEW insight",
+		"Do not declare yourself done",
+	} {
+		if !strings.Contains(modeSection, want) {
+			t.Fatalf("research mode section missing %q:\n%s", want, modeSection)
+		}
+	}
+	if got := nonEmptyLineCount(modeSection); got > 25 {
+		t.Fatalf("research mode section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
+	}
+}
+
+func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:    "ship it",
+		Mode:         goalx.ModeDevelop,
+		Engine:       "codex",
+		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+		Context:      goalx.ContextConfig{Files: []string{"/tmp/context.md"}},
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	modeSection := sectionBetween(string(out), "## Mode: Develop", "## Context")
+	for _, want := range []string{
+		"one fix at a time",
+		"Run the full gate",
+		"Atomic commit",
+		"go test ./...",
+	} {
+		if !strings.Contains(modeSection, want) {
+			t.Fatalf("develop mode section missing %q:\n%s", want, modeSection)
+		}
+	}
+	if got := nonEmptyLineCount(modeSection); got > 25 {
+		t.Fatalf("develop mode section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
+	}
+}
+
 func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -297,4 +370,27 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 			t.Fatalf("rendered master protocol missing %q", want)
 		}
 	}
+}
+
+func sectionBetween(text, start, end string) string {
+	startIdx := strings.Index(text, start)
+	if startIdx < 0 {
+		return ""
+	}
+	text = text[startIdx:]
+	endIdx := strings.Index(text, end)
+	if endIdx < 0 {
+		return text
+	}
+	return text[:endIdx]
+}
+
+func nonEmptyLineCount(text string) int {
+	count := 0
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
