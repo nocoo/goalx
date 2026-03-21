@@ -21,22 +21,23 @@ const (
 
 // Config is the merged configuration for a single run.
 type Config struct {
-	Name           string          `yaml:"name"`
-	Mode           Mode            `yaml:"mode"`
-	Objective      string          `yaml:"objective"`
-	Description    string          `yaml:"description,omitempty"`
-	Preset         string          `yaml:"preset,omitempty"`
-	Engine         string          `yaml:"engine,omitempty"`
-	Model          string          `yaml:"model,omitempty"`
-	Parallel       int             `yaml:"parallel,omitempty"`
-	DiversityHints []string        `yaml:"diversity_hints,omitempty"`
-	Sessions       []SessionConfig `yaml:"sessions,omitempty"`
-	Target         TargetConfig    `yaml:"target"`
-	Harness        HarnessConfig   `yaml:"harness,omitempty"`
-	Context        ContextConfig   `yaml:"context,omitempty"`
-	Budget         BudgetConfig    `yaml:"budget,omitempty"`
-	Master         MasterConfig    `yaml:"master,omitempty"`
-	Serve          ServeConfig     `yaml:"serve,omitempty"`
+	Name           string           `yaml:"name"`
+	Mode           Mode             `yaml:"mode"`
+	Objective      string           `yaml:"objective"`
+	Description    string           `yaml:"description,omitempty"`
+	Preset         string           `yaml:"preset,omitempty"`
+	Engine         string           `yaml:"engine,omitempty"`
+	Model          string           `yaml:"model,omitempty"`
+	Parallel       int              `yaml:"parallel,omitempty"`
+	DiversityHints []string         `yaml:"diversity_hints,omitempty"`
+	Sessions       []SessionConfig  `yaml:"sessions,omitempty"`
+	Target         TargetConfig     `yaml:"target"`
+	Harness        HarnessConfig    `yaml:"harness,omitempty"`
+	Acceptance     AcceptanceConfig `yaml:"acceptance,omitempty"`
+	Context        ContextConfig    `yaml:"context,omitempty"`
+	Budget         BudgetConfig     `yaml:"budget,omitempty"`
+	Master         MasterConfig     `yaml:"master,omitempty"`
+	Serve          ServeConfig      `yaml:"serve,omitempty"`
 }
 
 type TargetConfig struct {
@@ -45,6 +46,11 @@ type TargetConfig struct {
 }
 
 type HarnessConfig struct {
+	Command string        `yaml:"command"`
+	Timeout time.Duration `yaml:"timeout,omitempty"`
+}
+
+type AcceptanceConfig struct {
 	Command string        `yaml:"command"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 }
@@ -323,6 +329,9 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	if cfg.Harness.Command == "" || strings.HasPrefix(cfg.Harness.Command, "TODO") {
 		return fmt.Errorf("harness.command is required (set in goalx.yaml or .goalx/config.yaml)")
 	}
+	if cmd := strings.TrimSpace(cfg.Acceptance.Command); cmd != "" && strings.HasPrefix(cmd, "TODO") {
+		return fmt.Errorf("acceptance.command contains placeholder %q — edit goalx.yaml first", cfg.Acceptance.Command)
+	}
 
 	// Check engine/model can resolve and won't block on known interactive prompts.
 	if err := validateInteractiveEngine(engines, cfg.Master.Engine, cfg.Master.Model, "master"); err != nil {
@@ -448,6 +457,18 @@ func ExpandSessions(cfg *Config) []SessionConfig {
 	return sessions
 }
 
+// ResolveAcceptanceCommand returns the acceptance command, falling back to the
+// regular harness when no dedicated acceptance command is configured.
+func ResolveAcceptanceCommand(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	if cmd := strings.TrimSpace(cfg.Acceptance.Command); cmd != "" {
+		return cmd
+	}
+	return cfg.Harness.Command
+}
+
 // ProjectID returns a slug from the project root path.
 func ProjectID(projectRoot string) string {
 	abs, _ := filepath.Abs(projectRoot)
@@ -523,6 +544,12 @@ func mergeConfig(base, overlay *Config) {
 	}
 	if overlay.Harness.Command != "" {
 		base.Harness = overlay.Harness
+	}
+	if overlay.Acceptance.Command != "" {
+		base.Acceptance.Command = overlay.Acceptance.Command
+	}
+	if overlay.Acceptance.Timeout > 0 {
+		base.Acceptance.Timeout = overlay.Acceptance.Timeout
 	}
 	if len(overlay.Context.Files) > 0 || len(overlay.Context.Refs) > 0 {
 		base.Context = overlay.Context

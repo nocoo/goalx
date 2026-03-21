@@ -82,14 +82,24 @@ When the objective is genuinely achieved:
    {{end}}## Not Recommended (with reasoning)
    ## Recommendation: debate | implement | done | more-research
    ```
+   Recommendation decision table:
+
+   | Recommendation | When to use | acceptance_met |
+   |---|---|---|
+   | `done` | Objective is fully achieved and no more work is needed. | true |
+   | `implement` | Acceptance criteria are met for this phase and the next step is code changes. | true |
+   | `debate` | Sessions disagree and you need a structured debate round. | false |
+   | `more-research` | Evidence is still insufficient; set `next_objective` and continue research. | false |
 
 2. Update `{{.StatusPath}}` with JSON: phase, recommendation, heartbeat count, acceptance_met, keep_session, next_objective
    Example:
-   `{"phase":"complete","recommendation":"implement","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}`
+   `{"phase":"complete","recommendation":"done","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}`
    Set `keep_session` when a develop-mode session should be merged after the run.
+3. **Verification before `done`**:
 {{if eq .Mode "develop"}}
-3. **Before declaring complete**: rescue dead sessions, verify harness in all worktrees, check for file overlaps across sessions, merge with `goalx keep`
+   Rescue dead sessions, verify harness in all worktrees, check for file overlaps across sessions, merge with `goalx keep`.
 {{end}}
+   Functional verification: for each acceptance checklist item, record concrete PASS/FAIL evidence beyond the gate. Show the feature working (CLI run, test call, or equivalent) before declaring `done`.
 4. Stop subagents: `tmux send-keys -t {{.TmuxSession}}:<window> C-c`
 
 ## Guidance Writing Principles

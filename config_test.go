@@ -206,6 +206,27 @@ func TestValidateConfigOK(t *testing.T) {
 	}
 }
 
+func TestResolveAcceptanceCommandFallsBackToHarness(t *testing.T) {
+	cfg := &Config{
+		Harness: HarnessConfig{Command: "go test ./..."},
+	}
+
+	if got := ResolveAcceptanceCommand(cfg); got != "go test ./..." {
+		t.Fatalf("ResolveAcceptanceCommand() = %q, want harness command", got)
+	}
+}
+
+func TestResolveAcceptanceCommandUsesAcceptanceOverride(t *testing.T) {
+	cfg := &Config{
+		Harness:    HarnessConfig{Command: "go test ./..."},
+		Acceptance: AcceptanceConfig{Command: "go test -run E2E ./..."},
+	}
+
+	if got := ResolveAcceptanceCommand(cfg); got != "go test -run E2E ./..." {
+		t.Fatalf("ResolveAcceptanceCommand() = %q, want acceptance command", got)
+	}
+}
+
 func TestValidateConfigMissingObjective(t *testing.T) {
 	cfg := &Config{Name: "test", Mode: ModeDevelop}
 	if err := ValidateConfig(cfg, BuiltinEngines); err == nil {
@@ -244,6 +265,26 @@ func TestValidateConfigSessionsConflict(t *testing.T) {
 	}
 	if err := ValidateConfig(cfg, BuiltinEngines); err == nil {
 		t.Error("expected error for sessions + parallel conflict")
+	}
+}
+
+func TestValidateConfigRejectsAcceptancePlaceholder(t *testing.T) {
+	cfg := &Config{
+		Name:      "test",
+		Mode:      ModeDevelop,
+		Objective: "test objective",
+		Engine:    "claude-code",
+		Model:     "sonnet",
+		Target:    TargetConfig{Files: []string{"src/"}},
+		Harness:   HarnessConfig{Command: "go test ./..."},
+		Acceptance: AcceptanceConfig{
+			Command: "TODO: add e2e command",
+		},
+		Master: MasterConfig{Engine: "claude-code", Model: "opus"},
+	}
+
+	if err := ValidateConfig(cfg, BuiltinEngines); err == nil {
+		t.Fatal("expected error for placeholder in acceptance.command")
 	}
 }
 
