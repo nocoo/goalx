@@ -382,6 +382,9 @@ func resolveModelID(engines map[string]EngineConfig, engine, model string) (stri
 }
 
 func validateInteractiveEngine(engines map[string]EngineConfig, engine, model, role string) error {
+	if err := validateModelAliasForEngine(engines, engine, model, role); err != nil {
+		return err
+	}
 	if _, err := ResolveEngineCommand(engines, engine, model); err != nil {
 		return fmt.Errorf("%s engine: %w", role, err)
 	}
@@ -391,6 +394,28 @@ func validateInteractiveEngine(engines map[string]EngineConfig, engine, model, r
 	}
 	if engine == "codex" && (modelID == "gpt-5.3-codex" || modelID == "gpt-5.2") {
 		return fmt.Errorf("%s engine: codex model %q resolves to %s, which triggers an interactive migration prompt in Codex CLI; use gpt-5.4 or gpt-5.4-mini instead", role, model, modelID)
+	}
+	return nil
+}
+
+func validateModelAliasForEngine(engines map[string]EngineConfig, engine, model, role string) error {
+	if model == "" {
+		return nil
+	}
+	ec, ok := engines[engine]
+	if !ok {
+		return nil
+	}
+	if _, ok := ec.Models[model]; ok {
+		return nil
+	}
+	for otherEngine, other := range engines {
+		if otherEngine == engine {
+			continue
+		}
+		if _, ok := other.Models[model]; ok {
+			return fmt.Errorf("%s engine: model alias %q is not valid for engine %q", role, model, engine)
+		}
 	}
 	return nil
 }

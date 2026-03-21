@@ -395,6 +395,27 @@ func TestValidateConfigRejectsOldCodexModels(t *testing.T) {
 	}
 }
 
+func TestValidateConfigRejectsCrossEngineModelAlias(t *testing.T) {
+	cfg := &Config{
+		Name:      "test",
+		Mode:      ModeDevelop,
+		Objective: "test",
+		Engine:    "codex",
+		Model:     "codex",
+		Target:    TargetConfig{Files: []string{"src/"}},
+		Harness:   HarnessConfig{Command: "go test"},
+		Master:    MasterConfig{Engine: "codex", Model: "opus"},
+	}
+
+	err := ValidateConfig(cfg, BuiltinEngines)
+	if err == nil {
+		t.Fatal("expected error for cross-engine model alias")
+	}
+	if !strings.Contains(err.Error(), `model alias "opus"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestMergeConfig(t *testing.T) {
 	base := Config{
 		Name:    "base",
