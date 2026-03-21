@@ -77,6 +77,8 @@ goalx auto "refactor the config system" --research --parallel 2
 | `goalx keep` | Merge session branch into main |
 | `goalx next` | Suggest next pipeline step |
 | `goalx review` | Compare all session outputs |
+| `goalx tell` | Send message to master or session |
+| `goalx serve` | Start HTTP API server |
 | `goalx stop` | Graceful shutdown |
 | `goalx drop` | Cleanup worktrees and branches |
 
@@ -92,24 +94,39 @@ goalx implement → start → [observe...] → keep
 
 Each stage: CLI generates config, master supervises agents, framework handles git.
 
-## Research Strategies
+## Goal Dimensions
+
+Dimensions define how agents approach the objective — not what they do, but from what angle:
 
 ```bash
-goalx init "objective" --research --parallel 3 --strategy depth,adversarial,experimental
+goalx init "objective" --research --parallel 3 --strategy depth,adversarial,evidence
 ```
 
-| Strategy | Focus |
-|----------|-------|
-| `depth` | Deep-dive the most impactful area |
-| `breadth` | Scan all dimensions, prioritize surprises |
-| `adversarial` | Find bugs, flaws, security issues |
-| `experimental` | Quantify everything with data |
+| Dimension | Focus |
+|-----------|-------|
+| `depth` | Pick the most impactful area, go as deep as possible |
+| `breadth` | Scan all dimensions, find blind spots |
+| `creative` | Non-obvious solutions, challenge assumptions |
+| `feasibility` | Implementation cost, risk, dependencies |
+| `adversarial` | Find bugs, flaws, edge cases |
+| `evidence` | Quantify everything with data |
 | `comparative` | Compare with industry best practices |
-| `web` | Internet research for external perspectives |
-| `security` | Security audit from attacker's perspective |
-| `performance` | Profile, benchmark, find bottlenecks |
+| `user` | End-user perspective, usability |
 
-Defaults: parallel=2 gets depth+adversarial, parallel=3 adds experimental.
+Defaults: parallel=2 → depth+adversarial, parallel=3 → +evidence. Custom dimensions in `~/.goalx/config.yaml`.
+
+## Agent Composition
+
+```bash
+# Explicit agent composition with --sub
+goalx init "objective" --research --sub claude-code/opus:2 --sub codex/gpt-5.4:1
+
+# Override master engine
+goalx init "objective" --master codex/gpt-5.4 --parallel 2
+
+# N workers + 1 auditor pattern
+goalx init "objective" --preset claude-h --parallel 3 --auditor codex/gpt-5.4
+```
 
 ## Architecture
 
@@ -147,9 +164,12 @@ Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goa
 
 | Preset | Master | Research Sub | Develop Sub |
 |--------|--------|-------------|-------------|
-| default | claude/opus | claude/sonnet | codex/gpt-5.4 |
-| turbo | claude/sonnet | claude/haiku | codex/gpt-5.4-mini |
-| deep | claude/opus | claude/opus | codex/gpt-5.4 |
+| claude | claude/opus | claude/sonnet | codex/gpt-5.4 |
+| claude-h | claude/opus | claude/opus | claude/opus |
+| codex | codex/gpt-5.4 | codex/gpt-5.4 | codex/gpt-5.4 |
+| mixed | codex/gpt-5.4 | claude/opus | codex/gpt-5.4 |
+
+Custom presets in `~/.goalx/config.yaml`. Override per-run with `--master`, `--sub`, `--auditor`.
 
 ## HTTP API & Remote Management
 
