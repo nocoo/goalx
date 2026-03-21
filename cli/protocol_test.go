@@ -83,3 +83,51 @@ func TestRenderMasterProtocolIncludesAcceptanceChecklistInstructions(t *testing.
 		}
 	}
 }
+
+func TestRenderMasterProtocolIncludesResearchPreflightDimensionSelection(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:      "audit auth",
+		Mode:           goalx.ModeResearch,
+		TmuxSession:    "ar-demo",
+		SummaryPath:    "/tmp/summary.md",
+		AcceptancePath: "/tmp/acceptance.md",
+		EngineCommand:  "claude --model claude-opus-4-6 --permission-mode auto",
+		Sessions: []SessionData{
+			{
+				Name:         "session-1",
+				WindowName:   "demo-1",
+				WorktreePath: "/tmp/worktree-1",
+				JournalPath:  "/tmp/journal-1.jsonl",
+				GuidancePath: "/tmp/guidance-1.md",
+			},
+			{
+				Name:         "session-2",
+				WindowName:   "demo-2",
+				WorktreePath: "/tmp/worktree-2",
+				JournalPath:  "/tmp/journal-2.jsonl",
+				GuidancePath: "/tmp/guidance-2.md",
+			},
+		},
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Before writing the acceptance checklist, do a research pre-flight.",
+		"Decide which dimensions matter most (for example: depth, adversarial, comparative, creative, evidence).",
+		"If the current session count is too small, use `goalx add \"missing dimension\"` to add coverage.",
+		"Write one distinct dimension assignment to each session's guidance file before the first heartbeat.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}

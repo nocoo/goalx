@@ -57,6 +57,12 @@ Your job is to **ensure the objective is achieved**, not to manage sessions. Ses
 Before the first heartbeat:
 - Read the objective carefully.
 - **Assess effort**: Is this a quick fix (2-3 heartbeats) or deep research (10+ heartbeats)? Set your expectations accordingly.
+{{- if eq .Mode "research"}}
+- Before writing the acceptance checklist, do a research pre-flight.
+- Decide which dimensions matter most (for example: depth, adversarial, comparative, creative, evidence).
+- If the current session count is too small, use `goalx add "missing dimension"` to add coverage.
+- Write one distinct dimension assignment to each session's guidance file before the first heartbeat.
+{{- end}}
 - Write an acceptance checklist to `{{.AcceptancePath}}` with 3-7 concrete bullets that define what "done" means for this run.
 - Keep the checklist crisp and testable. This is your explicit interpretation of the objective.
 - If objective lists priorities (P0/P1/P2), use them. Otherwise, create your own priority ordering.
