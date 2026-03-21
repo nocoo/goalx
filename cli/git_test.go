@@ -10,7 +10,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestCreateWorktreeDoesNotDeleteExistingBranch(t *testing.T) {
+func TestCreateWorktreeDeletesStaleExistingBranch(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 
@@ -19,12 +19,28 @@ func TestCreateWorktreeDoesNotDeleteExistingBranch(t *testing.T) {
 
 	worktree := filepath.Join(t.TempDir(), "wt")
 	err := CreateWorktree(repo, worktree, "goalx/demo/1")
-	if err == nil {
-		t.Fatal("expected CreateWorktree to fail when branch already exists")
+	if err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
 	}
 
 	if err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "goalx/demo/1").Run(); err != nil {
 		t.Fatalf("branch ar/demo/1 should still exist: %v", err)
+	}
+	if _, err := os.Stat(worktree); err != nil {
+		t.Fatalf("worktree should exist: %v", err)
+	}
+}
+
+func TestCreateWorktreeRejectsBranchActiveInAnotherWorktree(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	runGit(t, repo, "checkout", "-b", "goalx/demo/1")
+
+	worktree := filepath.Join(t.TempDir(), "wt")
+	err := CreateWorktree(repo, worktree, "goalx/demo/1")
+	if err == nil || !strings.Contains(err.Error(), "already checked out") {
+		t.Fatalf("CreateWorktree error = %v, want already checked out", err)
 	}
 }
 

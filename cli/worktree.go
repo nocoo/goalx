@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,11 +9,26 @@ import (
 )
 
 // CreateWorktree creates a new git worktree with a new branch.
-// Cleans up stale worktree references and branches from failed previous runs.
+// Cleans up stale branch collisions from failed previous runs, but refuses to
+// delete branches that are still checked out in another worktree.
 func CreateWorktree(projectRoot, worktreePath, branch string) error {
-	// Prune stale worktree refs, but do not delete an existing branch. Branch
-	// collisions should fail fast so we do not destroy prior run history.
 	exec.Command("git", "-C", projectRoot, "worktree", "prune").Run()
+	exists, err := branchExists(projectRoot, branch)
+	if err != nil {
+		return err
+	}
+	if exists {
+		inUse, err := branchCheckedOutInAnyWorktree(projectRoot, branch)
+		if err != nil {
+			return err
+		}
+		if inUse {
+			return fmt.Errorf("branch %s is already checked out in another worktree", branch)
+		}
+		if err := DeleteBranch(projectRoot, branch); err != nil {
+			return fmt.Errorf("delete stale branch %s: %w", branch, err)
+		}
+	}
 	cmd := exec.Command("git", "-C", projectRoot, "worktree", "add", worktreePath, "-b", branch)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -100,6 +116,34 @@ func hasMergeConflictMarkers(out string) bool {
 	return strings.Contains(out, "<<<<<<<") &&
 		strings.Contains(out, "=======") &&
 		strings.Contains(out, ">>>>>>>")
+}
+
+func branchExists(projectRoot, branch string) (bool, error) {
+	out, err := exec.Command("git", "-C", projectRoot, "show-ref", "--verify", "--quiet", "refs/heads/"+branch).CombinedOutput()
+	if err == nil {
+		return true, nil
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, fmt.Errorf("git show-ref %s: %w: %s", branch, err, out)
+}
+
+func branchCheckedOutInAnyWorktree(projectRoot, branch string) (bool, error) {
+	out, err := exec.Command("git", "-C", projectRoot, "worktree", "list", "--porcelain").CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git worktree list: %w: %s", err, out)
+	}
+
+	target := "branch refs/heads/" + branch
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.TrimSpace(line) == target {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // TagArchive creates a git tag pointing at the given branch.
