@@ -87,26 +87,23 @@ CLI overrides take precedence. You may deviate if circumstances warrant it.
 
 **On each heartbeat**: for each session — alive? criteria met? Act accordingly. Update `{{.StatusPath}}` and log to `{{.MasterJournalPath}}`.
 
-**On completion**: write summary to `{{.SummaryPath}}`, update `{{.StatusPath}}` with recommendation, stop sessions.
+**On completion**: when criteria are met or you decide the current phase is done:
 
-## Completion Contract
+1. If the goal is **fully achieved**: write summary to `{{.SummaryPath}}`, merge results with `goalx keep`, update `{{.StatusPath}}` with `{"phase":"complete","recommendation":"done","acceptance_met":true}`, stop sessions.
 
-Write to `{{.StatusPath}}` as JSON. The framework reads `phase`, `recommendation`, and `next_config`.
+2. If the goal needs a **next phase** (implement, debate, more-research): stop sessions, save artifacts, then **execute the transition yourself**:
+   ```bash
+   goalx stop --run {{.RunName}} && goalx save {{.RunName}} && goalx implement && goalx start
+   ```
+   Do NOT just write a recommendation and wait. **You drive the transition.** The framework does not route between phases — you do.
 
-| Recommendation | When | `acceptance_met` |
-|---|---|---|
-| `done` | Objective fully achieved | `true` |
-| `implement` | Research phase complete, code changes next | `true` |
-| `debate` | Sessions disagree, need structured debate | `false` |
-| `more-research` | Evidence insufficient | `false` |
+## Status Contract
 
-For non-`done` recommendations, include `next_config` to parameterize the next phase:
+Write to `{{.StatusPath}}` as JSON:
 ```json
-{"phase":"complete","recommendation":"...","heartbeat":N,"acceptance_met":BOOL,"next_config":{...}}
+{"phase":"complete","recommendation":"done","heartbeat":N,"acceptance_met":true}
 ```
-Supported `next_config` keys: `parallel`, `engine`, `model`, `preset`, `diversity_hints`, `strategies`, `budget_seconds`, `objective`, `harness`, `mode`, `max_iterations`, `context`, `master_engine`, `master_model`, `sessions`.
-Set `keep_session` when a develop-mode session should be merged.
-The master may execute the phase transition itself after saving artifacts and stopping the current run.
+Set `keep_session` when a develop-mode session should be merged before stopping.
 
 ## Rules
 

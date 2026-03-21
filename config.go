@@ -186,7 +186,7 @@ var BuiltinEngines = map[string]EngineConfig{
 
 // BuiltinDefaults are the hardcoded default values.
 var BuiltinDefaults = Config{
-	Preset:   "claude",
+	Preset:   "codex",
 	Mode:     ModeDevelop,
 	Parallel: 1,
 	Master: MasterConfig{
@@ -290,7 +290,7 @@ func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
 func applyPreset(cfg *Config) {
 	preset, ok := Presets[cfg.Preset]
 	if !ok {
-		preset = Presets["claude"]
+		preset = Presets["codex"]
 	}
 
 	// Master

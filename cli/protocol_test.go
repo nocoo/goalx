@@ -363,12 +363,10 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 		"goalx save demo && goalx debate && goalx start",
 		"goalx save demo && goalx implement && goalx start",
 		"goalx stop --run demo",
-		"## Completion Contract",
-		"Supported `next_config` keys:",
-		"Set `keep_session` when a develop-mode session should be merged.",
-		"The master may execute the phase transition itself after saving artifacts and stopping the current run.",
-		"| `done` | Objective fully achieved | `true` |",
-		"| `implement` | Research phase complete, code changes next | `true` |",
+		"## Status Contract",
+		"You drive the transition.",
+		"Set `keep_session` when a develop-mode session should be merged",
+		"Do NOT just write a recommendation and wait.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

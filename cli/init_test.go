@@ -84,8 +84,8 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Engine != "claude-code" || cfg.Model != "sonnet" {
-		t.Fatalf("subagent = %s/%s, want claude-code/sonnet", cfg.Engine, cfg.Model)
+	if cfg.Engine != "codex" || cfg.Model != "codex" {
+		t.Fatalf("subagent = %s/%s, want codex/codex", cfg.Engine, cfg.Model)
 	}
 }
 
