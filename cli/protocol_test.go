@@ -80,6 +80,37 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:    "ship it",
+		Mode:         goalx.ModeDevelop,
+		Engine:       "codex",
+		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"You are running in Codex CLI with file system access and shell execution.",
+		"Check your guidance file (`/tmp/guidance.md`) for new instructions from the master agent.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q", want)
+		}
+	}
+}
+
 func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
