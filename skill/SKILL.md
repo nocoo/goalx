@@ -84,6 +84,7 @@ sessions:
 - `goalx add "direction" [--run NAME]`, `goalx review [NAME]`, `goalx diff [NAME] <a> [b]`: expand or compare session work
 - `goalx save [NAME]`, `goalx debate`, `goalx implement`, `goalx next`: move the pipeline forward
 - `goalx keep [NAME] <session>`, `goalx stop [NAME]`, `goalx drop [NAME]`: merge, stop, or clean up a run
+- `goalx result [NAME]`: show saved run results (research: summary, develop: git log + diff stat)
 - `goalx list`, `goalx archive`, `goalx report`, `goalx serve`: supporting management commands
 ## Observe and React
 - Healthy run: summarize progress and wait.
