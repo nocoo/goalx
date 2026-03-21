@@ -11,8 +11,17 @@ var (
 // The master continues orchestrating in tmux.
 func Auto(projectRoot string, args []string) error {
 	initArgs := append([]string(nil), args...)
-	if len(initArgs) > 0 && !hasMode(initArgs) {
-		initArgs = append(initArgs[:1:1], append([]string{"--research"}, initArgs[1:]...)...)
+	if len(initArgs) > 0 {
+		hasMode := false
+		for _, arg := range initArgs {
+			if arg == "--research" || arg == "--develop" {
+				hasMode = true
+				break
+			}
+		}
+		if !hasMode {
+			initArgs = append(initArgs[:1:1], append([]string{"--research"}, initArgs[1:]...)...)
+		}
 	}
 
 	if err := autoInit(projectRoot, initArgs); err != nil {

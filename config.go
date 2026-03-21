@@ -441,15 +441,30 @@ func validateModelAliasForEngine(engines map[string]EngineConfig, engine, model,
 	if _, ok := ec.Models[model]; ok {
 		return nil
 	}
+	if ModelAliasBelongsToOtherEngine(engines, engine, model) {
+		return fmt.Errorf("%s engine: model alias %q is not valid for engine %q", role, model, engine)
+	}
+	return nil
+}
+
+// ModelAliasBelongsToOtherEngine reports whether model is a known alias for an engine other than engine.
+func ModelAliasBelongsToOtherEngine(engines map[string]EngineConfig, engine, model string) bool {
+	ec, ok := engines[engine]
+	if !ok {
+		return false
+	}
+	if _, ok := ec.Models[model]; ok {
+		return false
+	}
 	for otherEngine, other := range engines {
 		if otherEngine == engine {
 			continue
 		}
 		if _, ok := other.Models[model]; ok {
-			return fmt.Errorf("%s engine: model alias %q is not valid for engine %q", role, model, engine)
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 // ResolvePrompt builds the prompt for an engine, substituting {protocol}.

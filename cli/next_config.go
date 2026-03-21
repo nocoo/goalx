@@ -214,7 +214,7 @@ func validateNextConfigModel(engines map[string]goalx.EngineConfig, engine, mode
 	if strings.TrimSpace(engine) == "" {
 		return fmt.Errorf("engine is required")
 	}
-	if modelAliasBelongsToOtherEngine(engines, engine, model) {
+	if goalx.ModelAliasBelongsToOtherEngine(engines, engine, model) {
 		return fmt.Errorf("model alias belongs to a different engine")
 	}
 	if _, err := goalx.ResolveEngineCommand(engines, engine, model); err != nil {
@@ -289,32 +289,4 @@ func normalizeNextConfigSessions(sessions []sessionConfigJSON) []sessionConfigJS
 		return nil
 	}
 	return normalized
-}
-
-func modelAliasBelongsToOtherEngine(engines map[string]goalx.EngineConfig, engine, model string) bool {
-	ec, ok := engines[engine]
-	if !ok {
-		return false
-	}
-	if _, ok := ec.Models[model]; ok {
-		return false
-	}
-	for otherEngine, other := range engines {
-		if otherEngine == engine {
-			continue
-		}
-		if _, ok := other.Models[model]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-func hasMode(args []string) bool {
-	for _, arg := range args {
-		if arg == "--research" || arg == "--develop" {
-			return true
-		}
-	}
-	return false
 }
