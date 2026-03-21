@@ -7,7 +7,7 @@ Autonomous research and development framework. Master/Subagent architecture powe
 ## How It Works
 
 ```
-goalx auto "investigate authentication system vulnerabilities" --research --parallel 3
+goalx auto "investigate authentication system vulnerabilities"
 ```
 
 GoalX creates a run directory and launches a master agent in tmux. The master decides when to call `goalx add`, assigns work, challenges findings, rescues failed sessions, and synthesizes results.
@@ -48,15 +48,14 @@ go build -o bin/goalx ./cmd/goalx
 ## Quick Start
 
 ```bash
-# Research mode — parallel AI agents investigate your codebase
-goalx init "audit code quality and find bugs" --research --parallel 2
-goalx start
+# Give a goal, master handles everything
+goalx auto "audit code quality and find bugs"
 
 # Watch progress
 goalx observe
 
-# Start a master-led run in the background
-goalx auto "refactor the config system" --research --parallel 2
+# View results
+goalx result
 ```
 
 ## Commands
@@ -137,7 +136,7 @@ goalx/
 │   ├── master.md.tmpl  # Master agent protocol
 │   └── program.md.tmpl # Subagent protocol
 ├── cli/                # All CLI commands
-│   ├── auto.go         # Full pipeline orchestration
+│   ├── auto.go         # Init + start, then exit
 │   ├── start.go        # Session launch + worktree setup
 │   ├── observe.go      # Live tmux capture
 │   └── ...
@@ -162,6 +161,7 @@ Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goa
 
 | Preset | Master | Research Sub | Develop Sub |
 |--------|--------|-------------|-------------|
+| hybrid | claude/opus | claude/opus | codex/gpt-5.4 |
 | claude | claude/opus | claude/sonnet | codex/gpt-5.4 |
 | claude-h | claude/opus | claude/opus | claude/opus |
 | codex | codex/gpt-5.4 | codex/gpt-5.4 | codex/gpt-5.4 |
