@@ -290,6 +290,73 @@ func TestAutoSkipsInitAfterImplement(t *testing.T) {
 	}
 }
 
+func TestAutoMoreResearchPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir goalx dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "goalx.yaml"), []byte("name: demo\nobjective: ship it\ntarget:\n  files: [README.md]\nharness:\n  command: go test ./...\n"), 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	initCalls := 0
+	autoInit = func(_ string, args []string) error {
+		initCalls++
+		if initCalls == 2 {
+			if len(args) < 2 || args[0] != "investigate auth" || args[1] != "--research" {
+				return errors.New("more-research args out of order")
+			}
+		}
+		return nil
+	}
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	pollCalls := 0
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		pollCalls++
+		switch pollCalls {
+		case 1:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "more-research",
+				NextObjective:  "investigate auth",
+			}, nil
+		case 2:
+			return &statusJSON{
+				Phase:          "complete",
+				Recommendation: "done",
+				AcceptanceMet:  true,
+			}, nil
+		default:
+			t.Fatalf("unexpected poll call %d", pollCalls)
+			return nil, nil
+		}
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+		t.Fatalf("Auto: %v", err)
+	}
+}
+
 var errUnexpectedSecondInit = errors.New("unexpected second init")
 
 func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) {

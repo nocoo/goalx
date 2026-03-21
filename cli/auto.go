@@ -139,7 +139,7 @@ func Auto(projectRoot string, args []string) (err error) {
 				return nil
 			}
 			fmt.Printf("Re-initializing with new objective: %s\n", obj)
-			initArgs = []string{"--research", obj}
+			initArgs = []string{obj, "--research"}
 			needsInit = true
 
 		default:
