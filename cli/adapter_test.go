@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,10 +48,14 @@ func TestGenerateAdapterQuotesGuidancePath(t *testing.T) {
 	}
 
 	out, err := exec.Command("bash", "-lc", doc.Hooks[0].Command).CombinedOutput()
-	if err != nil {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
 		t.Fatalf("run hook command: %v\n%s", err, string(out))
 	}
-	if !strings.Contains(string(out), "MASTER GUIDANCE PENDING") {
+	if exitErr.ExitCode() != 2 {
+		t.Fatalf("exit code = %d, want 2", exitErr.ExitCode())
+	}
+	if !strings.Contains(string(out), "GUIDANCE PENDING") {
 		t.Fatalf("hook output = %q, want guidance warning", string(out))
 	}
 	if !strings.Contains(string(out), guidancePath) {

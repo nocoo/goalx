@@ -12,16 +12,17 @@ import (
 
 // ProtocolData is passed to master.md.tmpl and program.md.tmpl.
 type ProtocolData struct {
-	Objective      string
-	Description    string
-	Mode           goalx.Mode
-	Sessions       []SessionData
-	Master         goalx.MasterConfig
-	Harness        goalx.HarnessConfig
-	Budget         goalx.BudgetConfig
-	Target         goalx.TargetConfig
-	Context        goalx.ContextConfig
-	TmuxSession    string
+	Objective         string
+	Description       string
+	Mode              goalx.Mode
+	Engine            string
+	Sessions          []SessionData
+	Master            goalx.MasterConfig
+	Harness           goalx.HarnessConfig
+	Budget            goalx.BudgetConfig
+	Target            goalx.TargetConfig
+	Context           goalx.ContextConfig
+	TmuxSession       string
 	ProjectRoot       string
 	SummaryPath       string
 	AcceptancePath    string

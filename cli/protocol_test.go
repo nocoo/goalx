@@ -14,6 +14,7 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	data := ProtocolData{
 		Objective:    "ship it",
 		Mode:         goalx.ModeDevelop,
+		Engine:       "codex",
 		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		SessionName:  "session-1",
@@ -32,6 +33,11 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
+		"## Critical References (do not forget)",
+		"Journal: `/tmp/journal.jsonl`",
+		"Guidance: `/tmp/guidance.md`",
+		"Objective: ship it",
+		"Gate: `go test ./...`",
 		"Before doing new work, first reconstruct context",
 		"Read your existing journal",
 		"Read the latest master guidance",
@@ -43,7 +49,38 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	}
 }
 
-func TestRenderMasterProtocolIncludesAcceptanceChecklistInstructions(t *testing.T) {
+func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:    "investigate auth",
+		Mode:         goalx.ModeResearch,
+		Engine:       "claude-code",
+		Target:       goalx.TargetConfig{Files: []string{"report.md"}},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"## Your Tools",
+		"Agent tool",
+		"WebSearch/WebFetch",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:      "ship it",
@@ -73,10 +110,11 @@ func TestRenderMasterProtocolIncludesAcceptanceChecklistInstructions(t *testing.
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Before the first heartbeat",
+		"## Before First Heartbeat",
 		"Write an acceptance checklist",
 		"/tmp/acceptance.md",
-		"Read the acceptance checklist first",
+		"Then wait for Heartbeat prompts. Do NOT loop on your own.",
+		"## Guidance Writing Principles",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -121,10 +159,10 @@ func TestRenderMasterProtocolIncludesResearchPreflightDimensionSelection(t *test
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Before writing the acceptance checklist, do a research pre-flight.",
-		"Decide which dimensions matter most (for example: depth, adversarial, comparative, creative, evidence).",
-		"If the current session count is too small, use `goalx add \"missing dimension\"` to add coverage.",
-		"Write one distinct dimension assignment to each session's guidance file before the first heartbeat.",
+		"Assess the objective's scope (quick fix vs deep research)",
+		"Decide which research dimensions matter most. If sessions are insufficient, use `goalx add`",
+		"Write a distinct dimension assignment to each session's guidance file",
+		"Write an acceptance checklist (3-7 testable bullets)",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -163,10 +201,10 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 	}
 	text := string(out)
 	for _, want := range []string{
-		"When you write the summary, also update `/tmp/status.json`.",
-		"Set `recommendation` to exactly one of: `debate`, `implement`, `done`, `more-research`.",
+		"Write summary to `/tmp/summary.md`",
+		"Update `/tmp/status.json` with JSON: phase, recommendation, heartbeat count, acceptance_met, keep_session, next_objective",
 		"Set `keep_session` when a develop-mode session should be merged after the run.",
-		"If you choose `more-research`, also set `next_objective` to the precise follow-up question.",
+		"Default action for the first 3+ heartbeats is **push deeper**.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

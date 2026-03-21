@@ -4,6 +4,13 @@
 
 {{.Description}}
 {{end}}
+## Critical References (do not forget)
+
+- Journal: `{{.JournalPath}}` — format: `{"round":N,"commit":"...","desc":"...","confidence":"HIGH|MEDIUM|LOW","status":"progress|fix|stuck|ack-guidance"}`
+- Guidance: `{{.GuidancePath}}` — check after every commit
+- Objective: {{.Objective}}
+{{if .Harness.Command}}- Gate: `{{.Harness.Command}}`{{end}}
+
 ## Resume First
 
 Before doing new work, first reconstruct context:
@@ -69,7 +76,7 @@ Structure your report as a chain of findings, not a flat document:
 
 - **Never declare yourself done.** There is always a deeper question to ask.
 - **Each round must produce NEW insight.** If you're restating previous findings, go deeper or change angle.
-- **Quantify everything you can.** "The code is complex" → "config.go has 450 lines with 12 exported functions and 3 levels of config merging"
+- **Quantify everything you can.** "The code is complex" -> "config.go has 450 lines with 12 exported functions and 3 levels of config merging"
 - **Challenge your own conclusions.** Spend at least one round looking for counter-evidence.
 - **The master will tell you when to stop.** Your job is to keep exploring until then.
 
@@ -96,7 +103,7 @@ Every fix MUST follow this cycle — no shortcuts:
 
 **2. Test (if applicable)** — Write or verify a test that demonstrates the problem:
    - Run existing tests: `{{.Harness.Command}}`
-   - If no test exists for this fix, write one first (red → green)
+   - If no test exists for this fix, write one first (red -> green)
 
 **3. Fix** — Make the minimal change. Don't refactor adjacent code.
 
@@ -139,17 +146,30 @@ Use these references for background (files: `cat`, URLs: fetch, text: read as-is
 {{.DiversityHint}}
 {{end}}
 
+{{if eq .Engine "claude-code"}}
+## Your Tools
+
+You are running in Claude Code with access to:
+- **Agent tool**: Spawn parallel subagents for independent research tasks
+- **WebSearch/WebFetch**: Search the internet for documentation and examples
+- Use these proactively. For research tasks, spawn parallel agents to investigate different angles simultaneously.
+{{end}}
+{{if eq .Engine "codex"}}
+## Your Tools
+
+You are running in Codex CLI with file system access and shell execution.
+Note: When you complete all tasks, check guidance file for new instructions before stopping.
+
+When you have completed all current tasks, do not stop. Check your guidance file (`{{.GuidancePath}}`) for new instructions from the master agent. Re-check every few minutes.
+{{end}}
+
 ## Journal
 
-After each round, append to `{{.JournalPath}}`:
+Append entries to `{{.JournalPath}}`:
 
 ```json
 {"round":1,"commit":"abc1234","desc":"what you investigated","confidence":"HIGH|MEDIUM|LOW","status":"progress"}
 ```
-
-Status: `progress` | `fix` | `stuck` | `ack-guidance`
-
-**Do NOT use status "done".** The master decides when you are done.
 
 ## Budget
 
@@ -158,37 +178,29 @@ Status: `progress` | `fix` | `stuck` | `ack-guidance`
 
 ## Master Guidance
 
-A master agent is monitoring your work. It can guide you without restarting you.
-
-**After every commit and after every harness run**, check for guidance:
+After every commit and after every harness run, check:
 
 ```bash
 cat {{.GuidancePath}}
 ```
 
 If the file has content:
-1. **Read it carefully.** Master has more context about the overall objective.
-2. **Follow the guidance.** Adjust your work direction as instructed.
-3. **Acknowledge in journal:**
-   ```json
-   {"round":N,"commit":"...","desc":"ack master guidance: {what you're changing}","status":"ack-guidance"}
-   ```
-4. **Clear the file** after you have acted on it:
+1. Read it carefully and adjust your direction.
+2. Acknowledge in journal with status `ack-guidance`.
+3. Clear the file after you have acted on it:
    ```bash
    echo -n "" > {{.GuidancePath}}
    ```
 
 If the file is empty or doesn't exist, continue your current work.
 
-**Master guidance takes priority over your current direction.** Master sees the bigger picture.
-
 ## When You Complete All Known Tasks
 
 After finishing all items in your assignment:
 
 1. Check guidance one final time: `cat {{.GuidancePath}}`
-2. If guidance has content → follow it (master may have new work)
-3. If guidance is empty → append to journal:
+2. If guidance has content -> follow it
+3. If guidance is empty -> append to journal:
    ```json
    {"round":N,"commit":"...","desc":"all assigned tasks complete, awaiting master","confidence":"HIGH","status":"idle"}
    ```

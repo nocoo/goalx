@@ -42,9 +42,10 @@ func GenerateAdapter(engine, worktreePath, guidancePath string) error {
 	}
 
 	quotedGuidancePath := shellQuote(guidancePath)
+	quotedGuidanceMessage := shellQuote("GUIDANCE PENDING: read " + guidancePath + " and follow it now")
 	stopCmd := fmt.Sprintf(
-		`cat %s 2>/dev/null | grep -q . && printf '\n⚠️ MASTER GUIDANCE PENDING — read %%s and follow it NOW\n' %s || true`,
-		quotedGuidancePath, quotedGuidancePath,
+		`if cat %s 2>/dev/null | grep -q .; then printf '%%s\n' %s >&2; exit 2; fi`,
+		quotedGuidancePath, quotedGuidanceMessage,
 	)
 	hooks = append(hooks, map[string]string{
 		"event":   "Stop",
