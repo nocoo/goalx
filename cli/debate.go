@@ -21,6 +21,11 @@ func Debate(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("no saved research run found in .goalx/runs/: %w", err)
 	}
+	savedCfg, _ := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	preset := savedCfg.Preset
+	if preset == "" {
+		preset = "claude"
+	}
 
 	// Collect report files (absolute paths for worktree access)
 	var contextFiles []string
@@ -41,7 +46,7 @@ func Debate(projectRoot string, args []string) error {
 		Name:      "debate",
 		Mode:      goalx.ModeResearch,
 		Objective: fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单", run),
-		Preset:    "claude",
+		Preset:    preset,
 		Parallel:  2,
 		DiversityHints: []string{
 			"你支持 session-1 的观点。用代码证据辩护 session-1 报告中的结论，挑战 session-2 的结论。如果对方证据更强，愿意让步。最终输出共识清单。",
