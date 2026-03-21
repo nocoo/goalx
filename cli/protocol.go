@@ -32,6 +32,7 @@ type ProtocolData struct {
 
 	// Subagent-specific (used in program.md.tmpl)
 	SessionName   string
+	SessionIndex  int // 0-based index of this session in the Sessions slice
 	JournalPath   string
 	GuidancePath  string
 	WorktreePath  string

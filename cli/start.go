@@ -235,18 +235,21 @@ func Start(projectRoot string, args []string) (err error) {
 
 	for i, sd := range sessionDataList {
 		subData := ProtocolData{
-			Objective:    cfg.Objective,
-			Description:  cfg.Description,
-			Mode:         cfg.Mode,
-			Engine:       sd.Engine,
-			Target:       cfg.Target,
-			Harness:      cfg.Harness,
-			Context:      cfg.Context,
-			Budget:       cfg.Budget,
-			SessionName:  sd.Name,
-			JournalPath:  sd.JournalPath,
-			GuidancePath: sd.GuidancePath,
-			WorktreePath: sd.WorktreePath,
+			Objective:      cfg.Objective,
+			Description:    cfg.Description,
+			Mode:           cfg.Mode,
+			Engine:         sd.Engine,
+			Sessions:       sessionDataList,
+			Target:         cfg.Target,
+			Harness:        cfg.Harness,
+			Context:        cfg.Context,
+			Budget:         cfg.Budget,
+			SessionName:    sd.Name,
+			SessionIndex:   i,
+			JournalPath:    sd.JournalPath,
+			GuidancePath:   sd.GuidancePath,
+			WorktreePath:   sd.WorktreePath,
+			AcceptancePath: acceptancePath,
 		}
 		if i < len(sessions) && sessions[i].Hint != "" {
 			subData.DiversityHint = sessions[i].Hint
