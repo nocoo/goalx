@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+var claudeAllowedTools = []string{
+	"Bash", "Read", "Write", "Edit", "Glob", "Grep",
+	"WebFetch", "WebSearch", "Agent",
+	"TaskCreate", "TaskUpdate", "LSP", "NotebookEdit", "EnterPlanMode",
+	"mcp__context7__resolve-library-id",
+	"mcp__context7__query-docs",
+}
+
 // EnsureEngineTrusted pre-accepts workspace trust for interactive engines so
 // freshly created worktrees can start unattended.
 func EnsureEngineTrusted(engine, path string) error {
@@ -104,14 +112,7 @@ func ensureClaudeTrusted(path string) error {
 
 	projects := coerceObject(doc["projects"])
 	entry := coerceObject(projects[path])
-	// Always set full allowedTools to prevent MCP permission popups.
-	existing := []any{
-		"Bash", "Read", "Write", "Edit", "Glob", "Grep",
-		"WebFetch", "WebSearch", "Agent",
-		"mcp__context7__resolve-library-id",
-		"mcp__context7__query-docs",
-	}
-	entry["allowedTools"] = existing
+	entry["allowedTools"] = mergeAllowedTools(coerceArray(entry["allowedTools"]), claudeAllowedTools)
 	entry["mcpContextUris"] = coerceArray(entry["mcpContextUris"])
 	entry["mcpServers"] = coerceObject(entry["mcpServers"])
 	entry["enabledMcpjsonServers"] = coerceArray(entry["enabledMcpjsonServers"])
@@ -199,4 +200,22 @@ func coerceArray(v any) []any {
 		return a
 	}
 	return []any{}
+}
+
+func mergeAllowedTools(existing []any, required []string) []any {
+	merged := append([]any(nil), existing...)
+	seen := map[string]bool{}
+	for _, item := range existing {
+		if tool, ok := item.(string); ok {
+			seen[tool] = true
+		}
+	}
+	for _, tool := range required {
+		if seen[tool] {
+			continue
+		}
+		merged = append(merged, tool)
+		seen[tool] = true
+	}
+	return merged
 }
