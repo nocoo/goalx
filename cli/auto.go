@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ func Auto(projectRoot string, args []string) (err error) {
 	}
 	needsInit := true
 	var finalStatus *statusJSON
+	var lastPhaseStartedAt time.Time
 
 	defer func() {
 		if err != nil || finalStatus == nil {
@@ -71,6 +73,7 @@ func Auto(projectRoot string, args []string) (err error) {
 
 	for i := 0; i < maxAutoIterations; i++ {
 		fmt.Printf("\n=== auto iteration %d/%d ===\n", i+1, maxAutoIterations)
+		lastPhaseStartedAt = time.Now()
 
 		// Init + Start
 		if needsInit {
@@ -114,6 +117,7 @@ func Auto(projectRoot string, args []string) (err error) {
 		// Terminal conditions
 		if status.AcceptanceMet || rec == "done" {
 			fmt.Println("Objective achieved. Results saved.")
+			printAutoResults(projectRoot, status, lastPhaseStartedAt)
 			if err := notifyAutoCompletion(projectRoot, status); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: notify failed: %v\n", err)
 			}
@@ -158,8 +162,66 @@ func Auto(projectRoot string, args []string) (err error) {
 		}
 	}
 
+	printAutoResults(projectRoot, finalStatus, lastPhaseStartedAt)
 	fmt.Printf("Reached max iterations (%d). Stopping.\n", maxAutoIterations)
 	return nil
+}
+
+func printAutoResults(projectRoot string, status *statusJSON, startedAt time.Time) {
+	if status == nil {
+		return
+	}
+
+	cfg, _, err := goalx.LoadConfig(projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: load config for results: %v\n", err)
+		return
+	}
+
+	fmt.Println("=== Results ===")
+	if cfg.Mode == goalx.ModeDevelop && status.KeepSession != "" {
+		fmt.Printf("Merged %s into main\n", status.KeepSession)
+		diffOut, err := exec.Command("git", "-C", projectRoot, "diff", "--stat", "HEAD~1..HEAD").CombinedOutput()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: git diff summary failed: %v\n", err)
+			return
+		}
+		fmt.Print(string(diffOut))
+		return
+	}
+
+	summaryPath, err := resolveAutoSummaryPath(projectRoot, cfg.Name)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: resolve summary path: %v\n", err)
+	} else if relPath, err := filepath.Rel(projectRoot, summaryPath); err == nil {
+		fmt.Printf("Summary: %s\n", filepath.ToSlash(relPath))
+	}
+
+	duration := time.Since(startedAt).Round(time.Second)
+	if duration < 0 {
+		duration = 0
+	}
+	sessions := len(goalx.ExpandSessions(cfg))
+	if sessions == 0 {
+		sessions = 1
+	}
+	fmt.Printf("Duration: %s | Sessions: %d | Heartbeats: %d\n", duration, sessions, status.Heartbeat)
+	fmt.Printf("Recommendation: %s\n", status.Recommendation)
+}
+
+func resolveAutoSummaryPath(projectRoot, runName string) (string, error) {
+	if runName != "" {
+		path := filepath.Join(projectRoot, ".goalx", "runs", runName, "summary.md")
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	_, runDir, err := findLatestSavedRun(filepath.Join(projectRoot, ".goalx", "runs"), "")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(runDir, "summary.md"), nil
 }
 
 func notifyAutoCompletion(projectRoot string, status *statusJSON) error {

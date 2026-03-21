@@ -479,6 +479,143 @@ func TestAutoMoreResearchPreservesOriginalFlags(t *testing.T) {
 	}
 }
 
+func TestAutoPrintsResearchResultsSummary(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeRootConfigFixture(t, projectRoot, goalx.Config{
+		Name:      "demo-run",
+		Mode:      goalx.ModeResearch,
+		Objective: "ship it",
+		Parallel:  3,
+		Target: goalx.TargetConfig{
+			Files: []string{"report.md"},
+		},
+		Harness: goalx.HarnessConfig{Command: "go test ./..."},
+	})
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	autoInit = func(string, []string) error { return nil }
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error {
+		writeSavedRunFixture(t, projectRoot, "demo-run", goalx.Config{
+			Name:      "demo-run",
+			Mode:      goalx.ModeResearch,
+			Objective: "ship it",
+			Parallel:  3,
+		}, map[string]string{
+			"summary.md": "# summary\n",
+		})
+		return nil
+	}
+	autoKeep = func(string, []string) error { return nil }
+	autoDrop = func(string, []string) error { return nil }
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		return &statusJSON{
+			Phase:          "complete",
+			Recommendation: "done",
+			AcceptanceMet:  true,
+			Heartbeat:      8,
+		}, nil
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	out := captureStdout(t, func() {
+		if err := Auto(projectRoot, []string{"ship it", "--research"}); err != nil {
+			t.Fatalf("Auto: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"=== Results ===",
+		"Summary: .goalx/runs/demo-run/summary.md",
+		"Sessions: 3",
+		"Heartbeats: 8",
+		"Recommendation: done",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("auto output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestAutoPrintsDevelopDiffAfterKeep(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := initGitRepo(t)
+	writeAndCommit(t, projectRoot, "README.md", "base\n", "base commit")
+	writeRootConfigFixture(t, projectRoot, goalx.Config{
+		Name:      "demo-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship it",
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+		Harness: goalx.HarnessConfig{Command: "go test ./..."},
+	})
+
+	oldInit := autoInit
+	oldStart := autoStart
+	oldSave := autoSave
+	oldKeep := autoKeep
+	oldDrop := autoDrop
+	oldPollUntilComplete := autoPollUntilComplete
+	autoInit = func(string, []string) error { return nil }
+	autoStart = func(string, []string) error { return nil }
+	autoSave = func(string, []string) error { return nil }
+	autoKeep = func(string, []string) error {
+		writeAndCommit(t, projectRoot, "README.md", "base\nupdated\n", "merged session-1")
+		return nil
+	}
+	autoDrop = func(string, []string) error { return nil }
+	autoPollUntilComplete = func(string, time.Duration, time.Duration) (*statusJSON, error) {
+		return &statusJSON{
+			Phase:          "complete",
+			Recommendation: "done",
+			AcceptanceMet:  true,
+			KeepSession:    "session-1",
+		}, nil
+	}
+	defer func() {
+		autoInit = oldInit
+		autoStart = oldStart
+		autoSave = oldSave
+		autoKeep = oldKeep
+		autoDrop = oldDrop
+		autoPollUntilComplete = oldPollUntilComplete
+	}()
+
+	out := captureStdout(t, func() {
+		if err := Auto(projectRoot, []string{"ship it", "--develop"}); err != nil {
+			t.Fatalf("Auto: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"=== Results ===",
+		"Merged session-1 into main",
+		"README.md |",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("auto output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 var errUnexpectedSecondInit = errors.New("unexpected second init")
 
 func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) {
@@ -501,5 +638,22 @@ func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.C
 		if err := os.WriteFile(filepath.Join(runDir, name), []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
+	}
+}
+
+func writeRootConfigFixture(t *testing.T, projectRoot string, cfg goalx.Config) {
+	t.Helper()
+
+	goalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir goalx dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal root config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write root goalx.yaml: %v", err)
 	}
 }
