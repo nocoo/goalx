@@ -670,7 +670,7 @@ func heartbeatStallPollLimit(checkInterval, pollInterval time.Duration) int {
 		return minHeartbeatStallPolls
 	}
 
-	limit := int((checkInterval*4 + pollInterval - 1) / pollInterval)
+	limit := int((checkInterval*8 + pollInterval - 1) / pollInterval)
 	if limit < minHeartbeatStallPolls {
 		return minHeartbeatStallPolls
 	}

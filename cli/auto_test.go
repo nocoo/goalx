@@ -1251,7 +1251,7 @@ func TestPollUntilCompleteDetectsStalledHeartbeat(t *testing.T) {
 		writeStatus(`{"phase":"running","recommendation":"","heartbeat":1}`)
 	}()
 
-	_, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 80*time.Millisecond, 10*time.Millisecond)
+	_, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 140*time.Millisecond, 10*time.Millisecond)
 	if err == nil || !strings.Contains(err.Error(), "heartbeat stalled") {
 		t.Fatalf("pollUntilComplete error = %v, want heartbeat stalled", err)
 	}
@@ -1271,8 +1271,8 @@ func TestPollUntilCompleteGracePeriodBeforeSecondHeartbeat(t *testing.T) {
 
 func TestHeartbeatStallPollLimitScalesWithCheckInterval(t *testing.T) {
 	got := heartbeatStallPollLimit(2*time.Minute, 30*time.Second)
-	if got != 16 {
-		t.Fatalf("stall poll limit = %d, want 16", got)
+	if got != 32 {
+		t.Fatalf("stall poll limit = %d, want 32", got)
 	}
 }
 
