@@ -19,7 +19,7 @@ GoalX is an orchestration CLI for unattended research and develop runs. Prefer t
 goalx auto "objective"
 ```
 - `goalx auto` defaults to research mode when no mode flag is provided.
-- Add `--context /abs/path/a,/abs/path/b` when local files or repos matter.
+- Add `--context /abs/path/a,/abs/path/b` when external files, saved runs, or other repos matter.
 - Add `--parallel` or `--strategy` only when the user clearly wants control.
 ### Explicit control
 ```bash
@@ -60,7 +60,7 @@ parallel: 2
 diversity_hints:
   - "custom session hint"
 context:
-  files: [/abs/path]
+  files: [/abs/path/outside/current-worktree]
   refs: ["https://example.com/spec"]
 target:
   files: [cli/]
@@ -84,7 +84,7 @@ sessions:
 - `goalx add "direction" [--run NAME]`, `goalx review [NAME]`, `goalx diff [NAME] <a> [b]`: expand or compare session work
 - `goalx save [NAME]`, `goalx debate`, `goalx implement`, `goalx next`: move the pipeline forward
 - `goalx keep [NAME] <session>`, `goalx stop [NAME]`, `goalx drop [NAME]`: merge, stop, or clean up a run
-- `goalx result [NAME]`: show saved run results (research: summary, develop: git log + diff stat)
+- `goalx result [NAME] [--full]`: show saved run results (research: smart summary by default, `--full` for raw summary; develop: git log + diff stat)
 - `goalx list`, `goalx archive`, `goalx report`, `goalx serve`: supporting management commands
 ## Observe and React
 - Healthy run: summarize progress and wait.
