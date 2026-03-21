@@ -195,6 +195,11 @@ func printAutoResults(projectRoot string, status *statusJSON, startedAt time.Tim
 		fmt.Fprintf(os.Stderr, "warning: resolve summary path: %v\n", err)
 	} else if relPath, err := filepath.Rel(projectRoot, summaryPath); err == nil {
 		fmt.Printf("Summary: %s\n", filepath.ToSlash(relPath))
+		if data, readErr := os.ReadFile(summaryPath); readErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: read summary for display: %v\n", readErr)
+		} else if summary := strings.TrimSpace(renderResearchSummary(data)); summary != "" {
+			fmt.Println(summary)
+		}
 	}
 
 	duration := time.Since(startedAt).Round(time.Second)

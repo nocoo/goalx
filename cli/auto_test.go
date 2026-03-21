@@ -510,7 +510,23 @@ func TestAutoPrintsResearchResultsSummary(t *testing.T) {
 			Objective: "ship it",
 			Parallel:  3,
 		}, map[string]string{
-			"summary.md": "# summary\n",
+			"summary.md": strings.TrimSpace(`
+# Summary
+
+## Key Findings
+- finding 1
+- finding 2
+- finding 3
+- finding 4
+- finding 5
+- finding 6
+
+## Priority Fix List
+- P0: config.go
+
+## Recommendation
+done
+`) + "\n",
 		})
 		return nil
 	}
@@ -542,6 +558,8 @@ func TestAutoPrintsResearchResultsSummary(t *testing.T) {
 	for _, want := range []string{
 		"=== Results ===",
 		"Summary: .goalx/runs/demo-run/summary.md",
+		"- finding 1",
+		"... (1 more lines)",
 		"Sessions: 3",
 		"Heartbeats: 8",
 		"Recommendation: done",
