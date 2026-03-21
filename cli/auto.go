@@ -52,7 +52,12 @@ type autoCompletionPayload struct {
 // Each iteration: init+start → poll → save → read recommendation → route.
 func Auto(projectRoot string, args []string) (err error) {
 	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
-	initArgs := args // first iteration uses the user's original args
+	originalArgs := append([]string(nil), args...)
+	initArgs := append([]string(nil), args...) // first iteration uses the user's original args
+	if len(initArgs) > 0 && !hasMode(initArgs) {
+		initArgs = append(initArgs[:1:1], append([]string{"--research"}, initArgs[1:]...)...)
+	}
+	needsInit := true
 	var finalStatus *statusJSON
 
 	defer func() {
@@ -68,8 +73,10 @@ func Auto(projectRoot string, args []string) (err error) {
 		fmt.Printf("\n=== auto iteration %d/%d ===\n", i+1, maxAutoIterations)
 
 		// Init + Start
-		if err := autoInit(projectRoot, initArgs); err != nil {
-			return fmt.Errorf("init (iter %d): %w", i, err)
+		if needsInit {
+			if err := autoInit(projectRoot, initArgs); err != nil {
+				return fmt.Errorf("init (iter %d): %w", i, err)
+			}
 		}
 		if err := autoStart(projectRoot, nil); err != nil {
 			return fmt.Errorf("start (iter %d): %w", i, err)
@@ -120,14 +127,14 @@ func Auto(projectRoot string, args []string) (err error) {
 			if err := Debate(projectRoot, nil); err != nil {
 				return fmt.Errorf("debate (iter %d): %w", i, err)
 			}
-			initArgs = nil // subsequent Start uses goalx.yaml as-is
+			needsInit = false
 
 		case "implement":
 			fmt.Println("Starting implementation...")
 			if err := Implement(projectRoot, nil); err != nil {
 				return fmt.Errorf("implement (iter %d): %w", i, err)
 			}
-			initArgs = nil
+			needsInit = false
 
 		case "more-research":
 			obj := status.NextObjective
@@ -136,7 +143,14 @@ func Auto(projectRoot string, args []string) (err error) {
 				return nil
 			}
 			fmt.Printf("Re-initializing with new objective: %s\n", obj)
-			initArgs = []string{"--research", obj}
+			initArgs = []string{obj}
+			if len(originalArgs) > 1 {
+				initArgs = append(initArgs, originalArgs[1:]...)
+			}
+			if !hasMode(initArgs) {
+				initArgs = append(initArgs, "--research")
+			}
+			needsInit = true
 
 		default:
 			fmt.Printf("Unknown recommendation %q. Stopping.\n", rec)
@@ -195,6 +209,15 @@ func notifyAutoCompletion(projectRoot string, status *statusJSON) error {
 		return fmt.Errorf("status %s", resp.Status)
 	}
 	return fmt.Errorf("status %s: %s", resp.Status, string(msg))
+}
+
+func hasMode(args []string) bool {
+	for _, arg := range args {
+		if arg == "--research" || arg == "--develop" {
+			return true
+		}
+	}
+	return false
 }
 
 // pollUntilComplete reads status.json every interval until phase=complete or timeout.
