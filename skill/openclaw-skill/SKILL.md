@@ -56,12 +56,18 @@ gx_put "$GOALX_URL/projects/Y/goalx/config" \
 gx_post "$GOALX_URL/projects/Y/goalx/start" | pj
 ```
 
-### Configure sessions with mixed models
+### "Use 2 opus + 1 codex" / Custom agent composition
 ```bash
-# Configure sessions with mixed models
-gx_put "$GOALX_URL/projects/my-project/goalx/config" \
-  -d '{"sessions":[{"engine":"claude-code","model":"opus","hint":"deep"},{"engine":"codex","model":"gpt-5.4","hint":"audit"}]}' | pj
+# Configure mixed model sessions
+gx_put "$GOALX_URL/projects/Y/goalx/config" \
+  -d '{"sessions":[
+    {"engine":"claude-code","model":"opus","hint":"deep exploration"},
+    {"engine":"claude-code","model":"opus","hint":"creative alternatives"},
+    {"engine":"codex","model":"gpt-5.4","hint":"audit and challenge"}
+  ]}' | pj
+gx_post "$GOALX_URL/projects/Y/goalx/start" | pj
 ```
+Translate user requests like "use opus for thinking, codex for auditing" into the right session config.
 
 ### "How's the research going?" / "Check progress"
 ```bash

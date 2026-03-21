@@ -126,30 +126,32 @@ master:
 ```
 
 ### When to edit config vs use CLI flags:
-- **CLI flags**: quick, single-value settings (`--parallel 3`, `--strategy depth,web`, `--master codex/gpt-5.4`, `--auditor codex/gpt-5.4`)
-- **Edit yaml**: multi-line objective, context refs/URLs, custom diversity hints, harness command, target files
+- **CLI flags**: quick settings (`--parallel`, `--strategy`, `--master`, `--auditor`, `--sub`)
+- **Edit yaml**: multi-line objective, context refs/URLs, custom diversity hints, harness, target files, per-session hints
 
 ### Session Orchestration
 
-For fine-grained control, edit `sessions:` in `.goalx/goalx.yaml`:
+Use `--sub engine/model:N` to explicitly compose agents:
 
-```yaml
-sessions:
-  - engine: claude-code
-    model: opus
-    hint: "Deep exploration"
-  - engine: claude-code
-    model: opus
-    hint: "Creative alternatives"
-  - engine: codex
-    model: gpt-5.4
-    hint: "Audit and challenge"
+```bash
+# 2 opus exploring + 1 codex auditing
+goalx init "obj" --research --sub claude-code/opus:2 --auditor codex/gpt-5.4
+
+# 3 codex dev + 1 opus reviewing
+goalx init "obj" --develop --master codex/gpt-5.4 --sub codex/gpt-5.4:3 --auditor claude-code/opus
+
+# mixed team
+goalx init "obj" --research --sub claude-code/opus:1 --sub codex/gpt-5.4:1
 ```
 
-Common patterns:
-- "3 opus + 1 codex auditor" → `--preset claude-h --parallel 3 --auditor codex/gpt-5.4`
-- "codex master + opus explorer" → `--preset mixed --parallel 2`
-- "all codex for dev" → `--preset codex --parallel 2`
+`--sub` overrides `--parallel`. Count defaults to 1 if omitted. Combine with `--auditor` for N workers + 1 reviewer.
+
+For per-session hints, edit `sessions:` in `.goalx/goalx.yaml` after init.
+
+Quick patterns with presets:
+- "all opus" → `--preset claude-h --parallel 3`
+- "all codex" → `--preset codex --parallel 2`
+- "codex master + claude sub" → `--preset mixed --parallel 2`
 
 Presets: `claude` (default), `claude-h` (all opus), `codex` (all gpt-5.4), `mixed` (codex master + claude sub)
 
