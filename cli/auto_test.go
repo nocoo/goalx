@@ -587,6 +587,86 @@ func TestValidateNextConfigRejectsInvalidFields(t *testing.T) {
 	}
 }
 
+func TestValidateNextConfigNormalizesExtendedFields(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	got := validateNextConfig(projectRoot, &nextConfigJSON{
+		Mode:          " research ",
+		MaxIterations: 7,
+		Context:       []string{" docs/plan.md ", " ", "README.md"},
+		MasterEngine:  " codex ",
+		MasterModel:   " fast ",
+		Sessions: []sessionConfigJSON{
+			{Hint: " alpha ", Engine: " codex ", Model: " fast "},
+			{Hint: " beta ", Engine: " unknown ", Model: " fast "},
+		},
+	})
+	if got == nil {
+		t.Fatal("validateNextConfig returned nil")
+	}
+	if got.Mode != "research" {
+		t.Fatalf("mode = %q, want research", got.Mode)
+	}
+	if got.MaxIterations != 7 {
+		t.Fatalf("max_iterations = %d, want 7", got.MaxIterations)
+	}
+	if len(got.Context) != 2 || got.Context[0] != "docs/plan.md" || got.Context[1] != "README.md" {
+		t.Fatalf("context = %#v, want trimmed non-empty paths", got.Context)
+	}
+	if got.MasterEngine != "codex" || got.MasterModel != "fast" {
+		t.Fatalf("master engine/model = %q/%q, want codex/fast", got.MasterEngine, got.MasterModel)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("sessions = %#v, want 2 entries", got.Sessions)
+	}
+	if got.Sessions[0].Hint != "alpha" || got.Sessions[0].Engine != "codex" || got.Sessions[0].Model != "fast" {
+		t.Fatalf("sessions[0] = %#v, want trimmed codex/fast entry", got.Sessions[0])
+	}
+	if got.Sessions[1].Hint != "beta" || got.Sessions[1].Engine != "" || got.Sessions[1].Model != "" {
+		t.Fatalf("sessions[1] = %#v, want invalid engine/model cleared", got.Sessions[1])
+	}
+}
+
+func TestValidateNextConfigRejectsInvalidExtendedFields(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	got := validateNextConfig(projectRoot, &nextConfigJSON{
+		Mode:          "invalid",
+		MaxIterations: 42,
+		MasterEngine:  "unknown",
+		MasterModel:   "fast",
+		Sessions: []sessionConfigJSON{
+			{Hint: "x", Engine: "codex", Model: "gpt-5.2"},
+			{Hint: "y", Model: "fast"},
+		},
+	})
+	if got == nil {
+		t.Fatal("validateNextConfig returned nil")
+	}
+	if got.Mode != "" {
+		t.Fatalf("mode = %q, want empty", got.Mode)
+	}
+	if got.MaxIterations != 0 {
+		t.Fatalf("max_iterations = %d, want 0", got.MaxIterations)
+	}
+	if got.MasterEngine != "" || got.MasterModel != "" {
+		t.Fatalf("master engine/model = %q/%q, want empty", got.MasterEngine, got.MasterModel)
+	}
+	if len(got.Sessions) != 2 {
+		t.Fatalf("sessions = %#v, want 2 entries", got.Sessions)
+	}
+	if got.Sessions[0].Model != "" {
+		t.Fatalf("sessions[0].model = %q, want empty", got.Sessions[0].Model)
+	}
+	if got.Sessions[1].Model != "" {
+		t.Fatalf("sessions[1].model = %q, want empty", got.Sessions[1].Model)
+	}
+}
+
 func TestAutoKeepsSessionOnlyWhenDone(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -1251,9 +1331,42 @@ func TestPollUntilCompleteDetectsStalledHeartbeat(t *testing.T) {
 		writeStatus(`{"phase":"running","recommendation":"","heartbeat":1}`)
 	}()
 
-	_, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 80*time.Millisecond, 10*time.Millisecond)
+	_, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 140*time.Millisecond, 10*time.Millisecond)
 	if err == nil || !strings.Contains(err.Error(), "heartbeat stalled") {
 		t.Fatalf("pollUntilComplete error = %v, want heartbeat stalled", err)
+	}
+}
+
+func TestPollUntilCompleteFailsFastWhenTmuxSessionDies(t *testing.T) {
+	projectRoot := t.TempDir()
+	goalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir goalx dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), []byte("name: demo\n"), 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	statusPath := filepath.Join(goalxDir, "status.json")
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":0}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+
+	oldSessionExists := autoSessionExists
+	autoSessionExists = func(session string) bool {
+		wantSession := goalx.TmuxSessionName(projectRoot, "demo")
+		if session != wantSession {
+			t.Fatalf("session = %q, want %q", session, wantSession)
+		}
+		return false
+	}
+	defer func() {
+		autoSessionExists = oldSessionExists
+	}()
+
+	_, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 40*time.Millisecond, 10*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "tmux session") {
+		t.Fatalf("pollUntilComplete error = %v, want tmux exit", err)
 	}
 }
 
@@ -1271,8 +1384,36 @@ func TestPollUntilCompleteGracePeriodBeforeSecondHeartbeat(t *testing.T) {
 
 func TestHeartbeatStallPollLimitScalesWithCheckInterval(t *testing.T) {
 	got := heartbeatStallPollLimit(2*time.Minute, 30*time.Second)
-	if got != 16 {
-		t.Fatalf("stall poll limit = %d, want 16", got)
+	if got != 32 {
+		t.Fatalf("stall poll limit = %d, want 32", got)
+	}
+}
+
+func TestPollUntilCompleteLogsProgressWhileWaiting(t *testing.T) {
+	statusPath := filepath.Join(t.TempDir(), "status.json")
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"running","recommendation":"","heartbeat":0}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+
+	go func() {
+		time.Sleep(24 * time.Millisecond)
+		if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","heartbeat":0}`), 0o644); err != nil {
+			t.Errorf("write completion status: %v", err)
+		}
+	}()
+
+	out := captureStdout(t, func() {
+		got, err := pollUntilCompleteWithHeartbeat(statusPath, 2*time.Millisecond, 80*time.Millisecond, 10*time.Millisecond)
+		if err != nil {
+			t.Fatalf("pollUntilCompleteWithHeartbeat: %v", err)
+		}
+		if got.Recommendation != "done" {
+			t.Fatalf("recommendation = %q, want done", got.Recommendation)
+		}
+	})
+
+	if !strings.Contains(out, "polling progress -- elapsed:") || !strings.Contains(out, "phase: running") {
+		t.Fatalf("poll output missing progress log:\n%s", out)
 	}
 }
 

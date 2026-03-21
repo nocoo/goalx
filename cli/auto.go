@@ -18,8 +18,11 @@ import (
 
 const maxAutoIterations = 5
 const maxNextConfigParallel = 10
+const maxNextConfigIterations = 20
 const minHeartbeatStallPolls = 10
 const defaultHeartbeatCheckInterval = 2 * time.Minute
+const heartbeatProgressPollInterval = 10
+const heartbeatTmuxCheckPollInterval = 5
 
 var (
 	autoInit              = Init
@@ -31,12 +34,13 @@ var (
 	autoImplement         = Implement
 	autoResolveRun        = ResolveRun
 	autoKillSession       = KillSession
+	autoSessionExists     = SessionExists
 	autoPollUntilComplete = func(statusPath string, interval, timeout time.Duration) (*statusJSON, error) {
 		return pollUntilCompleteWithHeartbeat(statusPath, interval, timeout, autoPollHeartbeatInterval)
 	}
 	autoPollHeartbeatInterval = defaultHeartbeatCheckInterval
-	autoVerifyHarness     = verifyHarness
-	autoHTTPClient        = &http.Client{Timeout: 10 * time.Second}
+	autoVerifyHarness         = verifyHarness
+	autoHTTPClient            = &http.Client{Timeout: 10 * time.Second}
 )
 
 // statusJSON matches the structure master writes to .goalx/status.json
@@ -51,15 +55,27 @@ type statusJSON struct {
 }
 
 type nextConfigJSON struct {
-	Parallel       int      `json:"parallel,omitempty"`
-	Engine         string   `json:"engine,omitempty"`
-	Model          string   `json:"model,omitempty"`
-	Preset         string   `json:"preset,omitempty"`
-	DiversityHints []string `json:"diversity_hints,omitempty"`
-	Strategies     []string `json:"strategies,omitempty"`
-	BudgetSeconds  int      `json:"budget_seconds,omitempty"`
-	Objective      string   `json:"objective,omitempty"`
-	Harness        string   `json:"harness,omitempty"`
+	Parallel       int                 `json:"parallel,omitempty"`
+	Engine         string              `json:"engine,omitempty"`
+	Model          string              `json:"model,omitempty"`
+	Preset         string              `json:"preset,omitempty"`
+	DiversityHints []string            `json:"diversity_hints,omitempty"`
+	Strategies     []string            `json:"strategies,omitempty"`
+	BudgetSeconds  int                 `json:"budget_seconds,omitempty"`
+	Objective      string              `json:"objective,omitempty"`
+	Harness        string              `json:"harness,omitempty"`
+	Mode           string              `json:"mode,omitempty"`
+	MaxIterations  int                 `json:"max_iterations,omitempty"`
+	Context        []string            `json:"context,omitempty"`
+	MasterEngine   string              `json:"master_engine,omitempty"`
+	MasterModel    string              `json:"master_model,omitempty"`
+	Sessions       []sessionConfigJSON `json:"sessions,omitempty"`
+}
+
+type sessionConfigJSON struct {
+	Hint   string `json:"hint,omitempty"`
+	Engine string `json:"engine,omitempty"`
+	Model  string `json:"model,omitempty"`
 }
 
 type autoCompletionPayload struct {
@@ -391,6 +407,11 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.Preset = strings.TrimSpace(validated.Preset)
 	validated.Objective = strings.TrimSpace(validated.Objective)
 	validated.Harness = strings.TrimSpace(validated.Harness)
+	validated.Mode = strings.TrimSpace(validated.Mode)
+	validated.Context = normalizeNextConfigContext(validated.Context)
+	validated.MasterEngine = strings.TrimSpace(validated.MasterEngine)
+	validated.MasterModel = strings.TrimSpace(validated.MasterModel)
+	validated.Sessions = normalizeNextConfigSessions(validated.Sessions)
 	validated.DiversityHints = normalizeNextConfigHints(validated.DiversityHints, 0)
 	validated.Strategies = normalizeNextConfigHints(validated.Strategies, 0)
 
@@ -405,6 +426,10 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.budget_seconds=%d (must be >= 0)\n", validated.BudgetSeconds)
 		validated.BudgetSeconds = 0
 	}
+	if validated.MaxIterations < 0 || validated.MaxIterations > maxNextConfigIterations {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.max_iterations=%d (must be 1-%d or 0)\n", validated.MaxIterations, maxNextConfigIterations)
+		validated.MaxIterations = 0
+	}
 	if len(validated.DiversityHints) > maxNextConfigParallel {
 		fmt.Fprintf(os.Stderr, "warning: truncating next_config.diversity_hints to %d entries\n", maxNextConfigParallel)
 		validated.DiversityHints = validated.DiversityHints[:maxNextConfigParallel]
@@ -418,6 +443,12 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	if _, loadedEngines, err := goalx.LoadRawBaseConfig(projectRoot); err == nil && len(loadedEngines) > 0 {
 		engines = loadedEngines
 	}
+	switch validated.Mode {
+	case "", string(goalx.ModeResearch), string(goalx.ModeDevelop):
+	default:
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.mode=%q (must be research or develop)\n", validated.Mode)
+		validated.Mode = ""
+	}
 	if validated.Engine != "" {
 		if _, ok := engines[validated.Engine]; !ok {
 			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.engine=%q (unknown engine)\n", validated.Engine)
@@ -429,6 +460,11 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.strategies: %v\n", err)
 			validated.Strategies = nil
 		}
+	}
+	validated.MasterEngine, validated.MasterModel = validateNamedEngineModelPair(engines, validated.MasterEngine, validated.MasterModel, "next_config.master")
+	for i := range validated.Sessions {
+		label := fmt.Sprintf("next_config.sessions[%d]", i)
+		validated.Sessions[i].Engine, validated.Sessions[i].Model = validateNamedEngineModelPair(engines, validated.Sessions[i].Engine, validated.Sessions[i].Model, label)
 	}
 
 	return &validated
@@ -557,6 +593,64 @@ func validateNextConfigModel(engines map[string]goalx.EngineConfig, engine, mode
 	return nil
 }
 
+func validateNamedEngineModelPair(engines map[string]goalx.EngineConfig, engine, model, label string) (string, string) {
+	if strings.TrimSpace(engine) == "" {
+		if strings.TrimSpace(model) != "" {
+			fmt.Fprintf(os.Stderr, "warning: ignoring %s.model=%q (engine is required)\n", label, model)
+		}
+		return "", ""
+	}
+	if _, ok := engines[engine]; !ok {
+		fmt.Fprintf(os.Stderr, "warning: ignoring %s.engine=%q (unknown engine)\n", label, engine)
+		return "", ""
+	}
+	if err := validateNextConfigModel(engines, engine, model); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: ignoring %s.model=%q for engine %q: %v\n", label, model, engine, err)
+		return engine, ""
+	}
+	return engine, model
+}
+
+func normalizeNextConfigContext(paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(paths))
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		normalized = append(normalized, path)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func normalizeNextConfigSessions(sessions []sessionConfigJSON) []sessionConfigJSON {
+	if len(sessions) == 0 {
+		return nil
+	}
+
+	normalized := make([]sessionConfigJSON, 0, len(sessions))
+	for _, session := range sessions {
+		session.Hint = strings.TrimSpace(session.Hint)
+		session.Engine = strings.TrimSpace(session.Engine)
+		session.Model = strings.TrimSpace(session.Model)
+		if session.Hint == "" && session.Engine == "" && session.Model == "" {
+			continue
+		}
+		normalized = append(normalized, session)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
 func modelAliasBelongsToOtherEngine(engines map[string]goalx.EngineConfig, engine, model string) bool {
 	ec, ok := engines[engine]
 	if !ok {
@@ -630,13 +724,17 @@ func pollUntilComplete(statusPath string, interval, timeout time.Duration) (*sta
 }
 
 func pollUntilCompleteWithHeartbeat(statusPath string, interval, timeout, checkInterval time.Duration) (*statusJSON, error) {
+	tmuxSession := tmuxSessionForStatusPath(statusPath)
 	deadline := time.Now().Add(timeout)
+	startedAt := time.Now()
 	lastHB := -1
 	stalledPolls := 0
 	heartbeatChanges := 0
 	stallLimit := heartbeatStallPollLimit(checkInterval, interval)
+	pollCount := 0
 
 	for time.Now().Before(deadline) {
+		pollCount++
 		data, err := os.ReadFile(statusPath)
 		if err == nil && len(data) > 0 {
 			var s statusJSON
@@ -655,11 +753,31 @@ func pollUntilCompleteWithHeartbeat(statusPath string, interval, timeout, checkI
 				if s.Phase == "complete" && s.Recommendation != "" {
 					return &s, nil
 				}
+				if s.Phase != "complete" && pollCount%heartbeatProgressPollInterval == 0 {
+					fmt.Printf("  polling progress -- elapsed: %s phase: %s heartbeat: %d stalled: %d/%d\n", time.Since(startedAt).Round(time.Millisecond), s.Phase, s.Heartbeat, stalledPolls, stallLimit)
+				}
+				if tmuxSession != "" && s.Phase != "complete" && pollCount%heartbeatTmuxCheckPollInterval == 0 && !autoSessionExists(tmuxSession) {
+					return nil, fmt.Errorf("tmux session %s exited while waiting for completion", tmuxSession)
+				}
 			}
 		}
 		time.Sleep(interval)
 	}
 	return nil, fmt.Errorf("timeout after %v waiting for completion", timeout)
+}
+
+func tmuxSessionForStatusPath(statusPath string) string {
+	goalxDir := filepath.Dir(statusPath)
+	if filepath.Base(goalxDir) != ".goalx" {
+		return ""
+	}
+
+	projectRoot := filepath.Dir(goalxDir)
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(goalxDir, "goalx.yaml"))
+	if err != nil || strings.TrimSpace(cfg.Name) == "" {
+		return ""
+	}
+	return goalx.TmuxSessionName(projectRoot, cfg.Name)
 }
 
 func heartbeatStallPollLimit(checkInterval, pollInterval time.Duration) int {
@@ -670,7 +788,7 @@ func heartbeatStallPollLimit(checkInterval, pollInterval time.Duration) int {
 		return minHeartbeatStallPolls
 	}
 
-	limit := int((checkInterval*4 + pollInterval - 1) / pollInterval)
+	limit := int((checkInterval*8 + pollInterval - 1) / pollInterval)
 	if limit < minHeartbeatStallPolls {
 		return minHeartbeatStallPolls
 	}
