@@ -107,16 +107,25 @@ When the objective is genuinely achieved:
    | `debate` | Sessions disagree and you need a structured debate round. | false |
    | `more-research` | Evidence is still insufficient; set `next_objective` and continue research. | false |
 
-2. Update `{{.StatusPath}}` with JSON:
+2. Update `{{.StatusPath}}`. Include `next_config` for every non-`done` recommendation:
+   For `done`:
    ```json
    {"phase":"complete","recommendation":"done","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}
    ```
-   For `implement` or `debate`, you can optionally add `next_config` to override the next phase:
+   For `implement`:
    ```json
-   {"phase":"complete","recommendation":"implement","heartbeat":5,"acceptance_met":true,"next_config":{"parallel":3,"engine":"codex","model":"codex","diversity_hints":["P0 fixes","P1 fixes","verification"],"budget_seconds":7200}}
+   {"phase":"complete","recommendation":"implement","heartbeat":5,"acceptance_met":true,"next_config":{"objective":"implement the agreed P0/P1 fixes","parallel":3,"diversity_hints":["P0 fixes","P1 fixes","verification"],"engine":"codex","model":"codex","budget_seconds":7200}}
    ```
-   Supported `next_config` keys: `parallel`, `engine`, `model`, `diversity_hints`, `budget_seconds`, `objective`.
-   If `next_config` is omitted, the framework uses defaults. Rules: parallel 1-10, engine from Available Engines, model must match the selected engine.
+   For `debate`:
+   ```json
+   {"phase":"complete","recommendation":"debate","heartbeat":5,"acceptance_met":false,"next_config":{"objective":"debate the remaining disagreements","parallel":2,"diversity_hints":["advocate position","critic position"]}}
+   ```
+   For `more-research`:
+   ```json
+   {"phase":"complete","recommendation":"more-research","heartbeat":5,"acceptance_met":false,"next_objective":"investigate the unresolved auth edge cases","next_config":{"parallel":2,"strategies":["depth","adversarial"],"budget_seconds":3600}}
+   ```
+   Supported `next_config` keys: `parallel`, `engine`, `model`, `preset`, `diversity_hints`, `strategies`, `budget_seconds`, `objective`, `harness`.
+   If `next_config` is omitted, the framework uses defaults. Do that only when you intentionally want framework defaults. Rules: parallel 1-10, engine from Available Engines, model must match the selected engine.
    Set `keep_session` when a develop-mode session should be merged after the run.
 3. **Verification before `done`**:
 {{if eq .Mode "develop"}}
