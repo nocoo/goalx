@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -60,6 +61,29 @@ func TestMergeWorktreeFallsBackToNoFF(t *testing.T) {
 	// Verify the feature file is present after merge.
 	if _, err := os.Stat(filepath.Join(repo, "feature.txt")); err != nil {
 		t.Fatal("feature.txt should exist after merge")
+	}
+}
+
+func TestMergeWorktreeRejectsConflictsBeforeMerge(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "shared.txt", "base\n", "base commit")
+
+	runGit(t, repo, "checkout", "-b", "feature")
+	writeAndCommit(t, repo, "shared.txt", "feature\n", "feature commit")
+	runGit(t, repo, "checkout", "-")
+	writeAndCommit(t, repo, "shared.txt", "main\n", "main commit")
+
+	err := MergeWorktree(repo, "feature")
+	if err == nil || !strings.Contains(err.Error(), "merge conflict detected") {
+		t.Fatalf("MergeWorktree error = %v, want merge conflict detected", err)
+	}
+
+	status, statErr := exec.Command("git", "-C", repo, "status", "--porcelain").CombinedOutput()
+	if statErr != nil {
+		t.Fatalf("git status: %v\n%s", statErr, string(status))
+	}
+	if strings.TrimSpace(string(status)) != "" {
+		t.Fatalf("merge precheck should leave repo clean, got:\n%s", string(status))
 	}
 }
 

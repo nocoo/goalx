@@ -58,12 +58,22 @@ func MergeWorktree(projectRoot, branch string) error {
 	head, _ := exec.Command("git", "-C", projectRoot, "rev-parse", "HEAD").Output()
 	branchRev, _ := exec.Command("git", "-C", projectRoot, "rev-parse", branch).Output()
 	if len(head) > 0 && len(branchRev) > 0 {
-		mtOut, mtErr := exec.Command("git", "-C", projectRoot, "merge-tree",
-			strings.TrimSpace(string(head)),
+		mergeBase, mergeBaseErr := exec.Command("git", "-C", projectRoot, "merge-base",
 			strings.TrimSpace(string(head)),
 			strings.TrimSpace(string(branchRev)),
 		).CombinedOutput()
-		if mtErr != nil && strings.Contains(string(mtOut), "<<<<<<") {
+		if mergeBaseErr != nil {
+			return fmt.Errorf("git merge-base: %w: %s", mergeBaseErr, mergeBase)
+		}
+		mtOut, mtErr := exec.Command("git", "-C", projectRoot, "merge-tree",
+			strings.TrimSpace(string(mergeBase)),
+			strings.TrimSpace(string(head)),
+			strings.TrimSpace(string(branchRev)),
+		).CombinedOutput()
+		if mtErr != nil {
+			return fmt.Errorf("git merge-tree: %w: %s", mtErr, mtOut)
+		}
+		if hasMergeConflictMarkers(string(mtOut)) {
 			return fmt.Errorf("merge conflict detected with %s — resolve manually or let master handle:\n%s", branch, string(mtOut)[:min(len(mtOut), 500)])
 		}
 	}
@@ -84,6 +94,12 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func hasMergeConflictMarkers(out string) bool {
+	return strings.Contains(out, "<<<<<<<") &&
+		strings.Contains(out, "=======") &&
+		strings.Contains(out, ">>>>>>>")
 }
 
 // TagArchive creates a git tag pointing at the given branch.
