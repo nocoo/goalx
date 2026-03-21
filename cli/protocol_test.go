@@ -203,6 +203,7 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 	for _, want := range []string{
 		"Write summary to `/tmp/summary.md`",
 		"Update `/tmp/status.json` with JSON: phase, recommendation, heartbeat count, acceptance_met, keep_session, next_objective",
+		`{"phase":"complete","recommendation":"implement","heartbeat":3,"acceptance_met":true,"keep_session":"session-1","next_objective":""}`,
 		"Set `keep_session` when a develop-mode session should be merged after the run.",
 		"Default action for the first 3+ heartbeats is **push deeper**.",
 	} {
