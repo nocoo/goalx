@@ -76,8 +76,9 @@ goalx auto "refactor the config system" --research --parallel 2
 | `goalx implement` | Generate develop config from consensus |
 | `goalx keep` | Merge session branch into main |
 | `goalx next` | Suggest next pipeline step |
+| `goalx result` | Show saved run results |
 | `goalx review` | Compare all session outputs |
-| `goalx tell` | Send message to master or session |
+| `goalx attach` | Attach to tmux session or window |
 | `goalx serve` | Start HTTP API server |
 | `goalx stop` | Graceful shutdown |
 | `goalx drop` | Cleanup worktrees and branches |
