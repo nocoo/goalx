@@ -16,6 +16,7 @@ type CoordinationState struct {
 	PlanSummary   []string                       `json:"plan_summary,omitempty"`
 	Owners        map[string]string              `json:"owners,omitempty"`
 	Sessions      map[string]CoordinationSession `json:"sessions,omitempty"`
+	Decision      *CoordinationDecision          `json:"decision,omitempty"`
 	Blocked       []string                       `json:"blocked,omitempty"`
 	OpenQuestions []string                       `json:"open_questions,omitempty"`
 	UpdatedAt     string                         `json:"updated_at,omitempty"`
@@ -29,6 +30,15 @@ type CoordinationSession struct {
 	DispatchableSlices []goalx.DispatchableSlice `json:"dispatchable_slices,omitempty"`
 	LastRound          int                       `json:"last_round,omitempty"`
 	UpdatedAt          string                    `json:"updated_at,omitempty"`
+}
+
+type CoordinationDecision struct {
+	RootCause        string `json:"root_cause,omitempty"`
+	LocalPath        string `json:"local_path,omitempty"`
+	CompatiblePath   string `json:"compatible_path,omitempty"`
+	ArchitecturePath string `json:"architecture_path,omitempty"`
+	ChosenPath       string `json:"chosen_path,omitempty"`
+	ChosenPathReason string `json:"chosen_path_reason,omitempty"`
 }
 
 func CoordinationPath(runDir string) string {

@@ -135,6 +135,44 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolIncludesOptimizerDoctrineInDevelopMode(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:      "demo",
+		Objective:    "optimize discovery pipeline",
+		Mode:         goalx.ModeDevelop,
+		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
+		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat the current implementation as evidence, not a boundary.",
+		"For any non-trivial task, identify the root cause, bottleneck, or design flaw before patching symptoms.",
+		"Do not assume the current module boundaries are correct.",
+		"Compare the local patch path, the compatibility-preserving path, and the architecture-level path.",
+		"If a deeper path materially improves the goal, report it clearly instead of silently following the old boundary.",
+		"When a better architecture path is justified, emit dispatchable slices or report it clearly",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered subagent protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -426,6 +464,45 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 	}
 }
 
+func TestRenderMasterProtocolIncludesOptimizerDoctrine(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:        "optimize pipeline discovery",
+		RunName:          "demo",
+		Mode:             goalx.ModeDevelop,
+		TmuxSession:      "ar-demo",
+		SummaryPath:      "/tmp/summary.md",
+		AcceptancePath:   "/tmp/acceptance.md",
+		CoordinationPath: "/tmp/coordination.json",
+		EngineCommand:    "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat every goal as a system optimization problem",
+		"Existing implementation boundaries are evidence, not boundaries.",
+		"identify the root cause or bottleneck first",
+		"local patch path",
+		"compatibility-preserving improvement path",
+		"architecture-level redesign path",
+		"Prefer the highest expected-value path",
+		"Do not over-engineer for elegance alone",
+		"record root cause, local path, compatibility-preserving path, architecture path, chosen path",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
 func TestRenderMasterProtocolIncludesResearchModeLaunchGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -454,6 +531,78 @@ func TestRenderMasterProtocolIncludesResearchModeLaunchGuidance(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolIncludesOptimizerDoctrineInResearchMode(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:      "demo",
+		Objective:    "investigate auth",
+		Mode:         goalx.ModeResearch,
+		Engine:       "claude-code",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
+		Target:       goalx.TargetConfig{Files: []string{"report.md"}},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat the current implementation as evidence, not a boundary.",
+		"For any non-trivial task, identify the root cause, bottleneck, or design flaw before patching symptoms.",
+		"Do not assume the current module boundaries are correct.",
+		"Compare the local patch path, the compatibility-preserving path, and the architecture-level path.",
+		"If a deeper path materially improves the goal, report it clearly instead of silently following the old boundary.",
+		"When a better architecture path is justified, emit dispatchable slices or report it clearly",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered subagent protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolEncouragesBetterArchitecturePathsInDevelopMode(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:      "demo",
+		Objective:    "ship it",
+		Mode:         goalx.ModeDevelop,
+		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
+		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
+		JournalPath:  "/tmp/journal.jsonl",
+		GuidancePath: "/tmp/guidance.md",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Do not assume the current module boundaries are correct",
+		"If a deeper path materially improves the goal",
+		"report it clearly instead of silently following the old boundary",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered develop protocol missing %q", want)
 		}
 	}
 }
@@ -600,6 +749,49 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesOptimizationDoctrine(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "maximize cross-platform discovery throughput",
+		RunName:             "demo",
+		Mode:                goalx.ModeDevelop,
+		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptancePath:      "/tmp/acceptance.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalContractPath:    "/tmp/goal-contract.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		StatusPath:          "/tmp/status.json",
+		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat every goal as a system optimization problem",
+		"Existing implementation boundaries are evidence, not boundaries.",
+		"identify the root cause or bottleneck first",
+		"local patch path",
+		"compatibility-preserving improvement path",
+		"architecture-level redesign path",
+		"Prefer the highest expected-value path feasible within budget and risk.",
+		"Do not over-engineer for elegance alone.",
+		"record root cause, local path, compatibility-preserving path, architecture path, chosen path",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
 }

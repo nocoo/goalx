@@ -46,6 +46,15 @@ Master's acceptance checklist: `{{.AcceptancePath}}` (read-only — master evalu
 {{end}}
 {{end}}
 
+## Optimization Doctrine
+
+- Treat the current implementation as evidence, not a boundary.
+- For any non-trivial task, identify the root cause, bottleneck, or design flaw before patching symptoms.
+- Do not assume the current module boundaries are correct.
+- Compare the local patch path, the compatibility-preserving path, and the architecture-level path.
+- If a deeper path materially improves the goal, report it clearly instead of silently following the old boundary.
+- When a better architecture path is justified, emit dispatchable slices or report it clearly in the journal/report so the master can adopt or dispatch it.
+
 {{if eq .Mode "research"}}
 ## Mode: Research — Evidence-Driven Exploration
 

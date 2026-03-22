@@ -53,3 +53,49 @@ func TestCoordinationStatePreservesExecutionStateAndDispatchableSlices(t *testin
 		t.Fatalf("DispatchableSlices[0].Title = %q", got.DispatchableSlices[0].Title)
 	}
 }
+
+func TestCoordinationStatePreservesDecisionRecord(t *testing.T) {
+	runDir := filepath.Join(t.TempDir(), "demo")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	state := &CoordinationState{
+		Version:   1,
+		Objective: "optimize discovery",
+		Decision: &CoordinationDecision{
+			RootCause:        "master keeps waiting on external blockers",
+			LocalPath:        "patch the current flow",
+			CompatiblePath:   "preserve existing contract semantics",
+			ArchitecturePath: "separate waiting_external from dispatchable coverage",
+			ChosenPath:       "architecture_path",
+			ChosenPathReason: "it reduces idle waiting without sacrificing correctness",
+		},
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), state); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+
+	loaded, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState: %v", err)
+	}
+	if loaded.Decision == nil {
+		t.Fatal("Decision = nil, want populated record")
+	}
+	if loaded.Decision.RootCause != "master keeps waiting on external blockers" {
+		t.Fatalf("Decision.RootCause = %q", loaded.Decision.RootCause)
+	}
+	if loaded.Decision.CompatiblePath != "preserve existing contract semantics" {
+		t.Fatalf("Decision.CompatiblePath = %q", loaded.Decision.CompatiblePath)
+	}
+	if loaded.Decision.ArchitecturePath != "separate waiting_external from dispatchable coverage" {
+		t.Fatalf("Decision.ArchitecturePath = %q", loaded.Decision.ArchitecturePath)
+	}
+	if loaded.Decision.ChosenPath != "architecture_path" {
+		t.Fatalf("Decision.ChosenPath = %q", loaded.Decision.ChosenPath)
+	}
+	if loaded.Decision.ChosenPathReason != "it reduces idle waiting without sacrificing correctness" {
+		t.Fatalf("Decision.ChosenPathReason = %q", loaded.Decision.ChosenPathReason)
+	}
+}
