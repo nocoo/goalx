@@ -180,7 +180,7 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	}
 	modeSection := sectionBetween(string(out), "## Mode: Develop", "## Context")
 	for _, want := range []string{
-		"one fix at a time",
+		"one coherent capability slice at a time",
 		"Your code will be reviewed. Every change must be justified and minimal.",
 		"Run the full gate",
 		"Atomic commit",
@@ -248,6 +248,7 @@ func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 		GuidancePath:        "/tmp/guidance.md",
 		AcceptancePath:      "/tmp/acceptance.md",
 		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalContractPath:    "/tmp/goal-contract.json",
 		Sessions: []SessionData{
 			{Name: "session-1", WorktreePath: "/tmp/worktree-1"},
 			{Name: "session-2", WorktreePath: "/tmp/worktree-2"},
@@ -269,10 +270,53 @@ func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 		"session-2",
 		"of 2 sessions",
 		"acceptance.md",
+		"goal-contract.json",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
 		}
+	}
+}
+
+func TestRenderSubagentProtocolMakesGoalContractBoundaryExplicit(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "ship it",
+		Mode:                goalx.ModeDevelop,
+		Engine:              "codex",
+		Target:              goalx.TargetConfig{Files: []string{"main.go"}},
+		Harness:             goalx.HarnessConfig{Command: "go test ./..."},
+		JournalPath:         "/tmp/journal.jsonl",
+		GuidancePath:        "/tmp/guidance.md",
+		GoalContractPath:    "/tmp/goal-contract.json",
+		AcceptancePath:      "/tmp/acceptance.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		Sessions: []SessionData{
+			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeDevelop},
+		},
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Goal contract: `/tmp/goal-contract.json`",
+		"The goal contract defines what must be true before the overall goal can be considered complete.",
+		"Your current assignment defines what to do next, not what counts as full completion.",
+		"one coherent capability slice at a time",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "one fix at a time") {
+		t.Fatalf("rendered protocol should replace one-fix framing with capability-slice framing:\n%s", text)
 	}
 }
 
@@ -286,6 +330,7 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		SummaryPath:         "/tmp/summary.md",
 		AcceptancePath:      "/tmp/acceptance.md",
 		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalContractPath:    "/tmp/goal-contract.json",
 		StatusPath:          "/tmp/status.json",
 		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
 	}
@@ -303,8 +348,9 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		"## Mode",
 		"The user specified **develop** mode.",
 		"## Your Job",
-		"acceptance criteria",
+		"goal contract",
 		"acceptance.json",
+		"goal-contract.json",
 		"goalx verify --run demo",
 		"completeness",
 		"evidence density (code refs)",
@@ -320,6 +366,9 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
 		}
+	}
+	if strings.Contains(text, "3-7 testable bullets") {
+		t.Fatalf("rendered master protocol should not cap required goal coverage:\n%s", text)
 	}
 }
 
@@ -449,6 +498,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		SummaryPath:         "/tmp/summary.md",
 		AcceptancePath:      "/tmp/acceptance.md",
 		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalContractPath:    "/tmp/goal-contract.json",
 		MasterJournalPath:   "/tmp/master.jsonl",
 		StatusPath:          "/tmp/status.json",
 		CoordinationPath:    "/tmp/coordination.json",
@@ -478,6 +528,9 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Check the coordination digest version each heartbeat.",
 		"Default to current repo state, control files, and latest session outputs.",
 		"Only reread older journal history when the current state is ambiguous",
+		"You may reorder, delegate, or temporarily postpone required work within the current goal",
+		"you may not declare the goal complete while any required item remains unfinished, blocked, or merely scheduled for later",
+		"Improvement backlog",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

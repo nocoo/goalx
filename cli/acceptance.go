@@ -111,7 +111,7 @@ func EnsureAcceptanceState(runDir string, cfg *goalx.Config) (*AcceptanceState, 
 	return state, nil
 }
 
-func updateStatusWithAcceptance(statusPath string, state *AcceptanceState) error {
+func updateStatusWithAcceptance(statusPath string, state *AcceptanceState, contractSummary GoalContractSummary) error {
 	if state == nil {
 		return fmt.Errorf("acceptance state is nil")
 	}
@@ -135,6 +135,11 @@ func updateStatusWithAcceptance(statusPath string, state *AcceptanceState) error
 	if state.EvidencePath != "" {
 		payload["acceptance_evidence_path"] = state.EvidencePath
 	}
+	payload["goal_contract_status"] = contractSummary.Status
+	payload["goal_required_total"] = contractSummary.RequiredTotal
+	payload["goal_required_done"] = contractSummary.RequiredDone
+	payload["goal_required_remaining"] = contractSummary.RequiredRemaining
+	payload["goal_enhancement_open"] = contractSummary.EnhancementOpen
 
 	data, err := json.Marshal(payload)
 	if err != nil {

@@ -155,9 +155,9 @@ goalx/
 
 GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates:
 
-**Master** (`master.md.tmpl`): Final responsible party. Writes acceptance checklist, challenges subagent findings, rescues dead sessions, runs verification before `done` / `implement`, synthesizes results, recommends next steps.
+**Master** (`master.md.tmpl`): Final responsible party. Maintains a machine-readable `goal-contract.json`, keeps the acceptance checklist aligned as proof against that contract, challenges subagent findings, rescues dead sessions, runs verification before `done` / `implement`, synthesizes results, and drives next steps.
 
-**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Communicates via journal files and guidance files.
+**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but the goal contract remains the run-level completion boundary. Communicates via journal files and guidance files.
 
 ### Config Hierarchy
 

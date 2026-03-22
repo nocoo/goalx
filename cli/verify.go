@@ -30,6 +30,10 @@ func Verify(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load acceptance state: %w", err)
 	}
+	goalContract, err := EnsureGoalContractState(rc.RunDir, rc.Config.Objective)
+	if err != nil {
+		return fmt.Errorf("load goal contract: %w", err)
+	}
 	command := strings.TrimSpace(state.Command)
 	if command == "" {
 		return fmt.Errorf("no acceptance command configured")
@@ -50,6 +54,10 @@ func Verify(projectRoot string, args []string) error {
 	cmd := exec.CommandContext(ctx, "bash", "-lc", command)
 	cmd.Dir = projectRoot
 	output, runErr := cmd.CombinedOutput()
+	contractSummary, contractErr := ValidateGoalContractForCompletion(goalContract)
+	if contractErr != nil {
+		output = append(output, []byte("\n[goal-contract]\n"+contractErr.Error()+"\n")...)
+	}
 
 	evidencePath := AcceptanceEvidencePath(rc.RunDir)
 	if err := os.WriteFile(evidencePath, output, 0o644); err != nil {
@@ -61,24 +69,30 @@ func Verify(projectRoot string, args []string) error {
 	state.EvidencePath = evidencePath
 	exitCode := 0
 
-	if runErr != nil {
+	if runErr != nil || contractErr != nil {
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
 			exitCode = exitErr.ExitCode()
 		} else if errors.Is(runErr, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded {
 			exitCode = 124
-		} else {
+		} else if runErr != nil {
 			exitCode = 1
+		}
+		if runErr == nil && contractErr != nil {
+			exitCode = 3
 		}
 		state.LastExitCode = &exitCode
 		state.Status = acceptanceStatusFailed
 		if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 			return fmt.Errorf("save acceptance state: %w", err)
 		}
-		if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state); err != nil {
+		if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state, contractSummary); err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
-		return fmt.Errorf("acceptance command failed (%d): %w", exitCode, runErr)
+		if runErr != nil {
+			return fmt.Errorf("acceptance command failed (%d): %w", exitCode, runErr)
+		}
+		return contractErr
 	}
 
 	state.Status = acceptanceStatusPassed
@@ -86,7 +100,7 @@ func Verify(projectRoot string, args []string) error {
 	if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 		return fmt.Errorf("save acceptance state: %w", err)
 	}
-	if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state); err != nil {
+	if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state, contractSummary); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
 

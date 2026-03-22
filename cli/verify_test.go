@@ -38,6 +38,21 @@ acceptance:
 	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
+	contract := []byte(`{
+  "version": 1,
+  "objective": "ship feature",
+  "items": [
+    {
+      "id": "req-1",
+      "kind": "user_required",
+      "requirement": "ship feature",
+      "status": "done"
+    }
+  ]
+}`)
+	if err := os.WriteFile(GoalContractPath(runDir), contract, 0o644); err != nil {
+		t.Fatalf("write goal contract: %v", err)
+	}
 
 	if err := Verify(repo, []string{"--run", runName}); err != nil {
 		t.Fatalf("Verify: %v", err)
@@ -97,6 +112,21 @@ harness:
 `)
 	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
+	}
+	contract := []byte(`{
+  "version": 1,
+  "objective": "ship feature",
+  "items": [
+    {
+      "id": "req-1",
+      "kind": "user_required",
+      "requirement": "ship feature",
+      "status": "done"
+    }
+  ]
+}`)
+	if err := os.WriteFile(GoalContractPath(runDir), contract, 0o644); err != nil {
+		t.Fatalf("write goal contract: %v", err)
 	}
 
 	err := Verify(repo, []string{"--run", runName})

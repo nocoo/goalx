@@ -130,3 +130,45 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 		t.Fatalf("saved manifest = %#v, want one research artifact", manifest)
 	}
 }
+
+func TestSaveCopiesGoalContractState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runName := "demo"
+	runDir := goalx.RunDir(projectRoot, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	cfg := goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	contract := `{"version":1,"objective":"ship feature","items":[{"id":"req-1","kind":"user_required","requirement":"ship feature","status":"done"}]}`
+	if err := os.WriteFile(filepath.Join(runDir, "goal-contract.json"), []byte(contract), 0o644); err != nil {
+		t.Fatalf("write goal contract: %v", err)
+	}
+
+	if err := Save(projectRoot, []string{"--run", runName}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(projectRoot, ".goalx", "runs", runName, "goal-contract.json"))
+	if err != nil {
+		t.Fatalf("read saved goal contract: %v", err)
+	}
+	if string(got) != contract {
+		t.Fatalf("saved goal contract = %q, want %q", string(got), contract)
+	}
+}

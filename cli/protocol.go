@@ -29,6 +29,7 @@ type ProtocolData struct {
 	TmuxSession         string
 	ProjectRoot         string
 	SummaryPath         string
+	GoalContractPath    string
 	AcceptancePath      string
 	AcceptanceStatePath string
 	CoordinationPath    string

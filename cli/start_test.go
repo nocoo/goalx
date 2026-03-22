@@ -220,6 +220,7 @@ esac
 		filepath.Join(runDir, "master.jsonl"),
 		filepath.Join(runDir, "acceptance.md"),
 		filepath.Join(runDir, "acceptance.json"),
+		filepath.Join(runDir, "goal-contract.json"),
 		filepath.Join(runDir, "artifacts.json"),
 		filepath.Join(runDir, "coordination.json"),
 		MasterInboxPath(runDir),

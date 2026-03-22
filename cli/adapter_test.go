@@ -123,7 +123,7 @@ func TestGenerateMasterAdapterRequiresVerifiedCompletionForDone(t *testing.T) {
 		t.Fatalf("running status exit code = %d, want 2", exitErr.ExitCode())
 	}
 
-	if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","acceptance_status":"pending"}`), 0o644); err != nil {
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","acceptance_status":"pending","goal_contract_status":"pending","goal_required_remaining":1}`), 0o644); err != nil {
 		t.Fatalf("write unverified done status: %v", err)
 	}
 	out, err = runHook()
@@ -138,7 +138,7 @@ func TestGenerateMasterAdapterRequiresVerifiedCompletionForDone(t *testing.T) {
 		t.Fatalf("more-research completion should allow stop, err=%v out=%q", err, out)
 	}
 
-	if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","acceptance_status":"passed"}`), 0o644); err != nil {
+	if err := os.WriteFile(statusPath, []byte(`{"phase":"complete","recommendation":"done","acceptance_status":"passed","goal_contract_status":"satisfied","goal_required_remaining":0}`), 0o644); err != nil {
 		t.Fatalf("write verified done status: %v", err)
 	}
 	if out, err = runHook(); err != nil {

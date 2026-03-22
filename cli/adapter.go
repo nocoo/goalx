@@ -37,9 +37,10 @@ func GenerateMasterAdapter(engine, projectRoot, statusPath string) error {
 	quotedStatusPath := shellQuote(statusPath)
 	quotedMessage := shellQuote("RUN INCOMPLETE: keep waiting until " + statusPath + ` reports "phase":"complete"`)
 	quotedVerifyMessage := shellQuote("RUN NOT VERIFIED: done/implement require acceptance_status=passed in " + statusPath)
+	quotedContractMessage := shellQuote("RUN CONTRACT INCOMPLETE: done/implement require goal_contract_status=satisfied and goal_required_remaining=0 in " + statusPath)
 	stopCmd := fmt.Sprintf(
-		`if [ ! -f %s ] || ! grep -Eq '"phase"[[:space:]]*:[[:space:]]*"complete"' %s; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && ! grep -Eq '"acceptance_status"[[:space:]]*:[[:space:]]*"passed"' %s; then printf '%%s\n' %s >&2; exit 2; fi`,
-		quotedStatusPath, quotedStatusPath, quotedMessage, quotedStatusPath, quotedStatusPath, quotedVerifyMessage,
+		`if [ ! -f %s ] || ! grep -Eq '"phase"[[:space:]]*:[[:space:]]*"complete"' %s; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && ! grep -Eq '"acceptance_status"[[:space:]]*:[[:space:]]*"passed"' %s; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && { ! grep -Eq '"goal_contract_status"[[:space:]]*:[[:space:]]*"satisfied"' %s || ! grep -Eq '"goal_required_remaining"[[:space:]]*:[[:space:]]*0([[:space:]]*[,}])' %s; }; then printf '%%s\n' %s >&2; exit 2; fi`,
+		quotedStatusPath, quotedStatusPath, quotedMessage, quotedStatusPath, quotedStatusPath, quotedVerifyMessage, quotedStatusPath, quotedStatusPath, quotedStatusPath, quotedContractMessage,
 	)
 	return appendClaudeHook(projectRoot, map[string]string{
 		"event":   "Stop",

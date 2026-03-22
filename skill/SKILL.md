@@ -15,14 +15,15 @@ GoalX launches a master agent that orchestrates everything. The framework provid
 goalx auto "goal"  →  master starts  →  master creates subagents  →  master evaluates  →  done
 ```
 
-The master is a **strategist + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, checks progress on each heartbeat, restarts dead sessions, and stops when criteria are met. Subagents are fully autonomous workers.
+The master is a **strategist + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, checks progress on each heartbeat, restarts dead sessions, and stops when the current goal contract is satisfied. Subagents are fully autonomous workers.
 
 ## Operating Rules
 1. Write the objective as a simple goal, not a task checklist. The master figures out the details.
 2. State the current direction, not a long history recap. GoalX persists durable run state; the master and subagents resume from current files plus run metadata.
-3. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
-4. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
-5. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
+3. The master may decompose, reorder, and improve, but its plan is not the completion standard. GoalX tracks a run-level `goal-contract.json`; required items can move within the current goal, but the goal is not complete until those required items are done or explicitly waived by the user.
+4. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
+5. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
+6. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
 
 ## Quick Start
 
@@ -40,7 +41,7 @@ Options only when the user wants control:
 - `--name NAME` — custom run name
 For explicit control over config: `goalx init "goal" → edit .goalx/goalx.yaml → goalx start`
 
-Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live under `<project>/.goalx/runs/...` after `goalx save`. GoalX also adds `.goalx/` to `.git/info/exclude` for local repos so saved run state does not get staged by default.
+Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live under `<project>/.goalx/runs/...` after `goalx save`. Runs maintain both `goal-contract.json` and acceptance state so completion is tied to required goal items, not just the master's current plan. GoalX also adds `.goalx/` to `.git/info/exclude` for local repos so saved run state does not get staged by default.
 
 ## Scenario Guide
 - Research, investigate, audit: `goalx auto "goal"`

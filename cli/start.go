@@ -107,6 +107,7 @@ func Start(projectRoot string, args []string) (err error) {
 	}
 	masterProtocolPath := filepath.Join(runDir, "master.md")
 	masterPrompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, masterProtocolPath)
+	goalContractPath := GoalContractPath(runDir)
 	acceptancePath := AcceptanceChecklistPath(runDir)
 	acceptanceStatePath := AcceptanceStatePath(runDir)
 	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
@@ -134,6 +135,7 @@ func Start(projectRoot string, args []string) (err error) {
 		TmuxSession:         tmuxSess,
 		ProjectRoot:         absProjectRoot,
 		SummaryPath:         filepath.Join(runDir, "summary.md"),
+		GoalContractPath:    goalContractPath,
 		AcceptancePath:      acceptancePath,
 		AcceptanceStatePath: acceptanceStatePath,
 		CoordinationPath:    CoordinationPath(runDir),
@@ -154,6 +156,9 @@ func Start(projectRoot string, args []string) (err error) {
 	}
 	if err := os.WriteFile(acceptancePath, nil, 0644); err != nil {
 		return fmt.Errorf("init acceptance checklist: %w", err)
+	}
+	if _, err := EnsureGoalContractState(runDir, cfg.Objective); err != nil {
+		return fmt.Errorf("init goal contract: %w", err)
 	}
 	if _, err := EnsureAcceptanceState(runDir, cfg); err != nil {
 		return fmt.Errorf("init acceptance state: %w", err)

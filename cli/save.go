@@ -53,6 +53,10 @@ func Save(projectRoot string, args []string) error {
 	}
 
 	// Copy acceptance checklist
+	goalContractPath := GoalContractPath(rc.RunDir)
+	if err := copyFileIfExists(goalContractPath, filepath.Join(saveDir, "goal-contract.json")); err != nil {
+		return fmt.Errorf("copy goal contract: %w", err)
+	}
 	acceptPath := filepath.Join(rc.RunDir, "acceptance.md")
 	if err := copyFileIfExists(acceptPath, filepath.Join(saveDir, "acceptance.md")); err != nil {
 		return fmt.Errorf("copy acceptance: %w", err)

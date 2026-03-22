@@ -190,6 +190,7 @@ func Add(projectRoot string, args []string) error {
 		JournalPath:         journalPath,
 		GuidancePath:        guidancePath,
 		WorktreePath:        wtPath,
+		GoalContractPath:    GoalContractPath(rc.RunDir),
 		AcceptancePath:      AcceptanceChecklistPath(rc.RunDir),
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
 		DiversityHint:       hint,
