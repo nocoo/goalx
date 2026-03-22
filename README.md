@@ -68,6 +68,8 @@ goalx result
 | `goalx observe` | Live tmux capture from all agents |
 | `goalx status` | Journal-based progress summary |
 | `goalx add` | Add a session to a running run (`--mode research` launches a temporary research session) |
+| `goalx park` | Park an idle/blocked session for later reuse without deleting its worktree |
+| `goalx resume` | Resume a parked session in its existing worktree |
 | `goalx save` | Save durable artifacts and `artifacts.json` to `.goalx/runs/` |
 | `goalx verify` | Run the active run's acceptance command and record the result |
 | `goalx debate` | Generate debate config from prior research |
@@ -155,9 +157,9 @@ goalx/
 
 GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates:
 
-**Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Maintains a machine-readable `goal-contract.json`, keeps required items covered or explicitly blocked, dispatches parallel work when independent required slices remain, keeps the acceptance checklist aligned as proof against that contract, rescues dead or stuck sessions, runs verification before `done` / `implement`, synthesizes results, and drives next steps.
+**Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Maintains a machine-readable `goal-contract.json`, keeps required items covered or explicitly blocked, dispatches parallel work when independent required slices remain, parks idle sessions for later reuse, resumes parked sessions before creating unnecessary new ones, keeps the acceptance checklist aligned as proof against that contract, rescues dead or stuck sessions, runs verification before `done` / `implement`, synthesizes results, and drives next steps.
 
-**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but the goal contract remains the run-level completion boundary. Communicates via journal files and guidance files, including concise blocker and dependency hints so the master can rebalance work quickly.
+**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but the goal contract remains the run-level completion boundary. Communicates via journal files and guidance files, including concise blocker and dependency hints so the master can rebalance work quickly or park/resume the session cleanly.
 
 ### Config Hierarchy
 

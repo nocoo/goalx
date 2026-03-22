@@ -15,7 +15,7 @@ GoalX launches a master agent that orchestrates everything. The framework provid
 goalx auto "goal"  →  master starts  →  master creates subagents  →  master evaluates  →  done
 ```
 
-The master is a **dispatcher + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, keeps required items covered, rebalances work when one session is stuck, and stops only when the current goal contract is satisfied. Subagents are fully autonomous workers.
+The master is a **dispatcher + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, keeps required items covered, rebalances work when one session is stuck, parks idle sessions for later reuse, and stops only when the current goal contract is satisfied. Subagents are fully autonomous workers.
 
 ## Operating Rules
 1. Write the objective as a simple goal, not a task checklist. The master figures out the details.
@@ -23,9 +23,10 @@ The master is a **dispatcher + referee**: it decomposes the goal, selects engine
 3. The master may decompose, reorder, and improve, but its plan is not the completion standard. GoalX tracks a run-level `goal-contract.json`; required items can move within the current goal, but the goal is not complete until those required items are done or explicitly waived by the user.
 4. The master should actively use available parallel capacity. If one session is blocked and other independent required work remains, it should rebalance or start another session instead of waiting.
 5. Subagents should report blockers concisely through the journal: what scope they own, what blocks them, what they depend on, and the next smallest useful split.
-6. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
-7. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
-8. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
+6. Prefer reusing or resuming a parked session before creating a brand new one when the scope still fits.
+7. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
+8. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
+9. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
 
 ## Quick Start
 
@@ -51,6 +52,8 @@ Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live unde
 - Reference another repo: `goalx auto "goal" --context /path/to/other-project`
 - Check progress: `goalx observe`, `goalx status`, `goalx attach`
 - Launch a temporary investigation inside a develop run: `goalx add --run NAME --mode research "investigate X"`
+- Park an idle or blocked session for later reuse: `goalx park --run NAME session-2`
+- Resume a parked session in the same worktree: `goalx resume --run NAME session-2`
 - Run the acceptance gate explicitly: `goalx verify --run NAME`
 - Redirect mid-run: `tmux send-keys -t <session>:master "new direction" Enter`
 - View results: `goalx result` or `goalx result --full`
@@ -66,6 +69,8 @@ Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live unde
 | `goalx status [NAME]` | Journal-based progress |
 | `goalx result [NAME]` | Show summary (`--full` for raw report) |
 | `goalx add "direction"` | Add a subagent session; use `--mode research` for temporary investigation |
+| `goalx park [NAME] <session>` | Park a session without deleting its worktree |
+| `goalx resume [NAME] <session>` | Resume a parked session |
 | `goalx keep [NAME] <session>` | Merge session branch into main |
 | `goalx save [NAME]` | Save durable artifacts and `artifacts.json` to `.goalx/runs/` |
 | `goalx verify [NAME]` | Run the active run's acceptance command and record the result |
@@ -78,7 +83,7 @@ Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live unde
 
 ## Observe and React
 - Healthy: summarize progress, wait.
-- Stuck 2+ heartbeats: redirect the master; it should rebalance required work instead of just waiting on one session.
+- Stuck 2+ heartbeats: redirect the master; it should rebalance or park/resume sessions instead of just waiting on one session.
 - Wrong direction: steer the master, not subagents.
 - Need an explicit acceptance check: run `goalx verify` before treating the run as done.
 - Complete: `goalx save` then `goalx result` to review. Saved reports are indexed through `artifacts.json`.

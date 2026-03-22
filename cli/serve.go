@@ -483,6 +483,10 @@ func buildServeCLIArgs(action string, req serveActionRequest) ([]string, error) 
 		}
 		return args, nil
 	case "keep":
+		fallthrough
+	case "park":
+		fallthrough
+	case "resume":
 		if strings.TrimSpace(req.Session) == "" {
 			return nil, fmt.Errorf("session is required")
 		}
@@ -553,6 +557,10 @@ func (a *serveApp) runCLIAction(projectRoot, action string, args []string) (stri
 			return Save(projectRoot, args)
 		case "keep":
 			return Keep(projectRoot, args)
+		case "park":
+			return Park(projectRoot, args)
+		case "resume":
+			return Resume(projectRoot, args)
 		case "drop":
 			return Drop(projectRoot, args)
 		default:

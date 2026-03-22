@@ -366,12 +366,15 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		"structure",
 		"/tmp/acceptance.md",
 		"goalx add --run demo",
+		"goalx park --run demo session-N",
+		"goalx resume --run demo session-N",
 		"dispatcher and referee",
 		"check evidence density, counter-evidence presence, and actionability of findings",
 		"If any required item is uncovered, that is a scheduling bug.",
 		"If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.",
 		"If a required item stays stuck, reassign it, split it, or take it over yourself.",
 		"Do not wait on one session if other independent required work can proceed.",
+		"Prefer reusing a parked or idle session with fresh guidance before launching another session.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -533,6 +536,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"master-state.json",
 		"heartbeat.json",
 		"goalx add --run demo --mode research",
+		"goalx park --run demo session-N",
+		"goalx resume --run demo session-N",
 		"temporary research session",
 		"Research-mode sessions produce evidence and reports, not mergeable code changes.",
 		"Check the coordination digest version each heartbeat.",
@@ -543,6 +548,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"If any required item is uncovered, that is a scheduling bug.",
 		"If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.",
 		"Do not wait on one session if other independent required work can proceed.",
+		"Prefer reusing a parked or idle session with fresh guidance before launching another session.",
 		"Improvement backlog",
 	} {
 		if !strings.Contains(text, want) {

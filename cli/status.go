@@ -23,11 +23,20 @@ func Status(projectRoot string, args []string) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "SESSION\tLAST_ROUND\tSTATUS\tSUMMARY")
+	coord, _ := LoadCoordinationState(CoordinationPath(rc.RunDir))
 
 	// Session journals
-	sessions := goalx.ExpandSessions(rc.Config)
-	for i := range sessions {
-		sName := SessionName(i + 1)
+	indexes, err := existingSessionIndexes(rc.RunDir)
+	if err != nil {
+		return err
+	}
+	if len(indexes) == 0 {
+		for i := range goalx.ExpandSessions(rc.Config) {
+			indexes = append(indexes, i+1)
+		}
+	}
+	for _, num := range indexes {
+		sName := SessionName(num)
 		if sessionFilter != "" && sName != sessionFilter {
 			continue
 		}
@@ -47,6 +56,32 @@ func Status(projectRoot string, args []string) error {
 		}
 
 		summary := goalx.Summary(entries)
+		if coord != nil {
+			if sess, ok := coord.Sessions[sName]; ok {
+				if sess.LastRound > 0 {
+					lastRound = fmt.Sprintf("%d", sess.LastRound)
+				}
+				if sess.State != "" {
+					status = sess.State
+				}
+				switch sess.State {
+				case "parked":
+					if sess.Scope != "" {
+						summary = "parked: " + sess.Scope
+					} else {
+						summary = "parked"
+					}
+				case "blocked":
+					if sess.BlockedBy != "" {
+						summary = "blocked: " + sess.BlockedBy
+					}
+				case "active":
+					if summary == "no entries" && sess.Scope != "" {
+						summary = "active: " + sess.Scope
+					}
+				}
+			}
+		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sName, lastRound, status, summary)
 	}
 

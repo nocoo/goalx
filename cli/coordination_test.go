@@ -22,6 +22,9 @@ func TestEnsureCoordinationStateCreatesDigest(t *testing.T) {
 	if state.Version <= 0 {
 		t.Fatalf("Version = %d, want > 0", state.Version)
 	}
+	if state.Sessions == nil {
+		t.Fatal("Sessions = nil, want initialized map")
+	}
 	if _, err := os.Stat(CoordinationPath(runDir)); err != nil {
 		t.Fatalf("coordination path missing: %v", err)
 	}

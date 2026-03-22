@@ -3,6 +3,7 @@ package cli
 import (
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -60,6 +61,20 @@ func KillSession(session string) error {
 func KillWindow(session, window string) error {
 	target := session + ":" + window
 	return exec.Command("tmux", "kill-window", "-t", target).Run()
+}
+
+// WindowExists returns true if a tmux window with the given name exists.
+func WindowExists(session, window string) bool {
+	out, err := exec.Command("tmux", "list-windows", "-t", session, "-F", "#{window_name}").Output()
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if strings.TrimSpace(line) == window {
+			return true
+		}
+	}
+	return false
 }
 
 // CapturePaneOutput captures the visible content of a tmux pane.

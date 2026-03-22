@@ -9,13 +9,22 @@ import (
 )
 
 type CoordinationState struct {
-	Version       int               `json:"version"`
-	Objective     string            `json:"objective,omitempty"`
-	PlanSummary   []string          `json:"plan_summary,omitempty"`
-	Owners        map[string]string `json:"owners,omitempty"`
-	Blocked       []string          `json:"blocked,omitempty"`
-	OpenQuestions []string          `json:"open_questions,omitempty"`
-	UpdatedAt     string            `json:"updated_at,omitempty"`
+	Version       int                            `json:"version"`
+	Objective     string                         `json:"objective,omitempty"`
+	PlanSummary   []string                       `json:"plan_summary,omitempty"`
+	Owners        map[string]string              `json:"owners,omitempty"`
+	Sessions      map[string]CoordinationSession `json:"sessions,omitempty"`
+	Blocked       []string                       `json:"blocked,omitempty"`
+	OpenQuestions []string                       `json:"open_questions,omitempty"`
+	UpdatedAt     string                         `json:"updated_at,omitempty"`
+}
+
+type CoordinationSession struct {
+	State     string `json:"state,omitempty"`
+	Scope     string `json:"scope,omitempty"`
+	BlockedBy string `json:"blocked_by,omitempty"`
+	LastRound int    `json:"last_round,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
 func CoordinationPath(runDir string) string {
@@ -68,6 +77,7 @@ func EnsureCoordinationState(runDir, objective string) (*CoordinationState, erro
 			Version:   1,
 			Objective: objective,
 			Owners:    map[string]string{},
+			Sessions:  map[string]CoordinationSession{},
 			UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 		}
 		if err := SaveCoordinationState(path, state); err != nil {
@@ -83,6 +93,9 @@ func EnsureCoordinationState(runDir, objective string) (*CoordinationState, erro
 	}
 	if state.Owners == nil {
 		state.Owners = map[string]string{}
+	}
+	if state.Sessions == nil {
+		state.Sessions = map[string]CoordinationSession{}
 	}
 	if state.UpdatedAt == "" {
 		state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)

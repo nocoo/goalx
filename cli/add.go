@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
@@ -221,6 +222,22 @@ func Add(projectRoot string, args []string) error {
 	}
 	if err := os.WriteFile(filepath.Join(rc.RunDir, "goalx.yaml"), cfgYAML, 0644); err != nil {
 		return fmt.Errorf("write config snapshot: %w", err)
+	}
+
+	if coord, err := EnsureCoordinationState(rc.RunDir, rc.Config.Objective); err == nil {
+		now := time.Now().UTC().Format(time.RFC3339)
+		coord.Sessions[sName] = CoordinationSession{
+			State:     "active",
+			Scope:     hint,
+			UpdatedAt: now,
+		}
+		coord.Version++
+		coord.UpdatedAt = now
+		if err := SaveCoordinationState(CoordinationPath(rc.RunDir), coord); err != nil {
+			return fmt.Errorf("update coordination state: %w", err)
+		}
+	} else {
+		return fmt.Errorf("load coordination state: %w", err)
 	}
 
 	// Notify master through durable inbox, then best-effort tmux nudge.

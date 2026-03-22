@@ -218,6 +218,20 @@ func TestServeHandlerGoalxActionRoutes(t *testing.T) {
 			wantAction: "drop",
 			wantArgs:   []string{"--run", "auth-audit"},
 		},
+		{
+			name:       "park",
+			path:       "/projects/goalx/goalx/park",
+			body:       `{"run":"auth-audit","session":"session-2"}`,
+			wantAction: "park",
+			wantArgs:   []string{"--run", "auth-audit", "session-2"},
+		},
+		{
+			name:       "resume",
+			path:       "/projects/goalx/goalx/resume",
+			body:       `{"run":"auth-audit","session":"session-2"}`,
+			wantAction: "resume",
+			wantArgs:   []string{"--run", "auth-audit", "session-2"},
+		},
 	}
 
 	for _, tc := range cases {
