@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -55,12 +54,10 @@ func Review(projectRoot string, args []string) error {
 
 		// Mode-specific output
 		if rc.Config.Mode == goalx.ModeResearch {
-			reportFile := "report.md"
-			if len(rc.Config.Target.Files) > 0 && rc.Config.Target.Files[0] != "" {
-				reportFile = rc.Config.Target.Files[0]
+			reportPath := findSessionReport(wtPath, rc.Config.Target.Files)
+			if reportPath != "" {
+				printFirstLines(reportPath, 20)
 			}
-			reportPath := filepath.Join(wtPath, reportFile)
-			printFirstLines(reportPath, 20)
 		} else {
 			out, err := exec.Command("git", "-C", wtPath, "diff", "--stat", "HEAD~5").Output()
 			if err == nil && len(out) > 0 {

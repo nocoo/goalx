@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,93 @@ import (
 )
 
 func TestReviewUsesConfiguredResearchTargetFile(t *testing.T) {
+	projectRoot, wtPath := seedReviewResearchRun(t, []string{"notes.md"})
+
+	want := "custom report body"
+	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte(want+"\n"), 0o644); err != nil {
+		t.Fatalf("write notes.md: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Review(projectRoot, []string{"--run", "demo"}); err != nil {
+			t.Fatalf("Review: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, want) {
+		t.Fatalf("review output missing configured target file contents:\n%s", out)
+	}
+}
+
+func TestReviewFallsBackToReportWhenTargetIsDot(t *testing.T) {
+	projectRoot, wtPath := seedReviewResearchRun(t, []string{"."})
+
+	want := "fallback report body"
+	if err := os.WriteFile(filepath.Join(wtPath, "report.md"), []byte(want+"\n"), 0o644); err != nil {
+		t.Fatalf("write report.md: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Review(projectRoot, []string{"--run", "demo"}); err != nil {
+			t.Fatalf("Review: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, want) {
+		t.Fatalf("review output missing fallback report.md contents:\n%s", out)
+	}
+}
+
+func TestReviewFallsBackToReportWhenConfiguredTargetMissing(t *testing.T) {
+	projectRoot, wtPath := seedReviewResearchRun(t, []string{"missing.md"})
+
+	want := "report fallback for missing target"
+	if err := os.WriteFile(filepath.Join(wtPath, "report.md"), []byte(want+"\n"), 0o644); err != nil {
+		t.Fatalf("write report.md: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Review(projectRoot, []string{"--run", "demo"}); err != nil {
+			t.Fatalf("Review: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, want) {
+		t.Fatalf("review output missing fallback report.md contents:\n%s", out)
+	}
+}
+
+func TestReviewFallsBackToUntrackedMarkdownReport(t *testing.T) {
+	projectRoot, wtPath := seedReviewResearchRun(t, []string{"missing.md"})
+
+	runReviewGit(t, wtPath, "init")
+	runReviewGit(t, wtPath, "config", "user.name", "Test User")
+	runReviewGit(t, wtPath, "config", "user.email", "test@example.com")
+	if err := os.WriteFile(filepath.Join(wtPath, "README.txt"), []byte("seed\n"), 0o644); err != nil {
+		t.Fatalf("write README.txt: %v", err)
+	}
+	runReviewGit(t, wtPath, "add", "README.txt")
+	runReviewGit(t, wtPath, "commit", "-m", "seed")
+
+	want := "untracked markdown fallback"
+	if err := os.WriteFile(filepath.Join(wtPath, "findings.md"), []byte(want+"\n"), 0o644); err != nil {
+		t.Fatalf("write findings.md: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Review(projectRoot, []string{"--run", "demo"}); err != nil {
+			t.Fatalf("Review: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, want) {
+		t.Fatalf("review output missing fallback untracked markdown contents:\n%s", out)
+	}
+}
+
+func seedReviewResearchRun(t *testing.T, targetFiles []string) (string, string) {
+	t.Helper()
+
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -34,7 +122,7 @@ func TestReviewUsesConfiguredResearchTargetFile(t *testing.T) {
 		Objective: "inspect",
 		Parallel:  1,
 		Target: goalx.TargetConfig{
-			Files: []string{"notes.md"},
+			Files: targetFiles,
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -48,19 +136,16 @@ func TestReviewUsesConfiguredResearchTargetFile(t *testing.T) {
 		t.Fatalf("seed session journal: %v", err)
 	}
 
-	want := "custom report body"
-	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte(want+"\n"), 0o644); err != nil {
-		t.Fatalf("write notes.md: %v", err)
-	}
+	return projectRoot, wtPath
+}
 
-	out := captureStdout(t, func() {
-		if err := Review(projectRoot, []string{"--run", runName}); err != nil {
-			t.Fatalf("Review: %v", err)
-		}
-	})
+func runReviewGit(t *testing.T, repo string, args ...string) {
+	t.Helper()
 
-	if !strings.Contains(out, want) {
-		t.Fatalf("review output missing configured target file contents:\n%s", out)
+	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, string(out))
 	}
 }
 
