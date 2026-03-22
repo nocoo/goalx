@@ -109,7 +109,7 @@ func Resume(projectRoot string, args []string) error {
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
 	}
-	absProjectRoot, _ := filepath.Abs(projectRoot)
+	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
 
 	idx, err := parseSessionIndex(sessionName)
 	if err != nil {
@@ -141,9 +141,9 @@ func Resume(projectRoot string, args []string) error {
 		return fmt.Errorf("init guidance state: %w", err)
 	}
 
-	_, engines, err := goalx.LoadConfig(projectRoot)
+	_, engines, err := goalx.LoadConfig(rc.ProjectRoot)
 	if err != nil {
-		_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
+		_, engines, err = goalx.LoadRawBaseConfig(rc.ProjectRoot)
 		if err != nil {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
@@ -182,7 +182,7 @@ func Resume(projectRoot string, args []string) error {
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
 		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
 		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath: ProjectRegistryPath(projectRoot),
+		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
 		ProjectRoot:         absProjectRoot,
 		DiversityHint:       effective.Hint,
 	}

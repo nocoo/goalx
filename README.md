@@ -61,7 +61,7 @@ goalx verify
 goalx result
 ```
 
-Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicitly want config-first or low-level control. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin the default run.
+Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicitly want config-first or low-level control. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin the default run. Explicit `--run NAME` resolution is global when the run name is unique; if names collide across projects, use `--run <project-id>/<run>`.
 
 ## Commands
 
@@ -71,8 +71,8 @@ Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicit
 | `goalx init` | Advanced/manual path: generate config from objective without starting |
 | `goalx start` | Advanced/manual path: launch tmux session from existing config |
 | `goalx auto` | Init and start one master-led run, then exit |
-| `goalx observe` | Live tmux capture from all agents |
-| `goalx status` | Journal-based progress summary |
+| `goalx observe` | Live tmux capture from all agents plus control-plane summary |
+| `goalx status` | Progress summary plus unread inbox / heartbeat lag / legacy-protocol hints |
 | `goalx focus` | Set the default run used by commands that omit `--run` |
 | `goalx add` | Add a session to a running run (`--mode research` launches a temporary research session) |
 | `goalx tell` | Send a durable instruction to the master or a specific session |
@@ -120,6 +120,7 @@ Use `goalx init` + `goalx start`, direct config edits, or manual session control
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, and `implement`.
 - GoalX bootstraps `.goalx/` into `.git/info/exclude` for local repos so project-scoped run state stays out of git by default.
 - When a project has multiple active runs, pass `--run NAME` explicitly for mutating commands. Use `goalx focus --run NAME` to pin the default run for commands that omit `--run`.
+- Explicit `--run NAME` resolution is global when the name is unique. If the same run name exists in multiple projects, disambiguate with `--run <project-id>/<run>`.
 
 ## Goal Dimensions
 

@@ -31,7 +31,7 @@ func Save(projectRoot string, args []string) error {
 		return err
 	}
 
-	saveDir := filepath.Join(projectRoot, ".goalx", "runs", rc.Name)
+	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Name)
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
 		return fmt.Errorf("create save dir: %w", err)
 	}
@@ -172,7 +172,7 @@ func Save(projectRoot string, args []string) error {
 	// Copy master journal
 	masterJPath := filepath.Join(rc.RunDir, "master.jsonl")
 	copyFileIfExists(masterJPath, filepath.Join(saveDir, "master.jsonl"))
-	if err := RegisterSavedRun(projectRoot, rc.Config); err != nil {
+	if err := RegisterSavedRun(rc.ProjectRoot, rc.Config); err != nil {
 		return fmt.Errorf("register saved run: %w", err)
 	}
 

@@ -38,7 +38,7 @@ func Pulse(projectRoot string, args []string) error {
 	derived.MasterStale = state.StaleSince != ""
 	derived.MasterStaleSince = state.StaleSince
 	derived.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	if err := syncProjectStatusCache(projectRoot, &derived); err != nil {
+	if err := syncProjectStatusCache(rc.ProjectRoot, &derived); err != nil {
 		return fmt.Errorf("update project status cache: %w", err)
 	}
 	if !SessionExists(rc.TmuxSession) {

@@ -30,14 +30,14 @@ func Verify(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load acceptance state: %w", err)
 	}
-	if _, err := EnsureRunMetadata(rc.RunDir, projectRoot, rc.Config.Objective); err != nil {
+	if _, err := EnsureRunMetadata(rc.RunDir, rc.ProjectRoot, rc.Config.Objective); err != nil {
 		return fmt.Errorf("load run metadata: %w", err)
 	}
 	goalContract, err := EnsureGoalContractState(rc.RunDir, rc.Config.Objective)
 	if err != nil {
 		return fmt.Errorf("load goal contract: %w", err)
 	}
-	completion, err := DetectCompletionState(projectRoot, rc.RunDir)
+	completion, err := DetectCompletionState(rc.ProjectRoot, rc.RunDir)
 	if err != nil {
 		return fmt.Errorf("detect completion state: %w", err)
 	}
@@ -66,7 +66,7 @@ func Verify(projectRoot string, args []string) error {
 	var runErr error
 	if acceptanceErr == nil {
 		cmd := exec.CommandContext(ctx, "bash", "-lc", command)
-		cmd.Dir = projectRoot
+		cmd.Dir = rc.ProjectRoot
 		output, runErr = cmd.CombinedOutput()
 	}
 	contractSummary, contractErr := ValidateGoalContractForCompletion(goalContract)
@@ -108,7 +108,7 @@ func Verify(projectRoot string, args []string) error {
 		if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 			return fmt.Errorf("save acceptance state: %w", err)
 		}
-		if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
+		if err := updateStatusWithAcceptance(filepath.Join(rc.ProjectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
 		if runErr != nil {
@@ -128,7 +128,7 @@ func Verify(projectRoot string, args []string) error {
 	if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 		return fmt.Errorf("save acceptance state: %w", err)
 	}
-	if err := updateStatusWithAcceptance(filepath.Join(projectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
+	if err := updateStatusWithAcceptance(filepath.Join(rc.ProjectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
 

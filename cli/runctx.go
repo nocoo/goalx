@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -15,6 +17,8 @@ type RunContext struct {
 	Config      *goalx.Config
 }
 
+var errRunNotFound = errors.New("run not found")
+
 // ResolveRun resolves run context. If runName is empty, it resolves the
 // focused/only active run from the project registry.
 func ResolveRun(projectRoot, runName string) (*RunContext, error) {
@@ -26,12 +30,57 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 		}
 	}
 
+	return resolveExplicitRun(projectRoot, runName)
+}
+
+func resolveExplicitRun(projectRoot, selector string) (*RunContext, error) {
+	if rc, err := resolveRunFromGlobalRegistry(selector); err == nil {
+		return rc, nil
+	} else if !isNotFoundRunError(err) {
+		return nil, err
+	}
+	return resolveLocalRun(projectRoot, selector)
+}
+
+func resolveRunFromGlobalRegistry(selector string) (*RunContext, error) {
+	matches, err := LookupGlobalRuns(selector)
+	if err != nil {
+		return nil, err
+	}
+	switch len(matches) {
+	case 0:
+		return nil, errRunNotFound
+	case 1:
+		return buildRunContext(matches[0].ProjectRoot, matches[0].RunDir, matches[0].Name)
+	default:
+		candidates := make([]string, 0, len(matches))
+		for _, match := range matches {
+			candidates = append(candidates, match.ProjectID+"/"+match.Name)
+		}
+		return nil, fmt.Errorf("multiple runs named %q: %s (use --run <project-id>/<run>)", selector, joinRunCandidates(candidates))
+	}
+}
+
+func resolveLocalRun(projectRoot, selector string) (*RunContext, error) {
+	projectID, runName := parseRunSelector(selector)
+	if projectID != "" && projectID != goalx.ProjectID(projectRoot) {
+		return nil, fmt.Errorf("run %q not found", selector)
+	}
 	runDir := goalx.RunDir(projectRoot, runName)
+	if _, err := os.Stat(RunSpecPath(runDir)); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("run %q not found", selector)
+		}
+		return nil, fmt.Errorf("stat run spec: %w", err)
+	}
+	return buildRunContext(projectRoot, runDir, runName)
+}
+
+func buildRunContext(projectRoot, runDir, runName string) (*RunContext, error) {
 	snapshot, err := LoadRunSpec(runDir)
 	if err != nil {
 		return nil, fmt.Errorf("load run spec: %w", err)
 	}
-
 	return &RunContext{
 		Name:        runName,
 		RunDir:      runDir,
@@ -39,4 +88,22 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 		ProjectRoot: projectRoot,
 		Config:      snapshot,
 	}, nil
+}
+
+func isNotFoundRunError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, errRunNotFound)
+}
+
+func joinRunCandidates(candidates []string) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	out := candidates[0]
+	for i := 1; i < len(candidates); i++ {
+		out += ", " + candidates[i]
+	}
+	return out
 }

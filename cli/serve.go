@@ -341,7 +341,7 @@ func (a *serveApp) handleTellAction(w http.ResponseWriter, projectRoot string, r
 		session = "master"
 	}
 
-	if _, _, err := deliverTell(projectRoot, req.Run, session, message, a.sendNudge); err != nil {
+	if _, _, err := deliverTell(rc.ProjectRoot, req.Run, session, message, a.sendNudge); err != nil {
 		writeJSONError(w, http.StatusBadRequest, err)
 		return
 	}

@@ -55,6 +55,7 @@ No sessions yet. Launch them yourself with `goalx add`.
 - Compare at least the local patch path, the compatibility-preserving improvement path, and the architecture-level redesign path.
 - Prefer the highest expected-value path feasible within budget and risk.
 - Do not over-engineer for elegance alone. Only choose a deeper redesign when it materially improves outcome, reliability, or operating efficiency.
+- Do not ask the user to choose between implementation paths unless the choice materially changes scope, risk, acceptance, or irreversible cost. Otherwise decide yourself, record why, and execute.
 {{- if or .Preferences.Research.Engines .Preferences.Research.Strategy .Preferences.Develop.Engines .Preferences.Develop.Strategy .Preferences.Simple.Engines .Preferences.Simple.Strategy}}
 
 ## User Preferences

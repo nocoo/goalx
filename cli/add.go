@@ -86,7 +86,7 @@ func Add(projectRoot string, args []string) error {
 	}
 
 	// Determine next session number from the run's existing session artifacts.
-	newNum, err := nextSessionIndex(rc.RunDir)
+	newNum, err := nextAvailableSessionIndex(rc.ProjectRoot, rc.RunDir, rc.Config.Name)
 	if err != nil {
 		return err
 	}
@@ -98,10 +98,10 @@ func Add(projectRoot string, args []string) error {
 	windowName := sessionWindowName(rc.Config.Name, newNum)
 
 	// Resolve engine
-	_, engines, err := goalx.LoadConfig(projectRoot)
+	_, engines, err := goalx.LoadConfig(rc.ProjectRoot)
 	if err != nil {
 		// Fallback: try base config
-		_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
+		_, engines, err = goalx.LoadRawBaseConfig(rc.ProjectRoot)
 		if err != nil {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
@@ -124,7 +124,7 @@ func Add(projectRoot string, args []string) error {
 	}
 
 	// Create worktree
-	absProjectRoot, _ := filepath.Abs(projectRoot)
+	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
 	if err := CreateWorktree(absProjectRoot, wtPath, branch); err != nil {
 		return fmt.Errorf("create worktree: %w", err)
 	}
@@ -164,7 +164,7 @@ func Add(projectRoot string, args []string) error {
 	}
 	if flagMode != "" {
 		newSess.Mode = flagMode
-		target, harness, err := defaultSessionExecution(projectRoot, rc.Config, flagMode)
+		target, harness, err := defaultSessionExecution(rc.ProjectRoot, rc.Config, flagMode)
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func Add(projectRoot string, args []string) error {
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
 		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
 		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath: ProjectRegistryPath(projectRoot),
+		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
 		ProjectRoot:         absProjectRoot,
 		DiversityHint:       hint,
 	}

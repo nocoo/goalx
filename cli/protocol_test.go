@@ -496,6 +496,8 @@ func TestRenderMasterProtocolIncludesOptimizerDoctrine(t *testing.T) {
 		"Prefer the highest expected-value path",
 		"Do not over-engineer for elegance alone",
 		"record root cause, local path, compatibility-preserving path, architecture path, chosen path",
+		"Do not ask the user to choose between implementation paths unless the choice materially changes scope, risk, acceptance, or irreversible cost.",
+		"Otherwise decide yourself, record why, and execute.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -565,6 +567,7 @@ func TestRenderSubagentProtocolIncludesOptimizerDoctrineInResearchMode(t *testin
 		"Compare the local patch path, the compatibility-preserving path, and the architecture-level path.",
 		"If a deeper path materially improves the goal, report it clearly instead of silently following the old boundary.",
 		"When a better architecture path is justified, emit dispatchable slices or report it clearly",
+		"Do not wait for user approval when you can recommend a clearly superior path to the master.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered subagent protocol missing %q", want)

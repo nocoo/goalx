@@ -20,6 +20,7 @@ Do not choose this path by default. Prefer `goalx auto`.
 Use these only when the user asks for manual control or the default autonomous path is not enough:
 
 - Redirect the master with a short direction message
+- Prefer `goalx tell --run NAME ...`; explicit `--run NAME` resolution is global when the name is unique, and `--run <project-id>/<run>` disambiguates collisions
 - `goalx add --run NAME ...` to create a session manually
 - `goalx park --run NAME session-N` to pause a session without losing its worktree
 - `goalx resume --run NAME session-N` to restart a parked session

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,9 @@ func Status(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Run: %s\n", rc.Name)
+	printStatusControlSummary(rc)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "SESSION\tLAST_ROUND\tSTATUS\tSUMMARY")
@@ -135,4 +139,69 @@ func Status(projectRoot string, args []string) error {
 	fmt.Fprintf(w, "master\t-\t-\t%s\n", masterSummary)
 
 	return w.Flush()
+}
+
+func printStatusControlSummary(rc *RunContext) {
+	if rc == nil {
+		return
+	}
+	masterState, _ := LoadMasterState(MasterStatePath(rc.RunDir))
+	heartbeatState, _ := LoadHeartbeatState(HeartbeatStatePath(rc.RunDir))
+	unread := unreadMasterInboxCount(rc.RunDir, masterState)
+	heartbeatLag := int64(0)
+	wakePending := false
+	if masterState != nil {
+		heartbeatLag = masterState.HeartbeatLag
+		wakePending = masterState.WakePending
+	}
+	if heartbeatLag == 0 && masterState != nil && heartbeatState != nil && heartbeatState.Seq >= masterState.LastHeartbeatSeq {
+		heartbeatLag = heartbeatState.Seq - masterState.LastHeartbeatSeq
+		if heartbeatLag > 0 {
+			wakePending = true
+		}
+	}
+	fmt.Printf("Control: unread_inbox=%d heartbeat_lag=%d wake_pending=%t\n", unread, heartbeatLag, wakePending)
+
+	meta, _ := LoadRunMetadata(RunMetadataPath(rc.RunDir))
+	if meta == nil || meta.ProtocolVersion < currentProtocolVersion {
+		fmt.Printf("Protocol: legacy protocol (run predates current control/autonomy contract)\n")
+	}
+	fmt.Println()
+}
+
+func unreadMasterInboxCount(runDir string, state *MasterState) int {
+	f, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		return 0
+	}
+	lastID := int64(0)
+	for _, line := range splitNonEmptyLines(string(f)) {
+		var msg MasterInboxMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+		if msg.ID > lastID {
+			lastID = msg.ID
+		}
+	}
+	if state == nil || lastID <= state.LastSeenID {
+		return 0
+	}
+	return int(lastID - state.LastSeenID)
+}
+
+func splitNonEmptyLines(s string) []string {
+	lines := make([]string, 0)
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i < len(s) && s[i] != '\n' {
+			continue
+		}
+		line := s[start:i]
+		start = i + 1
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }

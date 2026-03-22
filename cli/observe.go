@@ -35,6 +35,7 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
+	printStatusControlSummary(rc)
 
 	// Show run runtime summary if available
 	statusPath := RunRuntimeStatePath(rc.RunDir)

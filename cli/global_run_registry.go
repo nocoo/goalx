@@ -1,0 +1,189 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	goalx "github.com/vonbai/goalx"
+)
+
+type GlobalRunRegistry struct {
+	Version   int                     `json:"version"`
+	Runs      map[string]GlobalRunRef `json:"runs,omitempty"`
+	UpdatedAt string                  `json:"updated_at,omitempty"`
+}
+
+type GlobalRunRef struct {
+	Key         string `json:"key,omitempty"`
+	Name        string `json:"name"`
+	ProjectID   string `json:"project_id"`
+	ProjectRoot string `json:"project_root,omitempty"`
+	RunDir      string `json:"run_dir,omitempty"`
+	TmuxSession string `json:"tmux_session,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+	Objective   string `json:"objective,omitempty"`
+	State       string `json:"state,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
+func GlobalRunRegistryPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".goalx", "runs", "index.json")
+}
+
+func LoadGlobalRunRegistry() (*GlobalRunRegistry, error) {
+	data, err := os.ReadFile(GlobalRunRegistryPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &GlobalRunRegistry{
+				Version: 1,
+				Runs:    map[string]GlobalRunRef{},
+			}, nil
+		}
+		return nil, fmt.Errorf("read global run registry: %w", err)
+	}
+	reg := &GlobalRunRegistry{}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		reg.Version = 1
+		reg.Runs = map[string]GlobalRunRef{}
+		return reg, nil
+	}
+	if err := json.Unmarshal(data, reg); err != nil {
+		return nil, fmt.Errorf("parse global run registry: %w", err)
+	}
+	if reg.Version == 0 {
+		reg.Version = 1
+	}
+	if reg.Runs == nil {
+		reg.Runs = map[string]GlobalRunRef{}
+	}
+	return reg, nil
+}
+
+func SaveGlobalRunRegistry(reg *GlobalRunRegistry) error {
+	if reg == nil {
+		return fmt.Errorf("global run registry is nil")
+	}
+	if reg.Version == 0 {
+		reg.Version = 1
+	}
+	if reg.Runs == nil {
+		reg.Runs = map[string]GlobalRunRef{}
+	}
+	reg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	data, err := json.MarshalIndent(reg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal global run registry: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(GlobalRunRegistryPath()), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(GlobalRunRegistryPath(), data, 0o644); err != nil {
+		return fmt.Errorf("write global run registry: %w", err)
+	}
+	return nil
+}
+
+func globalRunKey(projectRoot, runName string) string {
+	return projectRoot + "::" + runName
+}
+
+func UpsertGlobalRun(projectRoot string, cfg *goalx.Config, state string) error {
+	if cfg == nil {
+		return fmt.Errorf("config is nil")
+	}
+	reg, err := LoadGlobalRunRegistry()
+	if err != nil {
+		return err
+	}
+	key := globalRunKey(projectRoot, cfg.Name)
+	reg.Runs[key] = GlobalRunRef{
+		Key:         key,
+		Name:        cfg.Name,
+		ProjectID:   goalx.ProjectID(projectRoot),
+		ProjectRoot: projectRoot,
+		RunDir:      goalx.RunDir(projectRoot, cfg.Name),
+		TmuxSession: goalx.TmuxSessionName(projectRoot, cfg.Name),
+		Mode:        string(cfg.Mode),
+		Objective:   cfg.Objective,
+		State:       state,
+		UpdatedAt:   time.Now().UTC().Format(time.RFC3339),
+	}
+	return SaveGlobalRunRegistry(reg)
+}
+
+func UpdateGlobalRunState(projectRoot, runName, state string) error {
+	reg, err := LoadGlobalRunRegistry()
+	if err != nil {
+		return err
+	}
+	key := globalRunKey(projectRoot, runName)
+	ref, ok := reg.Runs[key]
+	if !ok {
+		ref = GlobalRunRef{
+			Key:         key,
+			Name:        runName,
+			ProjectID:   goalx.ProjectID(projectRoot),
+			ProjectRoot: projectRoot,
+			RunDir:      goalx.RunDir(projectRoot, runName),
+			TmuxSession: goalx.TmuxSessionName(projectRoot, runName),
+		}
+		if cfg, err := LoadRunSpec(ref.RunDir); err == nil && cfg != nil {
+			ref.Mode = string(cfg.Mode)
+			ref.Objective = cfg.Objective
+		}
+	}
+	ref.State = state
+	ref.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	reg.Runs[key] = ref
+	return SaveGlobalRunRegistry(reg)
+}
+
+func RemoveGlobalRun(projectRoot, runName string) error {
+	reg, err := LoadGlobalRunRegistry()
+	if err != nil {
+		return err
+	}
+	delete(reg.Runs, globalRunKey(projectRoot, runName))
+	return SaveGlobalRunRegistry(reg)
+}
+
+func LookupGlobalRuns(selector string) ([]GlobalRunRef, error) {
+	projectID, runName := parseRunSelector(selector)
+	reg, err := LoadGlobalRunRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	matches := make([]GlobalRunRef, 0, len(reg.Runs))
+	for _, ref := range reg.Runs {
+		if ref.Name != runName {
+			continue
+		}
+		if projectID != "" && ref.ProjectID != projectID {
+			continue
+		}
+		ref.Key = globalRunKey(ref.ProjectRoot, ref.Name)
+		matches = append(matches, ref)
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].ProjectID == matches[j].ProjectID {
+			return matches[i].Name < matches[j].Name
+		}
+		return matches[i].ProjectID < matches[j].ProjectID
+	})
+	return matches, nil
+}
+
+func parseRunSelector(selector string) (projectID, runName string) {
+	parts := strings.SplitN(selector, "/", 2)
+	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+		return parts[0], parts[1]
+	}
+	return "", selector
+}

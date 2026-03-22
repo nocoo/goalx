@@ -24,7 +24,7 @@ func Drop(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if unsaved, err := hasUnsavedRunArtifacts(projectRoot, rc); err != nil {
+	if unsaved, err := hasUnsavedRunArtifacts(rc.ProjectRoot, rc); err != nil {
 		return err
 	} else if unsaved {
 		return fmt.Errorf("run '%s' has unsaved artifacts; run `goalx save %s` before drop", rc.Name, rc.Name)
@@ -61,10 +61,10 @@ func Drop(projectRoot string, args []string) error {
 	if err := os.RemoveAll(rc.RunDir); err != nil {
 		return fmt.Errorf("remove run dir %s: %w", rc.RunDir, err)
 	}
-	if err := RemoveRunRegistration(projectRoot, rc.Name); err != nil {
+	if err := RemoveRunRegistration(rc.ProjectRoot, rc.Name); err != nil {
 		return fmt.Errorf("remove run registry entry: %w", err)
 	}
-	if err := refreshProjectStatusCache(projectRoot); err != nil {
+	if err := refreshProjectStatusCache(rc.ProjectRoot); err != nil {
 		return fmt.Errorf("refresh project status cache: %w", err)
 	}
 
@@ -73,7 +73,7 @@ func Drop(projectRoot string, args []string) error {
 }
 
 func hasUnsavedRunArtifacts(projectRoot string, rc *RunContext) (bool, error) {
-	saveDir := filepath.Join(projectRoot, ".goalx", "runs", rc.Name)
+	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Name)
 	if _, err := os.Stat(saveDir); err == nil {
 		return false, nil
 	} else if !os.IsNotExist(err) {

@@ -43,9 +43,9 @@ func Archive(projectRoot string, args []string) error {
 	fmt.Printf("Archived %s as tag %s\n", sessionName, tag)
 
 	// Auto-save run artifacts on first archive
-	saveDir := filepath.Join(projectRoot, ".goalx", "runs", rc.Config.Name)
+	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Config.Name)
 	if _, err := os.Stat(saveDir); os.IsNotExist(err) {
-		if saveErr := Save(projectRoot, []string{rc.Name}); saveErr != nil {
+		if saveErr := Save(rc.ProjectRoot, []string{rc.Name}); saveErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: auto-save failed: %v\n", saveErr)
 		}
 	}

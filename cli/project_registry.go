@@ -112,7 +112,10 @@ func RegisterActiveRun(projectRoot string, cfg *goalx.Config) error {
 	if reg.FocusedRun == "" {
 		reg.FocusedRun = cfg.Name
 	}
-	return SaveProjectRegistry(projectRoot, reg)
+	if err := SaveProjectRegistry(projectRoot, reg); err != nil {
+		return err
+	}
+	return UpsertGlobalRun(projectRoot, cfg, "active")
 }
 
 func MarkRunInactive(projectRoot, runName string) error {
@@ -129,7 +132,10 @@ func MarkRunInactive(projectRoot, runName string) error {
 			}
 		}
 	}
-	return SaveProjectRegistry(projectRoot, reg)
+	if err := SaveProjectRegistry(projectRoot, reg); err != nil {
+		return err
+	}
+	return UpdateGlobalRunState(projectRoot, runName, "inactive")
 }
 
 func RegisterSavedRun(projectRoot string, cfg *goalx.Config) error {
@@ -147,7 +153,10 @@ func RegisterSavedRun(projectRoot string, cfg *goalx.Config) error {
 		State:     "saved",
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
-	return SaveProjectRegistry(projectRoot, reg)
+	if err := SaveProjectRegistry(projectRoot, reg); err != nil {
+		return err
+	}
+	return UpsertGlobalRun(projectRoot, cfg, "saved")
 }
 
 func RemoveRunRegistration(projectRoot, runName string) error {
@@ -160,7 +169,10 @@ func RemoveRunRegistration(projectRoot, runName string) error {
 	if reg.FocusedRun == runName {
 		reg.FocusedRun = ""
 	}
-	return SaveProjectRegistry(projectRoot, reg)
+	if err := SaveProjectRegistry(projectRoot, reg); err != nil {
+		return err
+	}
+	return RemoveGlobalRun(projectRoot, runName)
 }
 
 func ResolveDefaultRunName(projectRoot string) (string, error) {

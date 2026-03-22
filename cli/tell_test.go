@@ -58,6 +58,51 @@ func TestTellWritesSessionGuidanceStateAndNudges(t *testing.T) {
 	}
 }
 
+func TestTellResolvesExplicitRunGloballyOutsideProjectRoot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repoA := initGitRepo(t)
+	writeAndCommit(t, repoA, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repoA)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if _, err := EnsureRunMetadata(runDir, repoA, cfg.Objective); err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	if err := RegisterActiveRun(repoA, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+
+	repoB := initGitRepo(t)
+	writeAndCommit(t, repoB, "other.txt", "other", "other commit")
+
+	orig := sendAgentNudge
+	defer func() { sendAgentNudge = orig }()
+	called := false
+	sendAgentNudge = func(target, engine string) error {
+		called = true
+		return nil
+	}
+
+	if err := Tell(repoB, []string{"--run", runName, "master", "decide and execute"}); err != nil {
+		t.Fatalf("Tell: %v", err)
+	}
+
+	data, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if !strings.Contains(string(data), "decide and execute") {
+		t.Fatalf("master inbox = %q, want delivered message", string(data))
+	}
+	if !called {
+		t.Fatal("sendAgentNudge was not called")
+	}
+}
+
 func TestTellHelpDoesNotDeliverAnything(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

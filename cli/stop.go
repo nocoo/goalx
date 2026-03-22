@@ -25,7 +25,7 @@ func Stop(projectRoot string, args []string) error {
 	}
 
 	if !SessionExists(rc.TmuxSession) {
-		_ = MarkRunInactive(projectRoot, rc.Name)
+		_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
 		if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
 			state.Active = false
 			state.MasterWakePending = false
@@ -35,7 +35,7 @@ func Stop(projectRoot string, args []string) error {
 			state.UpdatedAt = state.StoppedAt
 			_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 		}
-		_ = refreshProjectStatusCache(projectRoot)
+		_ = refreshProjectStatusCache(rc.ProjectRoot)
 		fmt.Printf("Run '%s' is not active (no tmux session).\n", rc.Name)
 		return nil
 	}
@@ -52,8 +52,8 @@ func Stop(projectRoot string, args []string) error {
 		state.UpdatedAt = state.StoppedAt
 		_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 	}
-	_ = MarkRunInactive(projectRoot, rc.Name)
-	_ = refreshProjectStatusCache(projectRoot)
+	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
+	_ = refreshProjectStatusCache(rc.ProjectRoot)
 	fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
 	return nil
 }

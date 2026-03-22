@@ -38,12 +38,43 @@ func nextSessionIndex(runDir string) (int, error) {
 	return indexes[len(indexes)-1] + 1, nil
 }
 
+func nextAvailableSessionIndex(projectRoot, runDir, runName string) (int, error) {
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return 0, err
+	}
+	next := 1
+	if len(indexes) > 0 {
+		next = indexes[len(indexes)-1] + 1
+	}
+	for {
+		if isSessionSlotOccupied(projectRoot, runDir, runName, next) {
+			next++
+			continue
+		}
+		return next, nil
+	}
+}
+
 func hasSessionIndex(runDir string, idx int) (bool, error) {
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
 		return false, err
 	}
 	return slices.Contains(indexes, idx), nil
+}
+
+func isSessionSlotOccupied(projectRoot, runDir, runName string, idx int) bool {
+	ok, err := hasSessionIndex(runDir, idx)
+	if err == nil && ok {
+		return true
+	}
+	if info, err := os.Stat(WorktreePath(runDir, runName, idx)); err == nil && info.IsDir() {
+		return true
+	}
+	branch := fmt.Sprintf("goalx/%s/%d", runName, idx)
+	inUse, err := branchCheckedOutInAnyWorktree(projectRoot, branch)
+	return err == nil && inUse
 }
 
 func discoverSessionIndexesFromFS(runDir string) []int {

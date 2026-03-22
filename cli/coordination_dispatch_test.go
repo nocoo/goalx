@@ -99,3 +99,78 @@ func TestCoordinationStatePreservesDecisionRecord(t *testing.T) {
 		t.Fatalf("Decision.ChosenPathReason = %q", loaded.Decision.ChosenPathReason)
 	}
 }
+
+func TestLoadCoordinationStateNormalizesLegacySessionSchema(t *testing.T) {
+	runDir := filepath.Join(t.TempDir(), "demo")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	legacy := `{
+  "version": 2,
+  "objective": "ship it",
+  "active": [
+    {
+      "owner": "session-1",
+      "scope": ["req-1", "req-2"],
+      "status": "active"
+    },
+    {
+      "owner": "master",
+      "scope": ["req-3"],
+      "status": "active",
+      "note": "master is covering the remainder"
+    }
+  ],
+  "blocked": [
+    {
+      "owner": "session-2",
+      "scope": ["req-4"],
+      "reason": "waiting on external api"
+    }
+  ],
+  "parked": [
+    {
+      "session": "session-3",
+      "scope": "held for reuse",
+      "state": "parked"
+    }
+  ],
+  "waiting_external": [
+    {
+      "session": "master",
+      "scope": "remote deploy",
+      "state": "waiting_external"
+    }
+  ]
+}`
+	if err := os.WriteFile(CoordinationPath(runDir), []byte(legacy), 0o644); err != nil {
+		t.Fatalf("write coordination state: %v", err)
+	}
+
+	loaded, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState: %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("LoadCoordinationState returned nil")
+	}
+	if loaded.Sessions["session-1"].State != "active" {
+		t.Fatalf("session-1 state = %q, want active", loaded.Sessions["session-1"].State)
+	}
+	if loaded.Sessions["session-1"].Scope != "req-1, req-2" {
+		t.Fatalf("session-1 scope = %q, want joined scope", loaded.Sessions["session-1"].Scope)
+	}
+	if loaded.Sessions["session-2"].State != "blocked" {
+		t.Fatalf("session-2 state = %q, want blocked", loaded.Sessions["session-2"].State)
+	}
+	if loaded.Sessions["session-2"].BlockedBy != "waiting on external api" {
+		t.Fatalf("session-2 blocked_by = %q", loaded.Sessions["session-2"].BlockedBy)
+	}
+	if loaded.Sessions["session-3"].State != "parked" {
+		t.Fatalf("session-3 state = %q, want parked", loaded.Sessions["session-3"].State)
+	}
+	if loaded.Sessions["master"].ExecutionState != "waiting_external" {
+		t.Fatalf("master execution_state = %q, want waiting_external", loaded.Sessions["master"].ExecutionState)
+	}
+}

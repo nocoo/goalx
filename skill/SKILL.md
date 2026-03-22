@@ -7,7 +7,7 @@ user-invocable: true
 
 # GoalX
 
-Default to one autonomous run. Use low-level GoalX control only when the user explicitly asks for it. Use `goalx focus --run NAME` when a project has multiple active runs and the user wants to pin the default run.
+Default to one autonomous run. Use low-level GoalX control only when the user explicitly asks for it. Use `goalx focus --run NAME` when a project has multiple active runs and the user wants to pin the default run. Explicit `--run NAME` resolution is global when the name is unique; if names collide across projects, use `--run <project-id>/<run>`.
 
 ## Default Path
 
@@ -32,7 +32,7 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
    When you need a low-level redirect, prefer `goalx tell` over raw `tmux send-keys`.
 6. If a project has multiple active runs, use `goalx focus --run NAME` to set the default run instead of relying on implicit selection.
 7. Keep history recap short. GoalX resumes from durable run state and current files.
-8. Interpret `goalx observe` output. Report the signal, not raw tmux noise.
+8. Interpret `goalx observe` output. Report the signal, not raw tmux noise. The control summary tells you whether inbox items are unread, heartbeat lag is growing, or the run is using a legacy protocol.
 9. GoalX completion is stricter than "tests passed": `goalx verify` also checks required-item completion provenance and whether the effective acceptance gate was silently narrowed.
 10. If a project has multiple active runs, always include `--run NAME` for mutating or inspection commands that target one run.
 
@@ -52,8 +52,8 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
 | Command | Purpose |
 |---------|---------|
 | `goalx auto "goal"` | Default path: init + start one master-led run, then exit. |
-| `goalx observe [NAME]` | Live capture from all tmux windows |
-| `goalx status [NAME]` | Journal-based progress |
+| `goalx observe [NAME]` | Live capture from all tmux windows plus control-plane summary |
+| `goalx status [NAME]` | Progress summary plus unread inbox / heartbeat lag / legacy-protocol hints |
 | `goalx focus --run NAME` | Pin the default run for commands that omit `--run` |
 | `goalx result [NAME]` | Show summary (`--full` for raw report) |
 | `goalx save [NAME]` | Save durable artifacts and `artifacts.json` to `.goalx/runs/` |

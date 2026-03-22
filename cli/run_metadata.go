@@ -10,12 +10,16 @@ import (
 	"time"
 )
 
+const currentProtocolVersion = 1
+
 type RunMetadata struct {
-	Version      int    `json:"version"`
-	Objective    string `json:"objective,omitempty"`
-	BaseRevision string `json:"base_revision,omitempty"`
-	StartedAt    string `json:"started_at,omitempty"`
-	UpdatedAt    string `json:"updated_at,omitempty"`
+	Version         int    `json:"version"`
+	Objective       string `json:"objective,omitempty"`
+	ProjectRoot     string `json:"project_root,omitempty"`
+	ProtocolVersion int    `json:"protocol_version,omitempty"`
+	BaseRevision    string `json:"base_revision,omitempty"`
+	StartedAt       string `json:"started_at,omitempty"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
 }
 
 func RunMetadataPath(runDir string) string {
@@ -71,9 +75,11 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 			return nil, revErr
 		}
 		meta = &RunMetadata{
-			Version:      1,
-			Objective:    objective,
-			BaseRevision: baseRevision,
+			Version:         1,
+			Objective:       objective,
+			ProjectRoot:     projectRoot,
+			ProtocolVersion: currentProtocolVersion,
+			BaseRevision:    baseRevision,
 		}
 		if err := SaveRunMetadata(path, meta); err != nil {
 			return nil, err
@@ -87,6 +93,14 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 	}
 	if meta.Objective == "" {
 		meta.Objective = objective
+		changed = true
+	}
+	if meta.ProjectRoot == "" && projectRoot != "" {
+		meta.ProjectRoot = projectRoot
+		changed = true
+	}
+	if meta.ProtocolVersion < currentProtocolVersion {
+		meta.ProtocolVersion = currentProtocolVersion
 		changed = true
 	}
 	if meta.BaseRevision == "" {
