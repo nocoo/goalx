@@ -137,6 +137,9 @@ func Add(projectRoot string, args []string) error {
 	if err := os.WriteFile(guidancePath, nil, 0644); err != nil {
 		return fmt.Errorf("init guidance: %w", err)
 	}
+	if _, err := EnsureSessionGuidanceState(rc.RunDir, sName); err != nil {
+		return fmt.Errorf("init guidance state: %w", err)
+	}
 
 	// Generate adapter
 	if err := GenerateAdapter(engine, wtPath, guidancePath); err != nil {
@@ -199,10 +202,12 @@ func Add(projectRoot string, args []string) error {
 		SessionIndex:        newNum - 1,
 		JournalPath:         journalPath,
 		GuidancePath:        guidancePath,
+		GuidanceStatePath:   SessionGuidanceStatePath(rc.RunDir, sName),
 		WorktreePath:        wtPath,
 		GoalContractPath:    GoalContractPath(rc.RunDir),
 		AcceptancePath:      AcceptanceChecklistPath(rc.RunDir),
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
+		ProjectRoot:         absProjectRoot,
 		DiversityHint:       hint,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, newNum-1); err != nil {
@@ -285,15 +290,16 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 			return nil, fmt.Errorf("resolve session-%d engine: %w", num, err)
 		}
 		list = append(list, SessionData{
-			Name:          sName,
-			WindowName:    sessionWindowName(cfg.Name, num),
-			WorktreePath:  WorktreePath(runDir, cfg.Name, num),
-			JournalPath:   JournalPath(runDir, sName),
-			GuidancePath:  GuidancePath(runDir, sName),
-			Engine:        engine,
-			Model:         model,
-			Mode:          effective.Mode,
-			EngineCommand: engineCmd,
+			Name:              sName,
+			WindowName:        sessionWindowName(cfg.Name, num),
+			WorktreePath:      WorktreePath(runDir, cfg.Name, num),
+			JournalPath:       JournalPath(runDir, sName),
+			GuidancePath:      GuidancePath(runDir, sName),
+			GuidanceStatePath: SessionGuidanceStatePath(runDir, sName),
+			Engine:            engine,
+			Model:             model,
+			Mode:              effective.Mode,
+			EngineCommand:     engineCmd,
 		})
 	}
 	return list, nil

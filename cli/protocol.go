@@ -43,27 +43,29 @@ type ProtocolData struct {
 	EngineCommand       string // resolved master engine command
 
 	// Subagent-specific (used in program.md.tmpl)
-	SessionName   string
-	SessionIndex  int // 0-based index of this session in the Sessions slice
-	JournalPath   string
-	GuidancePath  string
-	WorktreePath  string
-	DiversityHint string
+	SessionName       string
+	SessionIndex      int // 0-based index of this session in the Sessions slice
+	JournalPath       string
+	GuidancePath      string
+	GuidanceStatePath string
+	WorktreePath      string
+	DiversityHint     string
 }
 
 // SessionData is per-session info for the master protocol.
 type SessionData struct {
-	Name          string
-	WindowName    string
-	WorktreePath  string
-	JournalPath   string
-	GuidancePath  string
-	Engine        string
-	Model         string
-	Mode          goalx.Mode
-	Hint          string
-	EngineCommand string
-	Prompt        string
+	Name              string
+	WindowName        string
+	WorktreePath      string
+	JournalPath       string
+	GuidancePath      string
+	GuidanceStatePath string
+	Engine            string
+	Model             string
+	Mode              goalx.Mode
+	Hint              string
+	EngineCommand     string
+	Prompt            string
 }
 
 // RenderMasterProtocol renders master.md.tmpl to the run directory.

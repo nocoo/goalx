@@ -74,6 +74,7 @@ Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicit
 | `goalx observe` | Live tmux capture from all agents |
 | `goalx status` | Journal-based progress summary |
 | `goalx add` | Add a session to a running run (`--mode research` launches a temporary research session) |
+| `goalx tell` | Send a durable instruction to the master or a specific session |
 | `goalx park` | Park an idle/blocked session for later reuse without deleting its worktree |
 | `goalx resume` | Resume a parked session in its existing worktree |
 | `goalx diff` | Diff session code or report outputs |

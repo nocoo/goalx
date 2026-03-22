@@ -8,6 +8,7 @@
 
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Guidance: `{{.GuidancePath}}` — latest assignment and direction changes
+{{if .GuidanceStatePath}}- Guidance state: `{{.GuidanceStatePath}}` — durable ack for the latest guidance version{{end}}
 - Objective: {{.Objective}}
 {{if .Harness.Command}}- Gate: `{{.Harness.Command}}`{{end}}
 
@@ -155,8 +156,12 @@ cat {{.GuidancePath}}
 
 If the file has content:
 1. Read it carefully and adjust to the latest direction.
-2. Acknowledge in journal with status `ack-guidance`.
-3. Clear the file after you have acted on it:
+2. Acknowledge the latest guidance version:
+   ```bash
+   cd {{.ProjectRoot}} && goalx ack-guidance --run {{.RunName}} {{.SessionName}}
+   ```
+3. Acknowledge in journal with status `ack-guidance`.
+4. Clear the file after you have acted on it:
    ```bash
    echo -n "" > {{.GuidancePath}}
    ```

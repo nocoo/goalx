@@ -35,6 +35,7 @@ Usage:
   goalx report  [--run NAME]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
   goalx add     "direction" [--run NAME] Add a session to a running run
+  goalx tell    [--run NAME] [target] "message" Send a durable instruction to master or a session
   goalx observe [NAME]                 Capture live output from all tmux windows
   goalx auto    "objective" [flags]   Init and start one master-led run, then exit
   goalx serve                         Start the GoalX HTTP control server
@@ -132,6 +133,10 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Implement(cwd, args, nil)
 	case "add":
 		return cli.Add(cwd, args)
+	case "tell":
+		return cli.Tell(cwd, args)
+	case "ack-guidance":
+		return cli.AckGuidance(cwd, args)
 	case "observe":
 		return cli.Observe(cwd, args)
 	case "serve":

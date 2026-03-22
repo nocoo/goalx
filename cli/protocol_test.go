@@ -12,9 +12,11 @@ import (
 func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "ship it",
 		Mode:         goalx.ModeDevelop,
 		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
 		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		SessionName:  "session-1",
@@ -57,9 +59,12 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "investigate auth",
 		Mode:         goalx.ModeResearch,
 		Engine:       "claude-code",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
 		Target:       goalx.TargetConfig{Files: []string{"report.md"}},
 		JournalPath:  "/tmp/journal.jsonl",
 		GuidancePath: "/tmp/guidance.md",
@@ -88,9 +93,12 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "ship it",
 		Mode:         goalx.ModeDevelop,
 		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
 		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		JournalPath:  "/tmp/journal.jsonl",
@@ -120,9 +128,12 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "investigate auth",
 		Mode:         goalx.ModeResearch,
 		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
 		Target:       goalx.TargetConfig{Files: []string{"report.md"}},
 		JournalPath:  "/tmp/journal.jsonl",
 		GuidancePath: "/tmp/guidance.md",
@@ -160,9 +171,12 @@ func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "ship it",
 		Mode:         goalx.ModeDevelop,
 		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
 		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		JournalPath:  "/tmp/journal.jsonl",
@@ -202,9 +216,12 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 func TestRenderSubagentProtocolIncludesQualityJournalAndSelfCheck(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:      "demo",
 		Objective:    "ship it",
 		Mode:         goalx.ModeDevelop,
 		Engine:       "codex",
+		ProjectRoot:  "/tmp/project",
+		SessionName:  "session-1",
 		Target:       goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:      goalx.HarnessConfig{Command: "go test ./..."},
 		JournalPath:  "/tmp/journal.jsonl",
@@ -245,9 +262,11 @@ func TestRenderSubagentProtocolIncludesQualityJournalAndSelfCheck(t *testing.T) 
 func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:             "demo",
 		Objective:           "investigate auth",
 		Mode:                goalx.ModeResearch,
 		Engine:              "codex",
+		ProjectRoot:         "/tmp/project",
 		Target:              goalx.TargetConfig{Files: []string{"report.md"}},
 		SessionName:         "session-1",
 		JournalPath:         "/tmp/journal.jsonl",
@@ -287,9 +306,12 @@ func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 func TestRenderSubagentProtocolMakesGoalContractBoundaryExplicit(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
+		RunName:             "demo",
 		Objective:           "ship it",
 		Mode:                goalx.ModeDevelop,
 		Engine:              "codex",
+		ProjectRoot:         "/tmp/project",
+		SessionName:         "session-1",
 		Target:              goalx.TargetConfig{Files: []string{"main.go"}},
 		Harness:             goalx.HarnessConfig{Command: "go test ./..."},
 		JournalPath:         "/tmp/journal.jsonl",
@@ -366,6 +388,7 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		"structure",
 		"/tmp/acceptance.md",
 		"goalx add --run demo",
+		"goalx tell --run demo session-N",
 		"goalx park --run demo session-N",
 		"goalx resume --run demo session-N",
 		"dispatcher and referee",
@@ -379,6 +402,9 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
 		}
+	}
+	if strings.Contains(text, "tmux send-keys -t ar-demo:<window> Enter") {
+		t.Fatalf("rendered master protocol should not tell master to hand-send tmux enter nudges:\n%s", text)
 	}
 	if strings.Contains(text, "3-7 testable bullets") {
 		t.Fatalf("rendered master protocol should not cap required goal coverage:\n%s", text)
@@ -536,6 +562,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"master-state.json",
 		"heartbeat.json",
 		"goalx add --run demo --mode research",
+		"goalx tell --run demo session-N",
 		"goalx park --run demo session-N",
 		"goalx resume --run demo session-N",
 		"temporary research session",

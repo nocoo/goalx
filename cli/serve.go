@@ -332,66 +332,33 @@ func (a *serveApp) handleTellAction(w http.ResponseWriter, projectRoot string, r
 		session = "master"
 	}
 
-	if session == "master" {
-		if _, err := AppendMasterInboxMessage(rc.RunDir, "tell", "user", message); err != nil {
-			writeJSONError(w, http.StatusInternalServerError, err)
-			return
-		}
-		target := rc.TmuxSession + ":master"
-		if err := a.sendNudge(target, rc.Config.Master.Engine); err != nil {
+	if _, _, err := deliverTell(projectRoot, req.Run, session, message, a.sendNudge); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	target := rc.TmuxSession + ":master"
+	if session != "master" {
+		windowName, err := resolveWindowName(rc.Name, session)
+		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err)
 			return
 		}
+		target = rc.TmuxSession + ":" + windowName
 		writeJSON(w, http.StatusOK, map[string]any{
-			"ok":     true,
-			"action": "tell",
-			"target": target,
+			"ok":                  true,
+			"action":              "tell",
+			"target":              target,
+			"guidance_path":       GuidancePath(rc.RunDir, session),
+			"guidance_state_path": SessionGuidanceStatePath(rc.RunDir, session),
 		})
 		return
 	}
 
-	idx, err := parseSessionIndex(session)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, err)
-		return
-	}
-	ok, err := hasSessionIndex(rc.RunDir, idx)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err)
-		return
-	}
-	if !ok {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("session %q out of range for run %q", session, rc.Name))
-		return
-	}
-
-	guidancePath := GuidancePath(rc.RunDir, session)
-	if err := os.MkdirAll(filepath.Dir(guidancePath), 0o755); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err)
-		return
-	}
-	if err := os.WriteFile(guidancePath, []byte(message+"\n"), 0o644); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	windowName, err := resolveWindowName(rc.Name, session)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, err)
-		return
-	}
-	target := rc.TmuxSession + ":" + windowName
-	effective := goalx.EffectiveSessionConfig(rc.Config, idx-1)
-	if err := a.sendNudge(target, effective.Engine); err != nil {
-		writeJSONError(w, http.StatusBadRequest, err)
-		return
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":            true,
-		"action":        "tell",
-		"target":        target,
-		"guidance_path": guidancePath,
+		"ok":     true,
+		"action": "tell",
+		"target": target,
 	})
 }
 

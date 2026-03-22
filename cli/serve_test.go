@@ -408,6 +408,16 @@ func TestServeHandlerTellWritesGuidanceAndNudgesSession(t *testing.T) {
 	if string(data) != "focus on authz regressions\n" {
 		t.Fatalf("guidance = %q", string(data))
 	}
+	state, err := LoadSessionGuidanceState(SessionGuidanceStatePath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionGuidanceState: %v", err)
+	}
+	if state == nil || !state.Pending || state.Version != 1 {
+		t.Fatalf("guidance state = %#v, want pending version 1", state)
+	}
+	if state.LastAckVersion != 0 {
+		t.Fatalf("last ack version = %d, want 0", state.LastAckVersion)
+	}
 
 	wantTarget := goalx.TmuxSessionName(workspace, "auth-audit") + ":" + sessionWindowName("auth-audit", 1)
 	if gotTarget != wantTarget || gotEngine != "" {

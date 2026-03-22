@@ -25,3 +25,8 @@ func WorktreePath(runDir, cfgName string, num int) string {
 func GuidancePath(runDir, sessionName string) string {
 	return filepath.Join(runDir, "guidance", sessionName+".md")
 }
+
+// SessionGuidanceStatePath returns the guidance state file path for a session.
+func SessionGuidanceStatePath(runDir, sessionName string) string {
+	return filepath.Join(ControlDir(runDir), sessionName+"-guidance.json")
+}

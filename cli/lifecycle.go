@@ -97,6 +97,7 @@ func Resume(projectRoot string, args []string) error {
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
 	}
+	absProjectRoot, _ := filepath.Abs(projectRoot)
 
 	idx, err := parseSessionIndex(sessionName)
 	if err != nil {
@@ -123,6 +124,9 @@ func Resume(projectRoot string, args []string) error {
 			err = fmt.Errorf("%s is not a directory", wtPath)
 		}
 		return fmt.Errorf("resume %s requires existing worktree: %w", sessionName, err)
+	}
+	if _, err := EnsureSessionGuidanceState(rc.RunDir, sessionName); err != nil {
+		return fmt.Errorf("init guidance state: %w", err)
 	}
 
 	_, engines, err := goalx.LoadConfig(projectRoot)
@@ -159,10 +163,12 @@ func Resume(projectRoot string, args []string) error {
 		SessionIndex:        idx - 1,
 		JournalPath:         JournalPath(rc.RunDir, sessionName),
 		GuidancePath:        GuidancePath(rc.RunDir, sessionName),
+		GuidanceStatePath:   SessionGuidanceStatePath(rc.RunDir, sessionName),
 		WorktreePath:        wtPath,
 		GoalContractPath:    GoalContractPath(rc.RunDir),
 		AcceptancePath:      AcceptanceChecklistPath(rc.RunDir),
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
+		ProjectRoot:         absProjectRoot,
 		DiversityHint:       effective.Hint,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, idx-1); err != nil {

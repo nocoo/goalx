@@ -29,6 +29,7 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
 3. Do not manually edit `.goalx/goalx.yaml` unless the user explicitly asks for config-level control.
 4. Do not micromanage the master or subagents unless the user explicitly asks for low-level intervention.
 5. Route direction changes through the master, not directly to subagent panes.
+   When you need a low-level redirect, prefer `goalx tell` over raw `tmux send-keys`.
 6. Keep history recap short. GoalX resumes from durable run state and current files.
 7. Interpret `goalx observe` output. Report the signal, not raw tmux noise.
 8. GoalX completion is stricter than "tests passed": `goalx verify` also checks required-item completion provenance and whether the effective acceptance gate was silently narrowed.
@@ -59,6 +60,7 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
 | `goalx init "goal"` | Advanced/manual path only: generate config without starting |
 | `goalx start` | Advanced/manual path only: launch from existing config |
 | `goalx add "direction"` | Advanced/manual path only: add a subagent session |
+| `goalx tell [target] "message"` | Advanced/manual path only: write a durable instruction to master or a session |
 | `goalx park [NAME] <session>` | Advanced/manual path only: park a session |
 | `goalx resume [NAME] <session>` | Advanced/manual path only: resume a parked session |
 | `goalx attach [NAME]` | Attach to tmux session |

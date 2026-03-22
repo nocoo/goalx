@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	goalx "github.com/vonbai/goalx"
@@ -80,6 +81,16 @@ func Status(projectRoot string, args []string) error {
 						summary = "active: " + sess.Scope
 					}
 				}
+			}
+		}
+		if guidanceState, err := LoadSessionGuidanceState(SessionGuidanceStatePath(rc.RunDir, sName)); err == nil && guidanceState != nil && guidanceState.Pending {
+			if status == "idle" || status == "pending" {
+				status = "guidance-pending"
+			}
+			if summary == "no entries" {
+				summary = "guidance pending"
+			} else if !strings.Contains(summary, "guidance pending") {
+				summary += " | guidance pending"
 			}
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sName, lastRound, status, summary)
