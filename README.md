@@ -10,7 +10,7 @@ Autonomous research and development framework. Master/Subagent architecture powe
 goalx auto "investigate authentication system vulnerabilities"
 ```
 
-GoalX creates a run directory and launches a master agent in tmux. The master decides when to call `goalx add`, assigns work, spins up temporary research sessions when needed, challenges findings, rescues failed sessions, and synthesizes results.
+GoalX creates a run directory and launches a master agent in tmux. The master decides when to call `goalx add`, keeps required goal work covered, spins up temporary research sessions when needed, challenges findings, rescues failed sessions, and synthesizes results.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -155,9 +155,9 @@ goalx/
 
 GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates:
 
-**Master** (`master.md.tmpl`): Final responsible party. Maintains a machine-readable `goal-contract.json`, keeps the acceptance checklist aligned as proof against that contract, challenges subagent findings, rescues dead sessions, runs verification before `done` / `implement`, synthesizes results, and drives next steps.
+**Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Maintains a machine-readable `goal-contract.json`, keeps required items covered or explicitly blocked, dispatches parallel work when independent required slices remain, keeps the acceptance checklist aligned as proof against that contract, rescues dead or stuck sessions, runs verification before `done` / `implement`, synthesizes results, and drives next steps.
 
-**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but the goal contract remains the run-level completion boundary. Communicates via journal files and guidance files.
+**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but the goal contract remains the run-level completion boundary. Communicates via journal files and guidance files, including concise blocker and dependency hints so the master can rebalance work quickly.
 
 ### Config Hierarchy
 

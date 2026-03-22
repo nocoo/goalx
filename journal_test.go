@@ -9,9 +9,9 @@ import (
 func TestLoadJournal(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.jsonl")
-	data := `{"round":1,"commit":"abc","desc":"read code","status":"progress"}
+	data := `{"round":1,"commit":"abc","desc":"read code","status":"progress","owner_scope":"auth retry flow"}
 {"round":2,"commit":"def","desc":"split file","status":"progress"}
-{"round":3,"commit":"ghi","desc":"all tests pass","status":"done"}
+{"round":3,"commit":"ghi","desc":"all tests pass","status":"done","quality":"A"}
 `
 	os.WriteFile(path, []byte(data), 0644)
 
@@ -25,8 +25,14 @@ func TestLoadJournal(t *testing.T) {
 	if entries[0].Round != 1 || entries[0].Commit != "abc" {
 		t.Errorf("entry[0] = %+v", entries[0])
 	}
+	if entries[0].OwnerScope != "auth retry flow" {
+		t.Errorf("entry[0].OwnerScope = %q, want auth retry flow", entries[0].OwnerScope)
+	}
 	if entries[2].Status != "done" {
 		t.Errorf("entry[2].Status = %q, want done", entries[2].Status)
+	}
+	if entries[2].Quality != "A" {
+		t.Errorf("entry[2].Quality = %q, want A", entries[2].Quality)
 	}
 }
 
@@ -60,6 +66,33 @@ func TestLoadJournalMaster(t *testing.T) {
 	}
 }
 
+func TestLoadJournalBlockedEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "blocked.jsonl")
+	data := `{"round":4,"desc":"live verification blocked","status":"stuck","blocked_by":"await_input response","depends_on":["session-4"],"can_split":true,"suggested_next":"spawn live verification session"}`
+	os.WriteFile(path, []byte(data), 0644)
+
+	entries, err := LoadJournal(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("len = %d, want 1", len(entries))
+	}
+	if entries[0].BlockedBy != "await_input response" {
+		t.Errorf("entries[0].BlockedBy = %q, want await_input response", entries[0].BlockedBy)
+	}
+	if len(entries[0].DependsOn) != 1 || entries[0].DependsOn[0] != "session-4" {
+		t.Errorf("entries[0].DependsOn = %+v", entries[0].DependsOn)
+	}
+	if !entries[0].CanSplit {
+		t.Errorf("entries[0].CanSplit = false, want true")
+	}
+	if entries[0].SuggestedNext != "spawn live verification session" {
+		t.Errorf("entries[0].SuggestedNext = %q", entries[0].SuggestedNext)
+	}
+}
+
 func TestSummary(t *testing.T) {
 	entries := []JournalEntry{
 		{Round: 1, Desc: "read code", Status: "progress"},
@@ -67,6 +100,16 @@ func TestSummary(t *testing.T) {
 	}
 	s := Summary(entries)
 	if s != "round 2: all pass (done)" {
+		t.Errorf("Summary = %q", s)
+	}
+}
+
+func TestSummaryStuckIncludesBlocker(t *testing.T) {
+	entries := []JournalEntry{
+		{Round: 4, Desc: "live verification blocked", Status: "stuck", BlockedBy: "await_input response"},
+	}
+	s := Summary(entries)
+	if s != "round 4: live verification blocked (stuck: await_input response)" {
 		t.Errorf("Summary = %q", s)
 	}
 }

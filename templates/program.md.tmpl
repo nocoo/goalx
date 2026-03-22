@@ -130,13 +130,15 @@ Rely on the current filesystem and durable run state. When you believe the curre
 Append entries to `{{.JournalPath}}`:
 
 ```json
-{"round":1,"commit":"abc1234","desc":"what you investigated","confidence":"HIGH|MEDIUM|LOW","status":"progress","quality":"A|B|C"}
+{"round":1,"commit":"abc1234","desc":"what you investigated","confidence":"HIGH|MEDIUM|LOW","status":"progress","quality":"A|B|C","owner_scope":"...","blocked_by":"...","depends_on":["session-2"],"can_split":true,"suggested_next":"..."}
 ```
 
 Quality rubric:
 - A=strong evidence+tested counter-evidence+actionable
 - B=reasonable but gaps remain
 - C=preliminary flag for deepening
+
+The extra blocker fields are optional unless you are stuck. If you are blocked, append a `status:"stuck"` entry with the blocker, dependency, ownership scope, and the next smallest useful split the master could dispatch.
 
 ## Budget
 

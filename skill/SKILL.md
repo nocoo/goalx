@@ -15,15 +15,17 @@ GoalX launches a master agent that orchestrates everything. The framework provid
 goalx auto "goal"  →  master starts  →  master creates subagents  →  master evaluates  →  done
 ```
 
-The master is a **strategist + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, checks progress on each heartbeat, restarts dead sessions, and stops when the current goal contract is satisfied. Subagents are fully autonomous workers.
+The master is a **dispatcher + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, keeps required items covered, rebalances work when one session is stuck, and stops only when the current goal contract is satisfied. Subagents are fully autonomous workers.
 
 ## Operating Rules
 1. Write the objective as a simple goal, not a task checklist. The master figures out the details.
 2. State the current direction, not a long history recap. GoalX persists durable run state; the master and subagents resume from current files plus run metadata.
 3. The master may decompose, reorder, and improve, but its plan is not the completion standard. GoalX tracks a run-level `goal-contract.json`; required items can move within the current goal, but the goal is not complete until those required items are done or explicitly waived by the user.
-4. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
-5. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
-6. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
+4. The master should actively use available parallel capacity. If one session is blocked and other independent required work remains, it should rebalance or start another session instead of waiting.
+5. Subagents should report blockers concisely through the journal: what scope they own, what blocks them, what they depend on, and the next smallest useful split.
+6. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
+7. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
+8. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
 
 ## Quick Start
 
@@ -41,7 +43,7 @@ Options only when the user wants control:
 - `--name NAME` — custom run name
 For explicit control over config: `goalx init "goal" → edit .goalx/goalx.yaml → goalx start`
 
-Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live under `<project>/.goalx/runs/...` after `goalx save`. Runs maintain both `goal-contract.json` and acceptance state so completion is tied to required goal items, not just the master's current plan. GoalX also adds `.goalx/` to `.git/info/exclude` for local repos so saved run state does not get staged by default.
+Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live under `<project>/.goalx/runs/...` after `goalx save`. Runs maintain both `goal-contract.json` and acceptance state so completion is tied to required goal items, not just the master's current plan. Journals can also carry blocker/dependency hints so the master can rebalance work without rereading long context. GoalX also adds `.goalx/` to `.git/info/exclude` for local repos so saved run state does not get staged by default.
 
 ## Scenario Guide
 - Research, investigate, audit: `goalx auto "goal"`
@@ -76,7 +78,7 @@ Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live unde
 
 ## Observe and React
 - Healthy: summarize progress, wait.
-- Stuck 2+ heartbeats: redirect the master.
+- Stuck 2+ heartbeats: redirect the master; it should rebalance required work instead of just waiting on one session.
 - Wrong direction: steer the master, not subagents.
 - Need an explicit acceptance check: run `goalx verify` before treating the run as done.
 - Complete: `goalx save` then `goalx result` to review. Saved reports are indexed through `artifacts.json`.

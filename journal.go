@@ -11,11 +11,17 @@ import (
 // JournalEntry is a single line in a subagent or master journal.
 type JournalEntry struct {
 	// Subagent fields
-	Round      int    `json:"round,omitempty"`
-	Commit     string `json:"commit,omitempty"`
-	Desc       string `json:"desc,omitempty"`
-	Confidence string `json:"confidence,omitempty"`
-	Status     string `json:"status,omitempty"`
+	Round         int      `json:"round,omitempty"`
+	Commit        string   `json:"commit,omitempty"`
+	Desc          string   `json:"desc,omitempty"`
+	Confidence    string   `json:"confidence,omitempty"`
+	Status        string   `json:"status,omitempty"`
+	Quality       string   `json:"quality,omitempty"`
+	OwnerScope    string   `json:"owner_scope,omitempty"`
+	BlockedBy     string   `json:"blocked_by,omitempty"`
+	DependsOn     []string `json:"depends_on,omitempty"`
+	CanSplit      bool     `json:"can_split,omitempty"`
+	SuggestedNext string   `json:"suggested_next,omitempty"`
 
 	// Master fields
 	Ts       string `json:"ts,omitempty"`
@@ -60,6 +66,9 @@ func Summary(entries []JournalEntry) string {
 	}
 	last := entries[len(entries)-1]
 	if last.Round > 0 {
+		if last.Status == "stuck" && last.BlockedBy != "" {
+			return fmt.Sprintf("round %d: %s (stuck: %s)", last.Round, last.Desc, last.BlockedBy)
+		}
 		return fmt.Sprintf("round %d: %s (%s)", last.Round, last.Desc, last.Status)
 	}
 	if last.Action != "" {

@@ -222,9 +222,15 @@ func TestRenderSubagentProtocolIncludesQualityJournalAndSelfCheck(t *testing.T) 
 	text := string(out)
 	for _, want := range []string{
 		`"quality":"A|B|C"`,
+		`"owner_scope":"..."`,
+		`"blocked_by":"..."`,
+		`"depends_on":["session-2"]`,
+		`"can_split":true`,
+		`"suggested_next":"..."`,
 		"A=strong evidence+tested counter-evidence+actionable",
 		"B=reasonable but gaps remain",
 		"C=preliminary flag for deepening",
+		"If you are blocked, append a `status:\"stuck\"` entry with the blocker, dependency, ownership scope, and the next smallest useful split the master could dispatch.",
 		"## Self-Check",
 		"Did I cover the full assigned scope and nothing extra?",
 		"Did I verify counter-evidence or alternative explanations where applicable?",
@@ -360,8 +366,12 @@ func TestRenderMasterProtocolIncludesGoalContractChecklistInstructions(t *testin
 		"structure",
 		"/tmp/acceptance.md",
 		"goalx add --run demo",
-		"strategist and referee",
+		"dispatcher and referee",
 		"check evidence density, counter-evidence presence, and actionability of findings",
+		"If any required item is uncovered, that is a scheduling bug.",
+		"If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.",
+		"If a required item stays stuck, reassign it, split it, or take it over yourself.",
+		"Do not wait on one session if other independent required work can proceed.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -530,6 +540,9 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Only reread older journal history when the current state is ambiguous",
 		"You may reorder, delegate, or temporarily postpone required work within the current goal",
 		"you may not declare the goal complete while any required item remains unfinished, blocked, or merely scheduled for later",
+		"If any required item is uncovered, that is a scheduling bug.",
+		"If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.",
+		"Do not wait on one session if other independent required work can proceed.",
 		"Improvement backlog",
 	} {
 		if !strings.Contains(text, want) {
