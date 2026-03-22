@@ -419,6 +419,162 @@ harness:
 	}
 }
 
+func TestLoadConfigProjectDefaultsOverrideUserDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+	userCfg := []byte(strings.TrimSpace(`
+defaults:
+  engine: claude-code
+  model: opus
+  parallel: 2
+  master:
+    engine: claude-code
+    model: opus
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+
+	projectRoot := t.TempDir()
+	projectGoalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(projectGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte(strings.TrimSpace(`
+defaults:
+  engine: codex
+  model: fast
+  parallel: 4
+  master:
+    engine: codex
+    model: fast
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	runCfg := []byte(strings.TrimSpace(`
+name: demo
+mode: develop
+objective: ship it
+target:
+  files: [README.md]
+harness:
+  command: go test ./...
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+
+	cfg, _, err := LoadConfig(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Engine != "codex" || cfg.Model != "fast" {
+		t.Fatalf("develop engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+	}
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "fast" {
+		t.Fatalf("master engine/model = %s/%s, want codex/fast", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Parallel != 4 {
+		t.Fatalf("parallel = %d, want 4", cfg.Parallel)
+	}
+}
+
+func TestLoadConfigProjectEnvelopeOverridesUserEnvelope(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	origPresets := clonePresetMap(Presets)
+	origStrategies := cloneStringMap(BuiltinStrategies)
+	defer func() {
+		Presets = origPresets
+		BuiltinStrategies = origStrategies
+	}()
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+	userCfg := []byte(strings.TrimSpace(`
+engines:
+  codex:
+    command: "codex --user {model_id}"
+    prompt: "Read {protocol}"
+    models:
+      fast: user-fast
+presets:
+  project-dev:
+    master: {engine: claude-code, model: opus}
+    develop: {engine: claude-code, model: sonnet}
+strategies:
+  architecture: "user architecture strategy"
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+
+	projectRoot := t.TempDir()
+	projectGoalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(projectGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte(strings.TrimSpace(`
+engines:
+  codex:
+    command: "codex --project {model_id}"
+    prompt: "Read {protocol}"
+    models:
+      fast: project-fast
+presets:
+  project-dev:
+    master: {engine: codex, model: fast}
+    develop: {engine: codex, model: fast}
+strategies:
+  architecture: "project architecture strategy"
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	runCfg := []byte(strings.TrimSpace(`
+name: demo
+mode: develop
+preset: project-dev
+objective: ship it
+target:
+  files: [README.md]
+harness:
+  command: go test ./...
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
+		t.Fatalf("write run config: %v", err)
+	}
+
+	cfg, engines, err := LoadConfig(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "fast" {
+		t.Fatalf("master engine/model = %s/%s, want codex/fast", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Engine != "codex" || cfg.Model != "fast" {
+		t.Fatalf("develop engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+	}
+	if engines["codex"].Command != "codex --project {model_id}" {
+		t.Fatalf("engines[codex].command = %q, want project override", engines["codex"].Command)
+	}
+	if engines["codex"].Models["fast"] != "project-fast" {
+		t.Fatalf("engines[codex].models[fast] = %q, want project-fast", engines["codex"].Models["fast"])
+	}
+	if BuiltinStrategies["architecture"] != "project architecture strategy" {
+		t.Fatalf("BuiltinStrategies[architecture] = %q, want project override", BuiltinStrategies["architecture"])
+	}
+}
+
 func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -662,6 +818,22 @@ func TestLoadYAMLValid(t *testing.T) {
 	if cfg.Name != "test-run" || cfg.Mode != ModeResearch {
 		t.Errorf("cfg = %+v", cfg)
 	}
+}
+
+func clonePresetMap(src map[string]PresetConfig) map[string]PresetConfig {
+	dst := make(map[string]PresetConfig, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
 }
 
 func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {

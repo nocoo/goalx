@@ -226,24 +226,16 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("user config: %w", err)
 	}
-	mergeConfig(&cfg, &userCfg.Defaults)
-	mergePreferencesConfig(&cfg.Preferences, &userCfg.Preferences)
-	// Merge serve config from user level
-	if userCfg.Serve.Bind != "" {
-		cfg.Serve = userCfg.Serve
-	}
-	for k, v := range userCfg.Engines {
-		engines[k] = v
-	}
-	for k, v := range userCfg.Presets {
-		Presets[k] = v
-	}
-	for k, v := range userCfg.Strategies {
-		BuiltinStrategies[k] = v
-	}
+	applyConfigEnvelope(&cfg, &engines, &userCfg)
 
 	// Layer 3: project config
-	projCfg, err := LoadYAML[Config](filepath.Join(projectRoot, ".goalx", "config.yaml"))
+	projectConfigPath := filepath.Join(projectRoot, ".goalx", "config.yaml")
+	projEnvelope, err := LoadYAML[UserConfig](projectConfigPath)
+	if err != nil {
+		return Config{}, nil, fmt.Errorf("project config: %w", err)
+	}
+	applyConfigEnvelope(&cfg, &engines, &projEnvelope)
+	projCfg, err := LoadYAML[Config](projectConfigPath)
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("project config: %w", err)
 	}
@@ -251,6 +243,26 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
 
 	return cfg, engines, nil
+}
+
+func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay *UserConfig) {
+	if cfg == nil || overlay == nil {
+		return
+	}
+	mergeConfig(cfg, &overlay.Defaults)
+	mergePreferencesConfig(&cfg.Preferences, &overlay.Preferences)
+	mergeServeConfig(&cfg.Serve, &overlay.Serve)
+	if engines != nil {
+		for k, v := range overlay.Engines {
+			(*engines)[k] = v
+		}
+	}
+	for k, v := range overlay.Presets {
+		Presets[k] = v
+	}
+	for k, v := range overlay.Strategies {
+		BuiltinStrategies[k] = v
+	}
 }
 
 // LoadRawBaseConfig loads built-in, user, and project config layers without
@@ -683,6 +695,24 @@ func mergePreferencesConfig(base, overlay *PreferencesConfig) {
 	mergePreferencePolicy(&base.Research, overlay.Research)
 	mergePreferencePolicy(&base.Develop, overlay.Develop)
 	mergePreferencePolicy(&base.Simple, overlay.Simple)
+}
+
+func mergeServeConfig(base, overlay *ServeConfig) {
+	if base == nil || overlay == nil {
+		return
+	}
+	if overlay.Bind != "" {
+		base.Bind = overlay.Bind
+	}
+	if overlay.Token != "" {
+		base.Token = overlay.Token
+	}
+	if len(overlay.Workspaces) > 0 {
+		base.Workspaces = overlay.Workspaces
+	}
+	if overlay.NotificationURL != "" {
+		base.NotificationURL = overlay.NotificationURL
+	}
 }
 
 func mergePreferencePolicy(base *PreferencePolicy, overlay PreferencePolicy) {
