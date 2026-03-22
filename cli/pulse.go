@@ -1,6 +1,9 @@
 package cli
 
-import "fmt"
+import (
+	"fmt"
+	"path/filepath"
+)
 
 // Pulse records a durable heartbeat tick, then nudges the master to read control files.
 func Pulse(projectRoot string, args []string) error {
@@ -18,6 +21,13 @@ func Pulse(projectRoot string, args []string) error {
 	}
 	if _, err := RecordHeartbeatTick(rc.RunDir); err != nil {
 		return fmt.Errorf("record heartbeat tick: %w", err)
+	}
+	state, heartbeat, err := RefreshMasterHeartbeatState(rc.RunDir)
+	if err != nil {
+		return fmt.Errorf("refresh heartbeat state: %w", err)
+	}
+	if err := updateStatusWithHeartbeat(filepath.Join(projectRoot, ".goalx", "status.json"), state, heartbeat); err != nil {
+		return fmt.Errorf("update heartbeat status: %w", err)
 	}
 	if !SessionExists(rc.TmuxSession) {
 		return nil

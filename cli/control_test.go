@@ -78,20 +78,111 @@ func TestRecordHeartbeatTickIncrementsSequence(t *testing.T) {
 	}
 }
 
-func TestNudgeSubmitKeyQueuesBusyCodex(t *testing.T) {
+func TestPlanAgentNudgeForBusyCodexStates(t *testing.T) {
 	pane := strings.Join([]string{
+		"• Working (1m 36s • esc to interrupt)",
+		"",
+		"  tab to queue message",
+	}, "\n")
+
+	plan := planAgentNudge("codex", pane)
+	if plan.Keys != masterWakeMessage || plan.SubmitKey != "Tab" || plan.Skip {
+		t.Fatalf("planAgentNudge(codex, absent) = %#v", plan)
+	}
+
+	draftedPane := strings.Join([]string{
 		"• Working (1m 36s • esc to interrupt)",
 		"",
 		"› goalx-hb",
 		"",
 		"  tab to queue message",
 	}, "\n")
-
-	if got := nudgeSubmitKey("codex", pane); got != "Tab" {
-		t.Fatalf("nudgeSubmitKey(codex, busy pane) = %q, want %q", got, "Tab")
+	plan = planAgentNudge("codex", draftedPane)
+	if plan.Keys != "" || plan.SubmitKey != "Tab" || plan.Skip {
+		t.Fatalf("planAgentNudge(codex, drafted) = %#v", plan)
 	}
-	if got := nudgeSubmitKey("claude-code", pane); got != "Enter" {
-		t.Fatalf("nudgeSubmitKey(claude-code, busy pane) = %q, want %q", got, "Enter")
+
+	queuedPane := strings.Join([]string{
+		"• Working (1m 36s • esc to interrupt)",
+		"",
+		"› goalx-hb",
+		"  goalx-hb",
+		"  goalx-hb",
+		"",
+		"  tab to queue message",
+	}, "\n")
+	plan = planAgentNudge("codex", queuedPane)
+	if !plan.Skip {
+		t.Fatalf("planAgentNudge(codex, queued) = %#v, want skip", plan)
+	}
+
+	plan = planAgentNudge("claude-code", draftedPane)
+	if plan.Keys != masterWakeMessage || plan.SubmitKey != "Enter" || plan.Skip {
+		t.Fatalf("planAgentNudge(claude-code, busy pane) = %#v", plan)
+	}
+}
+
+func TestSendAgentNudgeSkipsQueuedBusyCodexWake(t *testing.T) {
+	origCapture := captureAgentPane
+	origSend := sendAgentKeys
+	defer func() {
+		captureAgentPane = origCapture
+		sendAgentKeys = origSend
+	}()
+
+	captureAgentPane = func(target string) (string, error) {
+		return strings.Join([]string{
+			"• Working (5m 59s • esc to interrupt)",
+			"",
+			"› goalx-hb",
+			"  goalx-hb",
+			"  goalx-hb",
+			"",
+			"  tab to queue message",
+		}, "\n"), nil
+	}
+	called := false
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		called = true
+		return nil
+	}
+
+	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
+		t.Fatalf("SendAgentNudge: %v", err)
+	}
+	if called {
+		t.Fatal("SendAgentNudge should skip when wake is already queued")
+	}
+}
+
+func TestSendAgentNudgeSubmitsExistingDraftForBusyCodex(t *testing.T) {
+	origCapture := captureAgentPane
+	origSend := sendAgentKeys
+	defer func() {
+		captureAgentPane = origCapture
+		sendAgentKeys = origSend
+	}()
+
+	captureAgentPane = func(target string) (string, error) {
+		return strings.Join([]string{
+			"• Working (5m 59s • esc to interrupt)",
+			"",
+			"› goalx-hb",
+			"",
+			"  tab to queue message",
+		}, "\n"), nil
+	}
+	var gotKeys, gotSubmit string
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		gotKeys, gotSubmit = keys, submitKey
+		return nil
+	}
+
+	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
+		t.Fatalf("SendAgentNudge: %v", err)
+	}
+	if gotKeys != "" || gotSubmit != "Tab" {
+		t.Fatalf("SendAgentNudge used keys=%q submit=%q, want empty keys + Tab", gotKeys, gotSubmit)
 	}
 }
 
@@ -139,5 +230,72 @@ func TestPulseRecordsHeartbeatAndUsesControlNudge(t *testing.T) {
 	}
 	if gotTarget == "" || gotEngine != "codex" {
 		t.Fatalf("nudge target=%q engine=%q, want codex target", gotTarget, gotEngine)
+	}
+}
+
+func TestPulseTracksHeartbeatLagAndStaleState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	runName := "pulse-lag"
+	runDir := goalx.RunDir(repo, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir project .goalx: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 0; fi\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), []byte("name: pulse-lag\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	if err := EnsureMasterControl(runDir); err != nil {
+		t.Fatalf("EnsureMasterControl: %v", err)
+	}
+
+	orig := sendAgentNudge
+	sendAgentNudge = func(target, engine string) error { return nil }
+	defer func() { sendAgentNudge = orig }()
+
+	for i := 0; i < heartbeatLagStaleThreshold; i++ {
+		if err := Pulse(repo, []string{"--run", runName}); err != nil {
+			t.Fatalf("Pulse #%d: %v", i+1, err)
+		}
+	}
+
+	state, err := LoadMasterState(MasterStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadMasterState: %v", err)
+	}
+	if state.HeartbeatLag != heartbeatLagStaleThreshold {
+		t.Fatalf("heartbeat lag = %d, want %d", state.HeartbeatLag, heartbeatLagStaleThreshold)
+	}
+	if !state.WakePending {
+		t.Fatalf("wake pending = false, want true")
+	}
+	if state.StaleSince == "" {
+		t.Fatalf("stale since empty, want value")
+	}
+
+	statusData, err := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	if err != nil {
+		t.Fatalf("read status.json: %v", err)
+	}
+	statusText := string(statusData)
+	for _, want := range []string{
+		`"heartbeat_lag":3`,
+		`"master_wake_pending":true`,
+		`"master_stale":true`,
+	} {
+		if !strings.Contains(statusText, want) {
+			t.Fatalf("status.json missing %q:\n%s", want, statusText)
+		}
 	}
 }

@@ -23,6 +23,9 @@ type MasterInboxMessage struct {
 type MasterState struct {
 	LastSeenID       int64  `json:"last_seen_id"`
 	LastHeartbeatSeq int64  `json:"last_heartbeat_seq"`
+	HeartbeatLag     int64  `json:"heartbeat_lag,omitempty"`
+	WakePending      bool   `json:"wake_pending,omitempty"`
+	StaleSince       string `json:"stale_since,omitempty"`
 	UpdatedAt        string `json:"updated_at,omitempty"`
 }
 
@@ -32,6 +35,10 @@ type HeartbeatState struct {
 }
 
 var sendAgentNudge = SendAgentNudge
+var captureAgentPane = CapturePaneTargetOutput
+var sendAgentKeys = sendKeysWithSubmit
+
+const heartbeatLagStaleThreshold = 3
 
 func ControlDir(runDir string) string {
 	return filepath.Join(runDir, "control")
@@ -214,16 +221,131 @@ func RecordHeartbeatTick(runDir string) (*HeartbeatState, error) {
 }
 
 func SendAgentNudge(target, engine string) error {
-	pane, err := CapturePaneTargetOutput(target)
+	pane, err := captureAgentPane(target)
 	if err != nil {
 		pane = ""
 	}
-	return sendKeysWithSubmit(target, masterWakeMessage, nudgeSubmitKey(engine, pane))
+	plan := planAgentNudge(engine, pane)
+	if plan.Skip {
+		return nil
+	}
+	return sendAgentKeys(target, plan.Keys, plan.SubmitKey)
 }
 
-func nudgeSubmitKey(engine, pane string) string {
+type agentNudgePlan struct {
+	Keys      string
+	SubmitKey string
+	Skip      bool
+}
+
+func planAgentNudge(engine, pane string) agentNudgePlan {
 	if engine == "codex" && strings.Contains(strings.ToLower(pane), "tab to queue message") {
-		return "Tab"
+		switch detectWakeMessageState(pane) {
+		case wakeMessageDrafted:
+			return agentNudgePlan{SubmitKey: "Tab"}
+		case wakeMessageQueued:
+			return agentNudgePlan{Skip: true}
+		default:
+			return agentNudgePlan{Keys: masterWakeMessage, SubmitKey: "Tab"}
+		}
 	}
-	return "Enter"
+	return agentNudgePlan{Keys: masterWakeMessage, SubmitKey: "Enter"}
+}
+
+type wakeMessageState int
+
+const (
+	wakeMessageAbsent wakeMessageState = iota
+	wakeMessageDrafted
+	wakeMessageQueued
+)
+
+func detectWakeMessageState(pane string) wakeMessageState {
+	lines := strings.Split(pane, "\n")
+	if len(lines) > 20 {
+		lines = lines[len(lines)-20:]
+	}
+	draft := false
+	queuedCount := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.Contains(trimmed, "› "+masterWakeMessage):
+			draft = true
+		case trimmed == masterWakeMessage:
+			queuedCount++
+		}
+	}
+	if queuedCount > 0 {
+		return wakeMessageQueued
+	}
+	if draft {
+		return wakeMessageDrafted
+	}
+	return wakeMessageAbsent
+}
+
+func RefreshMasterHeartbeatState(runDir string) (*MasterState, *HeartbeatState, error) {
+	if err := EnsureMasterControl(runDir); err != nil {
+		return nil, nil, err
+	}
+	heartbeat, err := LoadHeartbeatState(HeartbeatStatePath(runDir))
+	if err != nil {
+		return nil, nil, err
+	}
+	state, err := LoadMasterState(MasterStatePath(runDir))
+	if err != nil {
+		return nil, nil, err
+	}
+	lag := heartbeat.Seq - state.LastHeartbeatSeq
+	if lag < 0 {
+		lag = 0
+	}
+	state.HeartbeatLag = lag
+	state.WakePending = lag > 0
+	now := time.Now().Format(time.RFC3339)
+	if lag >= heartbeatLagStaleThreshold {
+		if state.StaleSince == "" {
+			state.StaleSince = now
+		}
+	} else {
+		state.StaleSince = ""
+	}
+	state.UpdatedAt = now
+	if err := SaveMasterState(MasterStatePath(runDir), state); err != nil {
+		return nil, nil, err
+	}
+	return state, heartbeat, nil
+}
+
+func updateStatusWithHeartbeat(statusPath string, state *MasterState, heartbeat *HeartbeatState) error {
+	if state == nil || heartbeat == nil {
+		return fmt.Errorf("heartbeat status update requires state and heartbeat")
+	}
+
+	payload := map[string]any{}
+	if data, err := os.ReadFile(statusPath); err == nil && len(data) > 0 {
+		if err := json.Unmarshal(data, &payload); err != nil {
+			return fmt.Errorf("parse status %s: %w", statusPath, err)
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	payload["heartbeat_seq"] = heartbeat.Seq
+	payload["heartbeat_lag"] = state.HeartbeatLag
+	payload["master_wake_pending"] = state.WakePending
+	payload["master_stale"] = state.StaleSince != ""
+	if state.StaleSince != "" {
+		payload["master_stale_since"] = state.StaleSince
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(statusPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(statusPath, data, 0o644)
 }
