@@ -9,6 +9,7 @@ Use the manual path when the user wants to inspect or edit config before launch:
 ```bash
 goalx init "goal"
 # edit .goalx/goalx.yaml if requested
+# active runs use immutable run-spec.yaml snapshots; redirect them with `goalx tell`, `goalx add`, `goalx park`, or `goalx resume` instead of editing run files
 goalx start
 ```
 

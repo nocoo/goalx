@@ -112,9 +112,12 @@ Use `goalx init` + `goalx start`, direct config edits, or manual session control
 ## Runtime vs Saved State
 
 - Active runtime state lives under `~/.goalx/runs/{projectID}/{run}`.
+- Each active run now has an immutable `run-spec.yaml` plus mutable `state/run.json`, `state/sessions.json`, and `control/*`.
+- Project-level `.goalx/runs.json` tracks active and saved runs for that repo.
 - Durable project artifacts live under `<project>/.goalx/runs/{run}` after `goalx save`.
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, and `implement`.
 - GoalX bootstraps `.goalx/` into `.git/info/exclude` for local repos so project-scoped run state stays out of git by default.
+- When a project has multiple active runs, pass `--run NAME` explicitly for mutating commands.
 
 ## Goal Dimensions
 
@@ -204,7 +207,7 @@ goalx serve    # starts on configured bind address
 
 Common endpoints:
 - `GET /projects` — list all configured workspaces
-- `GET /runs` — list active runs across all configured workspaces
+- `GET /runs` — list runtime runs across all configured workspaces
 - `POST /workspaces` — add project directory (auto git-init if needed)
 - `POST /projects/:name/goalx/auto` — start one master-led run from an objective
 - `POST /projects/:name/goalx/start` — start from existing config, or init+start when an objective is provided
@@ -213,7 +216,7 @@ Common endpoints:
 - `POST /projects/:name/goalx/add` — add a session to a running run
 - `POST /projects/:name/goalx/keep|park|resume|save|stop|drop` — control a specific run or session
 - `POST /projects/:name/goalx/tell` — send instructions to the master
-- `POST /projects/:name/goalx/config` — read or modify project-level or run-scoped config
+- `POST /projects/:name/goalx/config` — read project config or read an active run's immutable run spec
 
 The HTTP server accepts the same action names as the local CLI for the supported routes above; see [cli/serve.go](cli/serve.go) if you need the exact request mapping.
 

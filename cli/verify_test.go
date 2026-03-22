@@ -35,7 +35,7 @@ harness:
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -122,7 +122,7 @@ target:
 harness:
   command: "test -f DOES-NOT-EXIST"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -192,7 +192,7 @@ objective: ship feature
 harness:
   command: "printf 'baseline gate\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -220,7 +220,7 @@ harness:
 		t.Fatalf("write run metadata: %v", err)
 	}
 	state := &AcceptanceState{
-		Version:        1,
+		Version:         1,
 		BaselineCommand: "printf 'baseline gate\\n'",
 		BaselineSource:  "harness",
 		Command:         "printf 'narrow gate\\n'",
@@ -263,7 +263,7 @@ objective: ship feature
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{

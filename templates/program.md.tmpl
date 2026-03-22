@@ -9,6 +9,8 @@
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Guidance: `{{.GuidancePath}}` — latest assignment and direction changes
 {{if .GuidanceStatePath}}- Guidance state: `{{.GuidanceStatePath}}` — durable ack for the latest guidance version{{end}}
+{{if .RunStatePath}}- Run runtime state: `{{.RunStatePath}}`{{end}}
+{{if .SessionsStatePath}}- Session runtime state: `{{.SessionsStatePath}}`{{end}}
 - Objective: {{.Objective}}
 {{if .Harness.Command}}- Gate: `{{.Harness.Command}}`{{end}}
 

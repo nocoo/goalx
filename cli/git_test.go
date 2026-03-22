@@ -197,7 +197,7 @@ func TestDropRemovesRunDirectoryAndBranch(t *testing.T) {
 		}
 	}
 	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nharness:\n  command: \"test -f base.txt\"\n")
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
@@ -241,7 +241,7 @@ func TestDropRefusesUnsavedRunWithArtifacts(t *testing.T) {
 		}
 	}
 	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nharness:\n  command: \"test -f base.txt\"\n")
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if _, err := EnsureArtifactsManifest(runDir); err != nil {

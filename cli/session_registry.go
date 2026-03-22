@@ -4,43 +4,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
-	"strconv"
+	"strings"
 )
 
-var sessionJournalPattern = regexp.MustCompile(`^session-(\d+)\.jsonl$`)
-
 func existingSessionIndexes(runDir string) ([]int, error) {
-	entries, err := os.ReadDir(filepath.Join(runDir, "journals"))
+	state, err := EnsureSessionsRuntimeState(runDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read session journals: %w", err)
+		return nil, fmt.Errorf("read session runtime state: %w", err)
 	}
 
-	seen := make(map[int]struct{}, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	indexes := make([]int, 0, len(state.Sessions))
+	for name := range state.Sessions {
+		idx, err := parseSessionIndex(name)
+		if err == nil && idx > 0 {
+			indexes = append(indexes, idx)
 		}
-		m := sessionJournalPattern.FindStringSubmatch(entry.Name())
-		if len(m) != 2 {
-			continue
-		}
-		idx, err := strconv.Atoi(m[1])
-		if err != nil || idx <= 0 {
-			continue
-		}
-		seen[idx] = struct{}{}
 	}
-
-	indexes := make([]int, 0, len(seen))
-	for idx := range seen {
-		indexes = append(indexes, idx)
-	}
+	indexes = append(indexes, discoverSessionIndexesFromFS(runDir)...)
 	slices.Sort(indexes)
+	indexes = slices.Compact(indexes)
 	return indexes, nil
 }
 
@@ -61,4 +44,38 @@ func hasSessionIndex(runDir string, idx int) (bool, error) {
 		return false, err
 	}
 	return slices.Contains(indexes, idx), nil
+}
+
+func discoverSessionIndexesFromFS(runDir string) []int {
+	var indexes []int
+	appendFromDir := func(dir string, transform func(string) string) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		for _, entry := range entries {
+			name := transform(entry.Name())
+			idx, err := parseSessionIndex(name)
+			if err == nil && idx > 0 {
+				indexes = append(indexes, idx)
+			}
+		}
+	}
+
+	appendFromDir(filepath.Join(runDir, "journals"), func(name string) string {
+		return strings.TrimSuffix(name, ".jsonl")
+	})
+	appendFromDir(filepath.Join(runDir, "guidance"), func(name string) string {
+		return strings.TrimSuffix(name, ".md")
+	})
+	appendFromDir(ControlDir(runDir), func(name string) string {
+		return strings.TrimSuffix(name, "-guidance.json")
+	})
+	appendFromDir(filepath.Join(runDir, "worktrees"), func(name string) string {
+		if i := strings.LastIndex(name, "-"); i >= 0 {
+			return "session-" + name[i+1:]
+		}
+		return name
+	})
+	return indexes
 }

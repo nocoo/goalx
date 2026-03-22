@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -16,27 +15,21 @@ type RunContext struct {
 	Config      *goalx.Config
 }
 
-// ResolveRun resolves run context. If runName is empty, reads goalx.yaml from
-// projectRoot to get the name.
+// ResolveRun resolves run context. If runName is empty, it resolves the
+// focused/only active run from the project registry.
 func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 	if runName == "" {
-		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+		var err error
+		runName, err = ResolveDefaultRunName(projectRoot)
 		if err != nil {
-			return nil, fmt.Errorf("load goalx.yaml: %w", err)
+			return nil, err
 		}
-		if cfg.Name == "" {
-			return nil, fmt.Errorf("no run name: set name in goalx.yaml or pass --name")
-		}
-		runName = cfg.Name
 	}
 
 	runDir := goalx.RunDir(projectRoot, runName)
-	snapshot, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	snapshot, err := LoadRunSpec(runDir)
 	if err != nil {
-		return nil, fmt.Errorf("load run snapshot: %w", err)
-	}
-	if snapshot.Name == "" {
-		return nil, fmt.Errorf("run %q not found (no snapshot at %s)", runName, runDir)
+		return nil, fmt.Errorf("load run spec: %w", err)
 	}
 
 	return &RunContext{
@@ -44,6 +37,6 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 		RunDir:      runDir,
 		TmuxSession: goalx.TmuxSessionName(projectRoot, runName),
 		ProjectRoot: projectRoot,
-		Config:      &snapshot,
+		Config:      snapshot,
 	}, nil
 }

@@ -32,6 +32,9 @@ type ProtocolData struct {
 	GoalContractPath    string
 	AcceptancePath      string
 	AcceptanceStatePath string
+	RunStatePath        string
+	SessionsStatePath   string
+	ProjectRegistryPath string
 	RunMetadataPath     string
 	CompletionStatePath string
 	CoordinationPath    string

@@ -101,7 +101,7 @@ func TestReviewUsesManifestDeclaredReportInMixedModeRun(t *testing.T) {
 	projectRoot, wtPath := seedReviewResearchRun(t, []string{"missing.md"})
 	runDir := goalx.RunDir(projectRoot, "demo")
 
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	cfg, err := goalx.LoadYAML[goalx.Config](RunSpecPath(runDir))
 	if err != nil {
 		t.Fatalf("load run config: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestReviewUsesManifestDeclaredReportInMixedModeRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run config: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func seedReviewResearchRun(t *testing.T, targetFiles []string) (string, string) 
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {

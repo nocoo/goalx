@@ -62,6 +62,14 @@ func AckGuidance(projectRoot string, args []string) error {
 	if err := AckSessionGuidance(rc.RunDir, sessionName); err != nil {
 		return err
 	}
+	if guidance, err := LoadSessionGuidanceState(SessionGuidanceStatePath(rc.RunDir, sessionName)); err == nil && guidance != nil {
+		_ = UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
+			Name:            sessionName,
+			GuidanceVersion: guidance.Version,
+			GuidancePending: guidance.Pending,
+			LastAckVersion:  guidance.LastAckVersion,
+		})
+	}
 	fmt.Printf("Acknowledged guidance for %s in run '%s'\n", sessionName, rc.Name)
 	return nil
 }
@@ -118,6 +126,14 @@ func deliverTell(projectRoot, runName, target, message string, nudge func(target
 	}
 	if err := WriteSessionGuidance(rc.RunDir, target, message); err != nil {
 		return "", "", err
+	}
+	if guidance, err := LoadSessionGuidanceState(SessionGuidanceStatePath(rc.RunDir, target)); err == nil && guidance != nil {
+		_ = UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
+			Name:            target,
+			GuidanceVersion: guidance.Version,
+			GuidancePending: guidance.Pending,
+			LastAckVersion:  guidance.LastAckVersion,
+		})
 	}
 	windowName, err := resolveWindowName(rc.Name, target)
 	if err != nil {

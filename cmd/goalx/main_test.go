@@ -45,7 +45,7 @@ func TestMainSupportsResultCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(runDir, "run-spec.yaml"), data, 0o644); err != nil {
 		t.Fatalf("write goalx.yaml: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary from result\n"), 0o644); err != nil {

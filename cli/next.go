@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	goalx "github.com/vonbai/goalx"
@@ -14,22 +15,37 @@ func Next(projectRoot string, _ []string) error {
 	home, _ := os.UserHomeDir()
 	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
 	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
+	reg, _ := LoadProjectRegistry(projectRoot)
 
 	// Check for active runs
-	activeRun := findActiveRun(projectRoot, runsDir)
-	if activeRun != "" {
-		fmt.Printf("Active run: %s\n", activeRun)
-		fmt.Printf("  → goalx attach %s\n", activeRun)
+	activeRuns := findActiveRuns(reg, projectRoot, runsDir)
+	if len(activeRuns) == 1 {
+		fmt.Printf("Active run: %s\n", activeRuns[0])
+		fmt.Printf("  → goalx attach --run %s\n", activeRuns[0])
+		return nil
+	}
+	if len(activeRuns) > 1 {
+		fmt.Printf("Active runs: %s\n", strings.Join(activeRuns, ", "))
+		fmt.Println("  → goalx list")
+		fmt.Println("  → goalx attach --run NAME")
 		return nil
 	}
 
 	// Check for completed (not yet saved) runs
-	completedRun := findCompletedRun(projectRoot, runsDir)
-	if completedRun != "" {
+	completedRuns := findCompletedRuns(reg, projectRoot, runsDir)
+	if len(completedRuns) == 1 {
+		completedRun := completedRuns[0]
 		fmt.Printf("Completed run: %s (not yet saved)\n", completedRun)
 		fmt.Printf("  → goalx save %s    # save artifacts to .goalx/runs/\n", completedRun)
 		fmt.Printf("  → goalx review %s  # inspect results\n", completedRun)
 		fmt.Printf("  → goalx drop %s    # clean up worktrees\n", completedRun)
+		return nil
+	}
+	if len(completedRuns) > 1 {
+		fmt.Printf("Completed unsaved runs: %s\n", strings.Join(completedRuns, ", "))
+		fmt.Println("  → goalx save NAME")
+		fmt.Println("  → goalx review --run NAME")
+		fmt.Println("  → goalx drop --run NAME")
 		return nil
 	}
 
@@ -46,7 +62,7 @@ func Next(projectRoot string, _ []string) error {
 			}
 			hasSaves = true
 			dir := filepath.Join(savesDir, e.Name())
-			cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(dir, "goalx.yaml"))
+			cfg, err := LoadSavedRunSpec(dir)
 			if err != nil {
 				continue
 			}
@@ -94,38 +110,55 @@ func Next(projectRoot string, _ []string) error {
 	return nil
 }
 
-func findActiveRun(projectRoot, runsDir string) string {
+func findActiveRuns(reg *ProjectRegistry, projectRoot, runsDir string) []string {
+	if reg != nil && len(reg.ActiveRuns) > 0 {
+		return sortedRunNames(reg.ActiveRuns)
+	}
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
-		return ""
+		return nil
 	}
+	var active []string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
 		if SessionExists(tmuxSess) {
-			return e.Name()
+			active = append(active, e.Name())
 		}
 	}
-	return ""
+	sort.Strings(active)
+	return active
 }
 
-func findCompletedRun(projectRoot, runsDir string) string {
+func findCompletedRuns(reg *ProjectRegistry, projectRoot, runsDir string) []string {
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
-		return ""
+		return nil
 	}
+	active := map[string]struct{}{}
+	if reg != nil {
+		for name := range reg.ActiveRuns {
+			active[name] = struct{}{}
+		}
+	}
+	var completed []string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
+		name := e.Name()
+		if _, ok := active[name]; ok {
+			continue
+		}
+		tmuxSess := goalx.TmuxSessionName(projectRoot, name)
 		if !SessionExists(tmuxSess) {
-			return e.Name()
+			completed = append(completed, name)
 		}
 	}
-	return ""
+	sort.Strings(completed)
+	return completed
 }
 
 func containsAny(s string, substrs ...string) bool {

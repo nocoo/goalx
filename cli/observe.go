@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
-
-	goalx "github.com/vonbai/goalx"
 )
 
 // Observe captures live tmux pane output for all windows in a run.
@@ -32,6 +29,9 @@ func Observe(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := syncRunStateFromProjectStatus(projectRoot, rc.RunDir); err != nil {
+		return fmt.Errorf("sync run state from status cache: %w", err)
+	}
 
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
@@ -39,8 +39,8 @@ func Observe(projectRoot string, args []string) error {
 
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
 
-	// Show status.json summary if available
-	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	// Show run runtime summary if available
+	statusPath := RunRuntimeStatePath(rc.RunDir)
 	if data, err := os.ReadFile(statusPath); err == nil && len(data) > 0 {
 		fmt.Println("### Status (from master)")
 		fmt.Println(strings.TrimSpace(string(data)))
@@ -120,27 +120,9 @@ func printPaneCapture(tmuxSession, window string) {
 // findSingleActiveRun finds the only active run for this project.
 // Returns error if zero or multiple active runs.
 func findSingleActiveRun(projectRoot string) (*RunContext, error) {
-	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
-	entries, err := os.ReadDir(runsDir)
+	runName, err := ResolveDefaultRunName(projectRoot)
 	if err != nil {
-		return nil, fmt.Errorf("no runs found")
+		return nil, err
 	}
-	var active []string
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
-		if SessionExists(tmuxSess) {
-			active = append(active, e.Name())
-		}
-	}
-	if len(active) == 0 {
-		return nil, fmt.Errorf("no active runs found")
-	}
-	if len(active) > 1 {
-		return nil, fmt.Errorf("multiple active runs: %s (specify one)", strings.Join(active, ", "))
-	}
-	return ResolveRun(projectRoot, active[0])
+	return ResolveRun(projectRoot, runName)
 }

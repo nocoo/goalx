@@ -211,7 +211,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write goalx.yaml: %v", err)
 	}
 	if err := os.WriteFile(JournalPath(runDir, "session-1"), nil, 0o644); err != nil {

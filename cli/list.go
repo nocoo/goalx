@@ -25,20 +25,24 @@ func List(projectRoot string, _ []string) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "NAME\tMODE\tSTATUS\tSESSIONS\tCREATED")
+	reg, _ := LoadProjectRegistry(projectRoot)
 
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		name := e.Name()
-		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runsDir, name, "goalx.yaml"))
+		cfg, err := LoadRunSpec(filepath.Join(runsDir, name))
 		if err != nil {
 			continue
 		}
 
 		status := "completed"
-		tmuxSess := goalx.TmuxSessionName(projectRoot, name)
-		if SessionExists(tmuxSess) {
+		if reg != nil {
+			if _, ok := reg.ActiveRuns[name]; ok {
+				status = "active"
+			}
+		} else if SessionExists(goalx.TmuxSessionName(projectRoot, name)) {
 			status = "active"
 		}
 

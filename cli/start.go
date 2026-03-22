@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	goalx "github.com/vonbai/goalx"
-	"gopkg.in/yaml.v3"
 )
 
 // Start executes the full goalx start workflow.
@@ -88,16 +87,9 @@ func Start(projectRoot string, args []string) (err error) {
 		return fmt.Errorf("bootstrap .goalx ignore: %w", err)
 	}
 
-	// Clear stale status.json from previous runs
-	os.Remove(filepath.Join(projectRoot, ".goalx", "status.json"))
-
-	// 8. Snapshot config (YAML for consistency with input format)
-	cfgYAML, err := yaml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("marshal config snapshot: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), cfgYAML, 0644); err != nil {
-		return fmt.Errorf("write run snapshot: %w", err)
+	// 8. Persist immutable run spec
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		return fmt.Errorf("write run spec: %w", err)
 	}
 
 	// 9. Resolve master engine command
@@ -138,6 +130,9 @@ func Start(projectRoot string, args []string) (err error) {
 		GoalContractPath:    goalContractPath,
 		AcceptancePath:      acceptancePath,
 		AcceptanceStatePath: acceptanceStatePath,
+		RunStatePath:        RunRuntimeStatePath(runDir),
+		SessionsStatePath:   SessionsRuntimeStatePath(runDir),
+		ProjectRegistryPath: ProjectRegistryPath(projectRoot),
 		RunMetadataPath:     RunMetadataPath(runDir),
 		CompletionStatePath: CompletionStatePath(runDir),
 		CoordinationPath:    CoordinationPath(runDir),
@@ -176,6 +171,19 @@ func Start(projectRoot string, args []string) (err error) {
 	}
 	if err := EnsureMasterControl(runDir); err != nil {
 		return fmt.Errorf("init master control: %w", err)
+	}
+	runState, err := EnsureRuntimeState(runDir, cfg)
+	if err != nil {
+		return fmt.Errorf("init runtime state: %w", err)
+	}
+	if _, err := EnsureSessionsRuntimeState(runDir); err != nil {
+		return fmt.Errorf("init session runtime state: %w", err)
+	}
+	if err := RegisterActiveRun(projectRoot, cfg); err != nil {
+		return fmt.Errorf("register active run: %w", err)
+	}
+	if err := syncProjectStatusCache(projectRoot, runState); err != nil {
+		return fmt.Errorf("init project status cache: %w", err)
 	}
 
 	// 13. Create tmux session (first window = "master")

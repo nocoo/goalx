@@ -121,6 +121,12 @@ func parseStatusArgs(args []string) (runName, sessionName string, err error) {
 	if err != nil {
 		return "", "", err
 	}
+	if runName != "" && isHelpToken(runName) {
+		return "", "", fmt.Errorf("usage: goalx status [NAME] [session-N]")
+	}
+	if len(rest) > 0 && isHelpToken(rest[0]) {
+		return "", "", fmt.Errorf("usage: goalx status [NAME] [session-N]")
+	}
 	// Allow positional run name: "goalx status myrun" without --run flag
 	if runName == "" && len(rest) >= 1 {
 		runName = rest[0]

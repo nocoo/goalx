@@ -35,6 +35,9 @@ func Save(projectRoot string, args []string) error {
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
 		return fmt.Errorf("create save dir: %w", err)
 	}
+	if err := syncRunStateFromProjectStatus(projectRoot, rc.RunDir); err != nil {
+		return fmt.Errorf("sync run state from status cache: %w", err)
+	}
 	manifest, err := EnsureRunArtifacts(rc.RunDir, rc.Config)
 	if err != nil {
 		return fmt.Errorf("ensure run artifacts: %w", err)
@@ -46,10 +49,15 @@ func Save(projectRoot string, args []string) error {
 		return fmt.Errorf("copy summary: %w", err)
 	}
 
-	// Copy config snapshot
-	cfgPath := filepath.Join(rc.RunDir, "goalx.yaml")
-	if err := copyFileIfExists(cfgPath, filepath.Join(saveDir, "goalx.yaml")); err != nil {
-		return fmt.Errorf("copy config: %w", err)
+	// Copy immutable run spec + runtime state.
+	if err := copyFileIfExists(RunSpecPath(rc.RunDir), filepath.Join(saveDir, "run-spec.yaml")); err != nil {
+		return fmt.Errorf("copy run spec: %w", err)
+	}
+	if err := copyFileIfExists(RunRuntimeStatePath(rc.RunDir), filepath.Join(saveDir, "run.json")); err != nil {
+		return fmt.Errorf("copy run state: %w", err)
+	}
+	if err := copyFileIfExists(SessionsRuntimeStatePath(rc.RunDir), filepath.Join(saveDir, "sessions.json")); err != nil {
+		return fmt.Errorf("copy session state: %w", err)
 	}
 
 	// Copy acceptance checklist
@@ -84,22 +92,68 @@ func Save(projectRoot string, args []string) error {
 	}
 
 	// Copy session artifacts + journals
-	sessions := goalx.ExpandSessions(rc.Config)
-	for i := range sessions {
-		num := i + 1
-		sName := SessionName(num)
-		if artifact := FindSessionArtifact(manifest, sName, "report"); artifact != nil && artifact.Path != "" {
-			destName := artifact.DurableName
+	sessionState, err := EnsureSessionsRuntimeState(rc.RunDir)
+	if err != nil {
+		return fmt.Errorf("load session runtime state: %w", err)
+	}
+	sessionList := sortedSessionStates(sessionState)
+	if len(sessionList) == 0 {
+		indexes, err := existingSessionIndexes(rc.RunDir)
+		if err != nil {
+			return err
+		}
+		for _, num := range indexes {
+			effective := goalx.EffectiveSessionConfig(rc.Config, num-1)
+			sessionList = append(sessionList, SessionRuntimeState{
+				Name:         SessionName(num),
+				Mode:         string(effective.Mode),
+				WorktreePath: WorktreePath(rc.RunDir, rc.Config.Name, num),
+			})
+		}
+	}
+	for _, sess := range sessionList {
+		sName := sess.Name
+		sessionMode := sess.Mode
+		targetFiles := []string(nil)
+		if sessionMode == "" {
+			if num, parseErr := parseSessionNumber(sName); parseErr == nil {
+				effective := goalx.EffectiveSessionConfig(rc.Config, num-1)
+				sessionMode = string(effective.Mode)
+				if effective.Target != nil {
+					targetFiles = append(targetFiles, effective.Target.Files...)
+				}
+			}
+		}
+		reportSource := ""
+		artifact := FindSessionArtifact(manifest, sName, "report")
+		if artifact != nil && artifact.Path != "" {
+			reportSource = artifact.Path
+		} else {
+			worktreePath := sess.WorktreePath
+			if worktreePath == "" {
+				if num, parseErr := parseSessionNumber(sName); parseErr == nil {
+					worktreePath = WorktreePath(rc.RunDir, rc.Config.Name, num)
+				}
+			}
+			if worktreePath != "" {
+				reportSource = findSessionReport(worktreePath, targetFiles)
+			}
+		}
+		if reportSource != "" {
+			destName := ""
+			if artifact != nil {
+				destName = artifact.DurableName
+			}
 			if destName == "" {
 				destName = fmt.Sprintf("%s-report.md", sName)
 			}
 			destPath := filepath.Join(saveDir, destName)
-			if err := copyFileIfExists(artifact.Path, destPath); err != nil {
+			if err := copyFileIfExists(reportSource, destPath); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: could not copy %s report: %v\n", sName, err)
 			} else {
-				sessionState := ensureSessionArtifactsEntry(savedManifest, sName, string(goalx.EffectiveSessionConfig(rc.Config, i).Mode))
-				upsertArtifact(sessionState, ArtifactMeta{
-					Kind:        artifact.Kind,
+				savedSession := ensureSessionArtifactsEntry(savedManifest, sName, sessionMode)
+				upsertArtifact(savedSession, ArtifactMeta{
+					Kind:        "report",
 					Path:        destPath,
 					RelPath:     destName,
 					DurableName: destName,
@@ -108,7 +162,7 @@ func Save(projectRoot string, args []string) error {
 		}
 
 		jPath := JournalPath(rc.RunDir, sName)
-		jDest := fmt.Sprintf("session-%d.jsonl", num)
+		jDest := fmt.Sprintf("%s.jsonl", sName)
 		if err := copyFileIfExists(jPath, filepath.Join(saveDir, jDest)); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not copy %s journal: %v\n", sName, err)
 		}
@@ -120,9 +174,20 @@ func Save(projectRoot string, args []string) error {
 	// Copy master journal
 	masterJPath := filepath.Join(rc.RunDir, "master.jsonl")
 	copyFileIfExists(masterJPath, filepath.Join(saveDir, "master.jsonl"))
+	if err := RegisterSavedRun(projectRoot, rc.Config); err != nil {
+		return fmt.Errorf("register saved run: %w", err)
+	}
 
 	fmt.Printf("Saved run '%s' to %s\n", rc.Name, saveDir)
 	return nil
+}
+
+func parseSessionNumber(name string) (int, error) {
+	var num int
+	if _, err := fmt.Sscanf(name, "session-%d", &num); err != nil {
+		return 0, fmt.Errorf("parse session number from %q: %w", name, err)
+	}
+	return num, nil
 }
 
 // findSessionReport locates the report file in a worktree.

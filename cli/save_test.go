@@ -34,7 +34,7 @@ func TestSaveUsesConfiguredResearchTargetFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 
@@ -88,7 +88,7 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestSaveCopiesGoalContractState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := `{"version":1,"objective":"ship feature","items":[{"id":"req-1","kind":"user_required","requirement":"ship feature","status":"done"}]}`

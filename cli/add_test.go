@@ -50,7 +50,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	for _, name := range []string{"session-1.jsonl", "session-2.jsonl"} {
@@ -63,18 +63,23 @@ harness:
 		t.Fatalf("Add: %v", err)
 	}
 
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	cfg, err := LoadRunSpec(runDir)
 	if err != nil {
-		t.Fatalf("load updated snapshot: %v", err)
+		t.Fatalf("load run spec: %v", err)
 	}
-	if len(cfg.Sessions) != 3 {
-		t.Fatalf("len(Sessions) = %d, want 3", len(cfg.Sessions))
+	if len(cfg.Sessions) != 2 {
+		t.Fatalf("len(Sessions) = %d, want immutable 2", len(cfg.Sessions))
 	}
-	if cfg.Sessions[2].Hint != "third direction" {
-		t.Fatalf("Sessions[2].Hint = %q, want %q", cfg.Sessions[2].Hint, "third direction")
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("load sessions runtime state: %v", err)
 	}
-	if cfg.Parallel != 1 {
-		t.Fatalf("Parallel = %d, want 1 for explicit sessions config", cfg.Parallel)
+	sess, ok := state.Sessions["session-3"]
+	if !ok {
+		t.Fatalf("runtime state missing session-3: %#v", state.Sessions)
+	}
+	if sess.OwnerScope != "third direction" {
+		t.Fatalf("session-3 owner scope = %q, want %q", sess.OwnerScope, "third direction")
 	}
 }
 
@@ -118,7 +123,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
@@ -129,16 +134,17 @@ harness:
 		t.Fatalf("Add: %v", err)
 	}
 
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
-	if err != nil {
-		t.Fatalf("load updated snapshot: %v", err)
-	}
-	if len(cfg.Sessions) != 2 {
-		t.Fatalf("len(Sessions) = %d, want 2", len(cfg.Sessions))
-	}
 	want := goalx.BuiltinStrategies["adversarial"]
-	if cfg.Sessions[1].Hint != want {
-		t.Fatalf("Sessions[1].Hint = %q, want %q", cfg.Sessions[1].Hint, want)
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("load sessions runtime state: %v", err)
+	}
+	sess, ok := state.Sessions["session-2"]
+	if !ok {
+		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
+	}
+	if sess.OwnerScope != want {
+		t.Fatalf("session-2 owner scope = %q, want %q", sess.OwnerScope, want)
 	}
 }
 
@@ -182,7 +188,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
@@ -244,7 +250,7 @@ harness:
 acceptance:
   command: "go test -run E2E ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "acceptance.md"), []byte("- deploy succeeds\n- e2e passes\n"), 0o644); err != nil {
@@ -323,7 +329,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
@@ -384,7 +390,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 
@@ -455,7 +461,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
@@ -466,15 +472,16 @@ harness:
 		t.Fatalf("Add: %v", err)
 	}
 
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
 	if err != nil {
-		t.Fatalf("load updated snapshot: %v", err)
+		t.Fatalf("load sessions runtime state: %v", err)
 	}
-	if len(cfg.Sessions) != 2 {
-		t.Fatalf("len(Sessions) = %d, want 2", len(cfg.Sessions))
+	sess, ok := state.Sessions["session-2"]
+	if !ok {
+		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
 	}
-	if cfg.Sessions[1].Mode != goalx.ModeResearch {
-		t.Fatalf("Sessions[1].Mode = %q, want %q", cfg.Sessions[1].Mode, goalx.ModeResearch)
+	if sess.Mode != string(goalx.ModeResearch) {
+		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeResearch)
 	}
 
 	out, err := os.ReadFile(filepath.Join(runDir, "program-2.md"))
@@ -533,7 +540,7 @@ target:
 harness:
   command: "go test ./..."
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {

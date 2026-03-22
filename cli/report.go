@@ -25,15 +25,21 @@ func Report(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := syncRunStateFromProjectStatus(projectRoot, rc.RunDir); err != nil {
+		return fmt.Errorf("sync run state from status cache: %w", err)
+	}
 
 	fmt.Printf("=== Report: %s ===\n", rc.Name)
 	fmt.Printf("Mode: %s\n", rc.Config.Mode)
 	fmt.Printf("Objective: %s\n\n", rc.Config.Objective)
 
 	// Per-session progress
-	sessions := goalx.ExpandSessions(rc.Config)
-	for i := range sessions {
-		sName := SessionName(i + 1)
+	sessionIndexes, err := existingSessionIndexes(rc.RunDir)
+	if err != nil {
+		return err
+	}
+	for _, num := range sessionIndexes {
+		sName := SessionName(num)
 		jPath := JournalPath(rc.RunDir, sName)
 		entries, _ := goalx.LoadJournal(jPath)
 

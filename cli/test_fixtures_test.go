@@ -21,8 +21,8 @@ func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.C
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
-		t.Fatalf("write goalx.yaml: %v", err)
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run-spec.yaml: %v", err)
 	}
 
 	for name, content := range files {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	goalx "github.com/vonbai/goalx"
@@ -45,7 +46,7 @@ func Result(projectRoot string, args []string) error {
 		return err
 	}
 
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	cfg, err := LoadSavedRunSpec(runDir)
 	if err != nil {
 		return fmt.Errorf("load saved config: %w", err)
 	}
@@ -196,11 +197,25 @@ func summarizeSectionLines(section string, limit int) string {
 func resolveSavedRunDir(projectRoot, runName string) (string, error) {
 	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
 	if runName == "" {
-		_, runDir, err := findLatestSavedRun(savesDir, "")
+		entries, err := os.ReadDir(savesDir)
 		if err != nil {
-			return "", fmt.Errorf("find latest saved run: %w", err)
+			return "", fmt.Errorf("read saved runs: %w", err)
 		}
-		return runDir, nil
+		var names []string
+		for _, entry := range entries {
+			if entry.IsDir() {
+				names = append(names, entry.Name())
+			}
+		}
+		switch len(names) {
+		case 0:
+			return "", fmt.Errorf("no saved runs found")
+		case 1:
+			return filepath.Join(savesDir, names[0]), nil
+		default:
+			sort.Strings(names)
+			return "", fmt.Errorf("multiple saved runs: %s (specify NAME)", strings.Join(names, ", "))
+		}
 	}
 	return filepath.Join(savesDir, runName), nil
 }

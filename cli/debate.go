@@ -25,7 +25,10 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	if err != nil {
 		return fmt.Errorf("load base config: %w", err)
 	}
-	savedCfg, _ := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	savedCfg, _ := LoadSavedRunSpec(runDir)
+	if savedCfg == nil {
+		return fmt.Errorf("saved run spec missing for %s", run)
+	}
 
 	// Collect report files (absolute paths for worktree access)
 	contextFiles, sessionNames, err := CollectSavedResearchContext(runDir)
@@ -62,7 +65,7 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 		}
 	}
 
-	cfg := buildPhaseConfig(goalx.ModeResearch, savedCfg, engines, nc)
+	cfg := buildPhaseConfig(goalx.ModeResearch, *savedCfg, engines, nc)
 	cfg.Name = "debate"
 	cfg.Objective = nextConfigObjective(fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单", run), nc)
 	cfg.DiversityHints = nextConfigHints(defaultHints, cfg.Parallel, nc)
@@ -113,7 +116,7 @@ func findLatestSavedRun(savesDir string, mode goalx.Mode) (string, string, error
 			continue
 		}
 		dir := filepath.Join(savesDir, e.Name())
-		cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(dir, "goalx.yaml"))
+		cfg, err := LoadSavedRunSpec(dir)
 		if err != nil {
 			continue
 		}

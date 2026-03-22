@@ -182,11 +182,16 @@ func (a *serveApp) handleGoalxAction(w http.ResponseWriter, r *http.Request, pro
 
 func (a *serveApp) handleConfigAction(w http.ResponseWriter, projectRoot string, req serveActionRequest) {
 	cfgPath := filepath.Join(projectRoot, ".goalx", "goalx.yaml")
+	runScoped := req.Run != ""
 	if req.Run != "" {
-		cfgPath = filepath.Join(goalx.RunDir(projectRoot, req.Run), "goalx.yaml")
+		cfgPath = RunSpecPath(goalx.RunDir(projectRoot, req.Run))
 	}
 	content := req.Content
 	if content != "" {
+		if runScoped {
+			writeJSONError(w, http.StatusBadRequest, fmt.Errorf("run spec is immutable; edit project .goalx/goalx.yaml or redirect the active run"))
+			return
+		}
 		if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, err)
 			return
@@ -267,6 +272,10 @@ func (a *serveApp) runs() ([]serveRun, error) {
 
 	for _, project := range a.projects() {
 		runsDir := filepath.Join(home, ".goalx", "runs", project.ProjectID)
+		reg, err := LoadProjectRegistry(project.Path)
+		if err != nil {
+			return nil, fmt.Errorf("load run registry for %s: %w", project.Name, err)
+		}
 		entries, err := os.ReadDir(runsDir)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -279,13 +288,13 @@ func (a *serveApp) runs() ([]serveRun, error) {
 			if !entry.IsDir() {
 				continue
 			}
-			cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(runsDir, entry.Name(), "goalx.yaml"))
+			cfg, err := LoadRunSpec(filepath.Join(runsDir, entry.Name()))
 			if err != nil || cfg.Name == "" {
 				continue
 			}
 
 			status := "completed"
-			if a.sessionExists(goalx.TmuxSessionName(project.Path, cfg.Name)) {
+			if _, ok := reg.ActiveRuns[cfg.Name]; ok || a.sessionExists(goalx.TmuxSessionName(project.Path, cfg.Name)) {
 				status = "active"
 			}
 

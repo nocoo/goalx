@@ -1,6 +1,9 @@
 package cli
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Stop kills the tmux session for the current run.
 func Stop(projectRoot string, args []string) error {
@@ -22,6 +25,17 @@ func Stop(projectRoot string, args []string) error {
 	}
 
 	if !SessionExists(rc.TmuxSession) {
+		_ = MarkRunInactive(projectRoot, rc.Name)
+		if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
+			state.Active = false
+			state.MasterWakePending = false
+			state.MasterStale = false
+			state.MasterStaleSince = ""
+			state.StoppedAt = time.Now().UTC().Format(time.RFC3339)
+			state.UpdatedAt = state.StoppedAt
+			_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
+		}
+		_ = refreshProjectStatusCache(projectRoot)
 		fmt.Printf("Run '%s' is not active (no tmux session).\n", rc.Name)
 		return nil
 	}
@@ -29,6 +43,17 @@ func Stop(projectRoot string, args []string) error {
 	if err := KillSession(rc.TmuxSession); err != nil {
 		return fmt.Errorf("kill tmux session %s: %w", rc.TmuxSession, err)
 	}
+	if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
+		state.Active = false
+		state.MasterWakePending = false
+		state.MasterStale = false
+		state.MasterStaleSince = ""
+		state.StoppedAt = time.Now().UTC().Format(time.RFC3339)
+		state.UpdatedAt = state.StoppedAt
+		_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
+	}
+	_ = MarkRunInactive(projectRoot, rc.Name)
+	_ = refreshProjectStatusCache(projectRoot)
 	fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
 	return nil
 }

@@ -56,7 +56,7 @@ harness:
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -144,7 +144,7 @@ target:
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -221,7 +221,7 @@ objective: ship feature
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{
@@ -279,7 +279,7 @@ objective: ship feature
 acceptance:
   command: "printf 'e2e ok\n'"
 `)
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), snapshot, 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	contract := []byte(`{

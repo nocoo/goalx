@@ -568,7 +568,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"temporary research session",
 		"Research-mode sessions produce evidence and reports, not mergeable code changes.",
 		"Check the coordination digest version each heartbeat.",
-		"Default to current repo state, control files, and latest session outputs.",
+		"Default to current repo state, control files, runtime state, and latest session outputs.",
 		"Only reread older journal history when the current state is ambiguous",
 		"You may reorder, delegate, or temporarily postpone required work within the current goal",
 		"you may not declare the goal complete while any required item remains unfinished, blocked, or merely scheduled for later",

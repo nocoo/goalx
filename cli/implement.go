@@ -67,7 +67,7 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 	// Prefer debate run (saved as mode=research, name=debate), then any research run
 	var run, runDir string
 	debateDir := filepath.Join(savesDir, "debate")
-	if debateCfg, err2 := goalx.LoadYAML[goalx.Config](filepath.Join(debateDir, "goalx.yaml")); err2 == nil && debateCfg.Mode == goalx.ModeResearch {
+	if debateCfg, err2 := LoadSavedRunSpec(debateDir); err2 == nil && debateCfg.Mode == goalx.ModeResearch {
 		run, runDir = "debate", debateDir
 	} else {
 		var err error
@@ -105,7 +105,10 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 	}
 
 	// Read saved config for objective context
-	savedCfg, _ := goalx.LoadYAML[goalx.Config](filepath.Join(runDir, "goalx.yaml"))
+	savedCfg, _ := LoadSavedRunSpec(runDir)
+	if savedCfg == nil {
+		return fmt.Errorf("saved run spec missing for %s", run)
+	}
 	objContext := savedCfg.Objective
 	if objContext == "" {
 		objContext = run
@@ -115,7 +118,7 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		"你负责剩余修复项（P2 + 重构类 P1）。先做独立的删除/清理，再做涉及多文件的重构。每步跑 gate。",
 	}
 
-	cfg := buildPhaseConfig(goalx.ModeDevelop, savedCfg, engines, nc)
+	cfg := buildPhaseConfig(goalx.ModeDevelop, *savedCfg, engines, nc)
 	cfg.Name = "implement"
 	cfg.Objective = nextConfigObjective(fmt.Sprintf("实施 %s 的共识修复清单。严格按照 context 中的文档执行，不做额外改动。", run), nc)
 	cfg.DiversityHints = nextConfigHints(defaultHints, cfg.Parallel, nc)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/tabwriter"
 
 	goalx "github.com/vonbai/goalx"
@@ -12,6 +11,10 @@ import (
 
 // Status shows the current progress for each session in a run.
 func Status(projectRoot string, args []string) error {
+	if len(args) == 1 && isHelpToken(args[0]) {
+		fmt.Println("usage: goalx status [NAME] [session-N]")
+		return nil
+	}
 	runName, sessionFilter, err := parseStatusArgs(args)
 	if err != nil {
 		return err
@@ -21,23 +24,33 @@ func Status(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := syncRunStateFromProjectStatus(projectRoot, rc.RunDir); err != nil {
+		return fmt.Errorf("sync run state from status cache: %w", err)
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "SESSION\tLAST_ROUND\tSTATUS\tSUMMARY")
 	coord, _ := LoadCoordinationState(CoordinationPath(rc.RunDir))
+	sessionState, _ := EnsureSessionsRuntimeState(rc.RunDir)
 
-	// Session journals
-	indexes, err := existingSessionIndexes(rc.RunDir)
-	if err != nil {
-		return err
-	}
-	if len(indexes) == 0 {
-		for i := range goalx.ExpandSessions(rc.Config) {
-			indexes = append(indexes, i+1)
+	sessionList := sortedSessionStates(sessionState)
+	if len(sessionList) == 0 {
+		indexes, err := existingSessionIndexes(rc.RunDir)
+		if err != nil {
+			return err
+		}
+		for _, num := range indexes {
+			sName := SessionName(num)
+			sessionList = append(sessionList, SessionRuntimeState{
+				Name:         sName,
+				State:        "pending",
+				Mode:         string(goalx.EffectiveSessionConfig(rc.Config, num-1).Mode),
+				WorktreePath: WorktreePath(rc.RunDir, rc.Config.Name, num),
+			})
 		}
 	}
-	for _, num := range indexes {
-		sName := SessionName(num)
+	for _, sess := range sessionList {
+		sName := sess.Name
 		if sessionFilter != "" && sName != sessionFilter {
 			continue
 		}
@@ -45,24 +58,30 @@ func Status(projectRoot string, args []string) error {
 		entries, _ := goalx.LoadJournal(jPath)
 
 		lastRound := "-"
-		status := "pending"
+		status := sess.State
+		if status == "" {
+			status = "pending"
+		}
 		if len(entries) > 0 {
 			last := entries[len(entries)-1]
 			if last.Round > 0 {
 				lastRound = fmt.Sprintf("%d", last.Round)
 			}
-			if last.Status != "" {
+			if status == "pending" && last.Status != "" {
 				status = last.Status
 			}
 		}
 
 		summary := goalx.Summary(entries)
+		if sess.LastRound > 0 {
+			lastRound = fmt.Sprintf("%d", sess.LastRound)
+		}
 		if coord != nil {
 			if sess, ok := coord.Sessions[sName]; ok {
 				if sess.LastRound > 0 {
 					lastRound = fmt.Sprintf("%d", sess.LastRound)
 				}
-				if sess.State != "" {
+				if status == "pending" && sess.State != "" {
 					status = sess.State
 				}
 				switch sess.State {
@@ -83,15 +102,31 @@ func Status(projectRoot string, args []string) error {
 				}
 			}
 		}
-		if guidanceState, err := LoadSessionGuidanceState(SessionGuidanceStatePath(rc.RunDir, sName)); err == nil && guidanceState != nil && guidanceState.Pending {
+		guidancePending := sess.GuidancePending
+		if !guidancePending {
+			if guidanceState, err := LoadSessionGuidanceState(SessionGuidanceStatePath(rc.RunDir, sName)); err == nil && guidanceState != nil {
+				guidancePending = guidanceState.Pending
+			}
+		}
+		if guidancePending {
 			if status == "idle" || status == "pending" {
 				status = "guidance-pending"
 			}
 			if summary == "no entries" {
 				summary = "guidance pending"
-			} else if !strings.Contains(summary, "guidance pending") {
+			} else if summary != "guidance pending" {
 				summary += " | guidance pending"
 			}
+		}
+		if sess.DirtyFiles > 0 {
+			if summary == "no entries" {
+				summary = fmt.Sprintf("dirty worktree (%d files)", sess.DirtyFiles)
+			} else {
+				summary += fmt.Sprintf(" | dirty=%d", sess.DirtyFiles)
+			}
+		}
+		if sess.LastTestSummary != "" {
+			summary += " | " + sess.LastTestSummary
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", sName, lastRound, status, summary)
 	}

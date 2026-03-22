@@ -8,7 +8,6 @@ import (
 	"time"
 
 	goalx "github.com/vonbai/goalx"
-	"gopkg.in/yaml.v3"
 )
 
 const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME]`
@@ -180,6 +179,17 @@ func Add(projectRoot string, args []string) error {
 	} else {
 		renderCfg.Parallel = newNum
 	}
+	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
+	if err := UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
+		Name:         sName,
+		State:        "active",
+		Mode:         string(effectiveSession.Mode),
+		Branch:       branch,
+		WorktreePath: wtPath,
+		OwnerScope:   hint,
+	}); err != nil {
+		return fmt.Errorf("prime session runtime state: %w", err)
+	}
 	sessionDataList, err := buildSessionDataList(rc.RunDir, &renderCfg, engines)
 	if err != nil {
 		return fmt.Errorf("build session roster: %w", err)
@@ -187,7 +197,6 @@ func Add(projectRoot string, args []string) error {
 
 	// Render protocol
 	protocolPath := filepath.Join(rc.RunDir, fmt.Sprintf("program-%d.md", newNum))
-	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
 	subData := ProtocolData{
 		RunName:             rc.Config.Name,
 		Objective:           rc.Config.Objective,
@@ -207,6 +216,9 @@ func Add(projectRoot string, args []string) error {
 		GoalContractPath:    GoalContractPath(rc.RunDir),
 		AcceptancePath:      AcceptanceChecklistPath(rc.RunDir),
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
+		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath: ProjectRegistryPath(projectRoot),
 		ProjectRoot:         absProjectRoot,
 		DiversityHint:       hint,
 	}
@@ -224,20 +236,6 @@ func Add(projectRoot string, args []string) error {
 		return fmt.Errorf("launch subagent: %w", err)
 	}
 
-	// Update config snapshot with new session count
-	if len(rc.Config.Sessions) > 0 {
-		rc.Config.Sessions = append(rc.Config.Sessions, newSess)
-	} else {
-		rc.Config.Parallel = newNum
-	}
-	cfgYAML, err := yaml.Marshal(&rc.Config)
-	if err != nil {
-		return fmt.Errorf("marshal config snapshot: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(rc.RunDir, "goalx.yaml"), cfgYAML, 0644); err != nil {
-		return fmt.Errorf("write config snapshot: %w", err)
-	}
-
 	if coord, err := EnsureCoordinationState(rc.RunDir, rc.Config.Objective); err == nil {
 		now := time.Now().UTC().Format(time.RFC3339)
 		coord.Sessions[sName] = CoordinationSession{
@@ -253,7 +251,6 @@ func Add(projectRoot string, args []string) error {
 	} else {
 		return fmt.Errorf("load coordination state: %w", err)
 	}
-
 	// Notify master through durable inbox, then best-effort tmux nudge.
 	masterMsg := fmt.Sprintf(
 		"New %s added to your run. Window: %s, Worktree: %s, Journal: %s, Guidance: %s. Direction: %s. Add it to your check cycle.",

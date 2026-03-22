@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
+	"time"
 )
 
 // Pulse records a durable heartbeat tick, then nudges the master to read control files.
@@ -26,8 +26,22 @@ func Pulse(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("refresh heartbeat state: %w", err)
 	}
-	if err := updateStatusWithHeartbeat(filepath.Join(projectRoot, ".goalx", "status.json"), state, heartbeat); err != nil {
-		return fmt.Errorf("update heartbeat status: %w", err)
+	runState, err := EnsureRuntimeState(rc.RunDir, rc.Config)
+	if err != nil {
+		return fmt.Errorf("load runtime state: %w", err)
+	}
+	runState.Active = true
+	runState.HeartbeatSeq = heartbeat.Seq
+	runState.HeartbeatLag = state.HeartbeatLag
+	runState.MasterWakePending = state.WakePending
+	runState.MasterStale = state.StaleSince != ""
+	runState.MasterStaleSince = state.StaleSince
+	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), runState); err != nil {
+		return fmt.Errorf("save runtime state: %w", err)
+	}
+	if err := syncProjectStatusCache(projectRoot, runState); err != nil {
+		return fmt.Errorf("update project status cache: %w", err)
 	}
 	if !SessionExists(rc.TmuxSession) {
 		return nil

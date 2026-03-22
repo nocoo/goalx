@@ -63,6 +63,13 @@ func Review(projectRoot string, args []string) error {
 			if artifact := FindSessionArtifact(manifest, sName, "report"); artifact != nil {
 				reportPath = artifact.Path
 			}
+			if reportPath == "" {
+				targetFiles := []string(nil)
+				if effective.Target != nil {
+					targetFiles = append(targetFiles, effective.Target.Files...)
+				}
+				reportPath = findSessionReport(wtPath, targetFiles)
+			}
 			if reportPath != "" {
 				printFirstLines(reportPath, 20)
 			}

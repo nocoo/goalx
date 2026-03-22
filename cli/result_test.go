@@ -44,17 +44,12 @@ func TestResultPrintsLatestResearchSummary(t *testing.T) {
 		t.Fatalf("chtimes newer run: %v", err)
 	}
 
-	out := captureStdout(t, func() {
-		if err := Result(projectRoot, nil); err != nil {
-			t.Fatalf("Result: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "# newer summary") {
-		t.Fatalf("result output missing latest summary:\n%s", out)
+	err := Result(projectRoot, nil)
+	if err == nil {
+		t.Fatalf("Result should require an explicit run when multiple saved runs exist")
 	}
-	if strings.Contains(out, "# older summary") {
-		t.Fatalf("result output should use latest saved run:\n%s", out)
+	if !strings.Contains(err.Error(), "multiple saved runs") {
+		t.Fatalf("Result error = %v, want multiple saved runs", err)
 	}
 }
 
@@ -250,8 +245,8 @@ func writeSavedResultRun(t *testing.T, projectRoot, runName string, cfg goalx.Co
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
-		t.Fatalf("write goalx.yaml: %v", err)
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run-spec.yaml: %v", err)
 	}
 
 	for name, content := range files {

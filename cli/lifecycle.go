@@ -75,6 +75,18 @@ func Park(projectRoot string, args []string) error {
 			_ = sendAgentNudge(rc.TmuxSession+":master", rc.Config.Master.Engine)
 		}
 	}
+	snapshot, err := SnapshotSessionRuntime(rc.RunDir, sessionName, WorktreePath(rc.RunDir, rc.Config.Name, idx))
+	if err != nil {
+		return fmt.Errorf("snapshot session runtime: %w", err)
+	}
+	snapshot.State = "parked"
+	snapshot.Mode = string(goalx.EffectiveSessionConfig(rc.Config, idx-1).Mode)
+	snapshot.Branch = fmt.Sprintf("goalx/%s/%d", rc.Config.Name, idx)
+	snapshot.OwnerScope = digest.Scope
+	snapshot.BlockedBy = digest.BlockedBy
+	if err := UpsertSessionRuntimeState(rc.RunDir, snapshot); err != nil {
+		return fmt.Errorf("update session runtime state: %w", err)
+	}
 
 	fmt.Printf("Parked %s in run '%s'\n", sessionName, rc.Name)
 	return nil
@@ -168,6 +180,9 @@ func Resume(projectRoot string, args []string) error {
 		GoalContractPath:    GoalContractPath(rc.RunDir),
 		AcceptancePath:      AcceptanceChecklistPath(rc.RunDir),
 		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
+		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath: ProjectRegistryPath(projectRoot),
 		ProjectRoot:         absProjectRoot,
 		DiversityHint:       effective.Hint,
 	}
@@ -205,6 +220,16 @@ func Resume(projectRoot string, args []string) error {
 	coord.UpdatedAt = now
 	if err := SaveCoordinationState(CoordinationPath(rc.RunDir), coord); err != nil {
 		return err
+	}
+	if err := UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
+		Name:         sessionName,
+		State:        "active",
+		Mode:         string(effective.Mode),
+		Branch:       fmt.Sprintf("goalx/%s/%d", rc.Config.Name, idx),
+		WorktreePath: wtPath,
+		OwnerScope:   current.Scope,
+	}); err != nil {
+		return fmt.Errorf("update session runtime state: %w", err)
 	}
 	if _, err := AppendMasterInboxMessage(rc.RunDir, "session_resumed", "goalx resume", fmt.Sprintf("%s was resumed for reuse.", sessionName)); err == nil {
 		_ = sendAgentNudge(rc.TmuxSession+":master", rc.Config.Master.Engine)

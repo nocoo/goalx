@@ -314,7 +314,7 @@ func TestServeHandlerConfigEndpointReadsAndWritesGoalxYAML(t *testing.T) {
 	}
 }
 
-func TestServeHandlerConfigEndpointCanTargetRunSnapshot(t *testing.T) {
+func TestServeHandlerConfigEndpointCanReadRunSpec(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -328,14 +328,14 @@ func TestServeHandlerConfigEndpointCanTargetRunSnapshot(t *testing.T) {
 	}
 
 	writeRunSnapshot(t, workspace, "auth-audit", goalx.ModeResearch, "audit auth flow")
-	runCfgPath := filepath.Join(goalx.RunDir(workspace, "auth-audit"), "goalx.yaml")
+	runCfgPath := RunSpecPath(goalx.RunDir(workspace, "auth-audit"))
 
 	app := newServeApp(goalx.ServeConfig{
 		Token:      "secret-token",
 		Workspaces: map[string]string{"goalx": workspace},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{"run":"auth-audit","content":"name: auth-audit\nmode: develop\n"}`))
+	req := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{"run":"auth-audit"}`))
 	req.Header.Set("Authorization", "Bearer secret-token")
 	rec := httptest.NewRecorder()
 	app.routes().ServeHTTP(rec, req)
@@ -344,12 +344,22 @@ func TestServeHandlerConfigEndpointCanTargetRunSnapshot(t *testing.T) {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
+	var resp struct {
+		Content string `json:"content"`
+		Path    string `json:"path"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	runData, err := os.ReadFile(runCfgPath)
 	if err != nil {
-		t.Fatalf("read run config: %v", err)
+		t.Fatalf("read run spec: %v", err)
 	}
-	if string(runData) != "name: auth-audit\nmode: develop\n" {
-		t.Fatalf("run goalx.yaml = %q", string(runData))
+	if resp.Content != string(runData) {
+		t.Fatalf("run spec content = %q, want %q", resp.Content, string(runData))
+	}
+	if resp.Path != runCfgPath {
+		t.Fatalf("path = %q, want %q", resp.Path, runCfgPath)
 	}
 
 	rootData, err := os.ReadFile(rootCfgPath)
@@ -489,7 +499,7 @@ func writeRunSnapshot(t *testing.T, workspace, runName string, mode goalx.Mode, 
 	if err != nil {
 		t.Fatalf("marshal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), data, 0o644); err != nil {
-		t.Fatalf("write goalx.yaml: %v", err)
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run-spec.yaml: %v", err)
 	}
 }

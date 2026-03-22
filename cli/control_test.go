@@ -241,7 +241,7 @@ func TestPulseRecordsHeartbeatAndUsesControlNudge(t *testing.T) {
 		t.Fatalf("write fake tmux: %v", err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), []byte("name: pulse-run\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-run\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := EnsureMasterControl(runDir); err != nil {
@@ -292,7 +292,7 @@ func TestPulseTracksHeartbeatLagAndStaleState(t *testing.T) {
 		t.Fatalf("write fake tmux: %v", err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if err := os.WriteFile(filepath.Join(runDir, "goalx.yaml"), []byte("name: pulse-lag\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-lag\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	if err := EnsureMasterControl(runDir); err != nil {

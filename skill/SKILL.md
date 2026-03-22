@@ -33,6 +33,7 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
 6. Keep history recap short. GoalX resumes from durable run state and current files.
 7. Interpret `goalx observe` output. Report the signal, not raw tmux noise.
 8. GoalX completion is stricter than "tests passed": `goalx verify` also checks required-item completion provenance and whether the effective acceptance gate was silently narrowed.
+9. If a project has multiple active runs, always include `--run NAME` for mutating or inspection commands that target one run.
 
 ## Scenario Guide
 
@@ -76,6 +77,7 @@ Treat GoalX as a master-led autonomous run: start it, observe it, redirect only 
 - Need an explicit acceptance check: run `goalx verify` before treating the run as done.
 - If a run says "verification only", make sure it did not also merge or keep code changes in the same closeout.
 - Complete: `goalx save` then `goalx result` to review. Saved reports are indexed through `artifacts.json`.
+- Runtime state lives under `~/.goalx/runs/{projectID}/{run}`. Saved artifacts live under `<project>/.goalx/runs/{run}`.
 
 ## Advanced Control
 
