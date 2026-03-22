@@ -1,89 +1,81 @@
 ---
 name: goalx
-description: Use when the user wants to launch goal-driven autonomous research or development, monitor agent progress, or manage GoalX runs. GoalX starts a master agent that self-orchestrates subagents to achieve the user's goal. Even if the user just says "research this" or "investigate that" or "look into X", this skill likely applies.
+description: Use when the user wants GoalX to autonomously research, implement, monitor, or redirect a goal in the current project.
 allowed-tools: Bash, Read, Glob, Grep, Write, Edit
 user-invocable: true
 ---
 
 # GoalX
 
-GoalX launches a master agent that orchestrates everything. The framework provides tools and infrastructure; the master decides what to do.
+Default to one autonomous run. Use low-level GoalX control only when the user explicitly asks for it.
 
-## Core Concept
-
-```
-goalx auto "goal"  →  master starts  →  master creates subagents  →  master evaluates  →  done
-```
-
-The master is a **dispatcher + referee**: it decomposes the goal, selects engines, launches subagents via `goalx add`, can spin up temporary `--mode research` sessions inside a develop run, keeps required items covered, rebalances work when one session is stuck, parks idle sessions for later reuse, and stops only when the current goal contract is satisfied. Subagents are fully autonomous workers.
-
-## Operating Rules
-1. Write the objective as a simple goal, not a task checklist. The master figures out the details.
-2. State the current direction, not a long history recap. GoalX persists durable run state; the master and subagents resume from current files plus run metadata.
-3. The master may decompose, reorder, and improve, but its plan is not the completion standard. GoalX tracks a run-level `goal-contract.json`; required items can move within the current goal, but the goal is not complete until those required items are done or explicitly waived by the user.
-4. The master should actively use available parallel capacity. If one session is blocked and other independent required work remains, it should rebalance or start another session instead of waiting.
-5. Subagents should report blockers concisely through the journal: what scope they own, what blocks them, what they depend on, and the next smallest useful split.
-6. Prefer reusing or resuming a parked session before creating a brand new one when the scope still fits.
-7. Route direction changes through the master via `tmux send-keys`, not directly to subagent panes.
-8. Interpret `goalx observe` output — report what matters, don't dump raw tmux noise.
-9. Keep git hygiene invisible. Handle dirty worktrees silently before `start` or `keep`.
-
-## Quick Start
+## Default Path
 
 ```bash
 goalx auto "goal"
 ```
 
-That's it. The master starts in tmux, creates subagents as needed, and runs until done. Use `goalx observe` to check progress, `goalx result` to see the outcome.
-You usually do not need to restate long background context after compaction; give the current goal or redirect and let GoalX resume from durable state.
+Use:
+- `goalx auto "goal"` for research, investigation, audit
+- `goalx auto "goal" --develop` for implementation, fixes, refactors
+- `goalx auto "goal" --context /path/a,/path/b` only when external files matter
 
-Options only when the user wants control:
-- `--develop` — hint that code changes are the primary goal
-- `--research` — hint that reports/analysis are the primary goal (default)
-- `--context /path/a,/path/b` — external reference files
-- `--name NAME` — custom run name
-For explicit control over config: `goalx init "goal" → edit .goalx/goalx.yaml → goalx start`
+Treat GoalX as a master-led autonomous run: start it, observe it, redirect only when needed, then review results.
 
-Runtime state lives under `~/.goalx/runs/...`; durable saved artifacts live under `<project>/.goalx/runs/...` after `goalx save`. Runs maintain both `goal-contract.json` and acceptance state so completion is tied to required goal items, not just the master's current plan. Journals can also carry blocker/dependency hints so the master can rebalance work without rereading long context. GoalX also adds `.goalx/` to `.git/info/exclude` for local repos so saved run state does not get staged by default.
+## Operating Rules
+
+1. Write the objective as a goal, not a task checklist. Let the master decompose it.
+2. Prefer `goalx auto` over `goalx init` + `goalx start`.
+3. Do not manually edit `.goalx/goalx.yaml` unless the user explicitly asks for config-level control.
+4. Do not micromanage the master or subagents unless the user explicitly asks for low-level intervention.
+5. Route direction changes through the master, not directly to subagent panes.
+6. Keep history recap short. GoalX resumes from durable run state and current files.
+7. Interpret `goalx observe` output. Report the signal, not raw tmux noise.
 
 ## Scenario Guide
+
 - Research, investigate, audit: `goalx auto "goal"`
 - Fix, implement, refactor: `goalx auto "goal" --develop`
 - Reference another repo: `goalx auto "goal" --context /path/to/other-project`
 - Check progress: `goalx observe`, `goalx status`, `goalx attach`
-- Launch a temporary investigation inside a develop run: `goalx add --run NAME --mode research "investigate X"`
-- Park an idle or blocked session for later reuse: `goalx park --run NAME session-2`
-- Resume a parked session in the same worktree: `goalx resume --run NAME session-2`
+- Redirect a running goal: send a short new direction to the master
 - Run the acceptance gate explicitly: `goalx verify --run NAME`
-- Redirect mid-run: `tmux send-keys -t <session>:master "new direction" Enter`
 - View results: `goalx result` or `goalx result --full`
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
-| `goalx auto "goal"` | Init + start master, then exit. Master runs in tmux. |
-| `goalx init "goal"` | Generate config only |
-| `goalx start` | Launch master from existing config |
+| `goalx auto "goal"` | Default path: init + start one master-led run, then exit. |
 | `goalx observe [NAME]` | Live capture from all tmux windows |
 | `goalx status [NAME]` | Journal-based progress |
 | `goalx result [NAME]` | Show summary (`--full` for raw report) |
-| `goalx add "direction"` | Add a subagent session; use `--mode research` for temporary investigation |
-| `goalx park [NAME] <session>` | Park a session without deleting its worktree |
-| `goalx resume [NAME] <session>` | Resume a parked session |
-| `goalx keep [NAME] <session>` | Merge session branch into main |
 | `goalx save [NAME]` | Save durable artifacts and `artifacts.json` to `.goalx/runs/` |
 | `goalx verify [NAME]` | Run the active run's acceptance command and record the result |
+| `goalx keep [NAME] <session>` | Merge a develop session branch into main |
 | `goalx stop [NAME]` | Graceful shutdown |
 | `goalx drop [NAME]` | Cleanup worktrees and branches; refuses unsaved runs until `goalx save` |
+| `goalx init "goal"` | Advanced/manual path only: generate config without starting |
+| `goalx start` | Advanced/manual path only: launch from existing config |
+| `goalx add "direction"` | Advanced/manual path only: add a subagent session |
+| `goalx park [NAME] <session>` | Advanced/manual path only: park a session |
+| `goalx resume [NAME] <session>` | Advanced/manual path only: resume a parked session |
 | `goalx attach [NAME]` | Attach to tmux session |
 | `goalx list` | List all runs |
 | `goalx debate` | Generate debate config from prior research |
 | `goalx implement` | Generate develop config from consensus |
 
 ## Observe and React
+
 - Healthy: summarize progress, wait.
-- Stuck 2+ heartbeats: redirect the master; it should rebalance or park/resume sessions instead of just waiting on one session.
+- Stuck 2+ heartbeats: redirect the master. It should rebalance or resume/park sessions instead of just waiting.
 - Wrong direction: steer the master, not subagents.
 - Need an explicit acceptance check: run `goalx verify` before treating the run as done.
 - Complete: `goalx save` then `goalx result` to review. Saved reports are indexed through `artifacts.json`.
+
+## Advanced Control
+
+Only use low-level GoalX control when the user explicitly asks for it.
+
+- Manual config flow: see [references/advanced-control.md](references/advanced-control.md)
+- Direct session lifecycle or tmux intervention: see [references/advanced-control.md](references/advanced-control.md)

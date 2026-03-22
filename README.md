@@ -58,12 +58,14 @@ goalx observe
 goalx result
 ```
 
+Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicitly want config-first or low-level control.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `goalx init` | Generate config from objective |
-| `goalx start` | Launch tmux session with the master only |
+| `goalx init` | Advanced/manual path: generate config from objective without starting |
+| `goalx start` | Advanced/manual path: launch tmux session from existing config |
 | `goalx auto` | Init and start one master-led run, then exit |
 | `goalx observe` | Live tmux capture from all agents |
 | `goalx status` | Journal-based progress summary |
@@ -86,13 +88,17 @@ goalx result
 ## Single-Run Flow
 
 ```
-goalx init → start → master reads config
-                    → master uses goalx add / keep / save as needed
-                    → observe / status while it runs
-                    → save / keep when the master finishes
+goalx auto → master-led run
+           → observe / status while it runs
+           → redirect only when needed
+           → save / result when the run finishes
 ```
 
 `goalx debate` and `goalx implement` still exist as explicit commands, but `goalx auto` no longer routes between phases on the framework side.
+
+## Advanced Control
+
+Use `goalx init` + `goalx start`, direct config edits, or manual session control only when you explicitly want low-level control. The default path for both research and development is still `goalx auto`.
 
 ## Runtime vs Saved State
 
