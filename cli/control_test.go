@@ -86,7 +86,7 @@ func TestPlanAgentNudgeForBusyCodexStates(t *testing.T) {
 	}, "\n")
 
 	plan := planAgentNudge("codex", pane)
-	if plan.Keys != masterWakeMessage || plan.SubmitKey != "Tab" || plan.Skip {
+	if !plan.Skip {
 		t.Fatalf("planAgentNudge(codex, absent) = %#v", plan)
 	}
 
@@ -98,7 +98,7 @@ func TestPlanAgentNudgeForBusyCodexStates(t *testing.T) {
 		"  tab to queue message",
 	}, "\n")
 	plan = planAgentNudge("codex", draftedPane)
-	if plan.Keys != "" || plan.SubmitKey != "Tab" || plan.Skip {
+	if !plan.Skip {
 		t.Fatalf("planAgentNudge(codex, drafted) = %#v", plan)
 	}
 
@@ -114,6 +114,16 @@ func TestPlanAgentNudgeForBusyCodexStates(t *testing.T) {
 	plan = planAgentNudge("codex", queuedPane)
 	if !plan.Skip {
 		t.Fatalf("planAgentNudge(codex, queued) = %#v, want skip", plan)
+	}
+
+	readyDraftPane := strings.Join([]string{
+		"› goalx-hb",
+		"",
+		"Ready for input",
+	}, "\n")
+	plan = planAgentNudge("codex", readyDraftPane)
+	if plan.Keys != "" || plan.SubmitKey != "Enter" || plan.Skip {
+		t.Fatalf("planAgentNudge(codex, ready drafted) = %#v", plan)
 	}
 
 	plan = planAgentNudge("claude-code", draftedPane)
@@ -155,7 +165,7 @@ func TestSendAgentNudgeSkipsQueuedBusyCodexWake(t *testing.T) {
 	}
 }
 
-func TestSendAgentNudgeSubmitsExistingDraftForBusyCodex(t *testing.T) {
+func TestSendAgentNudgeSkipsBusyCodexDraft(t *testing.T) {
 	origCapture := captureAgentPane
 	origSend := sendAgentKeys
 	defer func() {
@@ -172,6 +182,35 @@ func TestSendAgentNudgeSubmitsExistingDraftForBusyCodex(t *testing.T) {
 			"  tab to queue message",
 		}, "\n"), nil
 	}
+	called := false
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		called = true
+		return nil
+	}
+
+	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
+		t.Fatalf("SendAgentNudge: %v", err)
+	}
+	if called {
+		t.Fatal("SendAgentNudge should skip when codex is busy, even if a draft wake message is visible")
+	}
+}
+
+func TestSendAgentNudgeSubmitsExistingDraftForReadyCodex(t *testing.T) {
+	origCapture := captureAgentPane
+	origSend := sendAgentKeys
+	defer func() {
+		captureAgentPane = origCapture
+		sendAgentKeys = origSend
+	}()
+
+	captureAgentPane = func(target string) (string, error) {
+		return strings.Join([]string{
+			"› goalx-hb",
+			"",
+			"Ready for input",
+		}, "\n"), nil
+	}
 	var gotKeys, gotSubmit string
 	sendAgentKeys = func(target, keys, submitKey string) error {
 		gotKeys, gotSubmit = keys, submitKey
@@ -181,8 +220,8 @@ func TestSendAgentNudgeSubmitsExistingDraftForBusyCodex(t *testing.T) {
 	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
 		t.Fatalf("SendAgentNudge: %v", err)
 	}
-	if gotKeys != "" || gotSubmit != "Tab" {
-		t.Fatalf("SendAgentNudge used keys=%q submit=%q, want empty keys + Tab", gotKeys, gotSubmit)
+	if gotKeys != "" || gotSubmit != "Enter" {
+		t.Fatalf("SendAgentNudge used keys=%q submit=%q, want empty keys + Enter", gotKeys, gotSubmit)
 	}
 }
 

@@ -239,14 +239,15 @@ type agentNudgePlan struct {
 }
 
 func planAgentNudge(engine, pane string) agentNudgePlan {
-	if engine == "codex" && strings.Contains(strings.ToLower(pane), "tab to queue message") {
+	if engine == "codex" {
+		if strings.Contains(strings.ToLower(pane), "tab to queue message") {
+			return agentNudgePlan{Skip: true}
+		}
 		switch detectWakeMessageState(pane) {
 		case wakeMessageDrafted:
-			return agentNudgePlan{SubmitKey: "Tab"}
+			return agentNudgePlan{SubmitKey: "Enter"}
 		case wakeMessageQueued:
 			return agentNudgePlan{Skip: true}
-		default:
-			return agentNudgePlan{Keys: masterWakeMessage, SubmitKey: "Tab"}
 		}
 	}
 	return agentNudgePlan{Keys: masterWakeMessage, SubmitKey: "Enter"}
