@@ -11,12 +11,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME]`
+
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) error {
 	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME]
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
+	}
+	for _, arg := range rest {
+		switch arg {
+		case "--help", "-h", "help":
+			fmt.Println(addUsage)
+			return nil
+		}
 	}
 
 	// Extract flags from rest args
@@ -63,7 +72,7 @@ func Add(projectRoot string, args []string) error {
 		}
 	}
 	if len(hintParts) == 0 {
-		return fmt.Errorf("usage: goalx add \"research direction\" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME]")
+		return fmt.Errorf(addUsage)
 	}
 	hint := strings.Join(hintParts, " ")
 
