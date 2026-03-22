@@ -83,6 +83,8 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 		"## Your Tools",
 		"Agent tool",
 		"WebSearch/WebFetch",
+		"When you have 2+ independent research or analysis angles",
+		"collapse the results back into this session's journal, report, or dispatchable_slices",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
@@ -121,6 +123,14 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{
+		"2+ independent research or analysis angles",
+		"collapse the results back into this session's journal, report, or dispatchable_slices",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered codex protocol should not inherit claude-only agent guidance %q", unwanted)
 		}
 	}
 }
@@ -584,6 +594,9 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Do not wait on one session if other independent required work can proceed.",
 		"Prefer reusing a parked or idle session with fresh guidance before launching another session.",
 		"Improvement backlog",
+		"short-lived information gathering",
+		"if you are running on Claude Code, you may use Claude's native subagents inside the master session",
+		"`goalx add` remains the durable path",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

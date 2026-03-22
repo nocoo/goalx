@@ -120,7 +120,8 @@ Use these references for background (files: `cat`, URLs: fetch, text: read as-is
 You are running in Claude Code with access to:
 - **Agent tool**: Spawn parallel subagents for independent research tasks
 - **WebSearch/WebFetch**: Search the internet for documentation and examples
-- Use these proactively. For research tasks, spawn parallel agents to investigate different angles simultaneously.
+- Use these proactively. When you have 2+ independent research or analysis angles, you may use the Agent tool for short-lived parallel work inside this session.
+- Keep GoalX session boundaries durable: collapse the results back into this session's journal, report, or dispatchable_slices before you continue.
 {{end}}
 {{if eq .Engine "codex"}}
 ## Your Tools
