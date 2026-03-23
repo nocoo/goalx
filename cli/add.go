@@ -114,11 +114,13 @@ func Add(projectRoot string, args []string) error {
 	}
 
 	renderCfg := *rc.Config
-	renderCfg.Sessions = append([]goalx.SessionConfig(nil), rc.Config.Sessions...)
-	if len(renderCfg.Sessions) > 0 {
-		renderCfg.Sessions = append(renderCfg.Sessions, newSess)
-	} else {
-		renderCfg.Parallel = newNum
+	renderCfg.Sessions = append([]goalx.SessionConfig(nil), goalx.ExpandSessions(rc.Config)...)
+	for len(renderCfg.Sessions) < newNum {
+		renderCfg.Sessions = append(renderCfg.Sessions, goalx.SessionConfig{})
+	}
+	renderCfg.Sessions[newNum-1] = newSess
+	if renderCfg.Parallel < len(renderCfg.Sessions) {
+		renderCfg.Parallel = len(renderCfg.Sessions)
 	}
 	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
 	engine := effectiveSession.Engine

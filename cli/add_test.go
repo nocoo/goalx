@@ -522,6 +522,86 @@ harness:
 	}
 }
 
+func TestAddResearchModeOverrideUsesResearchRoleWithoutExplicitSessions(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	runName := "add-run"
+	runDir := goalx.RunDir(repo, runName)
+	for _, dir := range []string{
+		runDir,
+		filepath.Join(runDir, "journals"),
+		filepath.Join(runDir, "worktrees"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+engine: codex
+model: codex
+roles:
+  research:
+    engine: claude-code
+    model: opus
+  develop:
+    engine: codex
+    model: fast
+parallel: 1
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-1 journal: %v", err)
+	}
+
+	if err := Add(repo, []string{"audit root cause", "--mode", "research", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("load sessions runtime state: %v", err)
+	}
+	sess, ok := state.Sessions["session-2"]
+	if !ok {
+		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
+	}
+	if sess.Mode != string(goalx.ModeResearch) {
+		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeResearch)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-2.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	if !strings.Contains(text, "You are running in Claude Code with access to:") {
+		t.Fatalf("rendered protocol missing claude research engine guidance:\n%s", text)
+	}
+	if _, err := os.Stat(filepath.Join(runDir, "worktrees", "add-run-2", ".claude", "hooks.json")); err != nil {
+		t.Fatalf("expected claude adapter hook for session-2: %v", err)
+	}
+}
+
 func TestAddHelpDoesNotCreateSession(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
