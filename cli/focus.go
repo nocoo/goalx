@@ -17,6 +17,10 @@ func Focus(projectRoot string, args []string) error {
 	if runName == "" || len(rest) != 0 {
 		return fmt.Errorf(focusUsage)
 	}
+	runName, err = resolveLocalFocusRun(projectRoot, runName)
+	if err != nil {
+		return err
+	}
 
 	reg, err := LoadProjectRegistry(projectRoot)
 	if err != nil {
@@ -33,4 +37,15 @@ func Focus(projectRoot string, args []string) error {
 
 	fmt.Printf("Focused run set to %s\n", runName)
 	return nil
+}
+
+func resolveLocalFocusRun(projectRoot, selector string) (string, error) {
+	rc, err := resolveExplicitRun(projectRoot, selector)
+	if err != nil {
+		return "", err
+	}
+	if rc.ProjectRoot != projectRoot {
+		return "", fmt.Errorf("run %q is not in the current project", selector)
+	}
+	return rc.Name, nil
 }

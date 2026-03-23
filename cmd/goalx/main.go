@@ -20,32 +20,33 @@ Usage:
   goalx research "objective" [flags]  Start a research run directly from CLI flags
   goalx develop  "objective" [flags]  Start a develop run directly from CLI flags
   goalx list                          List all runs (active / completed / archived)
-  goalx status  [--run NAME] [session] Show current run progress and control summary
-  goalx attach  [--run NAME] [window]  Attach to tmux session (default: master)
-  goalx stop    [--run NAME]           Graceful shutdown
-  goalx review  [--run NAME]           Compare all sessions
-  goalx diff    [--run NAME] <a> [b]   Diff session code/reports
+  goalx status  [--run RUN] [session] Show current run progress and control summary
+  goalx attach  [--run RUN] [window]  Attach to tmux session (default: master)
+  goalx stop    [--run RUN]           Graceful shutdown
+  goalx review  [--run RUN]           Compare all sessions
+  goalx diff    [--run RUN] <a> [b]   Diff session code/reports
   goalx keep    [--run NAME] <session> Merge/preserve session
   goalx park    [--run NAME] <session> Park a session for later reuse
   goalx resume  [--run NAME] <session> Resume a parked session
   goalx focus   [--run NAME]           Set the default run for this project
-  goalx archive [--run NAME] <session> Git tag + preserve
-  goalx save    [--run NAME]           Save run artifacts to user-scoped durable storage
-  goalx verify  [--run NAME]           Run the effective acceptance gate, then validate contract and completion provenance
+  goalx archive [--run RUN] <session> Git tag + preserve
+  goalx save    [--run RUN]           Save run artifacts to user-scoped durable storage
+  goalx verify  [--run RUN]           Run the effective acceptance gate, then validate contract and completion provenance
   goalx debate  --from RUN [flags]     Start a debate run from a saved run
   goalx implement --from RUN [flags]   Start a develop run from a saved run
   goalx explore --from RUN [flags]     Start a follow-up research run from a saved run
-  goalx drop    [--run NAME]           Cleanup branch + worktree
-  goalx report  [--run NAME]           Generate markdown report from journal
+  goalx drop    [--run RUN]           Cleanup branch + worktree
+  goalx report  [--run RUN]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
-  goalx add     "direction" [--run NAME] Add a session to a running run
-  goalx tell    [--run NAME] [target] "message" Send a durable instruction to master or a session
-  goalx observe [NAME]                 Capture live output from all tmux windows
+  goalx add     "direction" [--run RUN] Add a session to a running run
+  goalx tell    [--run RUN] [target] "message" Send a durable instruction to master or a session
+  goalx observe [RUN]                  Capture live output from all tmux windows
   goalx auto    "objective" [flags]   Init and start one master-led run, then exit
   goalx serve                         Start the GoalX HTTP control server
   goalx next                           Show next pipeline step
 
 Notes:
+  RUN selectors are local-first. Bare NAME stays in the current project; use project-id/run or run_id for cross-project targeting.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   Use --master, --research-role, and --develop-role for role-specific engine/model defaults.
   goalx auto remains the default path; debate/implement/explore require --from RUN unless you choose --write-config.

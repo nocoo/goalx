@@ -108,3 +108,12 @@ func TestRunCommandStopsActiveRunOnSignal(t *testing.T) {
 		t.Fatalf("stop calls = %d, want 1", stopCalls)
 	}
 }
+
+func TestUsageDocumentsExplicitCrossProjectSelectors(t *testing.T) {
+	if !strings.Contains(usage, "project-id/run") {
+		t.Fatalf("usage missing project-id/run selector guidance:\n%s", usage)
+	}
+	if !strings.Contains(usage, "run_id") {
+		t.Fatalf("usage missing run_id selector guidance:\n%s", usage)
+	}
+}

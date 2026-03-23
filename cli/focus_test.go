@@ -102,3 +102,71 @@ func TestFocusHelpPrintsUsageWithoutMutatingRegistry(t *testing.T) {
 		t.Fatalf("focused run changed unexpectedly: %#v", reg)
 	}
 }
+
+func TestFocusRejectsCrossProjectSelector(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectA := initNamedGitRepo(t, "project-a")
+	projectB := initNamedGitRepo(t, "project-b")
+	writeAndCommit(t, projectA, "README.md", "base", "base commit")
+	writeAndCommit(t, projectB, "README.md", "base", "base commit")
+
+	cfg := &goalx.Config{
+		Name:      "beta",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, projectA, cfg)
+	if _, err := EnsureRunMetadata(runDir, projectA, cfg.Objective); err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	if err := RegisterActiveRun(projectA, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+
+	if err := SaveProjectRegistry(projectB, &ProjectRegistry{
+		Version:    1,
+		ActiveRuns: map[string]ProjectRunRef{},
+	}); err != nil {
+		t.Fatalf("SaveProjectRegistry: %v", err)
+	}
+
+	err := Focus(projectB, []string{"--run", goalx.ProjectID(projectA) + "/" + cfg.Name})
+	if err == nil {
+		t.Fatal("Focus succeeded, want error")
+	}
+	if !strings.Contains(err.Error(), "current project") {
+		t.Fatalf("Focus error = %v, want current project message", err)
+	}
+}
+
+func TestFocusAllowsLocalRunNameThatLooksLikeRunID(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := initNamedGitRepo(t, "project-a")
+	writeAndCommit(t, projectRoot, "README.md", "base", "base commit")
+
+	runName := "run_demo"
+	runDir := goalx.RunDir(projectRoot, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: run_demo\nmode: develop\nobjective: keep moving\n"), 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := SaveProjectRegistry(projectRoot, &ProjectRegistry{
+		Version: 1,
+		ActiveRuns: map[string]ProjectRunRef{
+			runName: {Name: runName, State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("save registry: %v", err)
+	}
+
+	if err := Focus(projectRoot, []string{"--run", runName}); err != nil {
+		t.Fatalf("Focus: %v", err)
+	}
+}

@@ -58,11 +58,11 @@ func TestTellWritesSessionGuidanceStateAndNudges(t *testing.T) {
 	}
 }
 
-func TestTellResolvesExplicitRunGloballyOutsideProjectRoot(t *testing.T) {
+func TestTellResolvesExplicitProjectSelectorOutsideProjectRoot(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	repoA := initGitRepo(t)
+	repoA := initNamedGitRepo(t, "project-a")
 	writeAndCommit(t, repoA, "base.txt", "base", "base commit")
 	runName, runDir := writeLifecycleRunFixture(t, repoA)
 	cfg, err := LoadRunSpec(runDir)
@@ -76,7 +76,7 @@ func TestTellResolvesExplicitRunGloballyOutsideProjectRoot(t *testing.T) {
 		t.Fatalf("RegisterActiveRun: %v", err)
 	}
 
-	repoB := initGitRepo(t)
+	repoB := initNamedGitRepo(t, "project-b")
 	writeAndCommit(t, repoB, "other.txt", "other", "other commit")
 
 	orig := sendAgentNudge
@@ -87,7 +87,7 @@ func TestTellResolvesExplicitRunGloballyOutsideProjectRoot(t *testing.T) {
 		return nil
 	}
 
-	if err := Tell(repoB, []string{"--run", runName, "master", "decide and execute"}); err != nil {
+	if err := Tell(repoB, []string{"--run", goalx.ProjectID(repoA) + "/" + runName, "master", "decide and execute"}); err != nil {
 		t.Fatalf("Tell: %v", err)
 	}
 

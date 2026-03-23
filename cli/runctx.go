@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -34,10 +35,28 @@ func ResolveRun(projectRoot, runName string) (*RunContext, error) {
 }
 
 func resolveExplicitRun(projectRoot, selector string) (*RunContext, error) {
-	if rc, err := resolveRunFromGlobalRegistry(selector); err == nil {
+	selector = strings.TrimSpace(selector)
+	if selector == "" {
+		return nil, fmt.Errorf("run %q not found", selector)
+	}
+	projectID, runName := parseRunSelector(selector)
+	if projectID != "" {
+		if projectID == goalx.ProjectID(projectRoot) {
+			return resolveLocalRun(projectRoot, runName)
+		}
+		return resolveRunFromGlobalRegistry(selector)
+	}
+	if rc, err := resolveLocalRun(projectRoot, selector); err == nil {
 		return rc, nil
 	} else if !isNotFoundRunError(err) {
 		return nil, err
+	}
+	if isRunIDSelector(selector) {
+		if rc, err := resolveRunFromGlobalRegistry(selector); err == nil {
+			return rc, nil
+		} else if !isNotFoundRunError(err) {
+			return nil, err
+		}
 	}
 	return resolveLocalRun(projectRoot, selector)
 }
@@ -69,7 +88,7 @@ func resolveLocalRun(projectRoot, selector string) (*RunContext, error) {
 	runDir := goalx.RunDir(projectRoot, runName)
 	if _, err := os.Stat(RunSpecPath(runDir)); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("run %q not found", selector)
+			return nil, errRunNotFound
 		}
 		return nil, fmt.Errorf("stat run spec: %w", err)
 	}
@@ -91,9 +110,6 @@ func buildRunContext(projectRoot, runDir, runName string) (*RunContext, error) {
 }
 
 func isNotFoundRunError(err error) bool {
-	if err == nil {
-		return false
-	}
 	return errors.Is(err, errRunNotFound)
 }
 

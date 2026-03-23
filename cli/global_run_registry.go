@@ -24,6 +24,7 @@ type GlobalRunRef struct {
 	ProjectID   string `json:"project_id"`
 	ProjectRoot string `json:"project_root,omitempty"`
 	RunDir      string `json:"run_dir,omitempty"`
+	RunID       string `json:"run_id,omitempty"`
 	TmuxSession string `json:"tmux_session,omitempty"`
 	Mode        string `json:"mode,omitempty"`
 	Objective   string `json:"objective,omitempty"`
@@ -114,6 +115,7 @@ func UpsertGlobalRun(projectRoot string, cfg *goalx.Config, state string) error 
 		State:       state,
 		UpdatedAt:   time.Now().UTC().Format(time.RFC3339),
 	}
+	reg.Runs[key] = hydrateGlobalRunIdentity(reg.Runs[key])
 	return SaveGlobalRunRegistry(reg)
 }
 
@@ -140,7 +142,7 @@ func UpdateGlobalRunState(projectRoot, runName, state string) error {
 	}
 	ref.State = state
 	ref.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	reg.Runs[key] = ref
+	reg.Runs[key] = hydrateGlobalRunIdentity(ref)
 	return SaveGlobalRunRegistry(reg)
 }
 
@@ -154,11 +156,23 @@ func RemoveGlobalRun(projectRoot, runName string) error {
 }
 
 func LookupGlobalRuns(selector string) ([]GlobalRunRef, error) {
-	projectID, runName := parseRunSelector(selector)
 	reg, err := LoadGlobalRunRegistry()
 	if err != nil {
 		return nil, err
 	}
+	if isRunIDSelector(selector) {
+		for _, ref := range reg.Runs {
+			ref = hydrateGlobalRunIdentity(ref)
+			if ref.RunID != selector {
+				continue
+			}
+			ref.Key = globalRunKey(ref.ProjectRoot, ref.Name)
+			return []GlobalRunRef{ref}, nil
+		}
+		return nil, nil
+	}
+
+	projectID, runName := parseRunSelector(selector)
 
 	matches := make([]GlobalRunRef, 0, len(reg.Runs))
 	for _, ref := range reg.Runs {
@@ -178,6 +192,18 @@ func LookupGlobalRuns(selector string) ([]GlobalRunRef, error) {
 		return matches[i].ProjectID < matches[j].ProjectID
 	})
 	return matches, nil
+}
+
+func hydrateGlobalRunIdentity(ref GlobalRunRef) GlobalRunRef {
+	if ref.RunID != "" || ref.RunDir == "" {
+		return ref
+	}
+	meta, err := LoadRunMetadata(RunMetadataPath(ref.RunDir))
+	if err != nil || meta == nil {
+		return ref
+	}
+	ref.RunID = meta.RunID
+	return ref
 }
 
 func parseRunSelector(selector string) (projectID, runName string) {
