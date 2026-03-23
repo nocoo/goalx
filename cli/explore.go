@@ -53,11 +53,11 @@ func Explore(projectRoot string, args []string) error {
 	cfg.Harness = goalx.HarnessConfig{Command: researchReportHarness()}
 
 	if opts.WriteConfig {
-		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx.yaml — explore based on %s\n", source.Run)); err != nil {
+		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — explore based on %s\n", source.Run)); err != nil {
 			return err
 		}
-		fmt.Printf("Generated %s/.goalx/goalx.yaml (explore from %s)\n", projectRoot, source.Run)
-		fmt.Println("\n  Next: review goalx.yaml, then goalx start")
+		fmt.Printf("Generated manual draft %s (explore from %s)\n", ManualDraftConfigPath(projectRoot), source.Run)
+		fmt.Println("\n  Next: review .goalx/goalx.yaml, then goalx start --config .goalx/goalx.yaml")
 		return nil
 	}
 

@@ -10,6 +10,9 @@ import (
 )
 
 func Park(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx park [--run NAME] <session-name>") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -93,6 +96,9 @@ func Park(projectRoot string, args []string) error {
 }
 
 func Resume(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx resume [--run NAME] <session-name>") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

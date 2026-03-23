@@ -12,6 +12,9 @@ import (
 
 // Keep merges or preserves a specific session from a run.
 func Keep(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx keep [--run NAME] <session-name>") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

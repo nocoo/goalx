@@ -10,7 +10,10 @@ import (
 )
 
 // List scans all runs for the current project and prints a table.
-func List(projectRoot string, _ []string) error {
+func List(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx list") {
+		return nil
+	}
 	home, _ := os.UserHomeDir()
 	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
 

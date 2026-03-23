@@ -352,7 +352,7 @@ serve:
 		t.Fatalf("write run config: %v", err)
 	}
 
-	cfg, _, err := LoadConfig(projectRoot)
+	cfg, _, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -415,7 +415,7 @@ harness:
 		t.Fatalf("write run config: %v", err)
 	}
 
-	cfg, _, err := LoadConfig(projectRoot)
+	cfg, _, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -484,7 +484,7 @@ harness:
 		t.Fatalf("write run config: %v", err)
 	}
 
-	cfg, _, err := LoadConfig(projectRoot)
+	cfg, _, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -568,7 +568,7 @@ harness:
 		t.Fatalf("write run config: %v", err)
 	}
 
-	cfg, engines, err := LoadConfig(projectRoot)
+	cfg, engines, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -637,7 +637,7 @@ func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 		t.Fatalf("write goalx.yaml: %v", err)
 	}
 
-	loaded, _, err := LoadConfig(projectRoot)
+	loaded, _, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}

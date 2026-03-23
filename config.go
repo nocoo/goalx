@@ -271,29 +271,7 @@ func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay 
 	}
 }
 
-// LoadRawBaseConfig loads built-in, user, and project config layers without
-// applying preset-derived engine/model defaults.
-func LoadRawBaseConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
-	cfg, engines, err := loadBaseConfigRaw(projectRoot)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &cfg, engines, nil
-}
-
-// LoadConfig loads and merges all config layers for the current project.
-func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
-	cfg, engines, err := loadBaseConfigRaw(projectRoot)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Layer 4: run config (.goalx/goalx.yaml)
-	runCfg, err := LoadYAML[Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
-	if err != nil {
-		return nil, nil, fmt.Errorf("goalx.yaml: %w", err)
-	}
-	mergeConfig(&cfg, &runCfg)
+func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
 
 	// Apply preset to fill in engine/model gaps
@@ -304,7 +282,50 @@ func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
 		cfg.Parallel = 1
 	}
 
+	return &cfg
+}
+
+// LoadRawBaseConfig loads built-in, user, and project config layers without
+// applying preset-derived engine/model defaults.
+func LoadRawBaseConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
+	cfg, engines, err := loadBaseConfigRaw(projectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
 	return &cfg, engines, nil
+}
+
+// LoadConfig loads and merges shared config layers for the current project.
+func LoadConfig(projectRoot string) (*Config, map[string]EngineConfig, error) {
+	cfg, engines, err := loadBaseConfigRaw(projectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return finalizeLoadedConfig(projectRoot, cfg), engines, nil
+}
+
+// LoadConfigWithManualDraft loads shared config layers, then overlays an
+// explicit manual draft config file such as .goalx/goalx.yaml.
+func LoadConfigWithManualDraft(projectRoot, draftPath string) (*Config, map[string]EngineConfig, error) {
+	cfg, engines, err := loadBaseConfigRaw(projectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := os.Stat(draftPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, fmt.Errorf("manual draft config not found: %s", draftPath)
+		}
+		return nil, nil, fmt.Errorf("manual draft config: %w", err)
+	}
+
+	runCfg, err := LoadYAML[Config](draftPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("manual draft config: %w", err)
+	}
+	mergeConfig(&cfg, &runCfg)
+
+	return finalizeLoadedConfig(projectRoot, cfg), engines, nil
 }
 
 // applyPreset fills in engine/model from the preset if not already set.
@@ -369,16 +390,16 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	}
 	for _, f := range cfg.Target.Files {
 		if strings.HasPrefix(f, "TODO") {
-			return fmt.Errorf("target.files contains placeholder %q — edit goalx.yaml first", f)
+			return fmt.Errorf("target.files contains placeholder %q — edit the manual draft config first", f)
 		}
 	}
 
 	// Check harness
 	if cfg.Harness.Command == "" || strings.HasPrefix(cfg.Harness.Command, "TODO") {
-		return fmt.Errorf("harness.command is required (set in goalx.yaml or .goalx/config.yaml)")
+		return fmt.Errorf("harness.command is required (set in the explicit manual draft config or .goalx/config.yaml)")
 	}
 	if cmd := strings.TrimSpace(cfg.Acceptance.Command); cmd != "" && strings.HasPrefix(cmd, "TODO") {
-		return fmt.Errorf("acceptance.command contains placeholder %q — edit goalx.yaml first", cfg.Acceptance.Command)
+		return fmt.Errorf("acceptance.command contains placeholder %q — edit the manual draft config first", cfg.Acceptance.Command)
 	}
 
 	// Check engine/model can resolve and won't block on known interactive prompts.

@@ -17,23 +17,27 @@ func Start(projectRoot string, args []string) (err error) {
 			fmt.Println(launchUsage("start"))
 			return nil
 		}
-		opts, err := parseStartInitArgs(args)
+		opts, err := parseStartArgs(args)
 		if err != nil {
 			return err
 		}
-		cfg, err = buildLaunchConfig(projectRoot, opts)
-		if err != nil {
-			return err
-		}
-		_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
-		if err != nil {
-			return fmt.Errorf("load base config: %w", err)
+		if opts.ConfigPath != "" {
+			cfg, engines, err = LoadManualDraftConfig(projectRoot, opts.ConfigPath)
+			if err != nil {
+				return fmt.Errorf("load manual draft config: %w", err)
+			}
+		} else {
+			cfg, err = buildLaunchConfig(projectRoot, opts.launchOptions)
+			if err != nil {
+				return err
+			}
+			_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
+			if err != nil {
+				return fmt.Errorf("load base config: %w", err)
+			}
 		}
 	} else {
-		cfg, engines, err = goalx.LoadConfig(projectRoot)
-		if err != nil {
-			return fmt.Errorf("load config: %w", err)
-		}
+		return fmt.Errorf("goalx start requires either an objective with flags or --config PATH for an explicit manual draft")
 	}
 	return startWithConfig(projectRoot, cfg, engines, nil)
 }

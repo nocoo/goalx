@@ -7,6 +7,9 @@ import (
 
 // Stop kills the tmux session for the current run.
 func Stop(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx stop [--run NAME]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

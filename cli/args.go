@@ -32,6 +32,14 @@ func hasHelpArg(args []string) bool {
 	return isHelpToken(args[0])
 }
 
+func printUsageIfHelp(args []string, usage string) bool {
+	if !hasHelpArg(args) {
+		return false
+	}
+	fmt.Println(usage)
+	return true
+}
+
 func parseStatusArgs(args []string) (runName, sessionName string, err error) {
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

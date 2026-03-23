@@ -4,6 +4,9 @@ import "fmt"
 
 // Attach attaches to a tmux session window for the current run.
 func Attach(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx attach [--run NAME] [window]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

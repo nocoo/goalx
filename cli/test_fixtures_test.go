@@ -48,3 +48,15 @@ func writeRootConfigFixture(t *testing.T, projectRoot string, cfg goalx.Config) 
 		t.Fatalf("write root goalx.yaml: %v", err)
 	}
 }
+
+func writeProjectConfigFixture(t *testing.T, projectRoot string, content string) {
+	t.Helper()
+
+	goalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir goalx dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "config.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write project config.yaml: %v", err)
+	}
+}

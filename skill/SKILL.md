@@ -51,7 +51,7 @@ Common path:
 8. `goalx verify` is stricter than "tests passed": it checks the effective acceptance gate, required-item completion, and closeout provenance.
 9. `--parallel` is optional. Treat it as initial fan-out, not as a permanent cap on later master dispatch.
 10. Role defaults are separate. Use `--master`, `--research-role`, and `--develop-role` only when the user wants to override the run's default engine/model split.
-11. `goalx research` and `goalx develop` are direct phase entry points. `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` continue from saved runs. Only use `--write-config` when the user explicitly wants config-first/manual control.
+11. `goalx research` and `goalx develop` are direct phase entry points. `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` continue from saved runs. Only use `--write-config` when the user explicitly wants config-first/manual control, and pair that with `goalx start --config .goalx/goalx.yaml`.
 12. When a project has multiple active runs, use `goalx focus --run NAME` to pin the default run. For targeted actions, always pass `--run NAME`; explicit run targeting is global when the name is unique.
 13. Shared project scope is minimal: `.goalx/config.yaml` is the project-scoped config, while active runs, new saved runs, focus, and status live under `~/.goalx/runs/{projectID}/...`. Older project-scoped saved runs remain readable for compatibility.
 

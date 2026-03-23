@@ -11,6 +11,9 @@ import (
 
 // Review shows a comparative summary of all sessions in a run.
 func Review(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx review [--run NAME]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

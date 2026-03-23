@@ -67,11 +67,11 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 	cfg.Harness = goalx.HarnessConfig{Command: harness}
 
 	if opts.WriteConfig {
-		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx.yaml — implement fixes from %s\n", source.Run)); err != nil {
+		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — implement fixes from %s\n", source.Run)); err != nil {
 			return err
 		}
-		fmt.Printf("Generated %s/.goalx/goalx.yaml (implement from %s)\n", projectRoot, source.Run)
-		fmt.Println("\n  Next: review goalx.yaml, then goalx start")
+		fmt.Printf("Generated manual draft %s (implement from %s)\n", ManualDraftConfigPath(projectRoot), source.Run)
+		fmt.Println("\n  Next: review .goalx/goalx.yaml, then goalx start --config .goalx/goalx.yaml")
 		return nil
 	}
 

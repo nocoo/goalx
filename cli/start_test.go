@@ -103,7 +103,7 @@ esac
 	tmuxSess := goalx.TmuxSessionName(repo, cfg.Name)
 	t.Setenv("GOALX_FAKE_TMUX_FAIL_TARGET", tmuxSess+":master")
 
-	err = Start(repo, nil)
+	err = Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")})
 	if err == nil {
 		t.Fatal("expected Start to fail")
 	}
@@ -210,7 +210,7 @@ esac
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
 
-	if err := Start(repo, nil); err != nil {
+	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 
@@ -365,7 +365,7 @@ esac
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
 
-	if err := Start(repo, nil); err != nil {
+	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 

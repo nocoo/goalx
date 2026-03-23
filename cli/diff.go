@@ -8,6 +8,9 @@ import (
 
 // Diff shows the code diff between two sessions, or a single session vs main.
 func Diff(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx diff [--run NAME] <session-a> [session-b]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

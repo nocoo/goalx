@@ -14,8 +14,8 @@ import (
 const usage = `goalx — autonomous research CLI
 
 Usage:
-  goalx init    "objective" [flags]   Generate goalx.yaml from objective
-  goalx start                         Create run + tmux + launch the master from goalx.yaml
+  goalx init    "objective" [flags]   Generate an explicit manual draft config from an objective
+  goalx start   --config PATH         Create run + tmux + launch the master from an explicit manual draft
   goalx start   "objective" [flags]   Create and start a run directly from CLI flags
   goalx research "objective" [flags]  Start a research run directly from CLI flags
   goalx develop  "objective" [flags]  Start a develop run directly from CLI flags
@@ -49,6 +49,7 @@ Notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   Use --master, --research-role, and --develop-role for role-specific engine/model defaults.
   goalx auto remains the default path; debate/implement/explore require --from RUN unless you choose --write-config.
+  .goalx/config.yaml is the shared project config; .goalx/goalx.yaml is an explicit manual draft only.
 
 Run 'goalx <command> --help' for details.`
 

@@ -254,3 +254,32 @@ func TestDebateHelpPrintsUsage(t *testing.T) {
 		t.Fatalf("debate help missing write-config note:\n%s", out)
 	}
 }
+
+func TestPhaseWriteConfigUsesManualDraft(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Preset:    "claude",
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	out := captureStdout(t, func() {
+		if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+			t.Fatalf("Debate --write-config: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "manual draft") {
+		t.Fatalf("write-config output should describe manual draft, got:\n%s", out)
+	}
+	if !strings.Contains(out, "goalx start --config .goalx/goalx.yaml") {
+		t.Fatalf("write-config output should suggest explicit --config start, got:\n%s", out)
+	}
+}

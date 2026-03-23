@@ -266,9 +266,13 @@ func TestResultReadsLegacyProjectScopedSavedRun(t *testing.T) {
 }
 
 func TestResultHelpPrintsUsage(t *testing.T) {
-	err := Result(t.TempDir(), []string{"--help"})
-	if err == nil || !strings.Contains(err.Error(), "usage: goalx result [NAME] [--full]") {
-		t.Fatalf("Result --help error = %v", err)
+	out := captureStdout(t, func() {
+		if err := Result(t.TempDir(), []string{"--help"}); err != nil {
+			t.Fatalf("Result --help: %v", err)
+		}
+	})
+	if !strings.Contains(out, "usage: goalx result [NAME] [--full]") {
+		t.Fatalf("Result --help output = %q", out)
 	}
 }
 

@@ -8,8 +8,8 @@ import (
 
 // Drop cleans up a run so the same name can be reused safely.
 func Drop(projectRoot string, args []string) error {
-	if hasHelpArg(args) {
-		return fmt.Errorf("usage: goalx drop [--run NAME]")
+	if printUsageIfHelp(args, "usage: goalx drop [--run NAME]") {
+		return nil
 	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

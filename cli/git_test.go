@@ -389,19 +389,34 @@ func TestInitBootstrapsGoalxExcludeRule(t *testing.T) {
 	}
 }
 
-func TestSaveDropArchiveHelpPrintUsage(t *testing.T) {
+func TestDirectCommandHelpPrintUsage(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		run  func() error
 		want string
 	}{
+		{name: "list", run: func() error { return List(t.TempDir(), []string{"--help"}) }, want: "usage: goalx list"},
+		{name: "attach", run: func() error { return Attach(t.TempDir(), []string{"--help"}) }, want: "usage: goalx attach [--run NAME] [window]"},
+		{name: "stop", run: func() error { return Stop(t.TempDir(), []string{"--help"}) }, want: "usage: goalx stop [--run NAME]"},
+		{name: "review", run: func() error { return Review(t.TempDir(), []string{"--help"}) }, want: "usage: goalx review [--run NAME]"},
+		{name: "diff", run: func() error { return Diff(t.TempDir(), []string{"--help"}) }, want: "usage: goalx diff [--run NAME] <session-a> [session-b]"},
+		{name: "keep", run: func() error { return Keep(t.TempDir(), []string{"--help"}) }, want: "usage: goalx keep [--run NAME] <session-name>"},
+		{name: "park", run: func() error { return Park(t.TempDir(), []string{"--help"}) }, want: "usage: goalx park [--run NAME] <session-name>"},
+		{name: "resume", run: func() error { return Resume(t.TempDir(), []string{"--help"}) }, want: "usage: goalx resume [--run NAME] <session-name>"},
 		{name: "save", run: func() error { return Save(t.TempDir(), []string{"--help"}) }, want: "usage: goalx save [NAME]"},
+		{name: "verify", run: func() error { return Verify(t.TempDir(), []string{"--help"}) }, want: "usage: goalx verify [--run NAME]"},
 		{name: "drop", run: func() error { return Drop(t.TempDir(), []string{"--help"}) }, want: "usage: goalx drop [--run NAME]"},
+		{name: "report", run: func() error { return Report(t.TempDir(), []string{"--help"}) }, want: "usage: goalx report [--run NAME]"},
 		{name: "archive", run: func() error { return Archive(t.TempDir(), []string{"--help"}) }, want: "usage: goalx archive [--run NAME] <session-name>"},
+		{name: "serve", run: func() error { return Serve(t.TempDir(), []string{"--help"}) }, want: "usage: goalx serve"},
 	} {
-		err := tc.run()
-		if err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Fatalf("%s --help error = %v, want %q", tc.name, err, tc.want)
+		out := captureStdout(t, func() {
+			if err := tc.run(); err != nil {
+				t.Fatalf("%s --help: %v", tc.name, err)
+			}
+		})
+		if !strings.Contains(out, tc.want) {
+			t.Fatalf("%s --help output = %q, want %q", tc.name, out, tc.want)
 		}
 	}
 }

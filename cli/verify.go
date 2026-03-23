@@ -12,6 +12,9 @@ import (
 
 // Verify executes the run's acceptance command and records the result.
 func Verify(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx verify [--run NAME]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

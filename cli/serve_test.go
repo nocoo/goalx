@@ -163,6 +163,13 @@ func TestServeHandlerGoalxActionRoutes(t *testing.T) {
 			wantArgs:   []string{"implement serve", "--develop", "--parallel", "1"},
 		},
 		{
+			name:       "start from manual draft",
+			path:       "/projects/goalx/goalx/start",
+			body:       `{"config_scope":"draft"}`,
+			wantAction: "start",
+			wantArgs:   []string{"--config", filepath.Join(workspace, ".goalx", "goalx.yaml")},
+		},
+		{
 			name:       "auto",
 			path:       "/projects/goalx/goalx/auto",
 			body:       `{"objective":"research remote management","mode":"research","parallel":3}`,
@@ -275,15 +282,19 @@ func TestServeHandlerGoalxActionRoutes(t *testing.T) {
 	}
 }
 
-func TestServeHandlerConfigEndpointReadsAndWritesGoalxYAML(t *testing.T) {
+func TestServeHandlerConfigEndpointDistinguishesSharedAndDraft(t *testing.T) {
 	workspace := t.TempDir()
 	cfgDir := filepath.Join(workspace, ".goalx")
 	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
 		t.Fatalf("mkdir cfg dir: %v", err)
 	}
-	cfgPath := filepath.Join(cfgDir, "goalx.yaml")
-	if err := os.WriteFile(cfgPath, []byte("name: before\n"), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
+	sharedPath := filepath.Join(cfgDir, "config.yaml")
+	if err := os.WriteFile(sharedPath, []byte("parallel: 2\n"), 0o644); err != nil {
+		t.Fatalf("write shared config: %v", err)
+	}
+	draftPath := filepath.Join(cfgDir, "goalx.yaml")
+	if err := os.WriteFile(draftPath, []byte("name: before\n"), 0o644); err != nil {
+		t.Fatalf("write draft config: %v", err)
 	}
 
 	app := newServeApp(goalx.ServeConfig{
@@ -291,7 +302,7 @@ func TestServeHandlerConfigEndpointReadsAndWritesGoalxYAML(t *testing.T) {
 		Workspaces: map[string]string{"goalx": workspace},
 	})
 
-	writeReq := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{"content":"name: after\nmode: research\n"}`))
+	writeReq := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{"content":"parallel: 4\n"}`))
 	writeReq.Header.Set("Authorization", "Bearer secret-token")
 	writeRec := httptest.NewRecorder()
 	app.routes().ServeHTTP(writeRec, writeReq)
@@ -300,12 +311,12 @@ func TestServeHandlerConfigEndpointReadsAndWritesGoalxYAML(t *testing.T) {
 		t.Fatalf("write status = %d, want %d, body=%s", writeRec.Code, http.StatusOK, writeRec.Body.String())
 	}
 
-	data, err := os.ReadFile(cfgPath)
+	data, err := os.ReadFile(sharedPath)
 	if err != nil {
-		t.Fatalf("read config: %v", err)
+		t.Fatalf("read shared config: %v", err)
 	}
-	if string(data) != "name: after\nmode: research\n" {
-		t.Fatalf("goalx.yaml = %q", string(data))
+	if string(data) != "parallel: 4\n" {
+		t.Fatalf("config.yaml = %q", string(data))
 	}
 
 	readReq := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{}`))
@@ -319,12 +330,34 @@ func TestServeHandlerConfigEndpointReadsAndWritesGoalxYAML(t *testing.T) {
 
 	var resp struct {
 		Content string `json:"content"`
+		Path    string `json:"path"`
 	}
 	if err := json.Unmarshal(readRec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode config response: %v", err)
 	}
-	if resp.Content != "name: after\nmode: research\n" {
+	if resp.Content != "parallel: 4\n" {
 		t.Fatalf("content = %q", resp.Content)
+	}
+	if resp.Path != sharedPath {
+		t.Fatalf("path = %q, want %q", resp.Path, sharedPath)
+	}
+
+	draftReq := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/config", bytes.NewBufferString(`{"config_scope":"draft"}`))
+	draftReq.Header.Set("Authorization", "Bearer secret-token")
+	draftRec := httptest.NewRecorder()
+	app.routes().ServeHTTP(draftRec, draftReq)
+
+	if draftRec.Code != http.StatusOK {
+		t.Fatalf("draft read status = %d, want %d, body=%s", draftRec.Code, http.StatusOK, draftRec.Body.String())
+	}
+	if err := json.Unmarshal(draftRec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode draft response: %v", err)
+	}
+	if resp.Content != "name: before\n" {
+		t.Fatalf("draft content = %q", resp.Content)
+	}
+	if resp.Path != draftPath {
+		t.Fatalf("draft path = %q, want %q", resp.Path, draftPath)
 	}
 }
 
@@ -336,8 +369,8 @@ func TestServeHandlerConfigEndpointCanReadRunSpec(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(workspace, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir workspace .goalx: %v", err)
 	}
-	rootCfgPath := filepath.Join(workspace, ".goalx", "goalx.yaml")
-	if err := os.WriteFile(rootCfgPath, []byte("name: root\nmode: research\n"), 0o644); err != nil {
+	rootCfgPath := filepath.Join(workspace, ".goalx", "config.yaml")
+	if err := os.WriteFile(rootCfgPath, []byte("parallel: 2\n"), 0o644); err != nil {
 		t.Fatalf("write root config: %v", err)
 	}
 
@@ -380,8 +413,8 @@ func TestServeHandlerConfigEndpointCanReadRunSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read root config: %v", err)
 	}
-	if string(rootData) != "name: root\nmode: research\n" {
-		t.Fatalf("root goalx.yaml should stay unchanged, got %q", string(rootData))
+	if string(rootData) != "parallel: 2\n" {
+		t.Fatalf("root config.yaml should stay unchanged, got %q", string(rootData))
 	}
 }
 

@@ -60,11 +60,15 @@ type serveActionRequest struct {
 	DevelopRole   string   `json:"develop_role"`
 	BudgetSeconds int      `json:"budget_seconds"`
 	WriteConfig   bool     `json:"write_config"`
+	ConfigScope   string   `json:"config_scope"`
 }
 
 var serveOutputMu sync.Mutex
 
 func Serve(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx serve") {
+		return nil
+	}
 	if len(args) > 0 {
 		return fmt.Errorf("usage: goalx serve")
 	}
@@ -168,7 +172,7 @@ func (a *serveApp) handleGoalxAction(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	args, err := buildServeCLIArgs(action, req)
+	args, err := buildServeCLIArgs(project.Path, action, req)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, err)
 		return
@@ -188,15 +192,25 @@ func (a *serveApp) handleGoalxAction(w http.ResponseWriter, r *http.Request, pro
 }
 
 func (a *serveApp) handleConfigAction(w http.ResponseWriter, projectRoot string, req serveActionRequest) {
-	cfgPath := filepath.Join(projectRoot, ".goalx", "goalx.yaml")
-	runScoped := req.Run != ""
-	if req.Run != "" {
+	cfgPath := SharedProjectConfigPath(projectRoot)
+	runScoped := strings.TrimSpace(req.Run) != ""
+	if runScoped {
 		cfgPath = RunSpecPath(goalx.RunDir(projectRoot, req.Run))
+	} else {
+		switch strings.TrimSpace(req.ConfigScope) {
+		case "", "project":
+			cfgPath = SharedProjectConfigPath(projectRoot)
+		case "draft":
+			cfgPath = ManualDraftConfigPath(projectRoot)
+		default:
+			writeJSONError(w, http.StatusBadRequest, fmt.Errorf("unknown config_scope %q", req.ConfigScope))
+			return
+		}
 	}
 	content := req.Content
 	if content != "" {
 		if runScoped {
-			writeJSONError(w, http.StatusBadRequest, fmt.Errorf("run spec is immutable; edit project .goalx/goalx.yaml or redirect the active run"))
+			writeJSONError(w, http.StatusBadRequest, fmt.Errorf("run spec is immutable; edit shared project config or an explicit manual draft instead"))
 			return
 		}
 		if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
@@ -435,7 +449,7 @@ func decodeServeActionRequest(r *http.Request) (serveActionRequest, error) {
 	return req, nil
 }
 
-func buildServeCLIArgs(action string, req serveActionRequest) ([]string, error) {
+func buildServeCLIArgs(projectRoot, action string, req serveActionRequest) ([]string, error) {
 	switch action {
 	case "init":
 		if strings.TrimSpace(req.Objective) == "" {
@@ -444,7 +458,10 @@ func buildServeCLIArgs(action string, req serveActionRequest) ([]string, error) 
 		return buildServeStartInitArgs(req), nil
 	case "start":
 		if strings.TrimSpace(req.Objective) == "" {
-			return nil, nil
+			if strings.TrimSpace(req.ConfigScope) == "draft" {
+				return []string{"--config", ManualDraftConfigPath(projectRoot)}, nil
+			}
+			return nil, fmt.Errorf("objective is required unless config_scope=draft")
 		}
 		return buildServeStartInitArgs(req), nil
 	case "auto":

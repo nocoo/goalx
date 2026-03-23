@@ -9,6 +9,9 @@ import (
 
 // Report prints a formatted report of run progress from journals.
 func Report(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx report [--run NAME]") {
+		return nil
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err

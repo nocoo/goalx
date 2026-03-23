@@ -9,7 +9,7 @@ Choose this path only when the user explicitly wants to inspect or edit config b
 ```bash
 goalx init "goal"
 # edit .goalx/goalx.yaml only if the user explicitly asks
-goalx start
+goalx start --config .goalx/goalx.yaml
 ```
 
 Do not choose this path by default. Prefer:
@@ -46,7 +46,7 @@ Prefer durable GoalX commands over direct tmux input:
 - `goalx explore --from RUN` to start a follow-up research phase from a saved run
 - `--master engine/model`, `--research-role engine/model`, and `--develop-role engine/model` to override role defaults
 - `--parallel N` to change the initial fan-out for this run or phase; omit it to keep project/preset defaults
-- `--write-config` only when the user explicitly wants to generate `.goalx/goalx.yaml` first
+- `--write-config` only when the user explicitly wants to generate `.goalx/goalx.yaml` first, then continue with `goalx start --config .goalx/goalx.yaml`
 - `goalx park --run NAME session-N` to pause a session without losing its worktree
 - `goalx resume --run NAME session-N` to restart a parked session
 - `goalx keep --run NAME session-N` to merge a develop session branch

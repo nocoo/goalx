@@ -24,6 +24,10 @@ type launchOptions struct {
 }
 
 type startInitOptions = launchOptions
+type startOptions struct {
+	launchOptions
+	ConfigPath string
+}
 
 func wantsHelp(args []string) bool {
 	if len(args) == 0 {
@@ -41,9 +45,10 @@ func launchUsage(command string) string {
 	switch command {
 	case "start":
 		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+       goalx start --config PATH
 
-advanced/manual path without flags:
-  goalx start
+advanced/manual path:
+  goalx start --config .goalx/goalx.yaml
 
 notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
@@ -52,7 +57,7 @@ notes:
 		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
-  this is the advanced config-first path and writes .goalx/goalx.yaml.
+  this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master, --research-role, --develop-role.`
 	case "auto":
@@ -169,4 +174,24 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {
 	return parseLaunchOptions(args, goalx.ModeDevelop, true)
+}
+
+func parseStartArgs(args []string) (startOptions, error) {
+	opts := startOptions{}
+	if len(args) == 0 {
+		return opts, nil
+	}
+	if args[0] == "--config" {
+		if len(args) != 2 {
+			return opts, fmt.Errorf("usage: goalx start --config PATH")
+		}
+		opts.ConfigPath = args[1]
+		return opts, nil
+	}
+	launch, err := parseLaunchOptions(args, goalx.ModeDevelop, true)
+	if err != nil {
+		return opts, err
+	}
+	opts.launchOptions = launch
+	return opts, nil
 }

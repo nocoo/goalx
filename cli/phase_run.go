@@ -165,7 +165,7 @@ func writePhaseConfig(projectRoot string, cfg *goalx.Config, header string) erro
 	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
 		return err
 	}
-	outPath := filepath.Join(goalxDir, "goalx.yaml")
+	outPath := ManualDraftConfigPath(projectRoot)
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

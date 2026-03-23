@@ -7,8 +7,8 @@ import (
 
 // Archive creates a git tag for a session branch, preserving it.
 func Archive(projectRoot string, args []string) error {
-	if hasHelpArg(args) {
-		return fmt.Errorf("usage: goalx archive [--run NAME] <session-name>")
+	if printUsageIfHelp(args, "usage: goalx archive [--run NAME] <session-name>") {
+		return nil
 	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

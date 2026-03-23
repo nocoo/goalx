@@ -13,8 +13,8 @@ import (
 
 // Save copies run artifacts to user-scoped durable storage.
 func Save(projectRoot string, args []string) error {
-	if hasHelpArg(args) {
-		return fmt.Errorf("usage: goalx save [NAME]")
+	if printUsageIfHelp(args, "usage: goalx save [NAME]") {
+		return nil
 	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

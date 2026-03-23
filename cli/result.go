@@ -20,8 +20,8 @@ type selectionJSON struct {
 // Result prints the saved result for a run. Research runs print summary.md,
 // develop runs print the kept session plus branch history and diff stat.
 func Result(projectRoot string, args []string) error {
-	if hasHelpArg(args) {
-		return fmt.Errorf("usage: goalx result [NAME] [--full]")
+	if printUsageIfHelp(args, "usage: goalx result [NAME] [--full]") {
+		return nil
 	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
