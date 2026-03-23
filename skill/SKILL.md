@@ -37,7 +37,7 @@ Common path:
 - Watch progress with `goalx observe` or `goalx status`
 - Redirect the master only when the goal or constraints change
 - Run `goalx verify` before treating a develop run as done
-- Use `goalx save` and `goalx result` for durable closeout
+- Use `goalx save` and `goalx result` for durable closeout in user-scoped saved runs
 
 ## Autonomy Rules
 
@@ -53,6 +53,7 @@ Common path:
 10. Role defaults are separate. Use `--master`, `--research-role`, and `--develop-role` only when the user wants to override the run's default engine/model split.
 11. `goalx research` and `goalx develop` are direct phase entry points. `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` continue from saved runs. Only use `--write-config` when the user explicitly wants config-first/manual control.
 12. When a project has multiple active runs, use `goalx focus --run NAME` to pin the default run. For targeted actions, always pass `--run NAME`; explicit run targeting is global when the name is unique.
+13. Shared project scope is minimal: `.goalx/config.yaml` is the project-scoped config, while active runs, new saved runs, focus, and status live under `~/.goalx/runs/{projectID}/...`. Older project-scoped saved runs remain readable for compatibility.
 
 ## Common Commands
 
@@ -70,7 +71,7 @@ Common path:
 - `goalx tell --run NAME "direction"`: durable redirect to the master or a specific session
 - `goalx verify --run NAME`: acceptance gate plus goal/closeout validation
 - `goalx save --run NAME`: durable artifacts and run closeout
-- `goalx result --run NAME`: saved summary (`--full` for raw report)
+- `goalx result --run NAME`: saved summary from user-scoped durable storage (`--full` for raw report)
 - `goalx focus --run NAME`: set the default run for commands that omit `--run`
 
 ## Advanced Control

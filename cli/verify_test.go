@@ -84,7 +84,7 @@ acceptance:
 		}
 	}
 
-	statusData, err := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
 	if err != nil {
 		t.Fatalf("read status.json: %v", err)
 	}
@@ -297,7 +297,7 @@ acceptance:
 		t.Fatalf("Verify: %v", err)
 	}
 
-	statusData, err := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
 	if err != nil {
 		t.Fatalf("read status.json: %v", err)
 	}

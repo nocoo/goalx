@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDebatePreservesSavedMasterConfig(t *testing.T) {
@@ -164,7 +165,7 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 		Preset:    "claude",
 		Parallel:  1,
 	}, nil)
-	runDir := filepath.Join(projectRoot, ".goalx", "runs", "research-a")
+	runDir := SavedRunDir(projectRoot, "research-a")
 	reportPath := filepath.Join(runDir, "custom-findings.txt")
 	if err := os.WriteFile(reportPath, []byte("report\n"), 0o644); err != nil {
 		t.Fatalf("write custom report: %v", err)
@@ -202,6 +203,40 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("context.files = %#v, want %q from artifacts manifest", cfg.Context.Files, reportPath)
+	}
+}
+
+func TestDebateReadsLegacyProjectScopedSavedRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runDir := LegacySavedRunDir(projectRoot, "research-a")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir legacy saved run: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Preset:    "claude",
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "session-1-report.md"), []byte("# report\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+		t.Fatalf("Debate: %v", err)
 	}
 }
 

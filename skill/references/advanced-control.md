@@ -28,6 +28,9 @@ goalx explore --from RUN
 - `goalx focus --run NAME` pins the default run for commands that omit `--run`
 - `--run NAME` resolution is global when the run name is unique
 - If names collide across projects, use `--run <project-id>/<run>`
+- Active runs, new saved runs, focus, and status are user-scoped under `~/.goalx/runs/{projectID}/...`
+- Older project-scoped saved runs remain readable for compatibility, but new saves go to user scope
+- `.goalx/config.yaml` is the shared project-scoped config file
 
 ## Manual Intervention
 

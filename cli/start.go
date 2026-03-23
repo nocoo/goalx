@@ -116,7 +116,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	goalContractPath := GoalContractPath(runDir)
 	acceptancePath := AcceptanceChecklistPath(runDir)
 	acceptanceStatePath := AcceptanceStatePath(runDir)
-	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	statusPath := ProjectStatusCachePath(projectRoot)
 
 	if err := EnsureEngineTrusted(cfg.Master.Engine, absProjectRoot); err != nil {
 		return fmt.Errorf("trust bootstrap master: %w", err)

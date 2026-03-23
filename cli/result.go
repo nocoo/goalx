@@ -2,11 +2,11 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	goalx "github.com/vonbai/goalx"
@@ -20,6 +20,9 @@ type selectionJSON struct {
 // Result prints the saved result for a run. Research runs print summary.md,
 // develop runs print the kept session plus branch history and diff stat.
 func Result(projectRoot string, args []string) error {
+	if hasHelpArg(args) {
+		return fmt.Errorf("usage: goalx result [NAME] [--full]")
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -41,10 +44,21 @@ func Result(projectRoot string, args []string) error {
 		return fmt.Errorf("usage: goalx result [NAME] [--full]")
 	}
 
-	runDir, err := resolveSavedRunDir(projectRoot, runName)
+	location, err := ResolveSavedRunLocation(projectRoot, runName)
 	if err != nil {
+		var multipleErr MultipleSavedRunsError
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			if strings.TrimSpace(runName) != "" {
+				return fmt.Errorf("saved run %q not found", runName)
+			}
+			return fmt.Errorf("no saved runs found")
+		case errors.As(err, &multipleErr):
+			return fmt.Errorf("%s (specify NAME)", multipleErr.Error())
+		}
 		return err
 	}
+	runDir := location.Dir
 
 	cfg, err := LoadSavedRunSpec(runDir)
 	if err != nil {
@@ -192,32 +206,6 @@ func summarizeSectionLines(section string, limit int) string {
 		return strings.Join(lines, "\n")
 	}
 	return strings.Join(append(lines[:limit], fmt.Sprintf("... (%d more lines)", len(lines)-limit)), "\n")
-}
-
-func resolveSavedRunDir(projectRoot, runName string) (string, error) {
-	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
-	if runName == "" {
-		entries, err := os.ReadDir(savesDir)
-		if err != nil {
-			return "", fmt.Errorf("read saved runs: %w", err)
-		}
-		var names []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				names = append(names, entry.Name())
-			}
-		}
-		switch len(names) {
-		case 0:
-			return "", fmt.Errorf("no saved runs found")
-		case 1:
-			return filepath.Join(savesDir, names[0]), nil
-		default:
-			sort.Strings(names)
-			return "", fmt.Errorf("multiple saved runs: %s (specify NAME)", strings.Join(names, ", "))
-		}
-	}
-	return filepath.Join(savesDir, runName), nil
 }
 
 func loadResultSelection(projectRoot, savedRunDir, runName string) (*selectionJSON, error) {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -108,7 +107,7 @@ func Verify(projectRoot string, args []string) error {
 		if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 			return fmt.Errorf("save acceptance state: %w", err)
 		}
-		if err := updateStatusWithAcceptance(filepath.Join(rc.ProjectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
+		if err := updateStatusWithAcceptance(ProjectStatusCachePath(rc.ProjectRoot), state, contractSummary, completion); err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
 		if runErr != nil {
@@ -128,7 +127,7 @@ func Verify(projectRoot string, args []string) error {
 	if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 		return fmt.Errorf("save acceptance state: %w", err)
 	}
-	if err := updateStatusWithAcceptance(filepath.Join(rc.ProjectRoot, ".goalx", "status.json"), state, contractSummary, completion); err != nil {
+	if err := updateStatusWithAcceptance(ProjectStatusCachePath(rc.ProjectRoot), state, contractSummary, completion); err != nil {
 		return fmt.Errorf("update status: %w", err)
 	}
 

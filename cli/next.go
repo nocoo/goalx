@@ -11,10 +11,12 @@ import (
 )
 
 // Next detects the current pipeline state and suggests the next action.
-func Next(projectRoot string, _ []string) error {
-	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
-	savesDir := filepath.Join(projectRoot, ".goalx", "runs")
+func Next(projectRoot string, args []string) error {
+	if hasHelpArg(args) {
+		fmt.Println("usage: goalx next")
+		return nil
+	}
+	runsDir := ProjectDataDir(projectRoot)
 	reg, _ := LoadProjectRegistry(projectRoot)
 	focusedRun := ""
 	if reg != nil && reg.FocusedRun != "" {
@@ -46,7 +48,7 @@ func Next(projectRoot string, _ []string) error {
 	if len(completedRuns) == 1 {
 		completedRun := completedRuns[0]
 		fmt.Printf("Completed run: %s (not yet saved)\n", completedRun)
-		fmt.Printf("  → goalx save %s    # save artifacts to .goalx/runs/\n", completedRun)
+		fmt.Printf("  → goalx save %s    # save artifacts to user-scoped durable storage\n", completedRun)
 		fmt.Printf("  → goalx review %s  # inspect results\n", completedRun)
 		fmt.Printf("  → goalx drop %s    # clean up worktrees\n", completedRun)
 		return nil
@@ -59,7 +61,7 @@ func Next(projectRoot string, _ []string) error {
 		return nil
 	}
 
-	// Check saved runs in .goalx/runs/
+	// Check saved runs in durable storage, preferring user scope and falling back to legacy project scope.
 	hasSaves := false
 	latestDebate := ""
 	latestResearch := ""
@@ -68,42 +70,34 @@ func Next(projectRoot string, _ []string) error {
 	latestResearchTime := int64(0)
 	latestAnyTime := int64(0)
 
-	if entries, err := os.ReadDir(savesDir); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
+	if locations, err := ListSavedRunLocations(projectRoot); err == nil {
+		for _, loc := range locations {
 			hasSaves = true
-			dir := filepath.Join(savesDir, e.Name())
-			cfg, err := LoadSavedRunSpec(dir)
+			cfg, err := LoadSavedRunSpec(loc.Dir)
 			if err != nil {
 				continue
 			}
-			info, _ := e.Info()
-			modTime := int64(0)
-			if info != nil {
-				modTime = info.ModTime().Unix()
+			info, err := os.Stat(loc.Dir)
+			if err != nil {
+				continue
 			}
+			modTime := info.ModTime().Unix()
 			if modTime >= latestAnyTime {
 				latestAnyTime = modTime
-				latestAny = e.Name()
+				latestAny = loc.Name
 			}
-			meta, _ := LoadRunMetadata(filepath.Join(dir, "run-metadata.json"))
+			meta, _ := LoadRunMetadata(filepath.Join(loc.Dir, "run-metadata.json"))
 			phaseKind := ""
 			if meta != nil {
 				phaseKind = meta.PhaseKind
 			}
-			if phaseKind == "debate" {
-				if modTime >= latestDebateTime {
-					latestDebateTime = modTime
-					latestDebate = e.Name()
-				}
+			if phaseKind == "debate" && modTime >= latestDebateTime {
+				latestDebateTime = modTime
+				latestDebate = loc.Name
 			}
-			if cfg.Mode == goalx.ModeResearch {
-				if modTime >= latestResearchTime {
-					latestResearchTime = modTime
-					latestResearch = e.Name()
-				}
+			if cfg.Mode == goalx.ModeResearch && modTime >= latestResearchTime {
+				latestResearchTime = modTime
+				latestResearch = loc.Name
 			}
 		}
 	}
@@ -152,7 +146,7 @@ func findActiveRuns(reg *ProjectRegistry, projectRoot, runsDir string) []string 
 	}
 	var active []string
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() || e.Name() == "saved" {
 			continue
 		}
 		tmuxSess := goalx.TmuxSessionName(projectRoot, e.Name())
@@ -177,7 +171,7 @@ func findCompletedRuns(reg *ProjectRegistry, projectRoot, runsDir string) []stri
 	}
 	var completed []string
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() || e.Name() == "saved" {
 			continue
 		}
 		name := e.Name()

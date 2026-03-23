@@ -25,6 +25,13 @@ func extractRunFlag(args []string) (string, []string, error) {
 	return runName, rest, nil
 }
 
+func hasHelpArg(args []string) bool {
+	if len(args) != 1 {
+		return false
+	}
+	return isHelpToken(args[0])
+}
+
 func parseStatusArgs(args []string) (runName, sessionName string, err error) {
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

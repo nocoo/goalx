@@ -11,9 +11,11 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-// Save copies run artifacts (reports, summary, config snapshot) to .goalx/runs/<name>/.
-// This preserves results locally after archive/drop without polluting the git repo.
+// Save copies run artifacts to user-scoped durable storage.
 func Save(projectRoot string, args []string) error {
+	if hasHelpArg(args) {
+		return fmt.Errorf("usage: goalx save [NAME]")
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -31,7 +33,7 @@ func Save(projectRoot string, args []string) error {
 		return err
 	}
 
-	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Name)
+	saveDir := SavedRunDir(rc.ProjectRoot, rc.Name)
 	if err := os.MkdirAll(saveDir, 0755); err != nil {
 		return fmt.Errorf("create save dir: %w", err)
 	}

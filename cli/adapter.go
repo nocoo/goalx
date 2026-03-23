@@ -28,7 +28,7 @@ func GenerateAdapter(engine, worktreePath, guidancePath string) error {
 }
 
 // GenerateMasterAdapter configures a project-level Stop hook for the master
-// agent so it does not exit before status.json reaches phase=complete.
+// agent so it does not exit before the status cache reaches phase=complete.
 func GenerateMasterAdapter(engine, projectRoot, statusPath string) error {
 	if engine != "claude-code" {
 		return nil

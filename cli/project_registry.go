@@ -29,7 +29,7 @@ type ProjectRegistry struct {
 }
 
 func ProjectRegistryPath(projectRoot string) string {
-	return filepath.Join(projectRoot, ".goalx", "runs.json")
+	return filepath.Join(ProjectDataDir(projectRoot), "registry.json")
 }
 
 func LoadProjectRegistry(projectRoot string) (*ProjectRegistry, error) {
@@ -194,8 +194,7 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 		return "", fmt.Errorf("multiple active runs: %s (specify --run)", strings.Join(sortedRunNames(reg.ActiveRuns), ", "))
 	}
 
-	home, _ := os.UserHomeDir()
-	runsDir := filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
+	runsDir := ProjectDataDir(projectRoot)
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -205,7 +204,7 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && e.Name() != "saved" {
 			names = append(names, e.Name())
 		}
 	}

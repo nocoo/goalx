@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,7 +26,14 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	if runName == "" {
 		return nil, fmt.Errorf("saved run name is required")
 	}
-	runDir := filepath.Join(projectRoot, ".goalx", "runs", runName)
+	location, err := ResolveSavedRunLocation(projectRoot, runName)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("saved run %q not found", runName)
+		}
+		return nil, err
+	}
+	runDir := location.Dir
 	cfg, err := LoadSavedRunSpec(runDir)
 	if err != nil {
 		return nil, fmt.Errorf("load saved run %q: %w", runName, err)

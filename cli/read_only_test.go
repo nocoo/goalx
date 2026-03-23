@@ -30,7 +30,7 @@ func TestObserveLeavesRunAndStatusStateUntouched(t *testing.T) {
 	}
 
 	assertFileUnchanged(t, RunRuntimeStatePath(runDir), runStateBefore)
-	assertFileUnchanged(t, filepath.Join(repo, ".goalx", "status.json"), statusBefore)
+	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 	assertTmuxTouched(t, logPath)
 }
 
@@ -64,7 +64,7 @@ func TestStatusLeavesRunAndStatusStateUntouched(t *testing.T) {
 	}
 
 	assertFileUnchanged(t, RunRuntimeStatePath(runDir), runStateBefore)
-	assertFileUnchanged(t, filepath.Join(repo, ".goalx", "status.json"), statusBefore)
+	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 }
 
 func TestReportLeavesRunAndStatusStateUntouched(t *testing.T) {
@@ -86,7 +86,7 @@ func TestReportLeavesRunAndStatusStateUntouched(t *testing.T) {
 	}
 
 	assertFileUnchanged(t, RunRuntimeStatePath(runDir), runStateBefore)
-	assertFileUnchanged(t, filepath.Join(repo, ".goalx", "status.json"), statusBefore)
+	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 }
 
 func TestSaveLeavesRunAndStatusStateUntouched(t *testing.T) {
@@ -110,7 +110,7 @@ func TestSaveLeavesRunAndStatusStateUntouched(t *testing.T) {
 	}
 
 	assertFileUnchanged(t, RunRuntimeStatePath(runDir), runStateBefore)
-	assertFileUnchanged(t, filepath.Join(repo, ".goalx", "status.json"), statusBefore)
+	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 }
 
 func TestVerifyDoesNotRewriteRunStateFromStatus(t *testing.T) {
@@ -148,7 +148,10 @@ func TestVerifyDoesNotRewriteRunStateFromStatus(t *testing.T) {
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, ".goalx", "status.json"), []byte(`{"run":"verify-run","phase":"working","recommendation":"keep going"}`), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(ProjectStatusCachePath(repo)), 0o755); err != nil {
+		t.Fatalf("mkdir status dir: %v", err)
+	}
+	if err := os.WriteFile(ProjectStatusCachePath(repo), []byte(`{"run":"verify-run","phase":"working","recommendation":"keep going"}`), 0o644); err != nil {
 		t.Fatalf("write status cache: %v", err)
 	}
 	if err := os.WriteFile(GoalContractPath(runDir), []byte(`{"version":1,"objective":"ship feature","items":[{"id":"req-1","kind":"user_required","requirement":"ship feature","status":"done","satisfaction_basis":"preexisting"}]}`), 0o644); err != nil {
@@ -197,7 +200,10 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 		t.Fatalf("write run state: %v", err)
 	}
 	statusBefore := []byte(`{"run":"readonly-run","phase":"working","recommendation":"keep going","heartbeat":7,"heartbeat_seq":7,"heartbeat_lag":2,"master_wake_pending":true,"master_stale":false,"active":true}`)
-	if err := os.WriteFile(filepath.Join(repo, ".goalx", "status.json"), statusBefore, 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(ProjectStatusCachePath(repo)), 0o755); err != nil {
+		t.Fatalf("mkdir status dir: %v", err)
+	}
+	if err := os.WriteFile(ProjectStatusCachePath(repo), statusBefore, 0o644); err != nil {
 		t.Fatalf("write status cache: %v", err)
 	}
 	return runName, runDir, runStateBefore, statusBefore

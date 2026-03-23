@@ -184,7 +184,7 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 		Preset:    "claude",
 		Parallel:  1,
 	}, nil)
-	runDir := filepath.Join(projectRoot, ".goalx", "runs", "debate")
+	runDir := SavedRunDir(projectRoot, "debate")
 	reportPath := filepath.Join(runDir, "custom-findings.txt")
 	if err := os.WriteFile(reportPath, []byte("report\n"), 0o644); err != nil {
 		t.Fatalf("write custom report: %v", err)

@@ -105,7 +105,7 @@ acceptance:
 		t.Fatalf("acceptance evidence missing goal contract failure:\n%s", evidenceData)
 	}
 
-	statusData, readErr := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	statusData, readErr := os.ReadFile(ProjectStatusCachePath(repo))
 	if readErr != nil {
 		t.Fatalf("read status.json: %v", readErr)
 	}
@@ -182,7 +182,7 @@ acceptance:
 		t.Fatalf("Verify: %v", err)
 	}
 
-	statusData, err := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
 	if err != nil {
 		t.Fatalf("read status.json: %v", err)
 	}

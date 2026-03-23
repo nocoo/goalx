@@ -48,7 +48,7 @@ func TestSaveUsesConfiguredResearchTargetFile(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	savedPath := filepath.Join(projectRoot, ".goalx", "runs", runName, "session-1-report.md")
+	savedPath := filepath.Join(SavedRunDir(projectRoot, runName), "session-1-report.md")
 	got, err := os.ReadFile(savedPath)
 	if err != nil {
 		t.Fatalf("read saved report: %v", err)
@@ -114,7 +114,7 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	savedPath := filepath.Join(projectRoot, ".goalx", "runs", runName, "session-1-report.md")
+	savedPath := filepath.Join(SavedRunDir(projectRoot, runName), "session-1-report.md")
 	got, err := os.ReadFile(savedPath)
 	if err != nil {
 		t.Fatalf("read saved report: %v", err)
@@ -123,7 +123,7 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 		t.Fatalf("saved report = %q, want %q", string(got), want+"\n")
 	}
 
-	manifest, err := LoadArtifacts(filepath.Join(projectRoot, ".goalx", "runs", runName, "artifacts.json"))
+	manifest, err := LoadArtifacts(filepath.Join(SavedRunDir(projectRoot, runName), "artifacts.json"))
 	if err != nil {
 		t.Fatalf("LoadArtifacts: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestSaveCopiesGoalContractState(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(projectRoot, ".goalx", "runs", runName, "goal-contract.json"))
+	got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "goal-contract.json"))
 	if err != nil {
 		t.Fatalf("read saved goal contract: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestSaveDoesNotMutateRunStateFromProjectStatusCache(t *testing.T) {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
 
-	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	statusPath := ProjectStatusCachePath(projectRoot)
 	if err := os.MkdirAll(filepath.Dir(statusPath), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestSaveDoesNotGuessReportWhenManifestExistsWithoutDeclaredReport(t *testin
 		t.Fatalf("Save: %v", err)
 	}
 
-	savedPath := filepath.Join(projectRoot, ".goalx", "runs", runName, "session-1-report.md")
+	savedPath := filepath.Join(SavedRunDir(projectRoot, runName), "session-1-report.md")
 	if _, err := os.Stat(savedPath); err == nil {
 		t.Fatalf("save guessed a report even though manifest declared no report: %s", savedPath)
 	} else if !os.IsNotExist(err) {
@@ -351,7 +351,7 @@ func TestSaveDoesNotCreateActiveRunArtifactsManifest(t *testing.T) {
 		t.Fatalf("stat active-run artifacts manifest: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(projectRoot, ".goalx", "runs", runName, "artifacts.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(SavedRunDir(projectRoot, runName), "artifacts.json")); err != nil {
 		t.Fatalf("expected saved artifacts manifest: %v", err)
 	}
 }

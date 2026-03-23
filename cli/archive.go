@@ -3,11 +3,13 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // Archive creates a git tag for a session branch, preserving it.
 func Archive(projectRoot string, args []string) error {
+	if hasHelpArg(args) {
+		return fmt.Errorf("usage: goalx archive [--run NAME] <session-name>")
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -43,11 +45,12 @@ func Archive(projectRoot string, args []string) error {
 	fmt.Printf("Archived %s as tag %s\n", sessionName, tag)
 
 	// Auto-save run artifacts on first archive
-	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Config.Name)
-	if _, err := os.Stat(saveDir); os.IsNotExist(err) {
+	if _, err := ResolveSavedRunLocation(rc.ProjectRoot, rc.Config.Name); os.IsNotExist(err) {
 		if saveErr := Save(rc.ProjectRoot, []string{rc.Name}); saveErr != nil {
 			fmt.Fprintf(os.Stderr, "warning: auto-save failed: %v\n", saveErr)
 		}
+	} else if err != nil {
+		return err
 	}
 
 	return nil

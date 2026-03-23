@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
+	"github.com/vonbai/goalx/cli"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,18 +19,20 @@ func TestMainSupportsResultCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 
 	binDir := t.TempDir()
 	binPath := filepath.Join(binDir, "goalx-test")
 	build := exec.Command("go", "build", "-o", binPath, ".")
 	build.Dir = pkgDir
-	build.Env = append(os.Environ(), "HOME="+t.TempDir())
+	build.Env = append(os.Environ(), "HOME="+home)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, string(out))
 	}
 
 	projectRoot := t.TempDir()
-	runDir := filepath.Join(projectRoot, ".goalx", "runs", "demo-run")
+	runDir := cli.SavedRunDir(projectRoot, "demo-run")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}
@@ -54,7 +57,7 @@ func TestMainSupportsResultCommand(t *testing.T) {
 
 	cmd := exec.Command(binPath, "result", "demo-run")
 	cmd.Dir = projectRoot
-	cmd.Env = append(os.Environ(), "HOME="+t.TempDir())
+	cmd.Env = append(os.Environ(), "HOME="+home)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("goalx result: %v\n%s", err, string(out))

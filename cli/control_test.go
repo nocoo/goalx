@@ -351,7 +351,7 @@ func TestPulseTracksHeartbeatLagAndStaleState(t *testing.T) {
 		t.Fatalf("run state changed:\nwant %s\ngot  %s", string(runStateBefore), string(gotRunState))
 	}
 
-	statusData, err := os.ReadFile(filepath.Join(repo, ".goalx", "status.json"))
+	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
 	if err != nil {
 		t.Fatalf("read status.json: %v", err)
 	}

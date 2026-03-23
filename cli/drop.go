@@ -8,6 +8,9 @@ import (
 
 // Drop cleans up a run so the same name can be reused safely.
 func Drop(projectRoot string, args []string) error {
+	if hasHelpArg(args) {
+		return fmt.Errorf("usage: goalx drop [--run NAME]")
+	}
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -73,8 +76,7 @@ func Drop(projectRoot string, args []string) error {
 }
 
 func hasUnsavedRunArtifacts(projectRoot string, rc *RunContext) (bool, error) {
-	saveDir := filepath.Join(rc.ProjectRoot, ".goalx", "runs", rc.Name)
-	if _, err := os.Stat(saveDir); err == nil {
+	if _, err := ResolveSavedRunLocation(rc.ProjectRoot, rc.Name); err == nil {
 		return false, nil
 	} else if !os.IsNotExist(err) {
 		return false, err

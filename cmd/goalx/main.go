@@ -30,7 +30,7 @@ Usage:
   goalx resume  [--run NAME] <session> Resume a parked session
   goalx focus   [--run NAME]           Set the default run for this project
   goalx archive [--run NAME] <session> Git tag + preserve
-  goalx save    [--run NAME]           Save run artifacts to .goalx/runs/<name>/
+  goalx save    [--run NAME]           Save run artifacts to user-scoped durable storage
   goalx verify  [--run NAME]           Run the effective acceptance gate, then validate contract and completion provenance
   goalx debate  --from RUN [flags]     Start a debate run from a saved run
   goalx implement --from RUN [flags]   Start a develop run from a saved run

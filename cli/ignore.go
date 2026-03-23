@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	goalxExcludeBegin = "# goalx-managed-begin"
+	goalxExcludeEnd   = "# goalx-managed-end"
+)
+
 func EnsureProjectGoalxIgnored(projectRoot string) error {
 	gitDirOut, err := exec.Command("git", "-C", projectRoot, "rev-parse", "--git-dir").CombinedOutput()
 	if err != nil {
@@ -28,13 +33,44 @@ func EnsureProjectGoalxIgnored(projectRoot string) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	text := string(data)
-	if strings.Contains(text, ".goalx/") {
-		return nil
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	managed := []string{goalxExcludeBegin, ".goalx/goalx.yaml", goalxExcludeEnd}
+	out := make([]string, 0, len(lines)+len(managed))
+	skippingManaged := false
+	inserted := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch trimmed {
+		case goalxExcludeBegin:
+			skippingManaged = true
+			if !inserted {
+				out = append(out, managed...)
+				inserted = true
+			}
+			continue
+		case goalxExcludeEnd:
+			skippingManaged = false
+			continue
+		}
+		if skippingManaged {
+			continue
+		}
+		if trimmed == ".goalx/" {
+			if !inserted {
+				out = append(out, managed...)
+				inserted = true
+			}
+			continue
+		}
+		out = append(out, line)
 	}
-	if len(text) > 0 && !strings.HasSuffix(text, "\n") {
-		text += "\n"
+	if !inserted {
+		if len(out) > 0 && strings.TrimSpace(out[len(out)-1]) != "" {
+			out = append(out, "")
+		}
+		out = append(out, managed...)
 	}
-	text += ".goalx/\n"
+	text := strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
 	return os.WriteFile(excludePath, []byte(text), 0o644)
 }

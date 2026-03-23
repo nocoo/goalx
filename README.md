@@ -93,7 +93,7 @@ Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an
 | `goalx review` | Compare all session outputs |
 | `goalx keep` | Merge session branch into main |
 | `goalx archive` | Tag and preserve a session branch |
-| `goalx save` | Save durable artifacts, contract state, provenance, and `artifacts.json` to `.goalx/runs/` |
+| `goalx save` | Save durable artifacts, contract state, provenance, and `artifacts.json` to user-scoped durable storage |
 | `goalx verify` | Run the effective acceptance gate, then validate goal contract completion and completion provenance |
 | `goalx debate` | Start a debate phase from `--from RUN` |
 | `goalx implement` | Start a develop phase from `--from RUN` |
@@ -126,14 +126,15 @@ Use `goalx init` + `goalx start`, direct config edits, or manual session control
 
 ## Runtime vs Saved State
 
+- Project scope is for shared config only: `.goalx/config.yaml`.
 - Active runtime state lives under `~/.goalx/runs/{projectID}/{run}`.
-- Each active run now has an immutable `run-spec.yaml` plus mutable `state/run.json`, `state/sessions.json`, and `control/*`.
-- Project-level `.goalx/runs.json` tracks active and saved runs for that repo.
-- `focused_run` in `.goalx/runs.json` is the explicit default run when a project has multiple active runs.
-- Durable project artifacts live under `<project>/.goalx/runs/{run}` after `goalx save`.
-- `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, and `implement`.
+- Saved runs live under `~/.goalx/runs/{projectID}/saved/{run}` after `goalx save`.
+- Older project-scoped saved runs under `<project>/.goalx/runs/{run}` remain readable as compatibility input, but new saves are user-scoped.
+- Each active run has an immutable `run-spec.yaml` plus mutable `state/run.json`, `state/sessions.json`, and `control/*`.
+- User-scoped `registry.json` and `status.json` under `~/.goalx/runs/{projectID}/` track focus/default resolution and external progress summaries for that project.
+- `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, `implement`, and `explore`.
 - `run-metadata.json` tracks phase lineage, including `phase_kind`, `source_run`, and `parent_run`, so each run can inherit from its own saved input without touching shared project config.
-- GoalX bootstraps `.goalx/` into `.git/info/exclude` for local repos so project-scoped run state stays out of git by default.
+- GoalX only auto-ignores `.goalx/goalx.yaml`, the advanced/manual scratch config. Shared `.goalx/config.yaml` stays visible to git.
 - When a project has multiple active runs, pass `--run NAME` explicitly for mutating commands. Use `goalx focus --run NAME` to pin the default run for commands that omit `--run`.
 - Explicit `--run NAME` resolution is global when the name is unique. If the same run name exists in multiple projects, disambiguate with `--run <project-id>/<run>`.
 
@@ -203,7 +204,7 @@ GoalX is a **protocol scaffolding tool**. The Go code launches the master, expos
 Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goalx.yaml
 ```
 
-`Built-in defaults` and `~/.goalx/config.yaml` provide global defaults. `.goalx/config.yaml` can override project-specific behavior. `.goalx/goalx.yaml` is the advanced/manual config-first path only; the direct `research` / `develop` / `debate --from` / `implement --from` / `explore --from` commands prefer immutable run specs instead of writing shared config first.
+`Built-in defaults` and `~/.goalx/config.yaml` provide global defaults. `.goalx/config.yaml` is the only shared project-scoped GoalX file. `.goalx/goalx.yaml` is an advanced/manual scratch config-first path only; the direct `research` / `develop` / `debate --from` / `implement --from` / `explore --from` commands prefer immutable run specs instead of writing shared config first.
 
 ### Engine Presets
 

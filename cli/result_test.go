@@ -233,10 +233,49 @@ func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
 	}
 }
 
+func TestResultReadsLegacyProjectScopedSavedRun(t *testing.T) {
+	projectRoot := t.TempDir()
+	runDir := LegacySavedRunDir(projectRoot, "legacy-run")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir legacy run dir: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:   "legacy-run",
+		Mode:   goalx.ModeResearch,
+		Target: goalx.TargetConfig{Files: []string{"report.md"}},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# legacy summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"legacy-run"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+	if !strings.Contains(out, "legacy summary") {
+		t.Fatalf("result output missing legacy summary:\n%s", out)
+	}
+}
+
+func TestResultHelpPrintsUsage(t *testing.T) {
+	err := Result(t.TempDir(), []string{"--help"})
+	if err == nil || !strings.Contains(err.Error(), "usage: goalx result [NAME] [--full]") {
+		t.Fatalf("Result --help error = %v", err)
+	}
+}
+
 func writeSavedResultRun(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) string {
 	t.Helper()
 
-	runDir := filepath.Join(projectRoot, ".goalx", "runs", runName)
+	runDir := SavedRunDir(projectRoot, runName)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}

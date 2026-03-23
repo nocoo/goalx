@@ -379,7 +379,7 @@ func deriveProjectStatusFromRun(state *RunRuntimeState) []byte {
 }
 
 func syncProjectStatusCache(projectRoot string, state *RunRuntimeState) error {
-	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	statusPath := ProjectStatusCachePath(projectRoot)
 	if state == nil {
 		if err := os.Remove(statusPath); err != nil && !os.IsNotExist(err) {
 			return err
@@ -422,7 +422,7 @@ func refreshProjectStatusCache(projectRoot string) error {
 }
 
 func syncRunStateFromProjectStatus(projectRoot, runDir string) error {
-	statusPath := filepath.Join(projectRoot, ".goalx", "status.json")
+	statusPath := ProjectStatusCachePath(projectRoot)
 	data, err := os.ReadFile(statusPath)
 	if err != nil {
 		if os.IsNotExist(err) {

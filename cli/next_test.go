@@ -62,10 +62,10 @@ func TestNextSuggestsExplicitPhaseFromSavedResearchRun(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	projectRoot := filepath.Join(t.TempDir(), "repo")
-	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx", "runs", "research-a"), 0o755); err != nil {
+	if err := os.MkdirAll(SavedRunDir(projectRoot, "research-a"), 0o755); err != nil {
 		t.Fatalf("mkdir saved run: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "runs", "research-a", "run-spec.yaml"), []byte("name: research-a\nmode: research\nobjective: audit auth\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(SavedRunDir(projectRoot, "research-a"), "run-spec.yaml"), []byte("name: research-a\nmode: research\nobjective: audit auth\n"), 0o644); err != nil {
 		t.Fatalf("write run-spec: %v", err)
 	}
 
@@ -85,5 +85,39 @@ func TestNextSuggestsExplicitPhaseFromSavedResearchRun(t *testing.T) {
 	}
 	if strings.Contains(out, "goalx start") {
 		t.Fatalf("next output should not suggest config-first start:\n%s", out)
+	}
+}
+
+func TestNextFallsBackToLegacySavedRuns(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := filepath.Join(t.TempDir(), "repo")
+	legacyRunDir := LegacySavedRunDir(projectRoot, "research-a")
+	if err := os.MkdirAll(legacyRunDir, 0o755); err != nil {
+		t.Fatalf("mkdir legacy saved run: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyRunDir, "run-spec.yaml"), []byte("name: research-a\nmode: research\nobjective: audit auth\n"), 0o644); err != nil {
+		t.Fatalf("write legacy run-spec: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Next(projectRoot, nil); err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+	})
+	if !strings.Contains(out, "goalx debate --from research-a") {
+		t.Fatalf("next output missing legacy saved run guidance:\n%s", out)
+	}
+}
+
+func TestNextHelpPrintsUsage(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Next(t.TempDir(), []string{"--help"}); err != nil {
+			t.Fatalf("Next --help: %v", err)
+		}
+	})
+	if !strings.Contains(out, "usage: goalx next") {
+		t.Fatalf("next help missing usage:\n%s", out)
 	}
 }

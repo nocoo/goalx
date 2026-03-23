@@ -42,7 +42,7 @@ type ProtocolData struct {
 	MasterStatePath     string
 	HeartbeatStatePath  string
 	MasterJournalPath   string
-	StatusPath          string // .goalx/status.json for external progress reporting
+	StatusPath          string // user-scoped status cache for external progress reporting
 	EngineCommand       string // resolved master engine command
 
 	// Subagent-specific (used in program.md.tmpl)

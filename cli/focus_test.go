@@ -62,6 +62,9 @@ func TestFocusSetsFocusedRun(t *testing.T) {
 	if got != runName {
 		t.Fatalf("ResolveDefaultRunName = %q, want %q", got, runName)
 	}
+	if _, err := os.Stat(filepath.Join(projectRoot, ".goalx", "runs.json")); !os.IsNotExist(err) {
+		t.Fatalf("project scoped runs.json should not exist, stat err = %v", err)
+	}
 }
 
 func TestFocusHelpPrintsUsageWithoutMutatingRegistry(t *testing.T) {

@@ -179,6 +179,71 @@ func TestHasDirtyWorktreeIgnoresCodexDir(t *testing.T) {
 	}
 }
 
+func TestEnsureProjectGoalxIgnoredOnlyIgnoresManualScratchConfig(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	gitDirOut, err := exec.Command("git", "-C", repo, "rev-parse", "--git-dir").CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-parse --git-dir: %v\n%s", err, string(gitDirOut))
+	}
+	excludePath := filepath.Join(strings.TrimSpace(string(gitDirOut)), "info", "exclude")
+	if !filepath.IsAbs(excludePath) {
+		excludePath = filepath.Join(repo, excludePath)
+	}
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatalf("read exclude: %v", err)
+	}
+	text := string(data)
+	if !strings.Contains(text, ".goalx/goalx.yaml") {
+		t.Fatalf("exclude missing scratch config rule:\n%s", text)
+	}
+	if strings.Contains(text, ".goalx/\n") || strings.Contains(text, ".goalx/\r\n") {
+		t.Fatalf("exclude should not blanket-ignore .goalx:\n%s", text)
+	}
+}
+
+func TestEnsureProjectGoalxIgnoredMigratesLegacyBlanketRule(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	gitDirOut, err := exec.Command("git", "-C", repo, "rev-parse", "--git-dir").CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-parse --git-dir: %v\n%s", err, string(gitDirOut))
+	}
+	excludePath := filepath.Join(strings.TrimSpace(string(gitDirOut)), "info", "exclude")
+	if !filepath.IsAbs(excludePath) {
+		excludePath = filepath.Join(repo, excludePath)
+	}
+	if err := os.WriteFile(excludePath, []byte("*.log\n.goalx/\n"), 0o644); err != nil {
+		t.Fatalf("seed exclude: %v", err)
+	}
+
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	data, err := os.ReadFile(excludePath)
+	if err != nil {
+		t.Fatalf("read exclude: %v", err)
+	}
+	text := string(data)
+	if !strings.Contains(text, goalxExcludeBegin) || !strings.Contains(text, ".goalx/goalx.yaml") {
+		t.Fatalf("exclude missing managed rule:\n%s", text)
+	}
+	if strings.Contains(text, "\n.goalx/\n") || strings.HasSuffix(strings.TrimSpace(text), ".goalx/") {
+		t.Fatalf("legacy blanket ignore should be removed:\n%s", text)
+	}
+	if !strings.Contains(text, "*.log") {
+		t.Fatalf("non-goalx exclude rules should be preserved:\n%s", text)
+	}
+}
+
 func TestDropRemovesRunDirectoryAndBranch(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -272,6 +337,40 @@ func TestDropRefusesUnsavedRunWithArtifacts(t *testing.T) {
 	}
 }
 
+func TestDropAcceptsLegacySavedRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	runName := "saved-run"
+	runDir := goalx.RunDir(repo, runName)
+	for _, dir := range []string{
+		filepath.Join(runDir, "journals"),
+		filepath.Join(runDir, "worktrees"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	snapshot := []byte("name: saved-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nharness:\n  command: \"test -f base.txt\"\n")
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	legacySaveDir := LegacySavedRunDir(repo, runName)
+	if err := os.MkdirAll(legacySaveDir, 0o755); err != nil {
+		t.Fatalf("mkdir legacy save dir: %v", err)
+	}
+
+	if err := Drop(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Drop: %v", err)
+	}
+}
+
 func TestInitBootstrapsGoalxExcludeRule(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -285,8 +384,25 @@ func TestInitBootstrapsGoalxExcludeRule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .git/info/exclude: %v", err)
 	}
-	if !strings.Contains(string(data), ".goalx/") {
-		t.Fatalf("exclude missing .goalx/ rule:\n%s", string(data))
+	if !strings.Contains(string(data), ".goalx/goalx.yaml") {
+		t.Fatalf("exclude missing .goalx/goalx.yaml rule:\n%s", string(data))
+	}
+}
+
+func TestSaveDropArchiveHelpPrintUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		run  func() error
+		want string
+	}{
+		{name: "save", run: func() error { return Save(t.TempDir(), []string{"--help"}) }, want: "usage: goalx save [NAME]"},
+		{name: "drop", run: func() error { return Drop(t.TempDir(), []string{"--help"}) }, want: "usage: goalx drop [--run NAME]"},
+		{name: "archive", run: func() error { return Archive(t.TempDir(), []string{"--help"}) }, want: "usage: goalx archive [--run NAME] <session-name>"},
+	} {
+		err := tc.run()
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Fatalf("%s --help error = %v, want %q", tc.name, err, tc.want)
+		}
 	}
 }
 
