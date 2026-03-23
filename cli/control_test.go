@@ -20,6 +20,14 @@ func TestEnsureMasterControlCreatesFiles(t *testing.T) {
 		MasterInboxPath(runDir),
 		MasterStatePath(runDir),
 		HeartbeatStatePath(runDir),
+		ControlRunIdentityPath(runDir),
+		ControlRunStatePath(runDir),
+		ControlEventsPath(runDir),
+		ControlLeasePath(runDir, "master"),
+		ControlLeasePath(runDir, "sidecar"),
+		ControlInboxPath(runDir, "master"),
+		ControlRemindersPath(runDir),
+		ControlDeliveriesPath(runDir),
 	} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected %s to exist: %v", path, err)

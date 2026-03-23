@@ -79,6 +79,9 @@ func EnsureMasterControl(runDir string) error {
 			return err
 		}
 	}
+	if err := EnsureControlState(runDir); err != nil {
+		return err
+	}
 	return nil
 }
 
