@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
@@ -45,6 +46,15 @@ func TestServeHandlerListsProjectsAndRuns(t *testing.T) {
 
 	writeRunSnapshot(t, workspaceA, "auth-audit", goalx.ModeResearch, "audit auth flow")
 	writeRunSnapshot(t, workspaceB, "serve-rollout", goalx.ModeDevelop, "implement serve API")
+	if err := SaveControlRunState(ControlRunStatePath(goalx.RunDir(workspaceB, "serve-rollout")), &ControlRunState{
+		Version:        1,
+		LifecycleState: "active",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := RenewControlLease(goalx.RunDir(workspaceB, "serve-rollout"), "sidecar", "run_demo", 1, time.Minute, "process", 4242); err != nil {
+		t.Fatalf("RenewControlLease: %v", err)
+	}
 
 	app := newServeApp(goalx.ServeConfig{
 		Token: "secret-token",
@@ -126,7 +136,7 @@ func TestServeHandlerListsProjectsAndRuns(t *testing.T) {
 		if resp.Runs[0].Workspace != "goalx" || resp.Runs[0].Name != "auth-audit" || resp.Runs[0].Status != "completed" {
 			t.Fatalf("first run = %+v", resp.Runs[0])
 		}
-		if resp.Runs[1].Workspace != "quantos" || resp.Runs[1].Name != "serve-rollout" || resp.Runs[1].Mode != string(goalx.ModeDevelop) {
+		if resp.Runs[1].Workspace != "quantos" || resp.Runs[1].Name != "serve-rollout" || resp.Runs[1].Mode != string(goalx.ModeDevelop) || resp.Runs[1].Status != "active" {
 			t.Fatalf("second run = %+v", resp.Runs[1])
 		}
 	})
