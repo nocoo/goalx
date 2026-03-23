@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,13 +11,18 @@ import (
 	"time"
 )
 
-const currentProtocolVersion = 1
+const (
+	currentProtocolVersion = 2
+	runIDPrefix            = "run_"
+)
 
 type RunMetadata struct {
 	Version         int    `json:"version"`
 	Objective       string `json:"objective,omitempty"`
 	ProjectRoot     string `json:"project_root,omitempty"`
 	ProtocolVersion int    `json:"protocol_version,omitempty"`
+	RunID           string `json:"run_id,omitempty"`
+	Epoch           int    `json:"epoch,omitempty"`
 	BaseRevision    string `json:"base_revision,omitempty"`
 	PhaseKind       string `json:"phase_kind,omitempty"`
 	SourceRun       string `json:"source_run,omitempty"`
@@ -83,6 +89,8 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 			Objective:       objective,
 			ProjectRoot:     projectRoot,
 			ProtocolVersion: currentProtocolVersion,
+			RunID:           newRunID(),
+			Epoch:           1,
 			BaseRevision:    baseRevision,
 		}
 		if err := SaveRunMetadata(path, meta); err != nil {
@@ -103,9 +111,19 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 		meta.ProjectRoot = projectRoot
 		changed = true
 	}
-	if meta.ProtocolVersion < currentProtocolVersion {
-		meta.ProtocolVersion = currentProtocolVersion
+	if meta.ProtocolVersion <= 0 {
+		meta.ProtocolVersion = 1
 		changed = true
+	}
+	if meta.ProtocolVersion >= 2 {
+		if meta.RunID == "" {
+			meta.RunID = newRunID()
+			changed = true
+		}
+		if meta.Epoch <= 0 {
+			meta.Epoch = 1
+			changed = true
+		}
 	}
 	if meta.BaseRevision == "" {
 		baseRevision, revErr := gitHeadRevision(projectRoot)
@@ -121,6 +139,18 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 		}
 	}
 	return meta, nil
+}
+
+func newRunID() string {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("%s%d", runIDPrefix, time.Now().UTC().UnixNano())
+	}
+	return fmt.Sprintf("%s%x", runIDPrefix, buf)
+}
+
+func isRunIDSelector(selector string) bool {
+	return strings.HasPrefix(selector, runIDPrefix)
 }
 
 func gitHeadRevision(projectRoot string) (string, error) {
