@@ -270,6 +270,29 @@ Rules:
 - `tell` returns queue or delivery identifiers, not just tmux targeting assumptions
 - `observe` and `status` must support degraded transport
 
+## Documentation And Skill Synchronization
+
+The protocol change is user-visible and operator-visible. Documentation and shipped skills are part of the contract surface and must move in the same release train as the code.
+
+Files that must be synchronized:
+
+- `README.md`
+- `deploy/README.md`
+- `skill/SKILL.md`
+- `skill/references/advanced-control.md`
+- `skill/openclaw-skill/SKILL.md`
+- `skill/agents/openai.yaml`
+
+Required updates:
+
+- remove or rewrite heartbeat-window-centered mental models
+- describe sidecar-based run monitoring and degraded transport semantics
+- change bare run targeting guidance from global-first to local-first
+- explain explicit cross-project selectors using `project-id/run` or `run_id`
+- update `status`, `observe`, and `tell` behavior descriptions to match control-v2 semantics
+- update remote/OpenClaw skill examples so HTTP API consumers reason about derived run state and durable delivery, not tmux-centric liveness
+- update local skill guidance so operators stop treating heartbeat lag and raw tmux intervention as the primary control path
+
 ## Compatibility Strategy
 
 Use a short migration window:
@@ -312,7 +335,8 @@ New protocol assumptions:
 5. Derived status and observe
 6. Serve API and resolver convergence
 7. Proof manifest and verify tightening
-8. Legacy compatibility cleanup
+8. README, deploy docs, and skill synchronization
+9. Legacy compatibility cleanup
 
 ## Acceptance For This Design
 
@@ -323,4 +347,5 @@ The implementation is acceptable only if it:
 - removes bare-`Enter` Codex wake behavior
 - makes stopped runs display terminal state without stale control confusion
 - adds canonical proof manifest enforcement
+- synchronizes README, deploy docs, and shipped skills with control-v2 semantics
 - keeps legacy runs observable without implicit migration

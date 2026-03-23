@@ -459,7 +459,84 @@ git add templates/master.md.tmpl templates/program.md.tmpl cli/protocol.go cli/p
 git commit -m "refactor: align goalx agent protocols with control v2"
 ```
 
-### Task 11: Add Legacy Compatibility And Migration Guardrails
+### Task 11: Synchronize README, Deploy Docs, And Skills
+
+**Files:**
+- Modify: `README.md`
+- Modify: `deploy/README.md`
+- Modify: `skill/SKILL.md`
+- Modify: `skill/references/advanced-control.md`
+- Modify: `skill/openclaw-skill/SKILL.md`
+- Modify: `skill/agents/openai.yaml`
+
+**Step 1: Write the documentation delta checklist**
+
+Create a short checklist in the task notes covering:
+- local-first run targeting
+- explicit cross-project selector rules
+- sidecar replacing heartbeat tmux window
+- control-first `status` / `observe`
+- durable reminder and delivery semantics
+- degraded transport behavior
+- proof-manifest-based completion
+- remote/OpenClaw usage changes
+
+**Step 2: Audit the docs and skills for stale language**
+
+Check for stale terms and examples:
+- `heartbeat lag`
+- `wake_pending`
+- raw tmux intervention as primary control path
+- global-first bare `--run`
+- tmux-session presence as the definition of liveness
+
+Run:
+```bash
+rg -n "heartbeat|wake_pending|stale|tmux|--run NAME|global when the run name is unique|control-plane summary" README.md deploy/README.md skill
+```
+
+Expected: multiple hits requiring synchronized edits.
+
+**Step 3: Update user-facing docs**
+
+Rewrite `README.md` and `deploy/README.md` so they describe:
+- daemonless run-scoped sidecar monitoring
+- local-first run selection
+- transport-degraded but observable runs
+- HTTP API reading derived run state instead of tmux-centric state
+
+**Step 4: Update local and remote skills**
+
+Update:
+- `skill/SKILL.md`
+- `skill/references/advanced-control.md`
+- `skill/openclaw-skill/SKILL.md`
+- `skill/agents/openai.yaml`
+
+So the skills teach:
+- control-v2 mental model
+- local-first targeting
+- explicit cross-project selectors
+- durable redirect/delivery semantics
+- reduced reliance on raw tmux operations
+
+**Step 5: Re-audit for stale protocol language**
+
+Run:
+```bash
+rg -n "heartbeat window|goalx-hb|global when the run name is unique|raw tmux|heartbeat lag" README.md deploy/README.md skill
+```
+
+Expected: only intentional legacy/compatibility mentions remain.
+
+**Step 6: Commit**
+
+```bash
+git add README.md deploy/README.md skill/SKILL.md skill/references/advanced-control.md skill/openclaw-skill/SKILL.md skill/agents/openai.yaml
+git commit -m "docs: sync goalx docs and skills with control v2"
+```
+
+### Task 12: Add Legacy Compatibility And Migration Guardrails
 
 **Files:**
 - Create: `cli/migrate.go`
@@ -505,15 +582,13 @@ git add cli/migrate.go cli/migrate_test.go cli/status.go cli/observe.go cli/veri
 git commit -m "refactor: add goalx legacy compatibility guardrails"
 ```
 
-### Task 12: Run Full Regression And Remove Dead Paths
+### Task 13: Run Full Regression And Remove Dead Paths
 
 **Files:**
 - Modify: `cli/pulse.go`
 - Modify: `cli/heartbeat.go`
 - Modify: `cli/start.go`
 - Modify: `cli/status.go`
-- Modify: `README.md`
-- Modify: `deploy/README.md`
 - Test: `cli/*_test.go`
 
 **Step 1: Write final regression assertions where coverage is still missing**
@@ -538,21 +613,17 @@ Expected: PASS, or only documented pre-existing failures if they already exist o
 
 **Step 4: Update docs**
 
-Update CLI and deploy docs to describe:
-- control v2
-- sidecar lifecycle
-- local-first run selectors
-- legacy compatibility rules
+Update only if regression cleanup exposed a previously-missed stale reference. Prefer to keep doc edits in Task 11.
 
 **Step 5: Commit**
 
 ```bash
-git add cli/pulse.go cli/heartbeat.go cli/start.go cli/status.go README.md deploy/README.md
+git add cli/pulse.go cli/heartbeat.go cli/start.go cli/status.go
 git add cli/*_test.go
 git commit -m "docs: finalize goalx daemonless control v2 rollout"
 ```
 
-### Task 13: Final Verification
+### Task 14: Final Verification
 
 **Files:**
 - Modify: none unless regressions are found
@@ -592,6 +663,7 @@ git commit -m "test: verify goalx control v2 rollout"
 - Every active run has identity, state, lease, inbox, reminder, and delivery objects.
 - Sidecar is per-run and stoppable; no hidden global daemon exists.
 - `status.json` is derived-only.
+- README, deploy docs, and shipped skills match control-v2 semantics.
 - Legacy v1 runs are readable without implicit migration.
 - Proof manifest is the canonical closeout gate.
 - Protocol templates and Go implementation ship in the same batch.
@@ -603,6 +675,7 @@ git commit -m "test: verify goalx control v2 rollout"
 - Allowing `status.json` to write back into run state.
 - Leaving serve and CLI on different resolver logic.
 - Tightening proof late, after control changes ship.
+- Treating README/skill synchronization as optional cleanup instead of release-surface work.
 
 ## Execution Notes
 
