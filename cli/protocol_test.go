@@ -507,6 +507,50 @@ func TestRenderMasterProtocolIncludesOptimizerDoctrine(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "ship it",
+		RunName:             "demo",
+		Mode:                goalx.ModeDevelop,
+		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptancePath:      "/tmp/acceptance.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalContractPath:    "/tmp/goal-contract.json",
+		RunStatePath:        "/tmp/state/run.json",
+		SessionsStatePath:   "/tmp/state/sessions.json",
+		MasterInboxPath:     "/tmp/control/master-inbox.jsonl",
+		MasterStatePath:     "/tmp/control/master-state.json",
+		HeartbeatStatePath:  "/tmp/control/heartbeat.json",
+		StatusPath:          "/tmp/status.json",
+		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Do not label work as external just because it happens late in the run or touches runtime state.",
+		"Local shell work such as building, restarting services, launching local deploy/dev processes, checking readiness, inspecting running revisions, and running acceptance/eval commands is part of the job when the required access is already available.",
+		"Before marking a required item `waiting_external`, verify that the blocker is truly outside your available permissions, credentials, or reachable environment.",
+		"If a required proof step depends on a long-running local process, confirm that the live process matches current `HEAD`; if it does not, rebuild/restart or relaunch it yourself before evaluating.",
+		"Do not stop at intermediate states such as \"implementation complete\", \"ready for eval\", or \"awaiting external verification\" while an actionable required item remains.",
+		"If the only remaining gap is proof or verification that you can execute yourself, run it now instead of waiting for a nudge.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
 func TestRenderMasterProtocolIncludesResearchModeLaunchGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
