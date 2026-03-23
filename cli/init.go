@@ -4,138 +4,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
-	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
 )
 
 // Init generates a goalx.yaml template in the project root.
 func Init(projectRoot string, args []string) error {
+	if wantsHelp(args) {
+		fmt.Println(launchUsage("init"))
+		return nil
+	}
 	opts, err := parseStartInitArgs(args)
 	if err != nil {
 		return err
 	}
-	objective := opts.Objective
-	mode := opts.Mode
-	parallel := opts.Parallel
-	name := opts.Name
-
-	if name == "" {
-		name = goalx.Slugify(objective)
-	}
-
-	baseCfg, _, err := goalx.LoadRawBaseConfig(projectRoot)
+	cfg, err := buildLaunchConfig(projectRoot, opts)
 	if err != nil {
-		return fmt.Errorf("load base config: %w", err)
+		return err
 	}
-	cfg := *baseCfg
-	cfg.Name = name
-	cfg.Mode = mode
-	cfg.Objective = objective
-	cfg.Parallel = parallel
-	cfg.Sessions = nil
-	cfg.DiversityHints = nil
-	if opts.Preset != "" {
-		cfg.Preset = opts.Preset
-	}
-	goalx.ApplyPreset(&cfg)
-
-	// Override master engine/model from --master flag
-	if opts.Master != "" {
-		parts := strings.SplitN(opts.Master, "/", 2)
-		if len(parts) == 2 {
-			cfg.Master.Engine = parts[0]
-			cfg.Master.Model = parts[1]
-		}
-	}
-
-	// Mode-specific defaults
-	if mode == goalx.ModeResearch {
-		reportFile := "report.md"
-		cfg.Target = goalx.TargetConfig{
-			Files:    []string{reportFile},
-			Readonly: []string{"."},
-		}
-		cfg.Harness = goalx.HarnessConfig{Command: fmt.Sprintf("test -s %s && echo 'ok'", cfg.Target.Files[0])}
-		// Apply research strategies
-		if len(opts.Strategies) > 0 {
-			hints, err := goalx.ResolveStrategies(opts.Strategies)
-			if err != nil {
-				return err
-			}
-			cfg.DiversityHints = hints
-		} else if parallel >= 2 {
-			defaults := goalx.DefaultStrategies(parallel)
-			hints, _ := goalx.ResolveStrategies(defaults)
-			cfg.DiversityHints = hints
-		}
-	} else {
-		if len(cfg.Target.Files) == 0 {
-			cfg.Target.Files = InferTarget(projectRoot)
-		}
-		if len(cfg.Target.Files) == 0 {
-			cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
-		}
-		if cfg.Harness.Command == "" {
-			cfg.Harness.Command = InferHarness(projectRoot)
-		}
-		if cfg.Harness.Command == "" {
-			cfg.Harness = goalx.HarnessConfig{Command: "TODO: build + test command"}
-		}
-	}
-
-	// Expand --sub engine/model:N into explicit sessions
-	if len(opts.Subs) > 0 {
-		cfg.Parallel = 0 // --sub overrides --parallel
-		cfg.DiversityHints = nil
-		for _, sub := range opts.Subs {
-			spec, countStr := sub, "1"
-			if idx := strings.LastIndex(sub, ":"); idx > 0 {
-				spec = sub[:idx]
-				countStr = sub[idx+1:]
-			}
-			parts := strings.SplitN(spec, "/", 2)
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid --sub format %q (expected engine/model or engine/model:N)", sub)
-			}
-			n, err := strconv.Atoi(countStr)
-			if err != nil || n < 1 {
-				return fmt.Errorf("invalid --sub count %q in %q", countStr, sub)
-			}
-			for j := 0; j < n; j++ {
-				cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
-					Engine: parts[0],
-					Model:  parts[1],
-				})
-			}
-		}
-	}
-
-	// Add auditor session from --auditor flag
-	if opts.Auditor != "" {
-		parts := strings.SplitN(opts.Auditor, "/", 2)
-		if len(parts) == 2 {
-			cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
-				Engine: parts[0],
-				Model:  parts[1],
-				Hint:   "Auditor: Review and challenge other sessions' work. Find flaws, missed edge cases, and incorrect assumptions.",
-			})
-		}
-	}
-
-	// Apply context from --context flag
-	if len(opts.ContextPaths) > 0 {
-		contextFiles, err := DiscoverContextFiles(opts.ContextPaths)
-		if err != nil {
-			return fmt.Errorf("discover context: %w", err)
-		}
-		cfg.Context = goalx.ContextConfig{Files: contextFiles}
-	}
-
-	cfg.Budget = goalx.BudgetConfig{MaxDuration: 6 * time.Hour}
 
 	goalxDir := filepath.Join(projectRoot, ".goalx")
 	os.MkdirAll(goalxDir, 0755)
@@ -154,9 +40,9 @@ func Init(projectRoot string, args []string) error {
 	}
 
 	fmt.Printf("Generated %s\n", outPath)
-	fmt.Printf("  name: %s\n", name)
-	fmt.Printf("  mode: %s\n", mode)
-	if mode == goalx.ModeDevelop && (len(cfg.Target.Files) == 0 || cfg.Target.Files[0] == "TODO: specify directories to modify" || cfg.Harness.Command == "TODO: build + test command") {
+	fmt.Printf("  name: %s\n", cfg.Name)
+	fmt.Printf("  mode: %s\n", cfg.Mode)
+	if cfg.Mode == "develop" && (len(cfg.Target.Files) == 0 || cfg.Target.Files[0] == "TODO: specify directories to modify" || cfg.Harness.Command == "TODO: build + test command") {
 		fmt.Println("\n  ⚠ Edit goalx.yaml: fill target.files and harness.command")
 	}
 	fmt.Println("\n  Next: vim goalx.yaml && goalx start")

@@ -1,6 +1,6 @@
 ---
 name: goalx
-description: Use when the user wants GoalX to autonomously pursue a goal in the current project, observe or redirect a running GoalX run, or avoid manual tmux, subagent, and config micromanagement while GoalX researches, implements, verifies, or closes out work.
+description: Use when the user wants GoalX to autonomously pursue a goal in the current project, observe or redirect a running GoalX run, or explicitly drive research/develop/debate/implement/explore phases without manual tmux, subagent, or config micromanagement.
 ---
 
 # GoalX
@@ -12,6 +12,7 @@ GoalX is the default autonomous path for repo-level goals. Start one master-led 
 ## When to Use
 
 - The user wants GoalX to research, audit, fix, implement, refactor, or monitor a goal in the current project.
+- The user wants to start a focused `research`, `develop`, `debate`, `implement`, or `explore` phase from a specific saved run.
 - The user wants to check progress, redirect a run, verify closeout, or review saved results.
 - The user wants autonomous orchestration instead of manual tmux, config, or subagent management.
 - Do not use the low-level path unless the user explicitly asks for manual control.
@@ -21,11 +22,18 @@ GoalX is the default autonomous path for repo-level goals. Start one master-led 
 ```bash
 goalx auto "goal"
 goalx auto "goal" --develop
+goalx research "goal"
+goalx develop "goal"
+goalx debate --from RUN
+goalx implement --from RUN
+goalx explore --from RUN
 ```
 
 Common path:
 
 - Start the run with `goalx auto ...`
+- Use `goalx research ...` or `goalx develop ...` when you want a direct phase-specific run with the same autonomous defaults.
+- Use `goalx debate --from RUN`, `goalx implement --from RUN`, or `goalx explore --from RUN` when you want to continue from a saved run.
 - Watch progress with `goalx observe` or `goalx status`
 - Redirect the master only when the goal or constraints change
 - Run `goalx verify` before treating a develop run as done
@@ -41,12 +49,22 @@ Common path:
 6. Keep recaps short. GoalX resumes from durable run state and current files.
 7. Interpret `goalx observe` and `goalx status` as control-plane summaries. Report unread inbox items, heartbeat lag, stale state, and contract progress instead of raw tmux noise.
 8. `goalx verify` is stricter than "tests passed": it checks the effective acceptance gate, required-item completion, and closeout provenance.
-9. When a project has multiple active runs, use `goalx focus --run NAME` to pin the default run. For targeted actions, always pass `--run NAME`; explicit run targeting is global when the name is unique.
+9. `--parallel` is optional. Treat it as initial fan-out, not as a permanent cap on later master dispatch.
+10. Role defaults are separate. Use `--master`, `--research-role`, and `--develop-role` only when the user wants to override the run's default engine/model split.
+11. `goalx research` and `goalx develop` are direct phase entry points. `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` continue from saved runs. Only use `--write-config` when the user explicitly wants config-first/manual control.
+12. When a project has multiple active runs, use `goalx focus --run NAME` to pin the default run. For targeted actions, always pass `--run NAME`; explicit run targeting is global when the name is unique.
 
 ## Common Commands
 
 - `goalx auto "goal"`: default autonomous path
 - `goalx auto "goal" --develop`: default implementation path
+- `goalx research "goal"`: direct research run with research-role defaults
+- `goalx develop "goal"`: direct develop run with develop-role defaults
+- `--master engine/model`, `--research-role engine/model`, `--develop-role engine/model`: optional role-default overrides for the current run
+- `--parallel N`: optional initial fan-out only; omit it to keep project/preset defaults
+- `goalx debate --from RUN`: start a debate phase from a saved research run
+- `goalx implement --from RUN`: start an implementation phase from a saved run
+- `goalx explore --from RUN`: start a follow-up research phase from a saved run
 - `goalx observe --run NAME`: live progress plus control-plane summary
 - `goalx status --run NAME`: concise status, unread inbox, heartbeat lag, protocol hints
 - `goalx tell --run NAME "direction"`: durable redirect to the master or a specific session

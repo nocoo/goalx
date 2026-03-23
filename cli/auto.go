@@ -3,13 +3,16 @@ package cli
 import "fmt"
 
 var (
-	autoInit  = Init
 	autoStart = Start
 )
 
 // Auto initializes a run, starts the master, and exits.
 // The master continues orchestrating in tmux.
 func Auto(projectRoot string, args []string) error {
+	if wantsHelp(args) {
+		fmt.Println(launchUsage("auto"))
+		return nil
+	}
 	initArgs := append([]string(nil), args...)
 	if len(initArgs) > 0 {
 		hasMode := false
@@ -24,10 +27,7 @@ func Auto(projectRoot string, args []string) error {
 		}
 	}
 
-	if err := autoInit(projectRoot, initArgs); err != nil {
-		return fmt.Errorf("init: %w", err)
-	}
-	if err := autoStart(projectRoot, nil); err != nil {
+	if err := autoStart(projectRoot, initArgs); err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
 

@@ -61,9 +61,12 @@ func Next(projectRoot string, _ []string) error {
 
 	// Check saved runs in .goalx/runs/
 	hasSaves := false
-	hasDebate := false
-	hasResearch := false
-	latestName := ""
+	latestDebate := ""
+	latestResearch := ""
+	latestAny := ""
+	latestDebateTime := int64(0)
+	latestResearchTime := int64(0)
+	latestAnyTime := int64(0)
 
 	if entries, err := os.ReadDir(savesDir); err == nil {
 		for _, e := range entries {
@@ -76,37 +79,57 @@ func Next(projectRoot string, _ []string) error {
 			if err != nil {
 				continue
 			}
-			latestName = e.Name()
+			info, _ := e.Info()
+			modTime := int64(0)
+			if info != nil {
+				modTime = info.ModTime().Unix()
+			}
+			if modTime >= latestAnyTime {
+				latestAnyTime = modTime
+				latestAny = e.Name()
+			}
+			meta, _ := LoadRunMetadata(filepath.Join(dir, "run-metadata.json"))
+			phaseKind := ""
+			if meta != nil {
+				phaseKind = meta.PhaseKind
+			}
+			if phaseKind == "debate" {
+				if modTime >= latestDebateTime {
+					latestDebateTime = modTime
+					latestDebate = e.Name()
+				}
+			}
 			if cfg.Mode == goalx.ModeResearch {
-				hasResearch = true
-				// Check if it looks like a debate (has "debate" or "consensus" in name/objective)
-				if e.Name() == "debate" || containsAny(cfg.Objective, "辩论", "debate", "共识", "consensus") {
-					hasDebate = true
+				if modTime >= latestResearchTime {
+					latestResearchTime = modTime
+					latestResearch = e.Name()
 				}
 			}
 		}
 	}
 
-	if hasDebate {
-		fmt.Printf("Debate completed: %s\n", latestName)
-		fmt.Println("  → goalx implement   # generate develop config from consensus")
-		fmt.Println("  → goalx start       # start implementation")
+	if latestDebate != "" {
+		fmt.Printf("Debate completed: %s\n", latestDebate)
+		fmt.Printf("  → goalx implement --from %s\n", latestDebate)
+		fmt.Printf("  → goalx explore --from %s    # extend debate findings if needed\n", latestDebate)
 		return nil
 	}
 
-	if hasResearch {
-		fmt.Printf("Research completed: %s\n", latestName)
-		fmt.Println("  → goalx debate      # generate debate config from research")
-		fmt.Println("  → goalx start       # start debate round")
+	if latestResearch != "" {
+		fmt.Printf("Research completed: %s\n", latestResearch)
+		fmt.Printf("  → goalx debate --from %s\n", latestResearch)
+		fmt.Printf("  → goalx implement --from %s\n", latestResearch)
 		fmt.Println()
-		fmt.Println("  Or skip debate:")
-		fmt.Println("  → goalx implement   # generate develop config directly")
+		fmt.Printf("  Or continue exploration:\n  → goalx explore --from %s\n", latestResearch)
 		return nil
 	}
 
 	if hasSaves {
 		fmt.Println("Saved runs exist but no clear next step detected.")
 		fmt.Println("  → goalx list        # see all runs")
+		if latestAny != "" {
+			fmt.Printf("  → goalx result %s\n", latestAny)
+		}
 		fmt.Println("  → goalx auto \"...\"  # start a new autonomous run")
 		return nil
 	}

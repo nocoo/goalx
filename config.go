@@ -21,24 +21,25 @@ const (
 
 // Config is the merged configuration for a single run.
 type Config struct {
-	Name           string            `yaml:"name"`
-	Mode           Mode              `yaml:"mode"`
-	Objective      string            `yaml:"objective"`
-	Description    string            `yaml:"description,omitempty"`
-	Preset         string            `yaml:"preset,omitempty"`
-	Preferences    PreferencesConfig `yaml:"preferences,omitempty"`
-	Engine         string            `yaml:"engine,omitempty"`
-	Model          string            `yaml:"model,omitempty"`
-	Parallel       int               `yaml:"parallel,omitempty"`
-	DiversityHints []string          `yaml:"diversity_hints,omitempty"`
-	Sessions       []SessionConfig   `yaml:"sessions,omitempty"`
-	Target         TargetConfig      `yaml:"target"`
-	Harness        HarnessConfig     `yaml:"harness,omitempty"`
-	Acceptance     AcceptanceConfig  `yaml:"acceptance,omitempty"`
-	Context        ContextConfig     `yaml:"context,omitempty"`
-	Budget         BudgetConfig      `yaml:"budget,omitempty"`
-	Master         MasterConfig      `yaml:"master,omitempty"`
-	Serve          ServeConfig       `yaml:"serve,omitempty"`
+	Name           string             `yaml:"name"`
+	Mode           Mode               `yaml:"mode"`
+	Objective      string             `yaml:"objective"`
+	Description    string             `yaml:"description,omitempty"`
+	Preset         string             `yaml:"preset,omitempty"`
+	Preferences    PreferencesConfig  `yaml:"preferences,omitempty"`
+	Engine         string             `yaml:"engine,omitempty"` // legacy fallback for session defaults
+	Model          string             `yaml:"model,omitempty"`  // legacy fallback for session defaults
+	Roles          RoleDefaultsConfig `yaml:"roles,omitempty"`
+	Parallel       int                `yaml:"parallel,omitempty"`
+	DiversityHints []string           `yaml:"diversity_hints,omitempty"`
+	Sessions       []SessionConfig    `yaml:"sessions,omitempty"`
+	Target         TargetConfig       `yaml:"target"`
+	Harness        HarnessConfig      `yaml:"harness,omitempty"`
+	Acceptance     AcceptanceConfig   `yaml:"acceptance,omitempty"`
+	Context        ContextConfig      `yaml:"context,omitempty"`
+	Budget         BudgetConfig       `yaml:"budget,omitempty"`
+	Master         MasterConfig       `yaml:"master,omitempty"`
+	Serve          ServeConfig        `yaml:"serve,omitempty"`
 }
 
 type TargetConfig struct {
@@ -97,6 +98,11 @@ type PreferencesConfig struct {
 type PreferencePolicy struct {
 	Engines  []string `yaml:"engines,omitempty"`
 	Strategy string   `yaml:"strategy,omitempty"`
+}
+
+type RoleDefaultsConfig struct {
+	Research SessionConfig `yaml:"research,omitempty"`
+	Develop  SessionConfig `yaml:"develop,omitempty"`
 }
 
 // EngineConfig defines how to launch an AI engine.
@@ -316,18 +322,27 @@ func applyPreset(cfg *Config) {
 		cfg.Master.Model = preset.Master.Model
 	}
 
-	// Subagent defaults based on mode
-	var sub SessionConfig
-	if cfg.Mode == ModeResearch {
-		sub = preset.Research
-	} else {
-		sub = preset.Develop
+	// Role defaults
+	if cfg.Roles.Research.Engine == "" {
+		cfg.Roles.Research.Engine = preset.Research.Engine
 	}
+	if cfg.Roles.Research.Model == "" {
+		cfg.Roles.Research.Model = preset.Research.Model
+	}
+	if cfg.Roles.Develop.Engine == "" {
+		cfg.Roles.Develop.Engine = preset.Develop.Engine
+	}
+	if cfg.Roles.Develop.Model == "" {
+		cfg.Roles.Develop.Model = preset.Develop.Model
+	}
+
+	// Legacy run-level fallback remains readable for existing configs/specs.
+	legacy := defaultRoleSession(cfg, cfg.Mode)
 	if cfg.Engine == "" {
-		cfg.Engine = sub.Engine
+		cfg.Engine = legacy.Engine
 	}
 	if cfg.Model == "" {
-		cfg.Model = sub.Model
+		cfg.Model = legacy.Model
 	}
 }
 
@@ -522,11 +537,18 @@ func EffectiveSessionConfig(cfg *Config, idx int) SessionConfig {
 	if out.Mode == "" {
 		out.Mode = cfg.Mode
 	}
+	roleDefault := defaultRoleSession(cfg, out.Mode)
 	if out.Engine == "" {
-		out.Engine = cfg.Engine
+		out.Engine = roleDefault.Engine
+		if out.Engine == "" {
+			out.Engine = cfg.Engine
+		}
 	}
 	if out.Model == "" {
-		out.Model = cfg.Model
+		out.Model = roleDefault.Model
+		if out.Model == "" {
+			out.Model = cfg.Model
+		}
 	}
 
 	target := cfg.Target
@@ -552,6 +574,23 @@ func EffectiveSessionConfig(cfg *Config, idx int) SessionConfig {
 	out.Harness = &harness
 
 	return out
+}
+
+func defaultRoleSession(cfg *Config, mode Mode) SessionConfig {
+	if cfg == nil {
+		return SessionConfig{}
+	}
+	switch mode {
+	case ModeResearch:
+		return cfg.Roles.Research
+	case ModeDevelop:
+		return cfg.Roles.Develop
+	default:
+		if cfg.Mode == ModeResearch {
+			return cfg.Roles.Research
+		}
+		return cfg.Roles.Develop
+	}
 }
 
 // ResolveAcceptanceCommand returns the acceptance command, falling back to the
@@ -634,6 +673,18 @@ func mergeConfig(base, overlay *Config) {
 	}
 	if overlay.Model != "" {
 		base.Model = overlay.Model
+	}
+	if overlay.Roles.Research.Engine != "" {
+		base.Roles.Research.Engine = overlay.Roles.Research.Engine
+	}
+	if overlay.Roles.Research.Model != "" {
+		base.Roles.Research.Model = overlay.Roles.Research.Model
+	}
+	if overlay.Roles.Develop.Engine != "" {
+		base.Roles.Develop.Engine = overlay.Roles.Develop.Engine
+	}
+	if overlay.Roles.Develop.Model != "" {
+		base.Roles.Develop.Model = overlay.Roles.Develop.Model
 	}
 	if overlay.Parallel > 0 {
 		base.Parallel = overlay.Parallel

@@ -7,27 +7,16 @@ import (
 )
 
 func TestAutoStartsRun(t *testing.T) {
-	oldInit := autoInit
 	oldStart := autoStart
 	defer func() {
-		autoInit = oldInit
 		autoStart = oldStart
 	}()
-
-	initCalls := 0
-	autoInit = func(_ string, args []string) error {
-		initCalls++
-		if len(args) < 2 || args[0] != "ship it" || args[1] != "--research" {
-			t.Fatalf("init args = %v, want objective plus default --research", args)
-		}
-		return nil
-	}
 
 	startCalls := 0
 	autoStart = func(_ string, args []string) error {
 		startCalls++
-		if args != nil {
-			t.Fatalf("start args = %v, want nil", args)
+		if len(args) < 2 || args[0] != "ship it" || args[1] != "--research" {
+			t.Fatalf("start args = %v, want objective plus default --research", args)
 		}
 		return nil
 	}
@@ -38,9 +27,6 @@ func TestAutoStartsRun(t *testing.T) {
 		}
 	})
 
-	if initCalls != 1 {
-		t.Fatalf("init calls = %d, want 1", initCalls)
-	}
 	if startCalls != 1 {
 		t.Fatalf("start calls = %d, want 1", startCalls)
 	}
@@ -57,26 +43,23 @@ func TestAutoStartsRun(t *testing.T) {
 }
 
 func TestAutoPreservesExplicitMode(t *testing.T) {
-	oldInit := autoInit
 	oldStart := autoStart
 	defer func() {
-		autoInit = oldInit
 		autoStart = oldStart
 	}()
 
-	autoInit = func(_ string, args []string) error {
+	autoStart = func(_ string, args []string) error {
 		want := []string{"ship it", "--develop"}
 		if len(args) != len(want) {
-			t.Fatalf("init args = %v, want %v", args, want)
+			t.Fatalf("start args = %v, want %v", args, want)
 		}
 		for i := range want {
 			if args[i] != want[i] {
-				t.Fatalf("init args = %v, want %v", args, want)
+				t.Fatalf("start args = %v, want %v", args, want)
 			}
 		}
 		return nil
 	}
-	autoStart = func(string, []string) error { return nil }
 
 	if err := Auto(t.TempDir(), []string{"ship it", "--develop"}); err != nil {
 		t.Fatalf("Auto: %v", err)
@@ -84,39 +67,71 @@ func TestAutoPreservesExplicitMode(t *testing.T) {
 }
 
 func TestAutoReturnsInitError(t *testing.T) {
-	oldInit := autoInit
 	oldStart := autoStart
 	defer func() {
-		autoInit = oldInit
 		autoStart = oldStart
 	}()
 
-	autoInit = func(string, []string) error { return errors.New("boom") }
-	autoStart = func(string, []string) error {
-		t.Fatal("start should not be called after init failure")
-		return nil
-	}
-
-	err := Auto(t.TempDir(), []string{"ship it"})
-	if err == nil || !strings.Contains(err.Error(), "init: boom") {
-		t.Fatalf("Auto error = %v, want init failure", err)
-	}
-}
-
-func TestAutoReturnsStartError(t *testing.T) {
-	oldInit := autoInit
-	oldStart := autoStart
-	defer func() {
-		autoInit = oldInit
-		autoStart = oldStart
-	}()
-
-	autoInit = func(string, []string) error { return nil }
 	autoStart = func(string, []string) error { return errors.New("boom") }
 
 	err := Auto(t.TempDir(), []string{"ship it"})
 	if err == nil || !strings.Contains(err.Error(), "start: boom") {
 		t.Fatalf("Auto error = %v, want start failure", err)
+	}
+}
+
+func TestAutoReturnsStartError(t *testing.T) {
+	oldStart := autoStart
+	defer func() {
+		autoStart = oldStart
+	}()
+
+	autoStart = func(string, []string) error { return errors.New("boom") }
+
+	err := Auto(t.TempDir(), []string{"ship it"})
+	if err == nil || !strings.Contains(err.Error(), "start: boom") {
+		t.Fatalf("Auto error = %v, want start failure", err)
+	}
+}
+
+func TestAutoHelpPrintsUsage(t *testing.T) {
+	oldStart := autoStart
+	defer func() {
+		autoStart = oldStart
+	}()
+
+	startCalls := 0
+	autoStart = func(string, []string) error {
+		startCalls++
+		return nil
+	}
+
+	out := captureStdout(t, func() {
+		if err := Auto(t.TempDir(), []string{"--help"}); err != nil {
+			t.Fatalf("Auto --help: %v", err)
+		}
+	})
+
+	if startCalls != 0 {
+		t.Fatalf("start calls = %d, want 0", startCalls)
+	}
+	if !strings.Contains(out, "usage: goalx auto") {
+		t.Fatalf("auto help missing usage:\n%s", out)
+	}
+}
+
+func TestResearchHelpPrintsUsage(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Research(t.TempDir(), []string{"--help"}); err != nil {
+			t.Fatalf("Research --help: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "usage: goalx research") {
+		t.Fatalf("research help missing usage:\n%s", out)
+	}
+	if !strings.Contains(out, "--research-role") {
+		t.Fatalf("research help missing role defaults:\n%s", out)
 	}
 }
 

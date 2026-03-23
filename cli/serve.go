@@ -42,17 +42,24 @@ type serveRun struct {
 }
 
 type serveActionRequest struct {
-	Objective  string   `json:"objective"`
-	Mode       string   `json:"mode"`
-	Parallel   int      `json:"parallel"`
-	Name       string   `json:"name"`
-	Context    []string `json:"context"`
-	Strategies []string `json:"strategies"`
-	Run        string   `json:"run"`
-	Session    string   `json:"session"`
-	Direction  string   `json:"direction"`
-	Message    string   `json:"message"`
-	Content    string   `json:"content"`
+	Objective     string   `json:"objective"`
+	Mode          string   `json:"mode"`
+	Parallel      int      `json:"parallel"`
+	Name          string   `json:"name"`
+	Context       []string `json:"context"`
+	Strategies    []string `json:"strategies"`
+	Run           string   `json:"run"`
+	From          string   `json:"from"`
+	Session       string   `json:"session"`
+	Direction     string   `json:"direction"`
+	Message       string   `json:"message"`
+	Content       string   `json:"content"`
+	Preset        string   `json:"preset"`
+	Master        string   `json:"master"`
+	ResearchRole  string   `json:"research_role"`
+	DevelopRole   string   `json:"develop_role"`
+	BudgetSeconds int      `json:"budget_seconds"`
+	WriteConfig   bool     `json:"write_config"`
 }
 
 var serveOutputMu sync.Mutex
@@ -445,6 +452,16 @@ func buildServeCLIArgs(action string, req serveActionRequest) ([]string, error) 
 			return nil, fmt.Errorf("objective is required")
 		}
 		return buildServeStartInitArgs(req), nil
+	case "research", "develop":
+		if strings.TrimSpace(req.Objective) == "" {
+			return nil, fmt.Errorf("objective is required")
+		}
+		return buildServeLaunchArgs(req), nil
+	case "debate", "implement", "explore":
+		if strings.TrimSpace(req.From) == "" {
+			return nil, fmt.Errorf("from is required")
+		}
+		return buildServePhaseArgs(req), nil
 	case "observe", "stop", "save", "drop":
 		return buildServeRunArgs(req.Run), nil
 	case "status":
@@ -494,6 +511,85 @@ func buildServeStartInitArgs(req serveActionRequest) []string {
 	if len(req.Strategies) > 0 {
 		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
 	}
+	if req.Preset != "" {
+		args = append(args, "--preset", req.Preset)
+	}
+	if req.Master != "" {
+		args = append(args, "--master", req.Master)
+	}
+	if req.ResearchRole != "" {
+		args = append(args, "--research-role", req.ResearchRole)
+	}
+	if req.DevelopRole != "" {
+		args = append(args, "--develop-role", req.DevelopRole)
+	}
+	return args
+}
+
+func buildServeLaunchArgs(req serveActionRequest) []string {
+	args := []string{req.Objective}
+	if req.Parallel > 0 {
+		args = append(args, "--parallel", strconv.Itoa(req.Parallel))
+	}
+	if req.Name != "" {
+		args = append(args, "--name", req.Name)
+	}
+	if len(req.Context) > 0 {
+		args = append(args, "--context", strings.Join(req.Context, ","))
+	}
+	if len(req.Strategies) > 0 {
+		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
+	}
+	if req.Preset != "" {
+		args = append(args, "--preset", req.Preset)
+	}
+	if req.Master != "" {
+		args = append(args, "--master", req.Master)
+	}
+	if req.ResearchRole != "" {
+		args = append(args, "--research-role", req.ResearchRole)
+	}
+	if req.DevelopRole != "" {
+		args = append(args, "--develop-role", req.DevelopRole)
+	}
+	return args
+}
+
+func buildServePhaseArgs(req serveActionRequest) []string {
+	args := []string{"--from", req.From}
+	if req.Name != "" {
+		args = append(args, "--name", req.Name)
+	}
+	if req.Objective != "" {
+		args = append(args, "--objective", req.Objective)
+	}
+	if req.Parallel > 0 {
+		args = append(args, "--parallel", strconv.Itoa(req.Parallel))
+	}
+	if len(req.Context) > 0 {
+		args = append(args, "--context", strings.Join(req.Context, ","))
+	}
+	if len(req.Strategies) > 0 {
+		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
+	}
+	if req.Preset != "" {
+		args = append(args, "--preset", req.Preset)
+	}
+	if req.Master != "" {
+		args = append(args, "--master", req.Master)
+	}
+	if req.ResearchRole != "" {
+		args = append(args, "--research-role", req.ResearchRole)
+	}
+	if req.DevelopRole != "" {
+		args = append(args, "--develop-role", req.DevelopRole)
+	}
+	if req.BudgetSeconds > 0 {
+		args = append(args, "--budget-seconds", strconv.Itoa(req.BudgetSeconds))
+	}
+	if req.WriteConfig {
+		args = append(args, "--write-config")
+	}
 	return args
 }
 
@@ -521,6 +617,10 @@ func (a *serveApp) runCLIAction(projectRoot, action string, args []string) (stri
 			return Start(projectRoot, args)
 		case "auto":
 			return Auto(projectRoot, args)
+		case "research":
+			return Research(projectRoot, args)
+		case "develop":
+			return Develop(projectRoot, args)
 		case "observe":
 			return Observe(projectRoot, args)
 		case "status":
@@ -539,6 +639,12 @@ func (a *serveApp) runCLIAction(projectRoot, action string, args []string) (stri
 			return Resume(projectRoot, args)
 		case "drop":
 			return Drop(projectRoot, args)
+		case "debate":
+			return Debate(projectRoot, args, nil)
+		case "implement":
+			return Implement(projectRoot, args, nil)
+		case "explore":
+			return Explore(projectRoot, args)
 		default:
 			return fmt.Errorf("unsupported action %q", action)
 		}

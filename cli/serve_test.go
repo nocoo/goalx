@@ -170,6 +170,20 @@ func TestServeHandlerGoalxActionRoutes(t *testing.T) {
 			wantArgs:   []string{"research remote management", "--research", "--parallel", "3"},
 		},
 		{
+			name:       "research",
+			path:       "/projects/goalx/goalx/research",
+			body:       `{"objective":"triage auth bugs","parallel":2,"preset":"hybrid","master":"codex/best","research_role":"claude-code/opus"}`,
+			wantAction: "research",
+			wantArgs:   []string{"triage auth bugs", "--parallel", "2", "--preset", "hybrid", "--master", "codex/best", "--research-role", "claude-code/opus"},
+		},
+		{
+			name:       "implement",
+			path:       "/projects/goalx/goalx/implement",
+			body:       `{"from":"auth-audit","objective":"implement fixes","parallel":2,"develop_role":"codex/fast","write_config":true}`,
+			wantAction: "implement",
+			wantArgs:   []string{"--from", "auth-audit", "--objective", "implement fixes", "--parallel", "2", "--develop-role", "codex/fast", "--write-config"},
+		},
+		{
 			name:       "observe",
 			path:       "/projects/goalx/goalx/observe",
 			body:       `{"run":"auth-audit"}`,

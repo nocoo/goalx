@@ -32,6 +32,9 @@ func TestParseStartInitArgs(t *testing.T) {
 		"--research",
 		"--parallel", "3",
 		"--name", "demo-run",
+		"--master", "codex/best",
+		"--research-role", "claude-code/opus",
+		"--develop-role", "codex/fast",
 	})
 	if err != nil {
 		t.Fatalf("parseStartInitArgs: %v", err)
@@ -47,6 +50,42 @@ func TestParseStartInitArgs(t *testing.T) {
 	}
 	if opts.Name != "demo-run" {
 		t.Fatalf("name = %q, want demo-run", opts.Name)
+	}
+	if opts.Master != "codex/best" {
+		t.Fatalf("master = %q, want codex/best", opts.Master)
+	}
+	if opts.ResearchRole != "claude-code/opus" {
+		t.Fatalf("research-role = %q", opts.ResearchRole)
+	}
+	if opts.DevelopRole != "codex/fast" {
+		t.Fatalf("develop-role = %q", opts.DevelopRole)
+	}
+}
+
+func TestParseLaunchOptionsRejectsAmbiguousTopLevelEngineFlags(t *testing.T) {
+	_, err := parseLaunchOptions([]string{"audit auth", "--engine", "codex"}, goalx.ModeResearch, true)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestParseLaunchOptionsLeavesParallelUnsetWhenOmitted(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeResearch, false)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if opts.Parallel != 0 {
+		t.Fatalf("parallel = %d, want 0 when omitted", opts.Parallel)
+	}
+}
+
+func TestParseLaunchOptionsLeavesParallelUnsetByDefault(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeResearch, true)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if opts.Parallel != 0 {
+		t.Fatalf("parallel = %d, want 0 when omitted", opts.Parallel)
 	}
 }
 

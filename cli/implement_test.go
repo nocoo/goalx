@@ -28,7 +28,7 @@ func TestImplementPreservesSavedMasterConfig(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Implement(projectRoot, nil, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -71,7 +71,7 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 		BudgetSeconds:  1200,
 		Objective:      "custom implement objective",
 	}
-	if err := Implement(projectRoot, nil, nc); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -117,7 +117,7 @@ func TestImplementResolvesNextConfigStrategiesIntoHints(t *testing.T) {
 		Strategies:     []string{"depth", "adversarial"},
 		DiversityHints: []string{"verification"},
 	}
-	if err := Implement(projectRoot, nil, nc); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -156,7 +156,7 @@ func TestImplementAppliesNextConfigPreset(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Implement(projectRoot, nil, &nextConfigJSON{Preset: "claude-h"}); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, &nextConfigJSON{Preset: "claude-h"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -205,7 +205,7 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 		t.Fatalf("SaveArtifacts: %v", err)
 	}
 
-	if err := Implement(projectRoot, nil, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nil); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 

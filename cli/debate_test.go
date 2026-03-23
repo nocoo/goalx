@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -28,7 +29,7 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, nil, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -65,7 +66,7 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 		BudgetSeconds:  900,
 		Objective:      "custom debate objective",
 	}
-	if err := Debate(projectRoot, nil, nc); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nc); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -106,7 +107,7 @@ func TestDebateInheritsSavedParallelWithoutOverride(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, nil, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -135,7 +136,7 @@ func TestDebateAppliesNextConfigPreset(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, nil, &nextConfigJSON{Preset: "claude"}); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, &nextConfigJSON{Preset: "claude"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -184,7 +185,7 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 		t.Fatalf("SaveArtifacts: %v", err)
 	}
 
-	if err := Debate(projectRoot, nil, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -201,5 +202,20 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("context.files = %#v, want %q from artifacts manifest", cfg.Context.Files, reportPath)
+	}
+}
+
+func TestDebateHelpPrintsUsage(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Debate(t.TempDir(), []string{"--help"}, nil); err != nil {
+			t.Fatalf("Debate --help: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "usage: goalx debate --from RUN") {
+		t.Fatalf("debate help missing usage:\n%s", out)
+	}
+	if !strings.Contains(out, "--write-config") {
+		t.Fatalf("debate help missing write-config note:\n%s", out)
 	}
 }

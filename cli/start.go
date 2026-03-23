@@ -10,21 +10,35 @@ import (
 
 // Start executes the full goalx start workflow.
 func Start(projectRoot string, args []string) (err error) {
+	var cfg *goalx.Config
+	var engines map[string]goalx.EngineConfig
 	if len(args) > 0 {
-		if _, err := parseStartInitArgs(args); err != nil {
+		if wantsHelp(args) {
+			fmt.Println(launchUsage("start"))
+			return nil
+		}
+		opts, err := parseStartInitArgs(args)
+		if err != nil {
 			return err
 		}
-		if err := Init(projectRoot, args); err != nil {
+		cfg, err = buildLaunchConfig(projectRoot, opts)
+		if err != nil {
 			return err
 		}
+		_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
+		if err != nil {
+			return fmt.Errorf("load base config: %w", err)
+		}
+	} else {
+		cfg, engines, err = goalx.LoadConfig(projectRoot)
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
 	}
+	return startWithConfig(projectRoot, cfg, engines, nil)
+}
 
-	// 1. Load config
-	cfg, engines, err := goalx.LoadConfig(projectRoot)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
+func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, metaPatch *RunMetadata) (err error) {
 	// 2. Auto-generate name if missing
 	if cfg.Name == "" {
 		cfg.Name = goalx.Slugify(cfg.Objective)
@@ -160,8 +174,26 @@ func Start(projectRoot string, args []string) (err error) {
 	if _, err := EnsureAcceptanceState(runDir, cfg); err != nil {
 		return fmt.Errorf("init acceptance state: %w", err)
 	}
-	if _, err := EnsureRunMetadata(runDir, projectRoot, cfg.Objective); err != nil {
+	meta, err := EnsureRunMetadata(runDir, projectRoot, cfg.Objective)
+	if err != nil {
 		return fmt.Errorf("init run metadata: %w", err)
+	}
+	if metaPatch != nil {
+		if metaPatch.PhaseKind != "" {
+			meta.PhaseKind = metaPatch.PhaseKind
+		}
+		if metaPatch.SourceRun != "" {
+			meta.SourceRun = metaPatch.SourceRun
+		}
+		if metaPatch.SourcePhase != "" {
+			meta.SourcePhase = metaPatch.SourcePhase
+		}
+		if metaPatch.ParentRun != "" {
+			meta.ParentRun = metaPatch.ParentRun
+		}
+		if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+			return fmt.Errorf("write run metadata: %w", err)
+		}
 	}
 	if _, err := EnsureArtifactsManifest(runDir); err != nil {
 		return fmt.Errorf("init artifacts manifest: %w", err)

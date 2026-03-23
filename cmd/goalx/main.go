@@ -16,9 +16,11 @@ const usage = `goalx — autonomous research CLI
 Usage:
   goalx init    "objective" [flags]   Generate goalx.yaml from objective
   goalx start                         Create run + tmux + launch the master from goalx.yaml
-  goalx start   "objective" [flags]   Init + start in one step (zero-config)
+  goalx start   "objective" [flags]   Create and start a run directly from CLI flags
+  goalx research "objective" [flags]  Start a research run directly from CLI flags
+  goalx develop  "objective" [flags]  Start a develop run directly from CLI flags
   goalx list                          List all runs (active / completed / archived)
-  goalx status  [--run NAME] [session] Show current run progress from journal
+  goalx status  [--run NAME] [session] Show current run progress and control summary
   goalx attach  [--run NAME] [window]  Attach to tmux session (default: master)
   goalx stop    [--run NAME]           Graceful shutdown
   goalx review  [--run NAME]           Compare all sessions
@@ -29,9 +31,10 @@ Usage:
   goalx focus   [--run NAME]           Set the default run for this project
   goalx archive [--run NAME] <session> Git tag + preserve
   goalx save    [--run NAME]           Save run artifacts to .goalx/runs/<name>/
-  goalx verify  [--run NAME]           Run the active run's acceptance command and record the result
-  goalx debate                         Generate debate config from latest research
-  goalx implement                      Generate develop config from consensus
+  goalx verify  [--run NAME]           Run the effective acceptance gate, then validate contract and completion provenance
+  goalx debate  --from RUN [flags]     Start a debate run from a saved run
+  goalx implement --from RUN [flags]   Start a develop run from a saved run
+  goalx explore --from RUN [flags]     Start a follow-up research run from a saved run
   goalx drop    [--run NAME]           Cleanup branch + worktree
   goalx report  [--run NAME]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
@@ -41,6 +44,11 @@ Usage:
   goalx auto    "objective" [flags]   Init and start one master-led run, then exit
   goalx serve                         Start the GoalX HTTP control server
   goalx next                           Show next pipeline step
+
+Notes:
+  --parallel is optional initial fan-out, not a permanent cap on later dispatch.
+  Use --master, --research-role, and --develop-role for role-specific engine/model defaults.
+  goalx auto remains the default path; debate/implement/explore require --from RUN unless you choose --write-config.
 
 Run 'goalx <command> --help' for details.`
 
@@ -94,6 +102,10 @@ func runCommand(cwd, cmd string, args []string) error {
 		return runWithSignalCleanup(cwd, func() error { return mainStart(cwd, args) })
 	case "auto":
 		return runWithSignalCleanup(cwd, func() error { return mainAuto(cwd, args) })
+	case "research":
+		return runWithSignalCleanup(cwd, func() error { return cli.Research(cwd, args) })
+	case "develop":
+		return runWithSignalCleanup(cwd, func() error { return cli.Develop(cwd, args) })
 	case "init":
 		return cli.Init(cwd, args)
 	case "list":
@@ -134,6 +146,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Debate(cwd, args, nil)
 	case "implement":
 		return cli.Implement(cwd, args, nil)
+	case "explore":
+		return cli.Explore(cwd, args)
 	case "add":
 		return cli.Add(cwd, args)
 	case "tell":

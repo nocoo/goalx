@@ -97,23 +97,41 @@ func Add(projectRoot string, args []string) error {
 	branch := fmt.Sprintf("goalx/%s/%d", rc.Config.Name, newNum)
 	windowName := sessionWindowName(rc.Config.Name, newNum)
 
+	newSess := goalx.SessionConfig{Hint: hint}
+	if flagEngine != "" {
+		newSess.Engine = flagEngine
+	}
+	if flagModel != "" {
+		newSess.Model = flagModel
+	}
+	if flagMode != "" {
+		newSess.Mode = flagMode
+		target, harness, err := defaultSessionExecution(rc.ProjectRoot, rc.Config, flagMode)
+		if err != nil {
+			return err
+		}
+		newSess.Target = &target
+		newSess.Harness = &harness
+	}
+
+	renderCfg := *rc.Config
+	renderCfg.Sessions = append([]goalx.SessionConfig(nil), rc.Config.Sessions...)
+	if len(renderCfg.Sessions) > 0 {
+		renderCfg.Sessions = append(renderCfg.Sessions, newSess)
+	} else {
+		renderCfg.Parallel = newNum
+	}
+	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
+	engine := effectiveSession.Engine
+	model := effectiveSession.Model
+
 	// Resolve engine
 	_, engines, err := goalx.LoadConfig(rc.ProjectRoot)
 	if err != nil {
-		// Fallback: try base config
 		_, engines, err = goalx.LoadRawBaseConfig(rc.ProjectRoot)
 		if err != nil {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
-	}
-
-	engine := rc.Config.Engine
-	model := rc.Config.Model
-	if flagEngine != "" {
-		engine = flagEngine
-	}
-	if flagModel != "" {
-		model = flagModel
 	}
 	engineCmd, err := goalx.ResolveEngineCommand(engines, engine, model)
 	if err != nil {
@@ -155,31 +173,6 @@ func Add(projectRoot string, args []string) error {
 		}
 	}
 
-	newSess := goalx.SessionConfig{Hint: hint}
-	if flagEngine != "" {
-		newSess.Engine = flagEngine
-	}
-	if flagModel != "" {
-		newSess.Model = flagModel
-	}
-	if flagMode != "" {
-		newSess.Mode = flagMode
-		target, harness, err := defaultSessionExecution(rc.ProjectRoot, rc.Config, flagMode)
-		if err != nil {
-			return err
-		}
-		newSess.Target = &target
-		newSess.Harness = &harness
-	}
-
-	renderCfg := *rc.Config
-	renderCfg.Sessions = append([]goalx.SessionConfig(nil), rc.Config.Sessions...)
-	if len(renderCfg.Sessions) > 0 {
-		renderCfg.Sessions = append(renderCfg.Sessions, newSess)
-	} else {
-		renderCfg.Parallel = newNum
-	}
-	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
 	if err := UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
 		Name:         sName,
 		State:        "active",

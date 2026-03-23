@@ -180,6 +180,13 @@ mode: develop
 objective: implement audit fixes
 engine: codex
 model: codex
+roles:
+  research:
+    engine: claude-code
+    model: opus
+  develop:
+    engine: codex
+    model: fast
 parallel: 1
 sessions:
   - hint: first
@@ -240,6 +247,13 @@ mode: develop
 objective: implement audit fixes
 engine: codex
 model: codex
+roles:
+  research:
+    engine: claude-code
+    model: opus
+  develop:
+    engine: codex
+    model: fast
 parallel: 1
 sessions:
   - hint: first
@@ -453,6 +467,13 @@ mode: develop
 objective: implement audit fixes
 engine: codex
 model: codex
+roles:
+  research:
+    engine: claude-code
+    model: opus
+  develop:
+    engine: codex
+    model: fast
 parallel: 1
 sessions:
   - hint: first
@@ -493,6 +514,7 @@ harness:
 		"## Mode: Research",
 		"DO NOT modify any source code.",
 		"`report.md`",
+		"Agent tool",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q:\n%s", want, text)

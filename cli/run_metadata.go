@@ -18,6 +18,10 @@ type RunMetadata struct {
 	ProjectRoot     string `json:"project_root,omitempty"`
 	ProtocolVersion int    `json:"protocol_version,omitempty"`
 	BaseRevision    string `json:"base_revision,omitempty"`
+	PhaseKind       string `json:"phase_kind,omitempty"`
+	SourceRun       string `json:"source_run,omitempty"`
+	SourcePhase     string `json:"source_phase,omitempty"`
+	ParentRun       string `json:"parent_run,omitempty"`
 	StartedAt       string `json:"started_at,omitempty"`
 	UpdatedAt       string `json:"updated_at,omitempty"`
 }

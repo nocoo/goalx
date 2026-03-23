@@ -57,16 +57,16 @@ func TestPresetClaude(t *testing.T) {
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Errorf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Engine != "codex" || cfg.Model != "codex" {
-		t.Errorf("develop = %s/%s, want codex/codex", cfg.Engine, cfg.Model)
+	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "codex" {
+		t.Errorf("develop role = %s/%s, want codex/codex", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 
 func TestPresetClaudeResearch(t *testing.T) {
 	cfg := Config{Preset: "claude", Mode: ModeResearch}
 	applyPreset(&cfg)
-	if cfg.Engine != "claude-code" || cfg.Model != "sonnet" {
-		t.Errorf("research = %s/%s, want claude-code/sonnet", cfg.Engine, cfg.Model)
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
+		t.Errorf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 }
 
@@ -76,8 +76,8 @@ func TestPresetClaudeH(t *testing.T) {
 	if cfg.Master.Model != "opus" {
 		t.Errorf("claude-h master model = %q, want opus", cfg.Master.Model)
 	}
-	if cfg.Engine != "claude-code" || cfg.Model != "opus" {
-		t.Errorf("claude-h develop = %s/%s, want claude-code/opus", cfg.Engine, cfg.Model)
+	if cfg.Roles.Develop.Engine != "claude-code" || cfg.Roles.Develop.Model != "opus" {
+		t.Errorf("claude-h develop role = %s/%s, want claude-code/opus", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 
@@ -87,8 +87,8 @@ func TestPresetCodex(t *testing.T) {
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
 		t.Errorf("codex master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Engine != "codex" || cfg.Model != "codex" {
-		t.Errorf("codex develop = %s/%s, want codex/codex", cfg.Engine, cfg.Model)
+	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "codex" {
+		t.Errorf("codex develop role = %s/%s, want codex/codex", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestPresetMixed(t *testing.T) {
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
 		t.Errorf("mixed master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Engine != "claude-code" || cfg.Model != "opus" {
-		t.Errorf("mixed research = %s/%s, want claude-code/opus", cfg.Engine, cfg.Model)
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "opus" {
+		t.Errorf("mixed research role = %s/%s, want claude-code/opus", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 }
 
@@ -108,6 +108,20 @@ func TestPresetNoOverrideExplicit(t *testing.T) {
 	applyPreset(&cfg)
 	if cfg.Engine != "aider" || cfg.Model != "opus" {
 		t.Errorf("explicit should not be overridden: %s/%s", cfg.Engine, cfg.Model)
+	}
+}
+
+func TestApplyPresetFillsRoleDefaults(t *testing.T) {
+	cfg := Config{Preset: "hybrid", Mode: ModeResearch}
+	ApplyPreset(&cfg)
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
+		t.Fatalf("master = %s/%s", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "opus" {
+		t.Fatalf("research role = %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	}
+	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "codex" {
+		t.Fatalf("develop role = %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 
@@ -839,6 +853,7 @@ func cloneStringMap(src map[string]string) map[string]string {
 func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 	cfg := &Config{
 		Mode:    ModeDevelop,
+		Roles:   RoleDefaultsConfig{Research: SessionConfig{Engine: "claude-code", Model: "opus"}},
 		Target:  TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
 		Harness: HarnessConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
@@ -866,6 +881,7 @@ func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	cfg := &Config{
 		Mode:    ModeDevelop,
+		Roles:   RoleDefaultsConfig{Develop: SessionConfig{Engine: "codex", Model: "fast"}},
 		Target:  TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
 		Harness: HarnessConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
@@ -882,5 +898,51 @@ func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	}
 	if got.Harness.Command != "go test ./..." {
 		t.Fatalf("Harness.Command = %q, want inherited run harness", got.Harness.Command)
+	}
+	if got.Engine != "codex" || got.Model != "fast" {
+		t.Fatalf("Engine/Model = %s/%s, want codex/fast", got.Engine, got.Model)
+	}
+}
+
+func TestEffectiveSessionConfigUsesModeSpecificRoleDefaults(t *testing.T) {
+	cfg := &Config{
+		Mode: ModeDevelop,
+		Roles: RoleDefaultsConfig{
+			Research: SessionConfig{Engine: "claude-code", Model: "opus"},
+			Develop:  SessionConfig{Engine: "codex", Model: "fast"},
+		},
+		Sessions: []SessionConfig{
+			{Mode: ModeResearch},
+			{Mode: ModeDevelop},
+		},
+		Target:  TargetConfig{Files: []string{"src/"}},
+		Harness: HarnessConfig{Command: "go test ./..."},
+	}
+
+	gotResearch := EffectiveSessionConfig(cfg, 0)
+	gotDevelop := EffectiveSessionConfig(cfg, 1)
+
+	if gotResearch.Engine != "claude-code" || gotResearch.Model != "opus" {
+		t.Fatalf("research session = %s/%s", gotResearch.Engine, gotResearch.Model)
+	}
+	if gotDevelop.Engine != "codex" || gotDevelop.Model != "fast" {
+		t.Fatalf("develop session = %s/%s", gotDevelop.Engine, gotDevelop.Model)
+	}
+}
+
+func TestLegacyTopLevelEngineModelRemainReadableFallback(t *testing.T) {
+	cfg := &Config{
+		Mode:   ModeResearch,
+		Engine: "claude-code",
+		Model:  "sonnet",
+		Target: TargetConfig{Files: []string{"report.md"}},
+		Harness: HarnessConfig{
+			Command: "test -s report.md",
+		},
+	}
+
+	got := EffectiveSessionConfig(cfg, 0)
+	if got.Engine != "claude-code" || got.Model != "sonnet" {
+		t.Fatalf("fallback session = %s/%s", got.Engine, got.Model)
 	}
 }

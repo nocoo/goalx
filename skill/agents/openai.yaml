@@ -1,4 +1,4 @@
 interface:
   display_name: "GoalX"
-  short_description: "Autonomous GoalX runs and redirects"
-  default_prompt: "Use $goalx to run, observe, or redirect an autonomous GoalX goal in this project."
+  short_description: "GoalX runs with explicit research, develop, debate, implement, and explore phases"
+  default_prompt: "Use $goalx to start, observe, redirect, or phase a GoalX goal in this project. Prefer $goalx auto by default; use $goalx research, $goalx develop, or $goalx debate --from / $goalx implement --from / $goalx explore --from for explicit phase progression, and use --write-config only for advanced config-first control."

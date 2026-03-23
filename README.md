@@ -51,6 +51,15 @@ go build -o bin/goalx ./cmd/goalx
 # Give a goal, master handles everything
 goalx auto "audit code quality and find bugs"
 
+# Start a direct research or develop run with role defaults
+goalx research "audit code quality and find bugs"
+goalx develop "implement the fix"
+
+# Continue from a saved run with an explicit source
+goalx debate --from research-audit
+goalx implement --from research-audit-debate
+goalx explore --from research-audit
+
 # Watch progress
 goalx observe
 
@@ -61,7 +70,7 @@ goalx verify
 goalx result
 ```
 
-Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicitly want config-first or low-level control. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin the default run. Explicit `--run NAME` resolution is global when the run name is unique; if names collide across projects, use `--run <project-id>/<run>`.
+Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an explicit phase-specific run with role defaults. Use `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` to continue from saved runs. Only use `goalx init` / `goalx start` when you explicitly want config-first or low-level control. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin the default run. Explicit `--run NAME` resolution is global when the run name is unique; if names collide across projects, use `--run <project-id>/<run>`. `--parallel` is optional: if you omit it, GoalX keeps project/preset defaults; if nothing else sets it, the initial fan-out is `1`. That value is initial planning guidance, not a permanent ceiling on later master dispatch.
 
 ## Commands
 
@@ -71,6 +80,8 @@ Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicit
 | `goalx init` | Advanced/manual path: generate config from objective without starting |
 | `goalx start` | Advanced/manual path: launch tmux session from existing config |
 | `goalx auto` | Init and start one master-led run, then exit |
+| `goalx research` | Start a research run directly from CLI flags |
+| `goalx develop` | Start a develop run directly from CLI flags |
 | `goalx observe` | Live tmux capture from all agents plus control-plane summary |
 | `goalx status` | Progress summary plus unread inbox / heartbeat lag / legacy-protocol hints |
 | `goalx focus` | Set the default run used by commands that omit `--run` |
@@ -84,8 +95,9 @@ Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicit
 | `goalx archive` | Tag and preserve a session branch |
 | `goalx save` | Save durable artifacts, contract state, provenance, and `artifacts.json` to `.goalx/runs/` |
 | `goalx verify` | Run the effective acceptance gate, then validate goal contract completion and completion provenance |
-| `goalx debate` | Generate debate config from prior research |
-| `goalx implement` | Generate develop config from consensus |
+| `goalx debate` | Start a debate phase from `--from RUN` |
+| `goalx implement` | Start a develop phase from `--from RUN` |
+| `goalx explore` | Start a follow-up research phase from `--from RUN` |
 | `goalx report` | Generate a markdown report from the run journal |
 | `goalx result` | Show saved run results (`--full` prints the full research summary) |
 | `goalx attach` | Attach to tmux session or window |
@@ -98,17 +110,19 @@ Default to `goalx auto`. Only use `goalx init` / `goalx start` when you explicit
 
 ```
 goalx auto → master-led run
+           → goalx research / goalx develop when you want a direct phase-specific run
            → observe / status while it runs
            → redirect only when needed
            → verify before done / implement closeout
            → save / result when the run finishes
+           → goalx debate --from RUN / goalx implement --from RUN / goalx explore --from RUN for follow-up phases
 ```
 
-`goalx debate` and `goalx implement` still exist as explicit commands, but `goalx auto` no longer routes between phases on the framework side.
+`goalx auto` remains the default path. `goalx research` / `goalx develop` are direct phase entry points with role defaults, and `goalx debate --from RUN` / `goalx implement --from RUN` / `goalx explore --from RUN` continue from saved runs. Phase commands default to direct run creation and start; `--write-config` stays advanced/manual only. Use `--master`, `--research-role`, and `--develop-role` when you need explicit role defaults for a run or phase.
 
 ## Advanced Control
 
-Use `goalx init` + `goalx start`, direct config edits, or manual session control only when you explicitly want low-level control. The default path for both research and development is still `goalx auto`.
+Use `goalx init` + `goalx start`, direct config edits, or manual session control only when you explicitly want low-level control. The default path for both research and development is still `goalx auto`, but explicit `goalx research` / `goalx develop` / `goalx debate --from` / `goalx implement --from` / `goalx explore --from` are the preferred non-config-first alternatives. Use `--write-config` only when you explicitly want to generate `.goalx/goalx.yaml` first.
 
 ## Runtime vs Saved State
 
@@ -118,6 +132,7 @@ Use `goalx init` + `goalx start`, direct config edits, or manual session control
 - `focused_run` in `.goalx/runs.json` is the explicit default run when a project has multiple active runs.
 - Durable project artifacts live under `<project>/.goalx/runs/{run}` after `goalx save`.
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, and `implement`.
+- `run-metadata.json` tracks phase lineage, including `phase_kind`, `source_run`, and `parent_run`, so each run can inherit from its own saved input without touching shared project config.
 - GoalX bootstraps `.goalx/` into `.git/info/exclude` for local repos so project-scoped run state stays out of git by default.
 - When a project has multiple active runs, pass `--run NAME` explicitly for mutating commands. Use `goalx focus --run NAME` to pin the default run for commands that omit `--run`.
 - Explicit `--run NAME` resolution is global when the name is unique. If the same run name exists in multiple projects, disambiguate with `--run <project-id>/<run>`.
@@ -127,7 +142,7 @@ Use `goalx init` + `goalx start`, direct config edits, or manual session control
 Dimensions define how agents approach the objective — not what they do, but from what angle:
 
 ```bash
-goalx init "objective" --research --parallel 3 --strategy depth,adversarial,evidence
+goalx research "objective" --parallel 3 --strategy depth,adversarial,evidence
 ```
 
 | Dimension | Focus |
@@ -141,19 +156,19 @@ goalx init "objective" --research --parallel 3 --strategy depth,adversarial,evid
 | `comparative` | Compare with industry best practices |
 | `user` | End-user perspective, usability |
 
-Defaults: parallel=2 → depth+adversarial, parallel=3 → +evidence. Custom dimensions in `~/.goalx/config.yaml`.
+Strategy defaults for research fan-out: parallel=2 → depth+adversarial, parallel=3 → +evidence. Custom dimensions in `~/.goalx/config.yaml`.
 
 ## Agent Composition
 
 ```bash
 # Explicit agent composition with --sub
-goalx init "objective" --research --sub claude-code/opus:2 --sub codex/gpt-5.4:1
+goalx research "objective" --sub claude-code/opus:2 --sub codex/gpt-5.4:1
 
-# Override master engine
-goalx init "objective" --master codex/gpt-5.4 --parallel 2
+# Override role defaults
+goalx research "objective" --master codex/gpt-5.4 --research-role claude-code/opus --develop-role codex/gpt-5.4-mini
 
 # N workers + 1 auditor pattern
-goalx init "objective" --preset claude-h --parallel 3 --auditor codex/gpt-5.4
+goalx develop "objective" --preset claude-h --parallel 3 --auditor codex/gpt-5.4
 ```
 
 ## Architecture
@@ -188,9 +203,11 @@ GoalX is a **protocol scaffolding tool**. The Go code launches the master, expos
 Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goalx.yaml
 ```
 
+`Built-in defaults` and `~/.goalx/config.yaml` provide global defaults. `.goalx/config.yaml` can override project-specific behavior. `.goalx/goalx.yaml` is the advanced/manual config-first path only; the direct `research` / `develop` / `debate --from` / `implement --from` / `explore --from` commands prefer immutable run specs instead of writing shared config first.
+
 ### Engine Presets
 
-| Preset | Master | Research Sub | Develop Sub |
+| Preset | Master | Research Role | Develop Role |
 |--------|--------|-------------|-------------|
 | hybrid | claude/opus | claude/opus | codex/gpt-5.4 |
 | claude | claude/opus | claude/sonnet | codex/gpt-5.4 |
@@ -198,7 +215,8 @@ Built-in defaults → ~/.goalx/config.yaml → .goalx/config.yaml → .goalx/goa
 | codex | codex/gpt-5.4 | codex/gpt-5.4 | codex/gpt-5.4 |
 | mixed | codex/gpt-5.4 | claude/opus | codex/gpt-5.4 |
 
-Custom presets in `~/.goalx/config.yaml`. Override per-run with `--master`, `--sub`, `--auditor`.
+Custom presets in `~/.goalx/config.yaml`. Override per-run with `--preset` plus role-specific flags.
+Role-specific overrides use `--master`, `--research-role`, `--develop-role`, `--parallel`, `--context`, `--strategy`, `--budget-seconds`, `--name`, and `--sub`. `--parallel` is optional initial fan-out. Master may still add or resume more durable workers later when the goal warrants it.
 
 ## HTTP API & Remote Management
 
@@ -214,9 +232,14 @@ Common endpoints:
 - `POST /workspaces` — add project directory (auto git-init if needed)
 - `POST /projects/:name/goalx/auto` — start one master-led run from an objective
 - `POST /projects/:name/goalx/start` — start from existing config, or init+start when an objective is provided
+- `POST /projects/:name/goalx/research` — start a research run directly from CLI flags
+- `POST /projects/:name/goalx/develop` — start a develop run directly from CLI flags
 - `POST /projects/:name/goalx/observe` — capture live progress
 - `POST /projects/:name/goalx/status` — summarize progress
 - `POST /projects/:name/goalx/add` — add a session to a running run
+- `POST /projects/:name/goalx/debate` — start a debate phase from `from`
+- `POST /projects/:name/goalx/implement` — start an implementation phase from `from`
+- `POST /projects/:name/goalx/explore` — start a follow-up research phase from `from`
 - `POST /projects/:name/goalx/keep|park|resume|save|stop|drop` — control a specific run or session
 - `POST /projects/:name/goalx/tell` — send instructions to the master
 - `POST /projects/:name/goalx/config` — read project config or read an active run's immutable run spec

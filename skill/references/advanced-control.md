@@ -4,7 +4,7 @@ Use this only when the user explicitly asks for operator-level GoalX control.
 
 ## Config-First Launch
 
-Choose this path only when the user wants to inspect or edit config before launch.
+Choose this path only when the user explicitly wants to inspect or edit config before launch.
 
 ```bash
 goalx init "goal"
@@ -12,7 +12,16 @@ goalx init "goal"
 goalx start
 ```
 
-Do not choose this path by default. Prefer `goalx auto`.
+Do not choose this path by default. Prefer:
+
+```bash
+goalx auto "goal"
+goalx research "goal"
+goalx develop "goal"
+goalx debate --from RUN
+goalx implement --from RUN
+goalx explore --from RUN
+```
 
 ## Manual Run Targeting
 
@@ -27,8 +36,18 @@ Prefer durable GoalX commands over direct tmux input:
 - `goalx tell --run NAME "direction"` to redirect the master or a session
 - `goalx add --run NAME "direction"` to create a session manually
 - `goalx add --run NAME --mode research "question"` to add a temporary research session
+- `goalx research "goal"` to start a direct research run with research-role defaults
+- `goalx develop "goal"` to start a direct develop run with develop-role defaults
+- `goalx debate --from RUN` to start a debate phase from a saved research run
+- `goalx implement --from RUN` to start an implementation phase from a saved run
+- `goalx explore --from RUN` to start a follow-up research phase from a saved run
+- `--master engine/model`, `--research-role engine/model`, and `--develop-role engine/model` to override role defaults
+- `--parallel N` to change the initial fan-out for this run or phase; omit it to keep project/preset defaults
+- `--write-config` only when the user explicitly wants to generate `.goalx/goalx.yaml` first
 - `goalx park --run NAME session-N` to pause a session without losing its worktree
 - `goalx resume --run NAME session-N` to restart a parked session
 - `goalx keep --run NAME session-N` to merge a develop session branch
+
+`--parallel` is not a permanent cap. Master may still add or resume more durable sessions later if the goal warrants it.
 
 Only fall back to raw tmux intervention when the user explicitly wants pane-level control or the GoalX durable control path is unavailable.
