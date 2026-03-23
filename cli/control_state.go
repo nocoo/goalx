@@ -34,6 +34,7 @@ type ControlRunState struct {
 type ControlLease struct {
 	Version   int    `json:"version"`
 	Holder    string `json:"holder,omitempty"`
+	RunID     string `json:"run_id,omitempty"`
 	Epoch     int    `json:"epoch,omitempty"`
 	RenewedAt string `json:"renewed_at,omitempty"`
 	ExpiresAt string `json:"expires_at,omitempty"`
@@ -271,6 +272,43 @@ func SaveControlLease(path string, state *ControlLease) error {
 		state.Version = 1
 	}
 	return writeJSONFile(path, state)
+}
+
+func RenewControlLease(runDir, holder, runID string, epoch int, ttl time.Duration, transport string, pid int) error {
+	if err := EnsureControlState(runDir); err != nil {
+		return err
+	}
+	if ttl <= 0 {
+		ttl = 30 * time.Second
+	}
+	now := time.Now().UTC()
+	return SaveControlLease(ControlLeasePath(runDir, holder), &ControlLease{
+		Version:   1,
+		Holder:    holder,
+		RunID:     runID,
+		Epoch:     epoch,
+		RenewedAt: now.Format(time.RFC3339),
+		ExpiresAt: now.Add(ttl).Format(time.RFC3339),
+		PID:       pid,
+		Transport: transport,
+	})
+}
+
+func ExpireControlLease(runDir, holder string) error {
+	now := time.Now().UTC()
+	lease, err := LoadControlLease(ControlLeasePath(runDir, holder))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		lease = &ControlLease{Version: 1, Holder: holder}
+	}
+	lease.Holder = holder
+	lease.RenewedAt = now.Format(time.RFC3339)
+	lease.ExpiresAt = now.Format(time.RFC3339)
+	lease.RunID = ""
+	lease.PID = 0
+	return SaveControlLease(ControlLeasePath(runDir, holder), lease)
 }
 
 func LoadControlReminders(path string) (*ControlReminders, error) {

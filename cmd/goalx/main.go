@@ -59,6 +59,7 @@ var (
 	mainStart            = cli.Start
 	mainAuto             = cli.Auto
 	mainStop             = cli.Stop
+	mainSidecar          = cli.Sidecar
 	notifySignalsContext = signal.NotifyContext
 )
 
@@ -162,6 +163,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Serve(cwd, args)
 	case "next":
 		return cli.Next(cwd, args)
+	case "sidecar":
+		return mainSidecar(cwd, args)
 	default:
 		return errUnknownCommand
 	}

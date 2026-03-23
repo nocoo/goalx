@@ -32,6 +32,9 @@ func Drop(projectRoot string, args []string) error {
 	} else if unsaved {
 		return fmt.Errorf("run '%s' has unsaved artifacts; run `goalx save %s` before drop", rc.Name, rc.Name)
 	}
+	if err := stopRunSidecar(rc.RunDir); err != nil {
+		return err
+	}
 
 	// Kill tmux session if still active
 	if SessionExists(rc.TmuxSession) {

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
@@ -210,6 +211,15 @@ esac
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
 
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	var gotSidecarProjectRoot, gotSidecarRunName string
+	var gotSidecarInterval time.Duration
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error {
+		gotSidecarProjectRoot, gotSidecarRunName, gotSidecarInterval = projectRoot, runName, interval
+		return nil
+	}
+
 	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -247,14 +257,17 @@ esac
 		t.Fatalf("read fake tmux log: %v", err)
 	}
 	logText := string(logData)
-	if !strings.Contains(logText, "new-window") || !strings.Contains(logText, "heartbeat") {
-		t.Fatalf("start should create heartbeat window:\n%s", logText)
-	}
-	if !strings.Contains(logText, "pulse --run") {
-		t.Fatalf("start log missing pulse heartbeat command:\n%s", logText)
+	if strings.Contains(logText, "heartbeat") {
+		t.Fatalf("start should not create heartbeat window:\n%s", logText)
 	}
 	if !strings.Contains(logText, "new-session -d -s "+goalx.TmuxSessionName(repo, cfg.Name)+" -n master") {
 		t.Fatalf("start log missing master session creation:\n%s", logText)
+	}
+	if gotSidecarProjectRoot != repo || gotSidecarRunName != cfg.Name {
+		t.Fatalf("launchRunSidecar got (%q, %q), want (%q, %q)", gotSidecarProjectRoot, gotSidecarRunName, repo, cfg.Name)
+	}
+	if gotSidecarInterval <= 0 {
+		t.Fatalf("launchRunSidecar interval = %v, want > 0", gotSidecarInterval)
 	}
 
 	stateData, err := os.ReadFile(filepath.Join(runDir, "acceptance.json"))

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -239,21 +240,13 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		return fmt.Errorf("launch master: %w", err)
 	}
 
-	// Launch heartbeat window (pure timer — wakes master periodically)
+	// Launch the run-scoped sidecar for lease renewal and supervision.
 	checkSec, warning := normalizeHeartbeatInterval(cfg.Master.CheckInterval)
 	if warning != "" {
 		fmt.Fprint(os.Stderr, warning)
 	}
-	goalxBin, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("resolve goalx executable: %w", err)
-	}
-	hbCmd := HeartbeatCommand(goalxBin, cfg.Name, checkSec)
-	if err := NewWindow(tmuxSess, "heartbeat", absProjectRoot); err != nil {
-		return fmt.Errorf("tmux heartbeat window: %w", err)
-	}
-	if err := SendKeys(tmuxSess+":heartbeat", hbCmd); err != nil {
-		return fmt.Errorf("launch heartbeat: %w", err)
+	if err := launchRunSidecar(projectRoot, cfg.Name, time.Duration(checkSec)*time.Second); err != nil {
+		return fmt.Errorf("launch sidecar: %w", err)
 	}
 
 	// 14. Print status

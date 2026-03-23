@@ -109,6 +109,24 @@ func TestRunCommandStopsActiveRunOnSignal(t *testing.T) {
 	}
 }
 
+func TestRunCommandDispatchesSidecar(t *testing.T) {
+	oldSidecar := mainSidecar
+	defer func() { mainSidecar = oldSidecar }()
+
+	called := false
+	mainSidecar = func(string, []string) error {
+		called = true
+		return nil
+	}
+
+	if err := runCommand(t.TempDir(), "sidecar", []string{"--run", "demo"}); err != nil {
+		t.Fatalf("runCommand sidecar: %v", err)
+	}
+	if !called {
+		t.Fatal("sidecar command was not dispatched")
+	}
+}
+
 func TestUsageDocumentsExplicitCrossProjectSelectors(t *testing.T) {
 	if !strings.Contains(usage, "project-id/run") {
 		t.Fatalf("usage missing project-id/run selector guidance:\n%s", usage)

@@ -26,6 +26,9 @@ func Stop(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := stopRunSidecar(rc.RunDir); err != nil {
+		return err
+	}
 
 	if !SessionExists(rc.TmuxSession) {
 		_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
@@ -56,6 +59,7 @@ func Stop(projectRoot string, args []string) error {
 		_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 	}
 	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
+	_ = ExpireControlLease(rc.RunDir, "sidecar")
 	_ = refreshProjectStatusCache(rc.ProjectRoot)
 	fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
 	return nil
