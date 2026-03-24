@@ -52,9 +52,9 @@ func DeleteBranch(projectRoot, branch string) error {
 	return nil
 }
 
-// MergeWorktree merges a branch into the current branch of projectRoot.
-func MergeWorktree(projectRoot, branch string) error {
-	statusOut, err := exec.Command("git", "-C", projectRoot, "status", "--porcelain").CombinedOutput()
+// MergeWorktree merges a branch into the current branch of targetDir.
+func MergeWorktree(targetDir, branch string) error {
+	statusOut, err := exec.Command("git", "-C", targetDir, "status", "--porcelain").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git status: %w: %s", err, statusOut)
 	}
@@ -67,21 +67,21 @@ func MergeWorktree(projectRoot, branch string) error {
 		if isAllowedLocalConfigPath(path) {
 			continue
 		}
-		return fmt.Errorf("project worktree is dirty; commit or stash changes before merge")
+		return fmt.Errorf("source root has uncommitted changes; commit or stash changes before merge")
 	}
 
 	// Pre-check for conflicts using merge-tree
-	head, _ := exec.Command("git", "-C", projectRoot, "rev-parse", "HEAD").Output()
-	branchRev, _ := exec.Command("git", "-C", projectRoot, "rev-parse", branch).Output()
+	head, _ := exec.Command("git", "-C", targetDir, "rev-parse", "HEAD").Output()
+	branchRev, _ := exec.Command("git", "-C", targetDir, "rev-parse", branch).Output()
 	if len(head) > 0 && len(branchRev) > 0 {
-		mergeBase, mergeBaseErr := exec.Command("git", "-C", projectRoot, "merge-base",
+		mergeBase, mergeBaseErr := exec.Command("git", "-C", targetDir, "merge-base",
 			strings.TrimSpace(string(head)),
 			strings.TrimSpace(string(branchRev)),
 		).CombinedOutput()
 		if mergeBaseErr != nil {
 			return fmt.Errorf("git merge-base: %w: %s", mergeBaseErr, mergeBase)
 		}
-		mtOut, mtErr := exec.Command("git", "-C", projectRoot, "merge-tree",
+		mtOut, mtErr := exec.Command("git", "-C", targetDir, "merge-tree",
 			strings.TrimSpace(string(mergeBase)),
 			strings.TrimSpace(string(head)),
 			strings.TrimSpace(string(branchRev)),
@@ -94,10 +94,10 @@ func MergeWorktree(projectRoot, branch string) error {
 		}
 	}
 
-	out, err := exec.Command("git", "-C", projectRoot, "merge", "--ff-only", branch).CombinedOutput()
+	out, err := exec.Command("git", "-C", targetDir, "merge", "--ff-only", branch).CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "note: fast-forward not possible, creating merge commit\n")
-		out, err = exec.Command("git", "-C", projectRoot, "merge", "--no-ff", branch).CombinedOutput()
+		out, err = exec.Command("git", "-C", targetDir, "merge", "--no-ff", branch).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%w: %s", err, out)
 		}
