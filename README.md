@@ -83,7 +83,7 @@ Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an
 | `goalx research` | Start a research run directly from CLI flags |
 | `goalx develop` | Start a develop run directly from CLI flags |
 | `goalx observe` | Live transport capture when available plus control-plane summary |
-| `goalx status` | Progress summary plus run status, lease health, unread inbox, reminders, and delivery failures |
+| `goalx status` | Progress summary plus run ID, epoch, charter health, lease health, unread inbox, reminders, and delivery failures |
 | `goalx focus` | Set the default run used by commands that omit `--run` |
 | `goalx add` | Add a session to a running run (`--mode research` launches a temporary research session) |
 | `goalx tell` | Send a durable instruction to the master or a specific session |
@@ -93,7 +93,7 @@ Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an
 | `goalx review` | Compare all session outputs |
 | `goalx keep` | Merge session branch into main |
 | `goalx archive` | Tag and preserve a session branch |
-| `goalx save` | Save durable artifacts, goal-boundary state, provenance, and `artifacts.json` to user-scoped durable storage |
+| `goalx save` | Save durable artifacts, `run-charter.json`, session identities, goal-boundary state, provenance, and `artifacts.json` to user-scoped durable storage |
 | `goalx verify` | Run the effective acceptance gate, then validate goal boundary completion and the canonical proof manifest |
 | `goalx debate` | Start a debate phase from `--from RUN` |
 | `goalx implement` | Start a develop phase from `--from RUN` |
@@ -129,8 +129,9 @@ Use `goalx init` + `goalx start --config .goalx/goalx.yaml`, direct config edits
 - Project scope is for shared config only: `.goalx/config.yaml`.
 - Active runtime state lives under `~/.goalx/runs/{projectID}/{run}`.
 - Saved runs live under `~/.goalx/runs/{projectID}/saved/{run}` after `goalx save`.
-- The charter/identity hard-cutover targets immutable `run-spec.yaml` plus `run-charter.json`, with mutable `state/run.json`, `state/sessions.json`, `control/*`, and `proof/completion.json`.
-- The same cutover targets a durable control plane centered on run-scoped files such as `control/run-identity.json`, `control/identity-fence.json`, `control/run-state.json`, `control/inbox/master.jsonl`, `control/reminders.json`, and `control/deliveries.json`.
+- Active protocol uses immutable `run-spec.yaml` plus `run-charter.json`, with mutable `state/run.json`, `state/sessions.json`, `control/*`, and `proof/completion.json`.
+- The durable control plane is centered on run-scoped files such as `control/run-identity.json`, `control/identity-fence.json`, `control/run-state.json`, `control/inbox/master.jsonl`, `control/reminders.json`, and `control/deliveries.json`.
+- `goalx save` exports immutable provenance too: `run-charter.json` plus `sessions/session-N/identity.json` for every durable worker.
 - User-scoped `registry.json` and `status.json` under `~/.goalx/runs/{projectID}/` are convenience indexes and external progress summaries, not the source of truth.
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, `implement`, and `explore`.
 - `run-metadata.json` tracks phase lineage, including `phase_kind`, `source_run`, and `parent_run`, so each run can inherit from its own saved input without touching shared project config.
@@ -192,7 +193,7 @@ goalx/
 
 ### Protocol Design
 
-GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates. The charter/identity hard-cutover described in `docs/plans/2026-03-24-goalx-charter-identity-design.md` is the target protocol vocabulary for this branch until the runtime wiring lands:
+GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates. The live protocol is built around immutable charter/identity files plus mutable goal/gate/proof state:
 
 **Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Re-reads `run-charter.json` and `control/run-identity.json` as the durable identity anchor, maintains `goal.json` as the mutable completion boundary, appends boundary/path decisions to `goal-log.jsonl`, keeps required outcomes covered or explicitly blocked, dispatches parallel work when independent required slices remain, parks idle sessions for later reuse, resumes parked sessions before creating unnecessary new ones, keeps `acceptance.json` aligned with the current verification gate, rescues dead or stuck sessions, runs verification before `done` / `implement`, and cannot close a run without both passing acceptance and a canonical `proof/completion.json`.
 

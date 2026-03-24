@@ -27,6 +27,8 @@ goalx status
 goalx verify --run your-run
 ```
 
+`goalx status` / `goalx observe` now surface `run_id`, `epoch`, and `charter=ok|missing|mismatch` alongside lease health. `goalx save` exports `run-charter.json` and durable session identities into the saved run.
+
 ## 4. Run as HTTP Server (remote management)
 
 ### Start manually:
@@ -66,6 +68,8 @@ The skill teaches the OpenClaw agent to:
 - Verify closeout: `POST /projects/:name/goalx/verify`
 - Modify config or inspect run specs: `POST /projects/:name/goalx/config`
 - Add workspaces: `POST /workspaces`
+
+Remote operators should treat missing charter or session-identity artifacts as a broken live run, not as a normal recoverable state.
 
 ### Network Requirements:
 

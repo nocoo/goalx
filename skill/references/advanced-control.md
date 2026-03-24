@@ -31,6 +31,7 @@ goalx explore --from RUN
 - Active runs, new saved runs, focus, and status are user-scoped under `~/.goalx/runs/{projectID}/...`
 - `.goalx/config.yaml` is the shared project-scoped config file
 - Canonical closeout proof lives at `~/.goalx/runs/{projectID}/{run}/proof/completion.json`
+- `run-charter.json` and `sessions/session-N/identity.json` are required live-run provenance. Missing files mean the run is broken, not that GoalX should fall back.
 
 ## Manual Intervention
 

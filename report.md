@@ -1,6 +1,6 @@
 # Shared Context for GoalX Subagents: Research Report
 
-Historical note: this report analyzed the pre-inbox protocol. References to session `guidance` files reflect the older design and are not the current control protocol.
+Historical note: this report analyzed the pre-inbox, pre-charter protocol. References to session `guidance` files and identity that lived only in prompts reflect the older design and are not the current GoalX control protocol.
 
 ## Finding 1: Subagents are team-blind at startup — 1-5 minute gap before first orientation
 

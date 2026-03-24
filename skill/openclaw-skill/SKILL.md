@@ -118,7 +118,7 @@ After each action, summarize concisely:
 
 ```
 Status: started / in progress / complete / stopped / failed
-Key info: run name, lifecycle status, lease health, active sessions
+Key info: run name, run_id, epoch, charter health, lifecycle status, lease health, active sessions
 Next step: observe later / redirect / verify / save / keep / drop
 ```
 
@@ -126,6 +126,8 @@ Next step: observe later / redirect / verify / save / keep / drop
 
 - Always include Bearer token
 - `save` before `drop` if results matter
+- `save` exports `run-charter.json` and session identities; use it before `drop` when provenance matters
 - Use `tell` to redirect — don't `stop` a healthy run unless asked
 - Use `observe` and `status` before making decisions about a run's direction
+- Treat `charter=missing|mismatch` as a broken live run that needs repair, not a normal degraded transport state
 - Run `verify` before calling a develop run complete
