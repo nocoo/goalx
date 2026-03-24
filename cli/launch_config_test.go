@@ -125,3 +125,46 @@ func TestBuildLaunchConfigAutoDefaultsPreconfiguredSessionsToDevelopMode(t *test
 		}
 	}
 }
+
+func TestBuildLaunchConfigAutoPreservesConfiguredEffortDefaults(t *testing.T) {
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfgYAML := `
+master:
+  effort: high
+roles:
+  research:
+    effort: high
+  develop:
+    effort: medium
+harness:
+  command: go test ./...
+target:
+  files: ["."]
+`
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte(cfgYAML), 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeAuto,
+	})
+	if err != nil {
+		t.Fatalf("buildLaunchConfig: %v", err)
+	}
+	if cfg.Mode != goalx.ModeAuto {
+		t.Fatalf("cfg.Mode = %q, want %q", cfg.Mode, goalx.ModeAuto)
+	}
+	if cfg.Master.Effort != goalx.EffortHigh {
+		t.Fatalf("master effort = %q, want %q", cfg.Master.Effort, goalx.EffortHigh)
+	}
+	if cfg.Roles.Research.Effort != goalx.EffortHigh {
+		t.Fatalf("research effort = %q, want %q", cfg.Roles.Research.Effort, goalx.EffortHigh)
+	}
+	if cfg.Roles.Develop.Effort != goalx.EffortMedium {
+		t.Fatalf("develop effort = %q, want %q", cfg.Roles.Develop.Effort, goalx.EffortMedium)
+	}
+}

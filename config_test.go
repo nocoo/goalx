@@ -476,6 +476,92 @@ harness:
 	}
 }
 
+func TestLoadConfigReadsTopLevelRoutingAndEffort(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+	userCfg := []byte(strings.TrimSpace(`
+preset: codex
+master:
+  engine: claude-code
+  model: opus
+  effort: high
+roles:
+  research:
+    engine: codex
+    model: gpt-5.4
+    effort: high
+  develop:
+    engine: codex
+    model: gpt-5.4
+    effort: medium
+routing:
+  profiles:
+    research_deep: { engine: claude-code, model: opus, effort: high }
+    build_fast: { engine: codex, model: gpt-5.4-mini, effort: minimal }
+  table:
+    research: { medium: research_deep }
+    develop: { low: build_fast }
+preferences:
+  research:
+    guidance: default to gpt-5.4 high
+  develop:
+    guidance: default to gpt-5.4 medium
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+
+	projectRoot := t.TempDir()
+	projectGoalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(projectGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte(strings.TrimSpace(`
+harness:
+  command: go build ./... && go test ./...
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	cfg, _, err := LoadConfig(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Preset != "codex" {
+		t.Fatalf("preset = %q, want codex", cfg.Preset)
+	}
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" || cfg.Master.Effort != EffortHigh {
+		t.Fatalf("master = %#v, want claude-code/opus/high", cfg.Master)
+	}
+	if cfg.Roles.Research.Effort != EffortHigh {
+		t.Fatalf("research effort = %q, want high", cfg.Roles.Research.Effort)
+	}
+	if cfg.Roles.Develop.Effort != EffortMedium {
+		t.Fatalf("develop effort = %q, want medium", cfg.Roles.Develop.Effort)
+	}
+	if cfg.Preferences.Research.Guidance != "default to gpt-5.4 high" {
+		t.Fatalf("research guidance = %q, want top-level guidance", cfg.Preferences.Research.Guidance)
+	}
+	if cfg.Preferences.Develop.Guidance != "default to gpt-5.4 medium" {
+		t.Fatalf("develop guidance = %q, want top-level guidance", cfg.Preferences.Develop.Guidance)
+	}
+	if got := cfg.Routing.Profiles["research_deep"]; got.Engine != "claude-code" || got.Model != "opus" || got.Effort != EffortHigh {
+		t.Fatalf("research_deep = %#v, want claude-code/opus/high", got)
+	}
+	if got := cfg.Routing.Table["develop"]["low"]; got != "build_fast" {
+		t.Fatalf("routing.table.develop.low = %q, want build_fast", got)
+	}
+	if cfg.Harness.Command != "go build ./... && go test ./..." {
+		t.Fatalf("harness.command = %q, want project harness", cfg.Harness.Command)
+	}
+}
+
 func TestLoadConfigProjectDefaultsOverrideUserDefaults(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
