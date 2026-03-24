@@ -129,6 +129,10 @@ func TestResumeRelaunchesParkedSessionAndMarksActive(t *testing.T) {
 		t.Fatalf("Resume: %v", err)
 	}
 
+	if _, err := os.Stat(filepath.Join(runDir, "sessions", "session-1", "identity.json")); err != nil {
+		t.Fatalf("expected session identity to exist after resume: %v", err)
+	}
+
 	state, err := LoadCoordinationState(CoordinationPath(runDir))
 	if err != nil {
 		t.Fatalf("LoadCoordinationState: %v", err)

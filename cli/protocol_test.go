@@ -433,7 +433,9 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 		"## Mode",
 		"The user specified **develop** mode.",
 		"## Your Job",
+		"run-charter.json",
 		"goal boundary",
+		"control/identity-fence.json",
 		"state\":\"open|claimed|waived\"",
 		"acceptance.json",
 		"goal.json",
@@ -503,6 +505,8 @@ func TestRenderMasterProtocolIncludesOptimizerDoctrine(t *testing.T) {
 		"Do not over-engineer for elegance alone",
 		"Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.",
 		"keep it short: current problem, chosen path, and one-line reason",
+		"run-charter.json",
+		"control/identity-fence.json",
 		"Do not ask the user to choose between implementation paths unless the choice materially changes scope, risk, acceptance, or irreversible cost.",
 		"Otherwise decide yourself, record why, and execute.",
 		"Before you commit on a non-trivial goal, compare at least 2-3 concrete paths first.",
@@ -624,6 +628,8 @@ func TestRenderSubagentProtocolIncludesOptimizerDoctrineInResearchMode(t *testin
 		"If a deeper path materially improves the goal, report it clearly instead of silently following the old boundary.",
 		"When a better architecture path is justified, emit dispatchable slices or report it clearly",
 		"Do not wait for user approval when you can recommend a clearly superior path to the master.",
+		"run-charter.json",
+		"session-1/identity.json",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered subagent protocol missing %q", want)

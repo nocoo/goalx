@@ -7,7 +7,7 @@ description: Use when the user wants GoalX to autonomously pursue a goal in the 
 
 ## Overview
 
-GoalX is the default autonomous path for repo-level goals. Start one master-led run, let the master decide how to decompose and execute, observe the durable control signal, then redirect only when needed.
+GoalX is the default autonomous path for repo-level goals. Start one master-led run, let the master decide how to decompose and execute, observe the durable control signal, then redirect only when needed. The active hard-cutover plan moves identity and exploration doctrine into durable state: immutable `run-charter.json`, immutable `sessions/session-N/identity.json`, and derived `control/identity-fence.json`.
 
 ## When to Use
 
@@ -54,6 +54,8 @@ Common path:
 11. `goalx research` and `goalx develop` are direct phase entry points. `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` continue from saved runs. Only use `--write-config` when the user explicitly wants config-first/manual control, and pair that with `goalx start --config .goalx/goalx.yaml`.
 12. When a project has multiple active runs, use `goalx focus --run NAME` to pin the default run. For targeted actions, always pass `--run NAME`; bare run targeting is local-first, and cross-project targeting should use `--run <project-id>/<run>`.
 13. Shared project scope is minimal: `.goalx/config.yaml` is the project-scoped config, while active runs, saved runs, focus, and status live under `~/.goalx/runs/{projectID}/...`.
+14. During the charter hardening rollout, treat `run-charter.json` as the target immutable doctrine anchor, `sessions/session-N/identity.json` as the target durable worker identity, and `control/identity-fence.json` as the target low-disturbance refresh signal.
+15. Treat this rollout as a hard cutover. Do not design new live behavior around compatibility fallbacks for runs that lack charter or session-identity artifacts.
 
 ## Common Commands
 

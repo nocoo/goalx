@@ -93,8 +93,8 @@ Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an
 | `goalx review` | Compare all session outputs |
 | `goalx keep` | Merge session branch into main |
 | `goalx archive` | Tag and preserve a session branch |
-| `goalx save` | Save durable artifacts, contract state, provenance, and `artifacts.json` to user-scoped durable storage |
-| `goalx verify` | Run the effective acceptance gate, then validate goal contract completion and the canonical proof manifest |
+| `goalx save` | Save durable artifacts, goal-boundary state, provenance, and `artifacts.json` to user-scoped durable storage |
+| `goalx verify` | Run the effective acceptance gate, then validate goal boundary completion and the canonical proof manifest |
 | `goalx debate` | Start a debate phase from `--from RUN` |
 | `goalx implement` | Start a develop phase from `--from RUN` |
 | `goalx explore` | Start a follow-up research phase from `--from RUN` |
@@ -129,8 +129,8 @@ Use `goalx init` + `goalx start --config .goalx/goalx.yaml`, direct config edits
 - Project scope is for shared config only: `.goalx/config.yaml`.
 - Active runtime state lives under `~/.goalx/runs/{projectID}/{run}`.
 - Saved runs live under `~/.goalx/runs/{projectID}/saved/{run}` after `goalx save`.
-- Each active run has an immutable `run-spec.yaml` plus mutable `state/run.json`, `state/sessions.json`, `control/*`, and `proof/completion.json`.
-- The durable control plane lives in run-scoped files such as `control/run-identity.json`, `control/run-state.json`, `control/inbox/master.jsonl`, `control/reminders.json`, and `control/deliveries.json`.
+- The charter/identity hard-cutover targets immutable `run-spec.yaml` plus `run-charter.json`, with mutable `state/run.json`, `state/sessions.json`, `control/*`, and `proof/completion.json`.
+- The same cutover targets a durable control plane centered on run-scoped files such as `control/run-identity.json`, `control/identity-fence.json`, `control/run-state.json`, `control/inbox/master.jsonl`, `control/reminders.json`, and `control/deliveries.json`.
 - User-scoped `registry.json` and `status.json` under `~/.goalx/runs/{projectID}/` are convenience indexes and external progress summaries, not the source of truth.
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, `implement`, and `explore`.
 - `run-metadata.json` tracks phase lineage, including `phase_kind`, `source_run`, and `parent_run`, so each run can inherit from its own saved input without touching shared project config.
@@ -192,11 +192,11 @@ goalx/
 
 ### Protocol Design
 
-GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates:
+GoalX is a **protocol scaffolding tool**. The Go code launches the master, exposes worker-management tools, and handles git/worktree mechanics; the orchestration logic lives in the protocol templates. The charter/identity hard-cutover described in `docs/plans/2026-03-24-goalx-charter-identity-design.md` is the target protocol vocabulary for this branch until the runtime wiring lands:
 
-**Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Maintains `goal.json` as the current goal boundary, appends boundary/path decisions to `goal-log.jsonl`, keeps required outcomes covered or explicitly blocked, dispatches parallel work when independent required slices remain, parks idle sessions for later reuse, resumes parked sessions before creating unnecessary new ones, keeps `acceptance.json` aligned with the current verification gate, rescues dead or stuck sessions, runs verification before `done` / `implement`, and cannot close a run without both passing acceptance and a satisfied `proof/completion.json`.
+**Master** (`master.md.tmpl`): Final responsible party and lightweight dispatcher. Re-reads `run-charter.json` and `control/run-identity.json` as the durable identity anchor, maintains `goal.json` as the mutable completion boundary, appends boundary/path decisions to `goal-log.jsonl`, keeps required outcomes covered or explicitly blocked, dispatches parallel work when independent required slices remain, parks idle sessions for later reuse, resumes parked sessions before creating unnecessary new ones, keeps `acceptance.json` aligned with the current verification gate, rescues dead or stuck sessions, runs verification before `done` / `implement`, and cannot close a run without both passing acceptance and a canonical `proof/completion.json`.
 
-**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Executes the current assignment, but `goal.json`, `acceptance.json`, and `proof/completion.json` remain the run-level completion boundary. Communicates via journal files plus the durable session inbox/cursor pair, including concise blocker and dependency hints so the master can rebalance work quickly or park/resume the session cleanly.
+**Subagent** (`program.md.tmpl`): Hypothesis-driven exploration (research) or structured TDD (develop). Resumes from `sessions/session-N/identity.json` plus `run-charter.json`, then executes the current assignment. `goal.json` remains the mutable completion boundary, `acceptance.json` remains the verification gate, and `proof/completion.json` remains the canonical closeout proof. Communicates via journal files plus the durable session inbox/cursor pair, including concise blocker and dependency hints so the master can rebalance work quickly or park/resume the session cleanly.
 
 ### Config Model
 

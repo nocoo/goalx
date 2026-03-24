@@ -228,10 +228,12 @@ esac
 	for _, path := range []string{
 		filepath.Join(runDir, "master.md"),
 		filepath.Join(runDir, "master.jsonl"),
+		filepath.Join(runDir, "run-charter.json"),
 		filepath.Join(runDir, "acceptance.json"),
 		filepath.Join(runDir, "goal.json"),
 		filepath.Join(runDir, "goal-log.jsonl"),
 		RunMetadataPath(runDir),
+		filepath.Join(runDir, "control", "identity-fence.json"),
 		filepath.Join(runDir, "artifacts.json"),
 		filepath.Join(runDir, "coordination.json"),
 		MasterInboxPath(runDir),
