@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -188,4 +191,86 @@ func hasDirtyWorktree(projectRoot string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// CopyGitignoredFiles copies ignored-but-existing regular files from sourceDir
+// into targetDir, preserving relative paths so worktrees inherit local project
+// state such as CLAUDE.md, docs/, and other ignored artifacts.
+func CopyGitignoredFiles(sourceDir, targetDir string) error {
+	out, err := exec.Command(
+		"git", "-c", "core.quotePath=false",
+		"-C", sourceDir,
+		"ls-files", "--others", "--ignored", "--exclude-standard", "-z",
+	).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git ls-files ignored in %s: %w: %s", sourceDir, err, out)
+	}
+
+	for _, raw := range bytes.Split(out, []byte{0}) {
+		if len(raw) == 0 {
+			continue
+		}
+
+		rel := filepath.Clean(string(raw))
+		if rel == "." || rel == ".git" || strings.HasPrefix(rel, ".git"+string(filepath.Separator)) {
+			continue
+		}
+		if filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			fmt.Fprintf(os.Stderr, "warning: skip invalid ignored path %q\n", rel)
+			continue
+		}
+
+		sourcePath := filepath.Join(sourceDir, rel)
+		info, statErr := os.Lstat(sourcePath)
+		if errors.Is(statErr, os.ErrNotExist) {
+			continue
+		}
+		if statErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: stat ignored path %s: %v\n", sourcePath, statErr)
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		if info.IsDir() {
+			if err := os.MkdirAll(filepath.Join(targetDir, rel), info.Mode().Perm()); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: mkdir mirrored ignored dir %s: %v\n", rel, err)
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		if err := copyIgnoredRegularFile(sourcePath, filepath.Join(targetDir, rel), info.Mode().Perm()); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: copy ignored file %s: %v\n", rel, err)
+		}
+	}
+
+	return nil
+}
+
+func copyIgnoredRegularFile(sourcePath, targetPath string, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return err
+	}
+
+	src, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return err
+	}
+	if err := dst.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(targetPath, mode)
 }
