@@ -191,6 +191,9 @@ func Add(projectRoot string, args []string) (err error) {
 		if err := CreateWorktree(runWT, wtPath, branch); err != nil {
 			return fmt.Errorf("create worktree: %w", err)
 		}
+		if err := CopyGitignoredFiles(runWT, wtPath); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: copy gitignored files to session worktree: %v\n", err)
+		}
 		workdir = wtPath
 	}
 	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)

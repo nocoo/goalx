@@ -433,6 +433,58 @@ harness:
 	}
 }
 
+func TestAddWithWorktreeCopiesGitignoredFiles(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	writeAndCommit(t, repo, ".gitignore", "CLAUDE.md\n", "add ignore rules")
+	writeTestFile(t, repo, "CLAUDE.md", "source root instructions\n")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+engine: codex
+model: codex
+parallel: 1
+sessions:
+  - hint: first
+target:
+  files: ["."]
+harness:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+runName+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	writeTestFile(t, runWT, "CLAUDE.md", "master customized instructions\n")
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-1 journal: %v", err)
+	}
+
+	if err := Add(repo, []string{"--run", runName, "--worktree", "second direction"}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(WorktreePath(runDir, runName, 2), "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read session CLAUDE.md: %v", err)
+	}
+	if string(data) != "master customized instructions\n" {
+		t.Fatalf("session CLAUDE.md = %q, want run worktree customization", string(data))
+	}
+}
+
 func TestAddNotifiesMasterViaInbox(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
