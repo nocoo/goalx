@@ -45,25 +45,29 @@ type serveRun struct {
 }
 
 type serveActionRequest struct {
-	Objective     string   `json:"objective"`
-	Mode          string   `json:"mode"`
-	Parallel      int      `json:"parallel"`
-	Name          string   `json:"name"`
-	Context       []string `json:"context"`
-	Strategies    []string `json:"strategies"`
-	Run           string   `json:"run"`
-	From          string   `json:"from"`
-	Session       string   `json:"session"`
-	Direction     string   `json:"direction"`
-	Message       string   `json:"message"`
-	Content       string   `json:"content"`
-	Preset        string   `json:"preset"`
-	Master        string   `json:"master"`
-	ResearchRole  string   `json:"research_role"`
-	DevelopRole   string   `json:"develop_role"`
-	BudgetSeconds int      `json:"budget_seconds"`
-	WriteConfig   bool     `json:"write_config"`
-	ConfigScope   string   `json:"config_scope"`
+	Objective      string            `json:"objective"`
+	Mode           string            `json:"mode"`
+	Parallel       int               `json:"parallel"`
+	Name           string            `json:"name"`
+	Context        []string          `json:"context"`
+	Dimensions     []string          `json:"dimensions"`
+	Run            string            `json:"run"`
+	From           string            `json:"from"`
+	Session        string            `json:"session"`
+	Direction      string            `json:"direction"`
+	Message        string            `json:"message"`
+	Content        string            `json:"content"`
+	Preset         string            `json:"preset"`
+	Master         string            `json:"master"`
+	ResearchRole   string            `json:"research_role"`
+	DevelopRole    string            `json:"develop_role"`
+	Effort         goalx.EffortLevel `json:"effort"`
+	MasterEffort   goalx.EffortLevel `json:"master_effort"`
+	ResearchEffort goalx.EffortLevel `json:"research_effort"`
+	DevelopEffort  goalx.EffortLevel `json:"develop_effort"`
+	BudgetSeconds  int               `json:"budget_seconds"`
+	WriteConfig    bool              `json:"write_config"`
+	ConfigScope    string            `json:"config_scope"`
 }
 
 var serveOutputMu sync.Mutex
@@ -543,8 +547,20 @@ func buildServeStartInitArgs(req serveActionRequest) []string {
 	if len(req.Context) > 0 {
 		args = append(args, "--context", strings.Join(req.Context, ","))
 	}
-	if len(req.Strategies) > 0 {
-		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
+	if len(req.Dimensions) > 0 {
+		args = append(args, "--dimension", strings.Join(req.Dimensions, ","))
+	}
+	if req.Effort != "" {
+		args = append(args, "--effort", string(req.Effort))
+	}
+	if req.MasterEffort != "" {
+		args = append(args, "--master-effort", string(req.MasterEffort))
+	}
+	if req.ResearchEffort != "" {
+		args = append(args, "--research-effort", string(req.ResearchEffort))
+	}
+	if req.DevelopEffort != "" {
+		args = append(args, "--develop-effort", string(req.DevelopEffort))
 	}
 	if req.Preset != "" {
 		args = append(args, "--preset", req.Preset)
@@ -572,8 +588,20 @@ func buildServeLaunchArgs(req serveActionRequest) []string {
 	if len(req.Context) > 0 {
 		args = append(args, "--context", strings.Join(req.Context, ","))
 	}
-	if len(req.Strategies) > 0 {
-		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
+	if len(req.Dimensions) > 0 {
+		args = append(args, "--dimension", strings.Join(req.Dimensions, ","))
+	}
+	if req.Effort != "" {
+		args = append(args, "--effort", string(req.Effort))
+	}
+	if req.MasterEffort != "" {
+		args = append(args, "--master-effort", string(req.MasterEffort))
+	}
+	if req.ResearchEffort != "" {
+		args = append(args, "--research-effort", string(req.ResearchEffort))
+	}
+	if req.DevelopEffort != "" {
+		args = append(args, "--develop-effort", string(req.DevelopEffort))
 	}
 	if req.Preset != "" {
 		args = append(args, "--preset", req.Preset)
@@ -604,8 +632,20 @@ func buildServePhaseArgs(req serveActionRequest) []string {
 	if len(req.Context) > 0 {
 		args = append(args, "--context", strings.Join(req.Context, ","))
 	}
-	if len(req.Strategies) > 0 {
-		args = append(args, "--strategy", strings.Join(req.Strategies, ","))
+	if len(req.Dimensions) > 0 {
+		args = append(args, "--dimension", strings.Join(req.Dimensions, ","))
+	}
+	if req.Effort != "" {
+		args = append(args, "--effort", string(req.Effort))
+	}
+	if req.MasterEffort != "" {
+		args = append(args, "--master-effort", string(req.MasterEffort))
+	}
+	if req.ResearchEffort != "" {
+		args = append(args, "--research-effort", string(req.ResearchEffort))
+	}
+	if req.DevelopEffort != "" {
+		args = append(args, "--develop-effort", string(req.DevelopEffort))
 	}
 	if req.Preset != "" {
 		args = append(args, "--preset", req.Preset)

@@ -114,11 +114,11 @@ harness:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"--strategy", "adversarial", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"--dimension", "adversarial", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
-	want := goalx.BuiltinStrategies["adversarial"]
+	want := goalx.BuiltinDimensions["adversarial"]
 	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
 	if err != nil {
 		t.Fatalf("load sessions runtime state: %v", err)
@@ -829,6 +829,10 @@ harness:
 		effective.Mode,
 		effective.Engine,
 		effective.Model,
+		effective.Effort,
+		"",
+		"",
+		"",
 		*effective.Target,
 	)
 	if err != nil {
@@ -941,6 +945,21 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
+	if cfg.Master.Engine == "" {
+		cfg.Master.Engine = "codex"
+	}
+	if cfg.Master.Model == "" {
+		cfg.Master.Model = "gpt-5.4"
+	}
+	if cfg.Roles.Research.Engine == "" {
+		cfg.Roles.Research = goalx.SessionConfig{Engine: "claude-code", Model: "opus"}
+	}
+	if cfg.Roles.Develop.Engine == "" {
+		cfg.Roles.Develop = goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"}
+	}
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
 	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
@@ -994,6 +1013,10 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 			effective.Mode,
 			effective.Engine,
 			effective.Model,
+			effective.Effort,
+			"",
+			"",
+			"",
 			*effective.Target,
 		)
 		if err != nil {

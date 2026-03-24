@@ -400,7 +400,7 @@ func seedSaveRunProvenance(t *testing.T, projectRoot, runDir, runName, objective
 func seedSaveSessionIdentity(t *testing.T, runDir, sessionName string, mode goalx.Mode, engine, model string, target goalx.TargetConfig, harness goalx.HarnessConfig) {
 	t.Helper()
 
-	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(mode), mode, engine, model, target)
+	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(mode), mode, engine, model, "", "", "", "", target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

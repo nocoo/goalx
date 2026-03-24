@@ -26,7 +26,6 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 		cfg.Parallel = opts.Parallel
 	}
 	cfg.Sessions = nil
-	cfg.DiversityHints = nil
 	if opts.Preset != "" {
 		cfg.Preset = opts.Preset
 	}
@@ -34,25 +33,25 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 	if err := applyLaunchRoleOverrides(&cfg, opts); err != nil {
 		return nil, err
 	}
-	syncLegacySessionFallback(&cfg)
 	if cfg.Parallel < 1 {
 		cfg.Parallel = 1
 	}
 
-	if cfg.Mode == goalx.ModeResearch {
-		if len(opts.Strategies) > 0 {
-			hints, err := goalx.ResolveStrategies(opts.Strategies)
-			if err != nil {
-				return nil, err
+	if len(opts.Dimensions) > 0 {
+		hints, err := goalx.ResolveDimensions(opts.Dimensions)
+		if err != nil {
+			return nil, err
+		}
+		if cfg.Parallel < len(hints) {
+			cfg.Parallel = len(hints)
+		}
+		cfg.Sessions = make([]goalx.SessionConfig, cfg.Parallel)
+		sessionMode := goalx.ResolveSessionMode(cfg.Mode, "")
+		for i, hint := range hints {
+			cfg.Sessions[i] = goalx.SessionConfig{
+				Hint: hint,
+				Mode: sessionMode,
 			}
-			cfg.DiversityHints = hints
-		} else if cfg.Parallel >= 2 {
-			defaults := goalx.DefaultStrategies(cfg.Parallel)
-			hints, err := goalx.ResolveStrategies(defaults)
-			if err != nil {
-				return nil, err
-			}
-			cfg.DiversityHints = hints
 		}
 	}
 	if len(cfg.Target.Files) == 0 {
@@ -69,8 +68,7 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 	}
 
 	if len(opts.Subs) > 0 {
-		cfg.Parallel = 0
-		cfg.DiversityHints = nil
+		cfg.Sessions = nil
 		sessionMode := goalx.ResolveSessionMode(cfg.Mode, "")
 		for _, sub := range opts.Subs {
 			spec, countStr := sub, "1"
@@ -104,6 +102,7 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 		cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
 			Engine: engine,
 			Model:  model,
+			Effort: opts.Effort,
 			Mode:   goalx.ResolveSessionMode(cfg.Mode, ""),
 			Hint:   "Auditor: Review and challenge other sessions' work. Find flaws, missed edge cases, and incorrect assumptions.",
 		})
@@ -133,6 +132,11 @@ func applyLaunchRoleOverrides(cfg *goalx.Config, opts launchOptions) error {
 		cfg.Master.Engine = engine
 		cfg.Master.Model = model
 	}
+	if opts.MasterEffort != "" {
+		cfg.Master.Effort = opts.MasterEffort
+	} else if opts.Effort != "" {
+		cfg.Master.Effort = opts.Effort
+	}
 	if opts.ResearchRole != "" {
 		engine, model, err := parseEngineModelValue("--research-role", opts.ResearchRole)
 		if err != nil {
@@ -141,6 +145,11 @@ func applyLaunchRoleOverrides(cfg *goalx.Config, opts launchOptions) error {
 		cfg.Roles.Research.Engine = engine
 		cfg.Roles.Research.Model = model
 	}
+	if opts.ResearchEffort != "" {
+		cfg.Roles.Research.Effort = opts.ResearchEffort
+	} else if opts.Effort != "" {
+		cfg.Roles.Research.Effort = opts.Effort
+	}
 	if opts.DevelopRole != "" {
 		engine, model, err := parseEngineModelValue("--develop-role", opts.DevelopRole)
 		if err != nil {
@@ -148,6 +157,11 @@ func applyLaunchRoleOverrides(cfg *goalx.Config, opts launchOptions) error {
 		}
 		cfg.Roles.Develop.Engine = engine
 		cfg.Roles.Develop.Model = model
+	}
+	if opts.DevelopEffort != "" {
+		cfg.Roles.Develop.Effort = opts.DevelopEffort
+	} else if opts.Effort != "" {
+		cfg.Roles.Develop.Effort = opts.Effort
 	}
 	return nil
 }
@@ -158,13 +172,4 @@ func parseEngineModelValue(flagName, value string) (string, string, error) {
 		return "", "", fmt.Errorf("%s expects engine/model, got %q", flagName, value)
 	}
 	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
-}
-
-func syncLegacySessionFallback(cfg *goalx.Config) {
-	if cfg == nil {
-		return
-	}
-	roleDefault := goalx.EffectiveSessionConfig(cfg, -1)
-	cfg.Engine = roleDefault.Engine
-	cfg.Model = roleDefault.Model
 }

@@ -9,19 +9,23 @@ import (
 )
 
 type launchOptions struct {
-	Objective    string
-	Mode         goalx.Mode
-	Parallel     int
-	Name         string
-	ContextPaths []string
-	Strategies   []string
-	Master       string
-	ResearchRole string
-	DevelopRole  string
-	Auditor      string
-	Subs         []string
-	Preset       string
-	NoSnapshot   bool
+	Objective      string
+	Mode           goalx.Mode
+	Parallel       int
+	Name           string
+	ContextPaths   []string
+	Dimensions     []string
+	Effort         goalx.EffortLevel
+	Master         string
+	ResearchRole   string
+	DevelopRole    string
+	MasterEffort   goalx.EffortLevel
+	ResearchEffort goalx.EffortLevel
+	DevelopEffort  goalx.EffortLevel
+	Auditor        string
+	Subs           []string
+	Preset         string
+	NoSnapshot     bool
 }
 
 type startInitOptions = launchOptions
@@ -45,7 +49,7 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
        goalx start --config PATH
 
 advanced/manual path:
@@ -55,21 +59,21 @@ notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master, --research-role, --develop-role.`
 	case "init":
-		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master, --research-role, --develop-role.`
 	case "auto":
-		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   master decides mode unless you pass --research or --develop.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master, --research-role, --develop-role.`
 	case "research", "develop":
-		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
@@ -122,30 +126,70 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 			}
 			i++
 			opts.ContextPaths = strings.Split(args[i], ",")
-		case "--strategy":
+		case "--dimension":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --strategy")
+				return opts, fmt.Errorf("missing value for --dimension")
 			}
 			i++
-			opts.Strategies = strings.Split(args[i], ",")
+			opts.Dimensions = strings.Split(args[i], ",")
 		case "--master":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --master")
 			}
 			i++
 			opts.Master = args[i]
+		case "--effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.Effort = level
+		case "--master-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --master-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.MasterEffort = level
 		case "--research-role":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --research-role")
 			}
 			i++
 			opts.ResearchRole = args[i]
+		case "--research-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --research-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.ResearchEffort = level
 		case "--develop-role":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --develop-role")
 			}
 			i++
 			opts.DevelopRole = args[i]
+		case "--develop-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --develop-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.DevelopEffort = level
 		case "--auditor":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --auditor")

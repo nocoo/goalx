@@ -84,8 +84,8 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Engine != "codex" || cfg.Model != "codex" {
-		t.Fatalf("subagent = %s/%s, want codex/codex", cfg.Engine, cfg.Model)
+	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
+		t.Fatalf("research role = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 }
 

@@ -162,10 +162,15 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	}
 
 	// 9. Resolve master engine command
-	masterCmd, err := goalx.ResolveEngineCommand(engines, cfg.Master.Engine, cfg.Master.Model)
+	masterSpec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: cfg.Master.Engine,
+		Model:  cfg.Master.Model,
+		Effort: cfg.Master.Effort,
+	})
 	if err != nil {
 		return fmt.Errorf("master engine: %w", err)
 	}
+	masterCmd := masterSpec.Command
 	masterProtocolPath := filepath.Join(runDir, "master.md")
 	masterPrompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, masterProtocolPath)
 	goalPath := GoalPath(runDir)

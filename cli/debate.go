@@ -33,7 +33,7 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	}
 	sort.Strings(source.SessionNames)
 	defaultHints := debateDefaultHints(source.SessionNames)
-	hints, err := applyPhaseStrategies(defaultHints, cfg.Parallel, opts)
+	hints, err := applyPhaseDimensions(defaultHints, cfg.Parallel, opts)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	if cfg.Objective == "" {
 		cfg.Objective = fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单。", source.Run)
 	}
-	cfg.DiversityHints = hints
+	applySessionHints(cfg, hints)
 	cfg.Context = goalx.ContextConfig{Files: contextFiles}
 	if len(cfg.Target.Files) == 0 {
 		cfg.Target.Files = InferTarget(projectRoot)

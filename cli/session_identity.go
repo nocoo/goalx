@@ -18,6 +18,10 @@ type SessionIdentity struct {
 	Mode            string             `json:"mode,omitempty"`
 	Engine          string             `json:"engine,omitempty"`
 	Model           string             `json:"model,omitempty"`
+	RequestedEffort goalx.EffortLevel  `json:"requested_effort,omitempty"`
+	EffectiveEffort string             `json:"effective_effort,omitempty"`
+	RouteProfile    string             `json:"route_profile,omitempty"`
+	QuotaState      string             `json:"quota_state,omitempty"`
 	Target          goalx.TargetConfig `json:"target,omitempty"`
 	OriginCharterID string             `json:"origin_charter_id,omitempty"`
 	CreatedAt       string             `json:"created_at,omitempty"`
@@ -45,7 +49,7 @@ func RequireSessionIdentity(runDir, sessionName string) (*SessionIdentity, error
 	return identity, nil
 }
 
-func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, engine, model string, target goalx.TargetConfig) (*SessionIdentity, error) {
+func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, engine, model string, requestedEffort goalx.EffortLevel, effectiveEffort, routeProfile, quotaState string, target goalx.TargetConfig) (*SessionIdentity, error) {
 	charter, err := RequireRunCharter(runDir)
 	if err != nil {
 		return nil, err
@@ -65,6 +69,10 @@ func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, e
 		Mode:            string(mode),
 		Engine:          engine,
 		Model:           model,
+		RequestedEffort: requestedEffort,
+		EffectiveEffort: effectiveEffort,
+		RouteProfile:    routeProfile,
+		QuotaState:      quotaState,
 		Target:          target,
 		OriginCharterID: charter.CharterID,
 		CreatedAt:       time.Now().UTC().Format(time.RFC3339),

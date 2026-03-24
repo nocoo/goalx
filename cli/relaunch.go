@@ -22,10 +22,15 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
 	}
-	engineCmd, err := goalx.ResolveEngineCommand(engines, cfg.Master.Engine, cfg.Master.Model)
+	spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: cfg.Master.Engine,
+		Model:  cfg.Master.Model,
+		Effort: cfg.Master.Effort,
+	})
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
+	engineCmd := spec.Command
 	protocolPath := filepath.Join(runDir, "master.md")
 	prompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, protocolPath)
 

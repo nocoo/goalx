@@ -287,8 +287,8 @@ func TestResumeUsesDurableSessionIdentityInsteadOfCurrentConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
-	cfg.Engine = "claude-code"
-	cfg.Model = "opus"
+	cfg.Roles.Research.Engine = "claude-code"
+	cfg.Roles.Research.Model = "opus"
 	cfg.Sessions = []goalx.SessionConfig{{
 		Engine: "claude-code",
 		Model:  "opus",
@@ -520,9 +520,10 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 		Name:      runName,
 		Mode:      goalx.ModeDevelop,
 		Objective: "fix pipeline",
-		Engine:    "codex",
-		Model:     "codex",
-		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+		Roles: goalx.RoleDefaultsConfig{
+			Develop: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
+		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		Sessions: []goalx.SessionConfig{
 			{Hint: "db race triage"},
 		},
@@ -587,7 +588,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err := SaveIdentityFence(IdentityFencePath(runDir), fence); err != nil {
 		t.Fatalf("SaveIdentityFence: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "codex", cfg.Target)
+	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", "", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

@@ -64,23 +64,23 @@ No sessions yet. Launch them yourself with `goalx add`.
 - Do not ask the user to choose between implementation paths unless the choice materially changes scope, risk, acceptance, or irreversible cost. Otherwise decide yourself, record why, and execute.
 - If later evidence shows the chosen path is stuck, falsified, or clearly lower-value, switch paths autonomously and record why.
 - Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.
-{{- if or .Preferences.Research.Engines .Preferences.Research.Strategy .Preferences.Develop.Engines .Preferences.Develop.Strategy .Preferences.Simple.Engines .Preferences.Simple.Strategy}}
+{{- if or .Preferences.Research.Guidance .Preferences.Develop.Guidance .Preferences.Simple.Guidance}}
 
 ## User Preferences
 
-| Scenario | Preferred Engines | Strategy |
-|----------|-------------------|----------|
-{{- if or .Preferences.Research.Engines .Preferences.Research.Strategy}}
-| Research | {{join .Preferences.Research.Engines ", "}} | {{.Preferences.Research.Strategy}} |
+| Scenario | Guidance |
+|----------|----------|
+{{- if .Preferences.Research.Guidance}}
+| Research | {{.Preferences.Research.Guidance}} |
 {{- end}}
-{{- if or .Preferences.Develop.Engines .Preferences.Develop.Strategy}}
-| Develop | {{join .Preferences.Develop.Engines ", "}} | {{.Preferences.Develop.Strategy}} |
+{{- if .Preferences.Develop.Guidance}}
+| Develop | {{.Preferences.Develop.Guidance}} |
 {{- end}}
-{{- if or .Preferences.Simple.Engines .Preferences.Simple.Strategy}}
-| Simple | {{join .Preferences.Simple.Engines ", "}} | {{.Preferences.Simple.Strategy}} |
+{{- if .Preferences.Simple.Guidance}}
+| Simple | {{.Preferences.Simple.Guidance}} |
 {{- end}}
 
-Use these when launching sessions (`goalx add --engine X --model Y`).
+Use these as routing guidance when launching or redirecting sessions.
 CLI overrides take precedence. You may deviate if circumstances warrant it.
 {{- end}}
 

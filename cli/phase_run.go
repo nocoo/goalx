@@ -108,7 +108,6 @@ func buildPhaseConfigFromSource(projectRoot string, phaseKind string, mode goalx
 	cfg.Name = derivePhaseRunName(source.Run, phaseKind, opts.Name)
 	cfg.Mode = mode
 	cfg.Sessions = nil
-	cfg.DiversityHints = nil
 	cfg.Context = goalx.ContextConfig{}
 	cfg.Acceptance = goalx.AcceptanceConfig{}
 	if opts.Preset != "" {
@@ -116,13 +115,16 @@ func buildPhaseConfigFromSource(projectRoot string, phaseKind string, mode goalx
 	}
 	goalx.ApplyPreset(&cfg)
 	if err := applyLaunchRoleOverrides(&cfg, launchOptions{
-		Master:       opts.Master,
-		ResearchRole: opts.ResearchRole,
-		DevelopRole:  opts.DevelopRole,
+		Master:         opts.Master,
+		ResearchRole:   opts.ResearchRole,
+		DevelopRole:    opts.DevelopRole,
+		Effort:         opts.Effort,
+		MasterEffort:   opts.MasterEffort,
+		ResearchEffort: opts.ResearchEffort,
+		DevelopEffort:  opts.DevelopEffort,
 	}); err != nil {
 		return nil, nil, err
 	}
-	syncLegacySessionFallback(&cfg)
 	if opts.Parallel > 0 {
 		cfg.Parallel = opts.Parallel
 	}
@@ -163,20 +165,34 @@ func mergePhaseContext(base []string, extra []string) ([]string, error) {
 	return merged, nil
 }
 
-func applyPhaseStrategies(defaultHints []string, parallel int, opts phaseOptions) ([]string, error) {
-	if len(opts.Strategies) == 0 && len(opts.DiversityHints) == 0 {
+func applyPhaseDimensions(defaultHints []string, parallel int, opts phaseOptions) ([]string, error) {
+	if len(opts.Dimensions) == 0 {
 		return nextConfigHints(defaultHints, parallel, nil), nil
 	}
-	merged := make([]string, 0, len(opts.Strategies)+len(opts.DiversityHints))
-	if len(opts.Strategies) > 0 {
-		hints, err := goalx.ResolveStrategies(opts.Strategies)
-		if err != nil {
-			return nil, err
-		}
-		merged = append(merged, hints...)
+	hints, err := goalx.ResolveDimensions(opts.Dimensions)
+	if err != nil {
+		return nil, err
 	}
-	merged = append(merged, opts.DiversityHints...)
-	return normalizeNextConfigHints(merged, parallel), nil
+	return normalizeNextConfigHints(hints, parallel), nil
+}
+
+func applySessionHints(cfg *goalx.Config, hints []string) {
+	if cfg == nil {
+		return
+	}
+	size := cfg.Parallel
+	if size < len(hints) {
+		size = len(hints)
+	}
+	if size == 0 {
+		cfg.Sessions = nil
+		return
+	}
+	cfg.Sessions = make([]goalx.SessionConfig, size)
+	sessionMode := goalx.ResolveSessionMode(cfg.Mode, "")
+	for i, hint := range hints {
+		cfg.Sessions[i] = goalx.SessionConfig{Hint: hint, Mode: sessionMode}
+	}
 }
 
 func writePhaseConfig(projectRoot string, cfg *goalx.Config, header string) error {

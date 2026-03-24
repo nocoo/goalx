@@ -28,15 +28,16 @@ func TestStartCleansUpOnLaunchFailure(t *testing.T) {
 		Name:      "demo",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Engine:    "codex",
-		Model:     "codex",
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -147,16 +148,17 @@ func TestStartLaunchesOnlyMaster(t *testing.T) {
 		Name:      "demo",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Engine:    "codex",
-		Model:     "codex",
-		Parallel:  2,
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
+		Parallel: 2,
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -347,8 +349,9 @@ func TestStartAddsClaudeMasterInboxHook(t *testing.T) {
 		Name:      "claude-master",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Engine:    "codex",
-		Model:     "codex",
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
@@ -468,24 +471,23 @@ func TestStartRendersMasterPreferences(t *testing.T) {
 		Name:      "demo",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Engine:    "codex",
-		Model:     "codex",
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 		Preferences: goalx.PreferencesConfig{
 			Research: goalx.PreferencePolicy{
-				Engines:  []string{"claude-code/opus", "codex/gpt-5.4"},
-				Strategy: "multi-perspective",
+				Guidance: "multi-perspective",
 			},
 			Develop: goalx.PreferencePolicy{
-				Engines:  []string{"codex/gpt-5.4"},
-				Strategy: "speed",
+				Guidance: "speed",
 			},
 		},
 	}
@@ -557,8 +559,8 @@ esac
 	text := string(masterProtocol)
 	for _, want := range []string{
 		"## User Preferences",
-		"| Research | claude-code/opus, codex/gpt-5.4 | multi-perspective |",
-		"| Develop | codex/gpt-5.4 | speed |",
+		"| Research | multi-perspective |",
+		"| Develop | speed |",
 		"CLI overrides take precedence.",
 		"Liveness state: `" + LivenessPath(runDir) + "`",
 		"Worktree snapshot: `" + WorktreeSnapshotPath(runDir) + "`",
@@ -586,15 +588,16 @@ func TestStartLaunchesMasterWithRuntimeEnv(t *testing.T) {
 		Name:      "demo",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Engine:    "codex",
-		Model:     "codex",
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
 		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -734,7 +737,7 @@ func TestStartAutoSnapshotsTrackedChangesIntoRunWorktree(t *testing.T) {
 		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -847,7 +850,7 @@ func TestStartCopiesGitignoredFilesToRunWorktree(t *testing.T) {
 		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}
 	data, err := yaml.Marshal(&cfg)

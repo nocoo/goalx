@@ -52,7 +52,7 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		"你负责优先级最高的修复项（P0 + P1 中不依赖其他文件的项）。逐个修复，每个修完跑一次 gate 验证。",
 		"你负责剩余修复项（P2 + 重构类 P1）。先做独立的删除/清理，再做涉及多文件的重构。每步跑 gate。",
 	}
-	hints, err := applyPhaseStrategies(defaultHints, cfg.Parallel, opts)
+	hints, err := applyPhaseDimensions(defaultHints, cfg.Parallel, opts)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 	if cfg.Objective == "" {
 		cfg.Objective = fmt.Sprintf("实施 %s 的共识修复清单。严格按照 context 中的文档执行，不做额外改动。", source.Run)
 	}
-	cfg.DiversityHints = hints
+	applySessionHints(cfg, hints)
 	cfg.Context = goalx.ContextConfig{Files: contextFiles}
 	cfg.Target = goalx.TargetConfig{Files: targetFiles}
 	cfg.Harness = goalx.HarnessConfig{Command: harness}

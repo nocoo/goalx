@@ -21,7 +21,7 @@ func TestImplementPreservesSavedMasterConfig(t *testing.T) {
 		Parallel:  2,
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
@@ -36,8 +36,8 @@ func TestImplementPreservesSavedMasterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
-		t.Fatalf("master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
+		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
 	}
 }
 
@@ -64,12 +64,12 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 	})
 
 	nc := &nextConfigJSON{
-		Parallel:       4,
-		Engine:         "codex",
-		Model:          "fast",
-		DiversityHints: []string{"P0", "P1", "P2", "verification"},
-		BudgetSeconds:  1200,
-		Objective:      "custom implement objective",
+		Parallel:      4,
+		Engine:        "codex",
+		Model:         "fast",
+		Dimensions:    []string{"depth", "adversarial", "evidence", "perfectionist"},
+		BudgetSeconds: 1200,
+		Objective:     "custom implement objective",
 	}
 	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
 		t.Fatalf("Implement: %v", err)
@@ -82,8 +82,8 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 	if cfg.Parallel != 4 {
 		t.Fatalf("parallel = %d, want 4", cfg.Parallel)
 	}
-	if cfg.Engine != "codex" || cfg.Model != "fast" {
-		t.Fatalf("engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "fast" {
+		t.Fatalf("develop role = %s/%s, want codex/fast", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 	if cfg.Objective != "custom implement objective" {
 		t.Fatalf("objective = %q, want custom implement objective", cfg.Objective)
@@ -91,12 +91,12 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 	if cfg.Budget.MaxDuration != 20*60*1_000_000_000 {
 		t.Fatalf("budget = %v, want 20m", cfg.Budget.MaxDuration)
 	}
-	if len(cfg.DiversityHints) != 4 || cfg.DiversityHints[3] != "verification" {
-		t.Fatalf("diversity_hints = %#v, want next_config values", cfg.DiversityHints)
+	if len(cfg.Sessions) != 4 || cfg.Sessions[3].Hint != goalx.BuiltinDimensions["perfectionist"] {
+		t.Fatalf("sessions = %#v, want hinted sessions from dimensions", cfg.Sessions)
 	}
 }
 
-func TestImplementResolvesNextConfigStrategiesIntoHints(t *testing.T) {
+func TestImplementResolvesNextConfigDimensionsIntoHints(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -113,9 +113,8 @@ func TestImplementResolvesNextConfigStrategiesIntoHints(t *testing.T) {
 	})
 
 	nc := &nextConfigJSON{
-		Parallel:       3,
-		Strategies:     []string{"depth", "adversarial"},
-		DiversityHints: []string{"verification"},
+		Parallel:   3,
+		Dimensions: []string{"depth", "adversarial", "evidence"},
 	}
 	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
 		t.Fatalf("Implement: %v", err)
@@ -126,16 +125,16 @@ func TestImplementResolvesNextConfigStrategiesIntoHints(t *testing.T) {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
 	wantHints := []string{
-		goalx.BuiltinStrategies["depth"],
-		goalx.BuiltinStrategies["adversarial"],
-		"verification",
+		goalx.BuiltinDimensions["depth"],
+		goalx.BuiltinDimensions["adversarial"],
+		goalx.BuiltinDimensions["evidence"],
 	}
-	if len(cfg.DiversityHints) != len(wantHints) {
-		t.Fatalf("diversity_hints = %#v, want %#v", cfg.DiversityHints, wantHints)
+	if len(cfg.Sessions) != len(wantHints) {
+		t.Fatalf("sessions = %#v, want %#v", cfg.Sessions, wantHints)
 	}
 	for i := range wantHints {
-		if cfg.DiversityHints[i] != wantHints[i] {
-			t.Fatalf("diversity_hints[%d] = %q, want %q", i, cfg.DiversityHints[i], wantHints[i])
+		if cfg.Sessions[i].Hint != wantHints[i] {
+			t.Fatalf("sessions[%d].hint = %q, want %q", i, cfg.Sessions[i].Hint, wantHints[i])
 		}
 	}
 }
@@ -167,8 +166,8 @@ func TestImplementAppliesNextConfigPreset(t *testing.T) {
 	if cfg.Preset != "claude-h" {
 		t.Fatalf("preset = %q, want claude-h", cfg.Preset)
 	}
-	if cfg.Engine != "claude-code" || cfg.Model != "opus" {
-		t.Fatalf("engine/model = %s/%s, want claude-code/opus", cfg.Engine, cfg.Model)
+	if cfg.Roles.Develop.Engine != "claude-code" || cfg.Roles.Develop.Model != "opus" {
+		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 

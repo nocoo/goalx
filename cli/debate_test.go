@@ -23,7 +23,7 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 		Parallel:  2,
 		Master: goalx.MasterConfig{
 			Engine: "codex",
-			Model:  "codex",
+			Model:  "gpt-5.4",
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
@@ -38,8 +38,8 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Master.Engine != "codex" || cfg.Master.Model != "codex" {
-		t.Fatalf("master = %s/%s, want codex/codex", cfg.Master.Engine, cfg.Master.Model)
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
+		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
 	}
 }
 
@@ -60,12 +60,12 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 	})
 
 	nc := &nextConfigJSON{
-		Parallel:       3,
-		Engine:         "codex",
-		Model:          "fast",
-		DiversityHints: []string{"angle A", "angle B", "angle C"},
-		BudgetSeconds:  900,
-		Objective:      "custom debate objective",
+		Parallel:      3,
+		Engine:        "codex",
+		Model:         "fast",
+		Dimensions:    []string{"depth", "adversarial", "evidence"},
+		BudgetSeconds: 900,
+		Objective:     "custom debate objective",
 	}
 	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nc); err != nil {
 		t.Fatalf("Debate: %v", err)
@@ -78,8 +78,8 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 	if cfg.Parallel != 3 {
 		t.Fatalf("parallel = %d, want 3", cfg.Parallel)
 	}
-	if cfg.Engine != "codex" || cfg.Model != "fast" {
-		t.Fatalf("engine/model = %s/%s, want codex/fast", cfg.Engine, cfg.Model)
+	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "fast" {
+		t.Fatalf("research role = %s/%s, want codex/fast", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 	if cfg.Objective != "custom debate objective" {
 		t.Fatalf("objective = %q, want custom debate objective", cfg.Objective)
@@ -87,8 +87,11 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 	if cfg.Budget.MaxDuration != 15*60*1_000_000_000 {
 		t.Fatalf("budget = %v, want 15m", cfg.Budget.MaxDuration)
 	}
-	if len(cfg.DiversityHints) != 3 || cfg.DiversityHints[2] != "angle C" {
-		t.Fatalf("diversity_hints = %#v, want next_config values", cfg.DiversityHints)
+	if len(cfg.Sessions) != 3 {
+		t.Fatalf("sessions = %#v, want 3 hinted sessions", cfg.Sessions)
+	}
+	if cfg.Sessions[2].Hint != goalx.BuiltinDimensions["evidence"] {
+		t.Fatalf("session[2].hint = %q, want evidence dimension", cfg.Sessions[2].Hint)
 	}
 }
 
@@ -148,8 +151,8 @@ func TestDebateAppliesNextConfigPreset(t *testing.T) {
 	if cfg.Preset != "claude" {
 		t.Fatalf("preset = %q, want claude", cfg.Preset)
 	}
-	if cfg.Engine != "claude-code" || cfg.Model != "sonnet" {
-		t.Fatalf("engine/model = %s/%s, want claude-code/sonnet", cfg.Engine, cfg.Model)
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 }
 

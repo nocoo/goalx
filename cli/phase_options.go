@@ -14,18 +14,21 @@ type phaseOptions struct {
 	Objective      string
 	Parallel       int
 	ContextPaths   []string
-	Strategies     []string
-	DiversityHints []string
+	Dimensions     []string
+	Effort         goalx.EffortLevel
 	Master         string
 	ResearchRole   string
 	DevelopRole    string
+	MasterEffort   goalx.EffortLevel
+	ResearchEffort goalx.EffortLevel
+	DevelopEffort  goalx.EffortLevel
 	Preset         string
 	BudgetSeconds  int
 	WriteConfig    bool
 }
 
 func phaseUsage(command string) string {
-	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--strategy NAMES] [--budget-seconds N] [--write-config]
+	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget-seconds N] [--write-config]
 
 notes:
   --from RUN is required and must reference a saved run.
@@ -71,30 +74,70 @@ func parsePhaseOptions(command string, args []string) (phaseOptions, error) {
 			}
 			i++
 			opts.ContextPaths = strings.Split(args[i], ",")
-		case "--strategy":
+		case "--dimension":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --strategy")
+				return opts, fmt.Errorf("missing value for --dimension")
 			}
 			i++
-			opts.Strategies = strings.Split(args[i], ",")
+			opts.Dimensions = strings.Split(args[i], ",")
 		case "--master":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --master")
 			}
 			i++
 			opts.Master = args[i]
+		case "--effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.Effort = level
+		case "--master-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --master-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.MasterEffort = level
 		case "--research-role":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --research-role")
 			}
 			i++
 			opts.ResearchRole = args[i]
+		case "--research-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --research-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.ResearchEffort = level
 		case "--develop-role":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --develop-role")
 			}
 			i++
 			opts.DevelopRole = args[i]
+		case "--develop-effort":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --develop-effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.DevelopEffort = level
 		case "--preset":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --preset")
@@ -144,14 +187,17 @@ func mergeNextConfigIntoPhaseOptions(opts phaseOptions, nc *nextConfigJSON, phas
 	if len(opts.ContextPaths) == 0 && len(nc.Context) > 0 {
 		opts.ContextPaths = append([]string(nil), nc.Context...)
 	}
-	if len(opts.Strategies) == 0 && len(nc.Strategies) > 0 {
-		opts.Strategies = append([]string(nil), nc.Strategies...)
+	if len(opts.Dimensions) == 0 && len(nc.Dimensions) > 0 {
+		opts.Dimensions = append([]string(nil), nc.Dimensions...)
 	}
-	if len(opts.DiversityHints) == 0 && len(nc.DiversityHints) > 0 {
-		opts.DiversityHints = append([]string(nil), nc.DiversityHints...)
+	if opts.Effort == "" && nc.Effort != "" {
+		opts.Effort = nc.Effort
 	}
 	if opts.Master == "" && nc.MasterEngine != "" && nc.MasterModel != "" {
 		opts.Master = nc.MasterEngine + "/" + nc.MasterModel
+	}
+	if opts.MasterEffort == "" && nc.MasterEffort != "" {
+		opts.MasterEffort = nc.MasterEffort
 	}
 	if nc.Engine != "" && nc.Model != "" {
 		targetMode := phaseMode
@@ -165,9 +211,15 @@ func mergeNextConfigIntoPhaseOptions(opts phaseOptions, nc *nextConfigJSON, phas
 			if opts.ResearchRole == "" {
 				opts.ResearchRole = nc.Engine + "/" + nc.Model
 			}
+			if opts.ResearchEffort == "" && nc.Effort != "" {
+				opts.ResearchEffort = nc.Effort
+			}
 		case goalx.ModeDevelop:
 			if opts.DevelopRole == "" {
 				opts.DevelopRole = nc.Engine + "/" + nc.Model
+			}
+			if opts.DevelopEffort == "" && nc.Effort != "" {
+				opts.DevelopEffort = nc.Effort
 			}
 		}
 	}

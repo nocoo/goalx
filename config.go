@@ -22,27 +22,23 @@ const (
 
 // Config is the merged configuration for a single run.
 type Config struct {
-	Name        string            `yaml:"name"`
-	Mode        Mode              `yaml:"mode"`
-	Objective   string            `yaml:"objective"`
-	Description string            `yaml:"description,omitempty"`
-	Preset      string            `yaml:"preset,omitempty"`
-	Preferences PreferencesConfig `yaml:"preferences,omitempty"`
-	// Deprecated: use Roles.Research/Develop instead.
-	Engine string `yaml:"engine,omitempty"` // legacy fallback for session defaults
-	// Deprecated: use Roles.Research/Develop instead.
-	Model          string             `yaml:"model,omitempty"` // legacy fallback for session defaults
-	Roles          RoleDefaultsConfig `yaml:"roles,omitempty"`
-	Parallel       int                `yaml:"parallel,omitempty"`
-	DiversityHints []string           `yaml:"diversity_hints,omitempty"`
-	Sessions       []SessionConfig    `yaml:"sessions,omitempty"`
-	Target         TargetConfig       `yaml:"target"`
-	Harness        HarnessConfig      `yaml:"harness,omitempty"`
-	Acceptance     AcceptanceConfig   `yaml:"acceptance,omitempty"`
-	Context        ContextConfig      `yaml:"context,omitempty"`
-	Budget         BudgetConfig       `yaml:"budget,omitempty"`
-	Master         MasterConfig       `yaml:"master,omitempty"`
-	Serve          ServeConfig        `yaml:"serve,omitempty"`
+	Name        string             `yaml:"name"`
+	Mode        Mode               `yaml:"mode"`
+	Objective   string             `yaml:"objective"`
+	Description string             `yaml:"description,omitempty"`
+	Preset      string             `yaml:"preset,omitempty"`
+	Preferences PreferencesConfig  `yaml:"preferences,omitempty"`
+	Roles       RoleDefaultsConfig `yaml:"roles,omitempty"`
+	Routing     RoutingTableConfig `yaml:"routing,omitempty"`
+	Parallel    int                `yaml:"parallel,omitempty"`
+	Sessions    []SessionConfig    `yaml:"sessions,omitempty"`
+	Target      TargetConfig       `yaml:"target"`
+	Harness     HarnessConfig      `yaml:"harness,omitempty"`
+	Acceptance  AcceptanceConfig   `yaml:"acceptance,omitempty"`
+	Context     ContextConfig      `yaml:"context,omitempty"`
+	Budget      BudgetConfig       `yaml:"budget,omitempty"`
+	Master      MasterConfig       `yaml:"master,omitempty"`
+	Serve       ServeConfig        `yaml:"serve,omitempty"`
 }
 
 type TargetConfig struct {
@@ -73,6 +69,7 @@ type BudgetConfig struct {
 type MasterConfig struct {
 	Engine        string        `yaml:"engine,omitempty"`
 	Model         string        `yaml:"model,omitempty"`
+	Effort        EffortLevel   `yaml:"effort,omitempty"`
 	CheckInterval time.Duration `yaml:"check_interval,omitempty"`
 }
 
@@ -87,6 +84,7 @@ type SessionConfig struct {
 	Hint    string         `yaml:"hint,omitempty"`
 	Engine  string         `yaml:"engine,omitempty"`
 	Model   string         `yaml:"model,omitempty"`
+	Effort  EffortLevel    `yaml:"effort,omitempty"`
 	Mode    Mode           `yaml:"mode,omitempty"`
 	Target  *TargetConfig  `yaml:"target,omitempty"`
 	Harness *HarnessConfig `yaml:"harness,omitempty"`
@@ -99,13 +97,34 @@ type PreferencesConfig struct {
 }
 
 type PreferencePolicy struct {
-	Engines  []string `yaml:"engines,omitempty"`
-	Strategy string   `yaml:"strategy,omitempty"`
+	Guidance string `yaml:"guidance,omitempty"`
 }
 
 type RoleDefaultsConfig struct {
 	Research SessionConfig `yaml:"research,omitempty"`
 	Develop  SessionConfig `yaml:"develop,omitempty"`
+}
+
+type EffortLevel string
+
+const (
+	EffortAuto    EffortLevel = "auto"
+	EffortMinimal EffortLevel = "minimal"
+	EffortLow     EffortLevel = "low"
+	EffortMedium  EffortLevel = "medium"
+	EffortHigh    EffortLevel = "high"
+	EffortMax     EffortLevel = "max"
+)
+
+type ExecutionProfile struct {
+	Engine string      `yaml:"engine,omitempty"`
+	Model  string      `yaml:"model,omitempty"`
+	Effort EffortLevel `yaml:"effort,omitempty"`
+}
+
+type RoutingTableConfig struct {
+	Profiles map[string]ExecutionProfile  `yaml:"profiles,omitempty"`
+	Table    map[string]map[string]string `yaml:"table,omitempty"`
 }
 
 // EngineConfig defines how to launch an AI engine.
@@ -114,6 +133,10 @@ type EngineConfig struct {
 	Command     string            `yaml:"command"`
 	Prompt      string            `yaml:"prompt"`
 	Models      map[string]string `yaml:"models"`
+	EffortMode  string            `yaml:"effort_mode,omitempty"`
+	EffortFlag  string            `yaml:"effort_flag,omitempty"`
+	EffortKey   string            `yaml:"effort_key,omitempty"`
+	EffortMap   map[string]string `yaml:"effort_map,omitempty"`
 }
 
 // PresetConfig defines engine/model for master, research, and develop roles.
@@ -125,12 +148,10 @@ type PresetConfig struct {
 
 // UserConfig is the top-level user config file (~/.goalx/config.yaml).
 type UserConfig struct {
-	Defaults    Config                  `yaml:"defaults,omitempty"`
-	Engines     map[string]EngineConfig `yaml:"engines,omitempty"`
-	Preferences PreferencesConfig       `yaml:"preferences,omitempty"`
-	Serve       ServeConfig             `yaml:"serve,omitempty"`
-	Presets     map[string]PresetConfig `yaml:"presets,omitempty"`
-	Strategies  map[string]string       `yaml:"strategies,omitempty"`
+	Config     `yaml:",inline"`
+	Engines    map[string]EngineConfig `yaml:"engines,omitempty"`
+	Presets    map[string]PresetConfig `yaml:"presets,omitempty"`
+	Dimensions map[string]string       `yaml:"dimensions,omitempty"`
 }
 
 // Presets — named engine/model combinations for different workflows.
@@ -138,7 +159,7 @@ var Presets = map[string]PresetConfig{
 	"claude": {
 		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
 		Research: SessionConfig{Engine: "claude-code", Model: "sonnet"},
-		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
+		Develop:  SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 	},
 	"claude-h": {
 		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
@@ -146,19 +167,19 @@ var Presets = map[string]PresetConfig{
 		Develop:  SessionConfig{Engine: "claude-code", Model: "opus"},
 	},
 	"codex": {
-		Master:   MasterConfig{Engine: "codex", Model: "codex"},
-		Research: SessionConfig{Engine: "codex", Model: "codex"},
-		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
+		Master:   MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Research: SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		Develop:  SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 	},
 	"mixed": {
-		Master:   MasterConfig{Engine: "codex", Model: "codex"},
+		Master:   MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		Research: SessionConfig{Engine: "claude-code", Model: "opus"},
-		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
+		Develop:  SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 	},
 	"hybrid": {
 		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
 		Research: SessionConfig{Engine: "claude-code", Model: "opus"},
-		Develop:  SessionConfig{Engine: "codex", Model: "codex"},
+		Develop:  SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 	},
 }
 
@@ -168,6 +189,15 @@ var BuiltinEngines = map[string]EngineConfig{
 		Description: "Deep reasoning and long-form research synthesis.",
 		Command:     "claude --model {model_id} --permission-mode auto",
 		Prompt:      "Read {protocol} and follow it exactly.",
+		EffortMode:  "flag",
+		EffortFlag:  "--effort",
+		EffortMap: map[string]string{
+			"minimal": "low",
+			"low":     "low",
+			"medium":  "medium",
+			"high":    "high",
+			"max":     "max",
+		},
 		Models: map[string]string{
 			"opus":   "claude-opus-4-6",
 			"sonnet": "claude-sonnet-4-6",
@@ -178,11 +208,21 @@ var BuiltinEngines = map[string]EngineConfig{
 		Description: "Fast code editing, testing, and implementation work.",
 		Command:     "codex -m {model_id} -a never -s danger-full-access",
 		Prompt:      "Read {protocol} and follow it exactly.",
+		EffortMode:  "config",
+		EffortKey:   "model_reasoning_effort",
+		EffortMap: map[string]string{
+			"minimal": "low",
+			"low":     "low",
+			"medium":  "medium",
+			"high":    "high",
+			"max":     "xhigh",
+		},
 		Models: map[string]string{
 			"codex":    "gpt-5.4",
 			"best":     "gpt-5.4",
 			"balanced": "gpt-5.4",
 			"fast":     "gpt-5.4-mini",
+			"gpt-5.4":  "gpt-5.4",
 		},
 	},
 	"aider": {
@@ -207,6 +247,39 @@ var BuiltinDefaults = Config{
 	Budget: BudgetConfig{
 		MaxDuration: 8 * time.Hour,
 	},
+}
+
+func ParseEffortLevel(raw string) (EffortLevel, error) {
+	level := EffortLevel(strings.TrimSpace(raw))
+	switch level {
+	case "", EffortAuto, EffortMinimal, EffortLow, EffortMedium, EffortHigh, EffortMax:
+		return level, nil
+	default:
+		return "", fmt.Errorf("invalid effort %q", raw)
+	}
+}
+
+func validateEffortLevel(level EffortLevel, field string) error {
+	normalized, err := ParseEffortLevel(string(level))
+	if err != nil {
+		return fmt.Errorf("%s: %w", field, err)
+	}
+	if normalized == "" {
+		return nil
+	}
+	return nil
+}
+
+type LaunchRequest struct {
+	Engine string
+	Model  string
+	Effort EffortLevel
+}
+
+type LaunchSpec struct {
+	Command         string
+	RequestedEffort EffortLevel
+	EffectiveEffort string
 }
 
 // LoadYAML loads a config file, returning zero value if not found.
@@ -244,11 +317,6 @@ func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, err
 		return Config{}, nil, fmt.Errorf("project config: %w", err)
 	}
 	applyConfigEnvelope(&cfg, &engines, &projEnvelope)
-	projCfg, err := LoadYAML[Config](projectConfigPath)
-	if err != nil {
-		return Config{}, nil, fmt.Errorf("project config: %w", err)
-	}
-	mergeConfig(&cfg, &projCfg)
 	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
 
 	return cfg, engines, nil
@@ -258,9 +326,7 @@ func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay 
 	if cfg == nil || overlay == nil {
 		return
 	}
-	mergeConfig(cfg, &overlay.Defaults)
-	mergePreferencesConfig(&cfg.Preferences, &overlay.Preferences)
-	mergeServeConfig(&cfg.Serve, &overlay.Serve)
+	mergeConfig(cfg, &overlay.Config)
 	if engines != nil {
 		for k, v := range overlay.Engines {
 			(*engines)[k] = v
@@ -269,15 +335,15 @@ func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay 
 	for k, v := range overlay.Presets {
 		Presets[k] = v
 	}
-	for k, v := range overlay.Strategies {
-		BuiltinStrategies[k] = v
+	for k, v := range overlay.Dimensions {
+		BuiltinDimensions[k] = v
 	}
 }
 
 func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
 
-	// Apply preset to fill in engine/model gaps
+	// Apply preset to fill in role defaults.
 	applyPreset(&cfg)
 
 	// Apply defaults for parallel
@@ -331,7 +397,7 @@ func LoadConfigWithManualDraft(projectRoot, draftPath string) (*Config, map[stri
 	return finalizeLoadedConfig(projectRoot, cfg), engines, nil
 }
 
-// applyPreset fills in engine/model from the preset if not already set.
+// applyPreset fills in missing master/role defaults from the selected preset.
 func applyPreset(cfg *Config) {
 	preset, ok := Presets[cfg.Preset]
 	if !ok {
@@ -359,18 +425,9 @@ func applyPreset(cfg *Config) {
 	if cfg.Roles.Develop.Model == "" {
 		cfg.Roles.Develop.Model = preset.Develop.Model
 	}
-
-	// Legacy run-level fallback remains readable for existing configs/specs.
-	legacy := defaultRoleSession(cfg, cfg.Mode)
-	if cfg.Engine == "" {
-		cfg.Engine = legacy.Engine
-	}
-	if cfg.Model == "" {
-		cfg.Model = legacy.Model
-	}
 }
 
-// ApplyPreset fills missing engine/model fields from the selected preset.
+// ApplyPreset fills missing master/role defaults from the selected preset.
 func ApplyPreset(cfg *Config) {
 	applyPreset(cfg)
 }
@@ -405,57 +462,107 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 		return fmt.Errorf("acceptance.command contains placeholder %q — edit the manual draft config first", cfg.Acceptance.Command)
 	}
 
-	// Check engine/model can resolve and won't block on known interactive prompts.
-	if err := validateInteractiveEngine(engines, cfg.Master.Engine, cfg.Master.Model, "master"); err != nil {
+	if err := validateEffortLevel(cfg.Master.Effort, "master.effort"); err != nil {
 		return err
 	}
-	sessions := ExpandSessions(cfg)
-	if len(sessions) == 0 {
-		sessions = []SessionConfig{{}}
+	if err := validateLaunchRequest(engines, LaunchRequest{
+		Engine: cfg.Master.Engine,
+		Model:  cfg.Master.Model,
+		Effort: cfg.Master.Effort,
+	}, "master"); err != nil {
+		return err
 	}
-	for i, sess := range sessions {
-		if sess.Mode != "" && sess.Mode != ModeResearch && sess.Mode != ModeDevelop {
-			return fmt.Errorf("session-%d mode must be 'research' or 'develop', got %q", i+1, sess.Mode)
-		}
-		engine := sess.Engine
-		if engine == "" {
-			engine = cfg.Engine
-		}
-		model := sess.Model
-		if model == "" {
-			model = cfg.Model
-		}
-		if err := validateInteractiveEngine(engines, engine, model, fmt.Sprintf("session-%d", i+1)); err != nil {
+
+	for name, profile := range cfg.Routing.Profiles {
+		if err := validateEffortLevel(profile.Effort, fmt.Sprintf("routing.profiles.%s.effort", name)); err != nil {
 			return err
+		}
+		if profile.Engine == "" && profile.Model == "" && profile.Effort == "" {
+			return fmt.Errorf("routing.profiles.%s must set at least one of engine, model, or effort", name)
+		}
+		if profile.Model != "" && profile.Engine == "" {
+			return fmt.Errorf("routing.profiles.%s.model requires engine", name)
+		}
+		if profile.Engine != "" {
+			if err := validateLaunchRequest(engines, LaunchRequest{
+				Engine: profile.Engine,
+				Model:  profile.Model,
+				Effort: profile.Effort,
+			}, fmt.Sprintf("routing profile %q", name)); err != nil {
+				return err
+			}
+		}
+	}
+	for role, dimensions := range cfg.Routing.Table {
+		for dimension, profileName := range dimensions {
+			if _, ok := cfg.Routing.Profiles[profileName]; !ok {
+				return fmt.Errorf("routing.table.%s.%s references unknown profile %q", role, dimension, profileName)
+			}
 		}
 	}
 
-	// Check sessions vs parallel
-	if len(cfg.Sessions) > 0 && cfg.Parallel > 1 {
-		return fmt.Errorf("cannot use both 'sessions' and 'parallel > 1' — pick one")
+	sessions := ExpandSessions(cfg)
+	if len(sessions) == 0 {
+		sessions = []SessionConfig{EffectiveSessionConfig(cfg, -1)}
 	}
-	if len(cfg.DiversityHints) > 0 && len(cfg.Sessions) > 0 {
-		return fmt.Errorf("cannot use both 'diversity_hints' and 'sessions' — pick one")
+	for i := range sessions {
+		sess := EffectiveSessionConfig(cfg, i)
+		if sess.Mode != "" && sess.Mode != ModeResearch && sess.Mode != ModeDevelop {
+			return fmt.Errorf("session-%d mode must be 'research' or 'develop', got %q", i+1, sess.Mode)
+		}
+		if err := validateEffortLevel(sess.Effort, fmt.Sprintf("session-%d.effort", i+1)); err != nil {
+			return err
+		}
+		if err := validateLaunchRequest(engines, LaunchRequest{
+			Engine: sess.Engine,
+			Model:  sess.Model,
+			Effort: sess.Effort,
+		}, fmt.Sprintf("session-%d", i+1)); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// ResolveEngineCommand builds the final shell command for an engine+model.
-func ResolveEngineCommand(engines map[string]EngineConfig, engine, model string) (string, error) {
-	ec, ok := engines[engine]
+func ResolveLaunchSpec(engines map[string]EngineConfig, req LaunchRequest) (LaunchSpec, error) {
+	ec, ok := engines[req.Engine]
 	if !ok {
-		return "", fmt.Errorf("unknown engine %q", engine)
+		return LaunchSpec{}, fmt.Errorf("unknown engine %q", req.Engine)
 	}
-	modelID, err := resolveModelID(engines, engine, model)
+	modelID, err := resolveModelID(engines, req.Engine, req.Model)
 	if err != nil {
-		return "", err
+		return LaunchSpec{}, err
 	}
 	cmd := strings.ReplaceAll(ec.Command, "{model_id}", modelID)
-	if engine == "claude-code" && os.Getenv("IS_SANDBOX") == "1" {
+	if req.Engine == "claude-code" && os.Getenv("IS_SANDBOX") == "1" {
 		cmd = strings.ReplaceAll(cmd, "--permission-mode auto", "--permission-mode bypassPermissions")
 	}
-	return cmd, nil
+	spec := LaunchSpec{
+		Command:         cmd,
+		RequestedEffort: req.Effort,
+	}
+	if req.Effort == "" || req.Effort == EffortAuto {
+		return spec, nil
+	}
+
+	effective := string(req.Effort)
+	if mapped, ok := ec.EffortMap[string(req.Effort)]; ok && strings.TrimSpace(mapped) != "" {
+		effective = mapped
+	}
+	spec.EffectiveEffort = effective
+
+	switch ec.EffortMode {
+	case "flag":
+		if ec.EffortFlag != "" {
+			spec.Command = spec.Command + " " + ec.EffortFlag + " " + effective
+		}
+	case "config":
+		if ec.EffortKey != "" {
+			spec.Command = spec.Command + fmt.Sprintf(" -c %s=%q", ec.EffortKey, effective)
+		}
+	}
+	return spec, nil
 }
 
 func resolveModelID(engines map[string]EngineConfig, engine, model string) (string, error) {
@@ -471,20 +578,33 @@ func resolveModelID(engines map[string]EngineConfig, engine, model string) (stri
 }
 
 func validateInteractiveEngine(engines map[string]EngineConfig, engine, model, role string) error {
-	if err := validateModelAliasForEngine(engines, engine, model, role); err != nil {
+	return validateLaunchRequest(engines, LaunchRequest{Engine: engine, Model: model}, role)
+}
+
+func validateLaunchRequest(engines map[string]EngineConfig, req LaunchRequest, role string) error {
+	if err := validateModelAliasForEngine(engines, req.Engine, req.Model, role); err != nil {
 		return err
 	}
-	if _, err := ResolveEngineCommand(engines, engine, model); err != nil {
-		return fmt.Errorf("%s engine: %w", role, err)
-	}
-	modelID, err := resolveModelID(engines, engine, model)
+	spec, err := ResolveLaunchSpec(engines, req)
 	if err != nil {
 		return fmt.Errorf("%s engine: %w", role, err)
 	}
-	if engine == "codex" && (modelID == "gpt-5.3-codex" || modelID == "gpt-5.2") {
-		return fmt.Errorf("%s engine: codex model %q resolves to %s, which triggers an interactive migration prompt in Codex CLI; use gpt-5.4 or gpt-5.4-mini instead", role, model, modelID)
+	modelID, err := resolveModelID(engines, req.Engine, req.Model)
+	if err != nil {
+		return fmt.Errorf("%s engine: %w", role, err)
 	}
+	if req.Engine == "codex" && (modelID == "gpt-5.3-codex" || modelID == "gpt-5.2") {
+		return fmt.Errorf("%s engine: codex model %q resolves to %s, which triggers an interactive migration prompt in Codex CLI; use gpt-5.4 or gpt-5.4-mini instead", role, req.Model, modelID)
+	}
+	_ = spec
 	return nil
+}
+
+func validateInteractiveEngineLegacy(engines map[string]EngineConfig, engine, model, role string) error {
+	if err := validateModelAliasForEngine(engines, engine, model, role); err != nil {
+		return err
+	}
+	return validateLaunchRequest(engines, LaunchRequest{Engine: engine, Model: model}, role)
 }
 
 func validateModelAliasForEngine(engines map[string]EngineConfig, engine, model, role string) error {
@@ -533,17 +653,20 @@ func ResolvePrompt(engines map[string]EngineConfig, engine, protocolPath string)
 	return strings.ReplaceAll(ec.Prompt, "{protocol}", protocolPath)
 }
 
-// ExpandSessions converts parallel+diversity_hints into explicit session configs.
+// ExpandSessions converts the configured session count into explicit session configs.
 func ExpandSessions(cfg *Config) []SessionConfig {
-	if len(cfg.Sessions) > 0 {
-		return cfg.Sessions
+	if cfg == nil {
+		return nil
 	}
-	sessions := make([]SessionConfig, cfg.Parallel)
-	for i := range sessions {
-		if i < len(cfg.DiversityHints) {
-			sessions[i].Hint = cfg.DiversityHints[i]
-		}
+	size := len(cfg.Sessions)
+	if cfg.Parallel > size {
+		size = cfg.Parallel
 	}
+	if size == 0 {
+		return nil
+	}
+	sessions := make([]SessionConfig, size)
+	copy(sessions, cfg.Sessions)
 	return sessions
 }
 
@@ -562,15 +685,12 @@ func EffectiveSessionConfig(cfg *Config, idx int) SessionConfig {
 	roleDefault := defaultRoleSession(cfg, out.Mode)
 	if out.Engine == "" {
 		out.Engine = roleDefault.Engine
-		if out.Engine == "" {
-			out.Engine = cfg.Engine
-		}
 	}
 	if out.Model == "" {
 		out.Model = roleDefault.Model
-		if out.Model == "" {
-			out.Model = cfg.Model
-		}
+	}
+	if out.Effort == "" {
+		out.Effort = roleDefault.Effort
 	}
 
 	target := cfg.Target
@@ -704,17 +824,14 @@ func mergeConfig(base, overlay *Config) {
 		base.Preset = overlay.Preset
 	}
 	mergePreferencesConfig(&base.Preferences, &overlay.Preferences)
-	if overlay.Engine != "" {
-		base.Engine = overlay.Engine
-	}
-	if overlay.Model != "" {
-		base.Model = overlay.Model
-	}
 	if overlay.Roles.Research.Engine != "" {
 		base.Roles.Research.Engine = overlay.Roles.Research.Engine
 	}
 	if overlay.Roles.Research.Model != "" {
 		base.Roles.Research.Model = overlay.Roles.Research.Model
+	}
+	if overlay.Roles.Research.Effort != "" {
+		base.Roles.Research.Effort = overlay.Roles.Research.Effort
 	}
 	if overlay.Roles.Develop.Engine != "" {
 		base.Roles.Develop.Engine = overlay.Roles.Develop.Engine
@@ -722,11 +839,17 @@ func mergeConfig(base, overlay *Config) {
 	if overlay.Roles.Develop.Model != "" {
 		base.Roles.Develop.Model = overlay.Roles.Develop.Model
 	}
+	if overlay.Roles.Develop.Effort != "" {
+		base.Roles.Develop.Effort = overlay.Roles.Develop.Effort
+	}
+	if len(overlay.Routing.Profiles) > 0 {
+		base.Routing.Profiles = copyProfiles(overlay.Routing.Profiles)
+	}
+	if len(overlay.Routing.Table) > 0 {
+		base.Routing.Table = copyRoutingTable(overlay.Routing.Table)
+	}
 	if overlay.Parallel > 0 {
 		base.Parallel = overlay.Parallel
-	}
-	if len(overlay.DiversityHints) > 0 {
-		base.DiversityHints = overlay.DiversityHints
 	}
 	if len(overlay.Sessions) > 0 {
 		base.Sessions = overlay.Sessions
@@ -760,6 +883,9 @@ func mergeConfig(base, overlay *Config) {
 	}
 	if overlay.Master.Model != "" {
 		base.Master.Model = overlay.Master.Model
+	}
+	if overlay.Master.Effort != "" {
+		base.Master.Effort = overlay.Master.Effort
 	}
 	if overlay.Master.CheckInterval > 0 {
 		base.Master.CheckInterval = overlay.Master.CheckInterval
@@ -803,11 +929,8 @@ func mergeServeConfig(base, overlay *ServeConfig) {
 }
 
 func mergePreferencePolicy(base *PreferencePolicy, overlay PreferencePolicy) {
-	if len(overlay.Engines) > 0 {
-		base.Engines = overlay.Engines
-	}
-	if overlay.Strategy != "" {
-		base.Strategy = overlay.Strategy
+	if overlay.Guidance != "" {
+		base.Guidance = overlay.Guidance
 	}
 }
 
@@ -819,7 +942,34 @@ func copyEngines(src map[string]EngineConfig) map[string]EngineConfig {
 			models[mk] = mv
 		}
 		v.Models = models
+		if len(v.EffortMap) > 0 {
+			effortMap := make(map[string]string, len(v.EffortMap))
+			for ek, ev := range v.EffortMap {
+				effortMap[ek] = ev
+			}
+			v.EffortMap = effortMap
+		}
 		dst[k] = v
+	}
+	return dst
+}
+
+func copyProfiles(src map[string]ExecutionProfile) map[string]ExecutionProfile {
+	dst := make(map[string]ExecutionProfile, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func copyRoutingTable(src map[string]map[string]string) map[string]map[string]string {
+	dst := make(map[string]map[string]string, len(src))
+	for role, dims := range src {
+		cloned := make(map[string]string, len(dims))
+		for dim, profile := range dims {
+			cloned[dim] = profile
+		}
+		dst[role] = cloned
 	}
 	return dst
 }

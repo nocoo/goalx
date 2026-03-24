@@ -173,10 +173,15 @@ func Resume(projectRoot string, args []string) error {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
 	}
-	engineCmd, err := goalx.ResolveEngineCommand(engines, sessionIdentity.Engine, sessionIdentity.Model)
+	spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: sessionIdentity.Engine,
+		Model:  sessionIdentity.Model,
+		Effort: sessionIdentity.RequestedEffort,
+	})
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
+	engineCmd := spec.Command
 	if sessionIdentity.Engine == "claude-code" {
 		engineCmd += " --disable-slash-commands"
 	}

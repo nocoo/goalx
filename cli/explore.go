@@ -36,7 +36,7 @@ func Explore(projectRoot string, args []string) error {
 		"继续扩大证据覆盖范围，优先验证原结论的盲点、缺失案例和失败模式。",
 		"从替代架构路径、反例和更高 ROI 方案入手，补充可派发的新切片。",
 	}
-	hints, err := applyPhaseStrategies(defaultHints, cfg.Parallel, opts)
+	hints, err := applyPhaseDimensions(defaultHints, cfg.Parallel, opts)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func Explore(projectRoot string, args []string) error {
 	if cfg.Objective == "" {
 		cfg.Objective = fmt.Sprintf("基于 %s 的已有研究结果，继续扩展探索、验证盲点、寻找更优路径，并产出新的可执行切片。", source.Run)
 	}
-	cfg.DiversityHints = hints
+	applySessionHints(cfg, hints)
 	cfg.Context = goalx.ContextConfig{Files: contextFiles}
 	if len(cfg.Target.Files) == 0 {
 		cfg.Target.Files = InferTarget(projectRoot)

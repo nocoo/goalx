@@ -13,21 +13,24 @@ const maxNextConfigParallel = 10
 const maxNextConfigIterations = 20
 
 type nextConfigJSON struct {
-	Parallel       int                 `json:"parallel,omitempty"`
-	Engine         string              `json:"engine,omitempty"`
-	Model          string              `json:"model,omitempty"`
-	Preset         string              `json:"preset,omitempty"`
-	DiversityHints []string            `json:"diversity_hints,omitempty"`
-	Strategies     []string            `json:"strategies,omitempty"`
-	BudgetSeconds  int                 `json:"budget_seconds,omitempty"`
-	Objective      string              `json:"objective,omitempty"`
-	Harness        string              `json:"harness,omitempty"`
-	Mode           string              `json:"mode,omitempty"`
-	MaxIterations  int                 `json:"max_iterations,omitempty"`
-	Context        []string            `json:"context,omitempty"`
-	MasterEngine   string              `json:"master_engine,omitempty"`
-	MasterModel    string              `json:"master_model,omitempty"`
-	Sessions       []sessionConfigJSON `json:"sessions,omitempty"`
+	Parallel      int                 `json:"parallel,omitempty"`
+	Engine        string              `json:"engine,omitempty"`
+	Model         string              `json:"model,omitempty"`
+	Effort        goalx.EffortLevel   `json:"effort,omitempty"`
+	Preset        string              `json:"preset,omitempty"`
+	Dimensions    []string            `json:"dimensions,omitempty"`
+	BudgetSeconds int                 `json:"budget_seconds,omitempty"`
+	Objective     string              `json:"objective,omitempty"`
+	Harness       string              `json:"harness,omitempty"`
+	Mode          string              `json:"mode,omitempty"`
+	MaxIterations int                 `json:"max_iterations,omitempty"`
+	Context       []string            `json:"context,omitempty"`
+	MasterEngine  string              `json:"master_engine,omitempty"`
+	MasterModel   string              `json:"master_model,omitempty"`
+	MasterEffort  goalx.EffortLevel   `json:"master_effort,omitempty"`
+	RouteProfile  string              `json:"route_profile,omitempty"`
+	QuotaState    string              `json:"quota_state,omitempty"`
+	Sessions      []sessionConfigJSON `json:"sessions,omitempty"`
 }
 
 type sessionConfigJSON struct {
@@ -51,9 +54,22 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.Context = normalizeNextConfigContext(validated.Context)
 	validated.MasterEngine = strings.TrimSpace(validated.MasterEngine)
 	validated.MasterModel = strings.TrimSpace(validated.MasterModel)
+	validated.RouteProfile = strings.TrimSpace(validated.RouteProfile)
+	validated.QuotaState = strings.TrimSpace(validated.QuotaState)
 	validated.Sessions = normalizeNextConfigSessions(validated.Sessions)
-	validated.DiversityHints = normalizeNextConfigHints(validated.DiversityHints, 0)
-	validated.Strategies = normalizeNextConfigHints(validated.Strategies, 0)
+	validated.Dimensions = normalizeNextConfigHints(validated.Dimensions, 0)
+	if level, err := goalx.ParseEffortLevel(string(validated.Effort)); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.effort=%q (%v)\n", validated.Effort, err)
+		validated.Effort = ""
+	} else {
+		validated.Effort = level
+	}
+	if level, err := goalx.ParseEffortLevel(string(validated.MasterEffort)); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.master_effort=%q (%v)\n", validated.MasterEffort, err)
+		validated.MasterEffort = ""
+	} else {
+		validated.MasterEffort = level
+	}
 
 	if validated.Parallel < 0 {
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.parallel=%d (must be >= 0)\n", validated.Parallel)
@@ -70,13 +86,9 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.max_iterations=%d (must be 1-%d or 0)\n", validated.MaxIterations, maxNextConfigIterations)
 		validated.MaxIterations = 0
 	}
-	if len(validated.DiversityHints) > maxNextConfigParallel {
-		fmt.Fprintf(os.Stderr, "warning: truncating next_config.diversity_hints to %d entries\n", maxNextConfigParallel)
-		validated.DiversityHints = validated.DiversityHints[:maxNextConfigParallel]
-	}
-	if len(validated.Strategies) > maxNextConfigParallel {
-		fmt.Fprintf(os.Stderr, "warning: truncating next_config.strategies to %d entries\n", maxNextConfigParallel)
-		validated.Strategies = validated.Strategies[:maxNextConfigParallel]
+	if len(validated.Dimensions) > maxNextConfigParallel {
+		fmt.Fprintf(os.Stderr, "warning: truncating next_config.dimensions to %d entries\n", maxNextConfigParallel)
+		validated.Dimensions = validated.Dimensions[:maxNextConfigParallel]
 	}
 
 	engines := goalx.BuiltinEngines
@@ -95,10 +107,10 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 			validated.Engine = ""
 		}
 	}
-	if len(validated.Strategies) > 0 {
-		if _, err := goalx.ResolveStrategies(validated.Strategies); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.strategies: %v\n", err)
-			validated.Strategies = nil
+	if len(validated.Dimensions) > 0 {
+		if _, err := goalx.ResolveDimensions(validated.Dimensions); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.dimensions: %v\n", err)
+			validated.Dimensions = nil
 		}
 	}
 	validated.MasterEngine, validated.MasterModel = validateNamedEngineModelPair(engines, validated.MasterEngine, validated.MasterModel, "next_config.master")
@@ -135,13 +147,11 @@ func nextConfigHints(fallback []string, parallel int, nc *nextConfigJSON) []stri
 	if nc == nil {
 		return normalizeNextConfigHints(fallback, parallel)
 	}
-	strategyHints := nextConfigStrategyHints(nc)
-	if len(strategyHints) == 0 && len(nc.DiversityHints) == 0 {
+	dimensionHints := nextConfigDimensionHints(nc)
+	if len(dimensionHints) == 0 {
 		return normalizeNextConfigHints(fallback, parallel)
 	}
-	merged := append([]string(nil), strategyHints...)
-	merged = append(merged, nc.DiversityHints...)
-	return normalizeNextConfigHints(merged, parallel)
+	return normalizeNextConfigHints(dimensionHints, parallel)
 }
 
 func normalizeNextConfigHints(hints []string, parallel int) []string {
@@ -166,13 +176,13 @@ func normalizeNextConfigHints(hints []string, parallel int) []string {
 	return normalized
 }
 
-func nextConfigStrategyHints(nc *nextConfigJSON) []string {
-	if nc == nil || len(nc.Strategies) == 0 {
+func nextConfigDimensionHints(nc *nextConfigJSON) []string {
+	if nc == nil || len(nc.Dimensions) == 0 {
 		return nil
 	}
-	hints, err := goalx.ResolveStrategies(nc.Strategies)
+	hints, err := goalx.ResolveDimensions(nc.Dimensions)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.strategies: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.dimensions: %v\n", err)
 		return nil
 	}
 	return hints
@@ -217,7 +227,7 @@ func validateNextConfigModel(engines map[string]goalx.EngineConfig, engine, mode
 	if goalx.ModelAliasBelongsToOtherEngine(engines, engine, model) {
 		return fmt.Errorf("model alias belongs to a different engine")
 	}
-	if _, err := goalx.ResolveEngineCommand(engines, engine, model); err != nil {
+	if _, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{Engine: engine, Model: model}); err != nil {
 		return err
 	}
 

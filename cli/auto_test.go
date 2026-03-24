@@ -150,10 +150,10 @@ func TestValidateNextConfigRejectsInvalidFields(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	got := validateNextConfig(projectRoot, &nextConfigJSON{
-		Parallel:       99,
-		Engine:         "unknown-engine",
-		BudgetSeconds:  -1,
-		DiversityHints: []string{"a", "b"},
+		Parallel:      99,
+		Engine:        "unknown-engine",
+		BudgetSeconds: -1,
+		Dimensions:    []string{"a", "b"},
 	})
 	if got == nil {
 		t.Fatal("validateNextConfig returned nil")

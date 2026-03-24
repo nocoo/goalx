@@ -10,11 +10,11 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME] [--worktree]`
+const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension NAME] [--worktree]`
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
-	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--strategy NAME]
+	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension NAME]
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -57,12 +57,12 @@ func Add(projectRoot string, args []string) (err error) {
 			default:
 				return fmt.Errorf("invalid --mode %q (expected research or develop)", rest[i])
 			}
-		case "--strategy":
+		case "--dimension":
 			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --strategy")
+				return fmt.Errorf("missing value for --dimension")
 			}
 			i++
-			hints, err := goalx.ResolveStrategies(strings.Split(rest[i], ","))
+			hints, err := goalx.ResolveDimensions(strings.Split(rest[i], ","))
 			if err != nil {
 				return err
 			}
@@ -139,15 +139,15 @@ func Add(projectRoot string, args []string) (err error) {
 		effectiveSession.Mode,
 		effectiveSession.Engine,
 		effectiveSession.Model,
+		effectiveSession.Effort,
+		"",
+		"",
+		"",
 		target,
 	)
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
 	}
-	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
-		return fmt.Errorf("write session identity: %w", err)
-	}
-	sessionIdentityWritten = true
 	engine := sessionIdentity.Engine
 	model := sessionIdentity.Model
 	meta, err := EnsureRunMetadata(rc.RunDir, rc.ProjectRoot, rc.Config.Objective)
@@ -174,10 +174,20 @@ func Add(projectRoot string, args []string) (err error) {
 			return fmt.Errorf("load config for engine resolution: %w", err)
 		}
 	}
-	engineCmd, err := goalx.ResolveEngineCommand(engines, engine, model)
+	launchSpec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: engine,
+		Model:  model,
+		Effort: effectiveSession.Effort,
+	})
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
+	engineCmd := launchSpec.Command
+	sessionIdentity.EffectiveEffort = launchSpec.EffectiveEffort
+	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
+		return fmt.Errorf("write session identity: %w", err)
+	}
+	sessionIdentityWritten = true
 	if engine == "claude-code" {
 		engineCmd += " --disable-slash-commands"
 	}
@@ -336,7 +346,11 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 		if identity.Mode != "" {
 			mode = goalx.Mode(identity.Mode)
 		}
-		engineCmd, err := goalx.ResolveEngineCommand(engines, engine, model)
+		spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+			Engine: engine,
+			Model:  model,
+			Effort: effective.Effort,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve session-%d engine: %w", num, err)
 		}
@@ -351,7 +365,7 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 			Engine:            engine,
 			Model:             model,
 			Mode:              mode,
-			EngineCommand:     engineCmd,
+			EngineCommand:     spec.Command,
 		})
 	}
 	return list, nil

@@ -183,9 +183,9 @@ func TestServeHandlerGoalxActionRoutes(t *testing.T) {
 		{
 			name:       "init",
 			path:       "/projects/goalx/goalx/init",
-			body:       `{"objective":"audit auth","mode":"research","parallel":2,"name":"auth-audit","context":["README.md","docs/arch.md"],"strategies":["depth","security"]}`,
+			body:       `{"objective":"audit auth","mode":"research","parallel":2,"name":"auth-audit","context":["README.md","docs/arch.md"],"dimensions":["depth","security"]}`,
 			wantAction: "init",
-			wantArgs:   []string{"audit auth", "--research", "--parallel", "2", "--name", "auth-audit", "--context", "README.md,docs/arch.md", "--strategy", "depth,security"},
+			wantArgs:   []string{"audit auth", "--research", "--parallel", "2", "--name", "auth-audit", "--context", "README.md,docs/arch.md", "--dimension", "depth,security"},
 		},
 		{
 			name:       "start",

@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func TestResolveStrategiesSupportsPerfectionistBuiltin(t *testing.T) {
-	hints, err := ResolveStrategies([]string{"perfectionist"})
+func TestResolveDimensionsSupportsPerfectionistBuiltin(t *testing.T) {
+	hints, err := ResolveDimensions([]string{"perfectionist"})
 	if err != nil {
-		t.Fatalf("ResolveStrategies(perfectionist): %v", err)
+		t.Fatalf("ResolveDimensions(perfectionist): %v", err)
 	}
 	if len(hints) != 1 {
 		t.Fatalf("len(hints) = %d, want 1", len(hints))
