@@ -31,6 +31,8 @@ type ProtocolData struct {
 	SummaryPath            string
 	GoalPath               string
 	GoalLogPath            string
+	CharterPath            string
+	IdentityFencePath      string
 	AcceptanceNotesPath    string
 	AcceptanceStatePath    string
 	CompletionProofPath    string
@@ -52,13 +54,14 @@ type ProtocolData struct {
 	EngineCommand          string // resolved master engine command
 
 	// Subagent-specific (used in program.md.tmpl)
-	SessionName       string
-	SessionIndex      int // 0-based index of this session in the Sessions slice
-	JournalPath       string
-	SessionInboxPath  string
-	SessionCursorPath string
-	WorktreePath      string
-	DiversityHint     string
+	SessionName         string
+	SessionIndex        int // 0-based index of this session in the Sessions slice
+	JournalPath         string
+	SessionIdentityPath string
+	SessionInboxPath    string
+	SessionCursorPath   string
+	WorktreePath        string
+	DiversityHint       string
 }
 
 // SessionData is per-session info for the master protocol.
@@ -79,20 +82,29 @@ type SessionData struct {
 
 // RenderMasterProtocol renders master.md.tmpl to the run directory.
 func RenderMasterProtocol(data ProtocolData, runDir string) error {
-	data = normalizeProtocolData(data)
+	data = normalizeProtocolData(data, runDir)
 	return renderTemplate("templates/master.md.tmpl", filepath.Join(runDir, "master.md"), data)
 }
 
 // RenderSubagentProtocol renders program.md.tmpl for a specific session.
 func RenderSubagentProtocol(data ProtocolData, runDir string, sessionIdx int) error {
-	data = normalizeProtocolData(data)
+	data = normalizeProtocolData(data, runDir)
 	outPath := filepath.Join(runDir, sessionName(sessionIdx)+".md")
 	return renderTemplate("templates/program.md.tmpl", outPath, data)
 }
 
-func normalizeProtocolData(data ProtocolData) ProtocolData {
+func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 	if data.GoalLogPath == "" && data.GoalPath != "" {
 		data.GoalLogPath = filepath.Join(filepath.Dir(data.GoalPath), "goal-log.jsonl")
+	}
+	if data.CharterPath == "" && runDir != "" {
+		data.CharterPath = RunCharterPath(runDir)
+	}
+	if data.IdentityFencePath == "" && runDir != "" {
+		data.IdentityFencePath = IdentityFencePath(runDir)
+	}
+	if data.SessionIdentityPath == "" && runDir != "" && data.SessionName != "" {
+		data.SessionIdentityPath = SessionIdentityPath(runDir, data.SessionName)
 	}
 	return data
 }

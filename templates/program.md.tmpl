@@ -6,6 +6,8 @@
 {{end}}
 ## Run State
 
+- Run charter: `{{.CharterPath}}` — immutable objective anchor, exploration doctrine, and completion rules
+- Session identity: `{{.SessionIdentityPath}}` — immutable role, mode, engine, target, and harness for this session
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Session inbox: `{{.SessionInboxPath}}` — latest assignment and direction changes
 - Session cursor: `{{.SessionCursorPath}}` — durable ack for the latest processed inbox entry
@@ -18,10 +20,12 @@
 
 Do not rebuild the full chat history unless the current state is ambiguous.
 
-1. Read unread session inbox entries from `{{.SessionInboxPath}}`
-2. Read the recent journal tail: `tail -n 20 {{.JournalPath}}`
-3. Inspect the current worktree state: `git status --short && git log --oneline -5`
-4. Resume from the current files and latest durable state. Only dig deeper into older history if something is unclear.
+1. Read `{{.SessionIdentityPath}}` to recover your immutable role and execution contract
+2. Read `{{.CharterPath}}` to recover the original objective, exploration doctrine, and completion rules
+3. Read unread session inbox entries from `{{.SessionInboxPath}}`
+4. Read the recent journal tail: `tail -n 20 {{.JournalPath}}`
+5. Inspect the current worktree state: `git status --short && git log --oneline -5`
+6. Resume from the current files and latest durable state. Only dig deeper into older history if something is unclear.
 
 {{if .Sessions}}
 ## Team Context
@@ -37,11 +41,12 @@ You are **{{.SessionName}}** of {{len .Sessions}} sessions working in parallel o
 
 Goal boundary: `{{.GoalPath}}` (read-only — this defines required current-goal work and optional improvements)
 The goal boundary defines what must be true before the overall goal can be considered complete. Your current assignment defines what to do next, not what counts as full completion.
+`{{.CharterPath}}` stays immutable. `{{.GoalPath}}` may evolve, but it may not silently shrink user-required outcomes.
 {{end}}
 
 {{if .AcceptanceStatePath}}### Acceptance Gate
 
-Machine-readable acceptance state: `{{.AcceptanceStatePath}}` (read-only — use this to understand the latest gate/check status)
+Machine-readable acceptance state: `{{.AcceptanceStatePath}}` (read-only — verification-only; it does not define scope)
 {{if .CompletionProofPath}}Canonical completion proof manifest: `{{.CompletionProofPath}}` (read-only — inspect this when you need to understand current closeout coverage or proof gaps){{end}}
 {{if .AcceptanceNotesPath}}Optional acceptance notes: `{{.AcceptanceNotesPath}}`{{end}}
 {{end}}
