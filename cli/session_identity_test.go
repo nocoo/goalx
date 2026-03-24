@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 		t.Fatalf("SaveRunCharter: %v", err)
 	}
 
-	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.TargetConfig{Files: []string{"main.go"}}, goalx.HarnessConfig{Command: "go test ./..."})
+	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.TargetConfig{Files: []string{"main.go"}})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -52,8 +53,8 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	if identity.OriginCharterID != charter.CharterID {
 		t.Fatalf("OriginCharterID = %q, want %q", identity.OriginCharterID, charter.CharterID)
 	}
-	if identity.Target.Files[0] != "main.go" || identity.Harness.Command != "go test ./..." {
-		t.Fatalf("session identity target/harness = %+v", identity)
+	if identity.Target.Files[0] != "main.go" {
+		t.Fatalf("session identity target = %+v", identity.Target)
 	}
 	if identity.CreatedAt == "" {
 		t.Fatal("CreatedAt empty")
@@ -75,14 +76,14 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	if reloaded.OriginCharterID != identity.OriginCharterID {
 		t.Fatalf("OriginCharterID = %q, want %q", reloaded.OriginCharterID, identity.OriginCharterID)
 	}
-	if reloaded.Target.Files[0] != "main.go" || reloaded.Harness.Command != "go test ./..." {
-		t.Fatalf("reloaded session identity target/harness = %+v", reloaded)
+	if reloaded.Target.Files[0] != "main.go" {
+		t.Fatalf("reloaded session identity target = %+v", reloaded.Target)
 	}
 }
 
 func TestNewSessionIdentityRequiresRunCharter(t *testing.T) {
 	runDir := t.TempDir()
-	if _, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.HarnessConfig{}); err == nil {
+	if _, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.TargetConfig{}); err == nil {
 		t.Fatal("NewSessionIdentity should fail when run-charter.json is missing")
 	}
 }
@@ -98,7 +99,7 @@ func TestSessionIdentityRoundTripKeepsSourceAndRole(t *testing.T) {
 		t.Fatalf("SaveRunCharter: %v", err)
 	}
 
-	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-research", goalx.ModeResearch, "claude-code", "opus", goalx.TargetConfig{Files: []string{"report.md"}}, goalx.HarnessConfig{Command: "go test ./..."})
+	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-research", goalx.ModeResearch, "claude-code", "opus", goalx.TargetConfig{Files: []string{"report.md"}})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -111,5 +112,24 @@ func TestSessionIdentityRoundTripKeepsSourceAndRole(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("session identity JSON missing %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestLoadSessionIdentityDoesNotDefaultMode(t *testing.T) {
+	runDir := t.TempDir()
+	path := SessionIdentityPath(runDir, "session-1")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir session identity dir: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"version":1,"session_name":"session-1"}`), 0o644); err != nil {
+		t.Fatalf("write session identity: %v", err)
+	}
+
+	identity, err := LoadSessionIdentity(path)
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity.Mode != "" {
+		t.Fatalf("Mode = %q, want empty", identity.Mode)
 	}
 }

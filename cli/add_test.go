@@ -526,7 +526,7 @@ harness:
 	text := string(out)
 	for _, want := range []string{
 		"## Mode: Research",
-		"DO NOT modify any source code.",
+		"Research mode typically focuses on producing reports; code modification controlled by target config.",
 		"Agent tool",
 	} {
 		if !strings.Contains(text, want) {
@@ -679,7 +679,6 @@ harness:
 		effective.Engine,
 		effective.Model,
 		*effective.Target,
-		*effective.Harness,
 	)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity session-1: %v", err)
@@ -845,7 +844,6 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 			effective.Engine,
 			effective.Model,
 			*effective.Target,
-			*effective.Harness,
 		)
 		if err != nil {
 			t.Fatalf("NewSessionIdentity %s: %v", SessionName(i+1), err)

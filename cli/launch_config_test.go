@@ -64,3 +64,33 @@ func TestBuildLaunchConfigOverridesParallelWhenFlagProvided(t *testing.T) {
 		t.Fatalf("parallel = %d, want 2", cfg.Parallel)
 	}
 }
+
+func TestBuildLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) {
+	projectRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, "go.mod"), []byte("module example.com/demo\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatalf("write main.go: %v", err)
+	}
+
+	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
+		Objective: "audit auth",
+		Mode:      goalx.ModeResearch,
+	})
+	if err != nil {
+		t.Fatalf("buildLaunchConfig: %v", err)
+	}
+	if len(cfg.Target.Readonly) != 0 {
+		t.Fatalf("research launch should not hardcode readonly target, got %#v", cfg.Target.Readonly)
+	}
+	if len(cfg.Target.Files) == 1 && cfg.Target.Files[0] == "report.md" {
+		t.Fatalf("research launch should not hardcode report.md target: %#v", cfg.Target.Files)
+	}
+	if cfg.Harness.Command == "test -s report.md && echo 'ok'" {
+		t.Fatalf("research launch should not hardcode report harness")
+	}
+}

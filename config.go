@@ -21,14 +21,16 @@ const (
 
 // Config is the merged configuration for a single run.
 type Config struct {
-	Name           string             `yaml:"name"`
-	Mode           Mode               `yaml:"mode"`
-	Objective      string             `yaml:"objective"`
-	Description    string             `yaml:"description,omitempty"`
-	Preset         string             `yaml:"preset,omitempty"`
-	Preferences    PreferencesConfig  `yaml:"preferences,omitempty"`
-	Engine         string             `yaml:"engine,omitempty"` // legacy fallback for session defaults
-	Model          string             `yaml:"model,omitempty"`  // legacy fallback for session defaults
+	Name        string            `yaml:"name"`
+	Mode        Mode              `yaml:"mode"`
+	Objective   string            `yaml:"objective"`
+	Description string            `yaml:"description,omitempty"`
+	Preset      string            `yaml:"preset,omitempty"`
+	Preferences PreferencesConfig `yaml:"preferences,omitempty"`
+	// Deprecated: use Roles.Research/Develop instead.
+	Engine string `yaml:"engine,omitempty"` // legacy fallback for session defaults
+	// Deprecated: use Roles.Research/Develop instead.
+	Model          string             `yaml:"model,omitempty"` // legacy fallback for session defaults
 	Roles          RoleDefaultsConfig `yaml:"roles,omitempty"`
 	Parallel       int                `yaml:"parallel,omitempty"`
 	DiversityHints []string           `yaml:"diversity_hints,omitempty"`

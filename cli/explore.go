@@ -46,11 +46,18 @@ func Explore(projectRoot string, args []string) error {
 	}
 	cfg.DiversityHints = hints
 	cfg.Context = goalx.ContextConfig{Files: contextFiles}
-	cfg.Target = goalx.TargetConfig{
-		Files:    []string{"report.md"},
-		Readonly: []string{"."},
+	if len(cfg.Target.Files) == 0 {
+		cfg.Target.Files = InferTarget(projectRoot)
 	}
-	cfg.Harness = goalx.HarnessConfig{Command: researchReportHarness()}
+	if len(cfg.Target.Files) == 0 {
+		cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
+	}
+	if cfg.Harness.Command == "" {
+		cfg.Harness.Command = InferHarness(projectRoot)
+	}
+	if cfg.Harness.Command == "" {
+		cfg.Harness = goalx.HarnessConfig{Command: "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"}
+	}
 
 	if opts.WriteConfig {
 		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — explore based on %s\n", source.Run)); err != nil {

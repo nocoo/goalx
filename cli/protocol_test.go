@@ -224,6 +224,38 @@ func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolResearchModeUsesGuidanceNotHardBan(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "investigate auth",
+		Mode:              goalx.ModeResearch,
+		Engine:            "codex",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		Target:            goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	if strings.Contains(text, "DO NOT modify any source code.") {
+		t.Fatalf("research mode should use guidance, not a hard source-code ban:\n%s", text)
+	}
+	if !strings.Contains(text, "Research mode typically focuses on producing reports; code modification controlled by target config.") {
+		t.Fatalf("research mode guidance missing updated target-config wording:\n%s", text)
+	}
+}
+
 func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{

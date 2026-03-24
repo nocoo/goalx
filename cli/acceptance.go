@@ -163,16 +163,6 @@ func ValidateAcceptanceStateForVerification(state *AcceptanceState, goal *GoalSt
 	return nil
 }
 
-func acceptanceStatus(state *AcceptanceState) string {
-	if state == nil {
-		return ""
-	}
-	if strings.TrimSpace(state.LastResult.Status) == "" {
-		return acceptanceStatusPending
-	}
-	return state.LastResult.Status
-}
-
 func normalizeAcceptanceState(state *AcceptanceState) {
 	if state.Version <= 0 {
 		state.Version = 1

@@ -40,11 +40,6 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 	}
 
 	if cfg.Mode == goalx.ModeResearch {
-		cfg.Target = goalx.TargetConfig{
-			Files:    []string{"report.md"},
-			Readonly: []string{"."},
-		}
-		cfg.Harness = goalx.HarnessConfig{Command: researchReportHarness()}
 		if len(opts.Strategies) > 0 {
 			hints, err := goalx.ResolveStrategies(opts.Strategies)
 			if err != nil {
@@ -59,19 +54,18 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 			}
 			cfg.DiversityHints = hints
 		}
-	} else {
-		if len(cfg.Target.Files) == 0 {
-			cfg.Target.Files = InferTarget(projectRoot)
-		}
-		if len(cfg.Target.Files) == 0 {
-			cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
-		}
-		if cfg.Harness.Command == "" {
-			cfg.Harness.Command = InferHarness(projectRoot)
-		}
-		if cfg.Harness.Command == "" {
-			cfg.Harness = goalx.HarnessConfig{Command: "TODO: build + test command"}
-		}
+	}
+	if len(cfg.Target.Files) == 0 {
+		cfg.Target.Files = InferTarget(projectRoot)
+	}
+	if len(cfg.Target.Files) == 0 {
+		cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
+	}
+	if cfg.Harness.Command == "" {
+		cfg.Harness.Command = InferHarness(projectRoot)
+	}
+	if cfg.Harness.Command == "" {
+		cfg.Harness = goalx.HarnessConfig{Command: "TODO: build + test command"}
 	}
 
 	if len(opts.Subs) > 0 {
@@ -164,10 +158,6 @@ func parseEngineModelValue(flagName, value string) (string, string, error) {
 		return "", "", fmt.Errorf("%s expects engine/model, got %q", flagName, value)
 	}
 	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), nil
-}
-
-func researchReportHarness() string {
-	return "test -s report.md && echo 'ok'"
 }
 
 func syncLegacySessionFallback(cfg *goalx.Config) {

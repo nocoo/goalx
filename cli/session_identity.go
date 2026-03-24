@@ -12,16 +12,15 @@ import (
 )
 
 type SessionIdentity struct {
-	Version         int                 `json:"version"`
-	SessionName     string              `json:"session_name,omitempty"`
-	RoleKind        string              `json:"role_kind,omitempty"`
-	Mode            string              `json:"mode,omitempty"`
-	Engine          string              `json:"engine,omitempty"`
-	Model           string              `json:"model,omitempty"`
-	Target          goalx.TargetConfig  `json:"target,omitempty"`
-	Harness         goalx.HarnessConfig `json:"harness,omitempty"`
-	OriginCharterID string              `json:"origin_charter_id,omitempty"`
-	CreatedAt       string              `json:"created_at,omitempty"`
+	Version         int                `json:"version"`
+	SessionName     string             `json:"session_name,omitempty"`
+	RoleKind        string             `json:"role_kind,omitempty"`
+	Mode            string             `json:"mode,omitempty"`
+	Engine          string             `json:"engine,omitempty"`
+	Model           string             `json:"model,omitempty"`
+	Target          goalx.TargetConfig `json:"target,omitempty"`
+	OriginCharterID string             `json:"origin_charter_id,omitempty"`
+	CreatedAt       string             `json:"created_at,omitempty"`
 }
 
 func SessionIdentityPath(runDir, sessionName string) string {
@@ -46,7 +45,7 @@ func RequireSessionIdentity(runDir, sessionName string) (*SessionIdentity, error
 	return identity, nil
 }
 
-func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, engine, model string, target goalx.TargetConfig, harness goalx.HarnessConfig) (*SessionIdentity, error) {
+func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, engine, model string, target goalx.TargetConfig) (*SessionIdentity, error) {
 	charter, err := RequireRunCharter(runDir)
 	if err != nil {
 		return nil, err
@@ -67,7 +66,6 @@ func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, e
 		Engine:          engine,
 		Model:           model,
 		Target:          target,
-		Harness:         harness,
 		OriginCharterID: charter.CharterID,
 		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
 	}
@@ -132,9 +130,6 @@ func normalizeSessionIdentity(identity *SessionIdentity) {
 	}
 	if identity.Version <= 0 {
 		identity.Version = 1
-	}
-	if strings.TrimSpace(identity.Mode) == "" {
-		identity.Mode = string(goalx.ModeDevelop)
 	}
 }
 

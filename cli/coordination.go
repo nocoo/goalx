@@ -13,7 +13,6 @@ import (
 
 type CoordinationState struct {
 	Version       int                            `json:"version"`
-	Objective     string                         `json:"objective,omitempty"`
 	PlanSummary   []string                       `json:"plan_summary,omitempty"`
 	Owners        map[string]string              `json:"owners,omitempty"`
 	Sessions      map[string]CoordinationSession `json:"sessions,omitempty"`
@@ -41,7 +40,6 @@ type CoordinationDecision struct {
 	ChosenPath       string `json:"chosen_path,omitempty"`
 	ChosenPathReason string `json:"chosen_path_reason,omitempty"`
 }
-
 
 func CoordinationPath(runDir string) string {
 	return filepath.Join(runDir, "coordination.json")
@@ -121,7 +119,6 @@ func EnsureCoordinationState(runDir, objective string) (*CoordinationState, erro
 
 type coordinationWire struct {
 	Version       int                            `json:"version"`
-	Objective     string                         `json:"objective,omitempty"`
 	PlanSummary   []string                       `json:"plan_summary,omitempty"`
 	Owners        map[string]string              `json:"owners,omitempty"`
 	Sessions      map[string]CoordinationSession `json:"sessions,omitempty"`
@@ -148,7 +145,6 @@ func parseCoordinationState(data []byte) (*CoordinationState, error) {
 	if err := json.Unmarshal(data, wire); err == nil {
 		state := &CoordinationState{
 			Version:       maxInt(wire.Version, 1),
-			Objective:     wire.Objective,
 			PlanSummary:   wire.PlanSummary,
 			Owners:        mapOrEmpty(wire.Owners),
 			Sessions:      mapSessionsOrEmpty(wire.Sessions),
@@ -172,7 +168,6 @@ func parseCoordinationState(data []byte) (*CoordinationState, error) {
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	_ = json.Unmarshal(raw["version"], &state.Version)
-	_ = json.Unmarshal(raw["objective"], &state.Objective)
 	_ = json.Unmarshal(raw["updated_at"], &state.UpdatedAt)
 	_ = json.Unmarshal(raw["plan_summary"], &state.PlanSummary)
 	_ = json.Unmarshal(raw["open_questions"], &state.OpenQuestions)
@@ -269,7 +264,6 @@ func normalizeCoordinationState(state *CoordinationState) {
 	if state == nil {
 		return
 	}
-	state.Objective = ""
 	if state.Sessions == nil {
 		state.Sessions = map[string]CoordinationSession{}
 	}

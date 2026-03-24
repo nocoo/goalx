@@ -128,12 +128,8 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
 	var target goalx.TargetConfig
-	var harness goalx.HarnessConfig
 	if effectiveSession.Target != nil {
 		target = *effectiveSession.Target
-	}
-	if effectiveSession.Harness != nil {
-		harness = *effectiveSession.Harness
 	}
 	sessionIdentity, err := NewSessionIdentity(
 		rc.RunDir,
@@ -143,7 +139,6 @@ func Add(projectRoot string, args []string) (err error) {
 		effectiveSession.Engine,
 		effectiveSession.Model,
 		target,
-		harness,
 	)
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
@@ -231,7 +226,7 @@ func Add(projectRoot string, args []string) (err error) {
 		Engine:              sessionIdentity.Engine,
 		Sessions:            sessionDataList,
 		Target:              sessionIdentity.Target,
-		Harness:             sessionIdentity.Harness,
+		Harness:             rc.Config.Harness,
 		Context:             rc.Config.Context,
 		Budget:              rc.Config.Budget,
 		SessionName:         sName,
@@ -344,4 +339,3 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 	}
 	return list, nil
 }
-

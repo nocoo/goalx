@@ -50,7 +50,7 @@ func TestIdentityFencePathAndDerivation(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveAcceptanceState: %v", err)
 	}
-	coord := &CoordinationState{Version: 1, Objective: "ship feature"}
+	coord := &CoordinationState{Version: 1}
 	if err := SaveCoordinationState(CoordinationPath(runDir), coord); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestRefreshIdentityFenceDetectsChangedGoalContent(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveAcceptanceState: %v", err)
 	}
-	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{Version: 1, Objective: "ship feature"}); err != nil {
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{Version: 1}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
 	initial, err := NewIdentityFence(runDir, meta)

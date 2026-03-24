@@ -16,9 +16,6 @@ func TestEnsureCoordinationStateCreatesDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureCoordinationState: %v", err)
 	}
-	if state.Objective != "" {
-		t.Fatalf("Objective = %q, want empty display-only coordination state", state.Objective)
-	}
 	if state.Version <= 0 {
 		t.Fatalf("Version = %d, want > 0", state.Version)
 	}
@@ -38,7 +35,6 @@ func TestCoordinationStripsObjectiveFromSavedState(t *testing.T) {
 
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
 		Version:     1,
-		Objective:   "stale duplicate objective",
 		PlanSummary: []string{"compare paths"},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -47,9 +43,6 @@ func TestCoordinationStripsObjectiveFromSavedState(t *testing.T) {
 	state, err := LoadCoordinationState(CoordinationPath(runDir))
 	if err != nil {
 		t.Fatalf("LoadCoordinationState: %v", err)
-	}
-	if state.Objective != "" {
-		t.Fatalf("Objective = %q, want stripped duplicate objective", state.Objective)
 	}
 	if len(state.PlanSummary) != 1 || state.PlanSummary[0] != "compare paths" {
 		t.Fatalf("PlanSummary = %#v", state.PlanSummary)

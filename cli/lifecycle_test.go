@@ -524,7 +524,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err := SaveIdentityFence(IdentityFencePath(runDir), fence); err != nil {
 		t.Fatalf("SaveIdentityFence: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "codex", cfg.Target, cfg.Harness)
+	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "codex", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

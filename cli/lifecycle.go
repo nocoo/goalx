@@ -187,7 +187,7 @@ func Resume(projectRoot string, args []string) error {
 		Engine:              sessionIdentity.Engine,
 		Sessions:            sessionDataList,
 		Target:              sessionIdentity.Target,
-		Harness:             sessionIdentity.Harness,
+		Harness:             rc.Config.Harness,
 		Context:             rc.Config.Context,
 		Budget:              rc.Config.Budget,
 		SessionName:         sessionName,

@@ -16,9 +16,8 @@ func TestCoordinationStatePreservesExecutionStateAndDispatchableSlices(t *testin
 	}
 
 	state := &CoordinationState{
-		Version:   1,
-		Objective: "audit auth flow",
-		Owners:    map[string]string{"req-1": "master"},
+		Version: 1,
+		Owners:  map[string]string{"req-1": "master"},
 		Sessions: map[string]CoordinationSession{
 			"session-1": {
 				State:          "active",
@@ -62,8 +61,7 @@ func TestCoordinationStatePreservesDecisionRecord(t *testing.T) {
 	}
 
 	state := &CoordinationState{
-		Version:   1,
-		Objective: "optimize discovery",
+		Version: 1,
 		Decision: &CoordinationDecision{
 			RootCause:        "master keeps waiting on external blockers",
 			LocalPath:        "patch the current flow",
@@ -108,8 +106,7 @@ func TestSaveCoordinationStateSanitizesDigestFields(t *testing.T) {
 	}
 
 	state := &CoordinationState{
-		Version:   1,
-		Objective: "optimize discovery",
+		Version: 1,
 		Sessions: map[string]CoordinationSession{
 			"session-1": {
 				State:          "active",

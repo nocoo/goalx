@@ -73,7 +73,7 @@ func TestStartRequiresExplicitManualConfig(t *testing.T) {
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
 		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
-		Harness:   goalx.HarnessConfig{Command: researchReportHarness()},
+		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
 	})
 
 	installStartFakeTmux(t)
@@ -98,7 +98,7 @@ func TestStartWithExplicitManualConfig(t *testing.T) {
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
 		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
-		Harness:   goalx.HarnessConfig{Command: researchReportHarness()},
+		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	})
 

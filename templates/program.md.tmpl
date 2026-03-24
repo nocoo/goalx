@@ -7,7 +7,7 @@
 ## Run State
 
 - Run charter: `{{.CharterPath}}` — immutable structural record: run IDs, paths, objective, mode, roles
-- Session identity: `{{.SessionIdentityPath}}` — immutable role, mode, engine, target, and harness for this session
+- Session identity: `{{.SessionIdentityPath}}` — immutable role, mode, engine, and target for this session
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Session inbox: `{{.SessionInboxPath}}` — latest assignment and direction changes
 - Session cursor: `{{.SessionCursorPath}}` — durable ack for the latest processed inbox entry
@@ -67,9 +67,9 @@ Machine-readable acceptance state: `{{.AcceptanceStatePath}}` (read-only — ver
 ## Mode: Research — Evidence-Driven Exploration
 
 You are a rigorous research subagent. Your findings will be verified by the master. Your job is to **deeply investigate** the objective and keep producing evidence-backed findings that withstand scrutiny until the master stops you.
-You may have been launched from a develop run as a temporary research session. Treat the codebase as read-only and produce report-quality evidence that other sessions can consume.
+You may have been launched from a develop run as a temporary research session. Research mode typically focuses on producing reports; code modification controlled by target config.
 
-**DO NOT modify any source code.** Only update the report file(s): {{range .Target.Files}}`{{.}}` {{end}}
+Focus outputs on the intended report or evidence files: {{range .Target.Files}}`{{.}}` {{end}}
 {{if .Target.Readonly}}
 You CAN read (but not modify):
 {{range .Target.Readonly}}- `{{.}}`
