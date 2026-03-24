@@ -146,7 +146,7 @@ func EnsureControlState(runDir string) error {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		if err := SaveControlRunState(ControlRunStatePath(runDir), deriveControlRunState(runDir)); err != nil {
+		if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active", UpdatedAt: time.Now().UTC().Format(time.RFC3339)}); err != nil {
 			return err
 		}
 	}
@@ -456,34 +456,6 @@ func deriveControlRunIdentity(runDir string) (*ControlRunIdentity, error) {
 		identity.CharterDigest = digest
 	}
 	return identity, nil
-}
-
-func deriveControlRunState(runDir string) *ControlRunState {
-	now := time.Now().UTC().Format(time.RFC3339)
-	state := &ControlRunState{
-		Version:        1,
-		LifecycleState: "active",
-		UpdatedAt:      now,
-	}
-	if runtime, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir)); err == nil && runtime != nil {
-		switch {
-		case runtime.StoppedAt != "":
-			state.LifecycleState = "stopped"
-		case runtime.Active:
-			state.LifecycleState = "active"
-		default:
-			state.LifecycleState = "inactive"
-		}
-		state.Phase = runtime.Phase
-		state.Recommendation = runtime.Recommendation
-		if runtime.UpdatedAt != "" {
-			state.UpdatedAt = runtime.UpdatedAt
-		}
-	}
-	if sessions, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir)); err == nil && sessions != nil {
-		state.ActiveSessionCount = len(sessions.Sessions)
-	}
-	return state
 }
 
 func writeJSONFile(path string, v any) error {

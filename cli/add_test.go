@@ -54,7 +54,7 @@ harness:
 	if identity == nil {
 		t.Fatal("session-3 identity missing")
 	}
-	if identity.RoleKind != "master-derived-develop" || identity.Mode != string(goalx.ModeDevelop) {
+	if identity.RoleKind != "develop" || identity.Mode != string(goalx.ModeDevelop) {
 		t.Fatalf("session-3 identity role/mode = %+v", identity)
 	}
 
@@ -503,11 +503,8 @@ harness:
 	if identity == nil {
 		t.Fatal("session-2 identity missing")
 	}
-	if identity.RoleKind != "master-derived-research" || identity.Engine != "claude-code" || identity.Model != "opus" {
+	if identity.RoleKind != "research" || identity.Engine != "claude-code" || identity.Model != "opus" {
 		t.Fatalf("session-2 identity = %+v", identity)
-	}
-	if len(identity.Target.Files) != 1 || identity.Target.Files[0] != "report.md" {
-		t.Fatalf("session-2 identity target = %#v", identity.Target.Files)
 	}
 
 	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
@@ -530,7 +527,6 @@ harness:
 	for _, want := range []string{
 		"## Mode: Research",
 		"DO NOT modify any source code.",
-		"`report.md`",
 		"Agent tool",
 	} {
 		if !strings.Contains(text, want) {

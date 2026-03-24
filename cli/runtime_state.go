@@ -14,31 +14,19 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
+// RunRuntimeState holds master-written runtime state for a run.
+// All derived fields (GoalSatisfied, CompletionMode, etc.) are removed —
+// master writes status.json directly with whatever it decides.
 type RunRuntimeState struct {
-	Version                int    `json:"version"`
-	Run                    string `json:"run"`
-	Mode                   string `json:"mode,omitempty"`
-	Objective              string `json:"objective,omitempty"`
-	Active                 bool   `json:"active"`
-	Phase                  string `json:"phase,omitempty"`
-	Recommendation         string `json:"recommendation,omitempty"`
-	AcceptanceMet          bool   `json:"acceptance_met,omitempty"`
-	AcceptanceStatus       string `json:"acceptance_status,omitempty"`
-	AcceptanceCheckedAt    string `json:"acceptance_checked_at,omitempty"`
-	AcceptanceEvidencePath string `json:"acceptance_evidence_path,omitempty"`
-	GoalVersion            int    `json:"goal_version"`
-	GoalSatisfied          bool   `json:"goal_satisfied"`
-	RequiredTotal          int    `json:"required_total"`
-	RequiredSatisfied      int    `json:"required_satisfied"`
-	RequiredRemaining      int    `json:"required_remaining"`
-	OptionalOpen           int    `json:"optional_open"`
-	CodeChanged            bool   `json:"code_changed,omitempty"`
-	CompletionMode         string `json:"completion_mode,omitempty"`
-	BaseRevision           string `json:"base_revision,omitempty"`
-	HeadRevision           string `json:"head_revision,omitempty"`
-	StartedAt              string `json:"started_at,omitempty"`
-	StoppedAt              string `json:"stopped_at,omitempty"`
-	UpdatedAt              string `json:"updated_at,omitempty"`
+	Version        int    `json:"version"`
+	Run            string `json:"run"`
+	Mode           string `json:"mode,omitempty"`
+	Active         bool   `json:"active"`
+	Phase          string `json:"phase,omitempty"`
+	Recommendation string `json:"recommendation,omitempty"`
+	StartedAt      string `json:"started_at,omitempty"`
+	StoppedAt      string `json:"stopped_at,omitempty"`
+	UpdatedAt      string `json:"updated_at,omitempty"`
 }
 
 type SessionRuntimeState struct {
@@ -52,7 +40,6 @@ type SessionRuntimeState struct {
 	DirtyFiles       int    `json:"dirty_files,omitempty"`
 	DiffStat         string `json:"diff_stat,omitempty"`
 	LastRound        int    `json:"last_round,omitempty"`
-	LastTestSummary  string `json:"last_test_summary,omitempty"`
 	LastJournalState string `json:"last_journal_state,omitempty"`
 	UpdatedAt        string `json:"updated_at,omitempty"`
 }
@@ -128,7 +115,6 @@ func SaveRunRuntimeState(path string, state *RunRuntimeState) error {
 	if state.Version == 0 {
 		state.Version = 1
 	}
-	state.Objective = ""
 	if state.UpdatedAt == "" {
 		state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
@@ -249,9 +235,6 @@ func mergeSessionRuntimeState(dst *SessionRuntimeState, src SessionRuntimeState)
 	if src.LastRound != 0 {
 		dst.LastRound = src.LastRound
 	}
-	if src.LastTestSummary != "" {
-		dst.LastTestSummary = src.LastTestSummary
-	}
 	if src.LastJournalState != "" {
 		dst.LastJournalState = src.LastJournalState
 	}
@@ -265,12 +248,10 @@ func SnapshotSessionRuntime(runDir, sessionName, worktreePath string) (SessionRu
 	journalEntries, _ := goalx.LoadJournal(JournalPath(runDir, sessionName))
 	lastRound := 0
 	lastJournalState := ""
-	lastTestSummary := ""
 	if len(journalEntries) > 0 {
 		last := journalEntries[len(journalEntries)-1]
 		lastRound = last.Round
 		lastJournalState = last.Status
-		lastTestSummary = summarizeJournalForTest(journalEntries)
 	}
 	snapshot := SessionRuntimeState{
 		Name:             sessionName,
@@ -279,7 +260,6 @@ func SnapshotSessionRuntime(runDir, sessionName, worktreePath string) (SessionRu
 		DiffStat:         diffStat,
 		LastRound:        lastRound,
 		LastJournalState: lastJournalState,
-		LastTestSummary:  lastTestSummary,
 	}
 	return snapshot, nil
 }
@@ -308,20 +288,6 @@ func snapshotWorktreeState(worktreePath string) (int, string, error) {
 	return dirty, strings.TrimSpace(string(diffOut)), nil
 }
 
-func summarizeJournalForTest(entries []goalx.JournalEntry) string {
-	for i := len(entries) - 1; i >= 0; i-- {
-		desc := strings.TrimSpace(entries[i].Desc)
-		if desc == "" {
-			continue
-		}
-		lower := strings.ToLower(desc)
-		if strings.Contains(lower, "test") || strings.Contains(lower, "pytest") || strings.Contains(lower, "lint") || strings.Contains(lower, "build") {
-			return desc
-		}
-	}
-	return ""
-}
-
 func sortedSessionStates(state *SessionsRuntimeState) []SessionRuntimeState {
 	if state == nil {
 		return nil
@@ -334,83 +300,6 @@ func sortedSessionStates(state *SessionsRuntimeState) []SessionRuntimeState {
 		return list[i].Name < list[j].Name
 	})
 	return list
-}
-
-func deriveProjectStatusFromRun(state *RunRuntimeState) []byte {
-	if state == nil {
-		return nil
-	}
-	payload := map[string]any{
-		"run":                      state.Run,
-		"phase":                    state.Phase,
-		"recommendation":           state.Recommendation,
-		"acceptance_met":           state.AcceptanceMet,
-		"acceptance_status":        state.AcceptanceStatus,
-		"acceptance_checked_at":    state.AcceptanceCheckedAt,
-		"acceptance_evidence_path": state.AcceptanceEvidencePath,
-		"goal_version":             state.GoalVersion,
-		"goal_satisfied":           state.GoalSatisfied,
-		"required_total":           state.RequiredTotal,
-		"required_satisfied":       state.RequiredSatisfied,
-		"required_remaining":       state.RequiredRemaining,
-		"optional_open":            state.OptionalOpen,
-		"completion_mode":          state.CompletionMode,
-		"code_changed":             state.CodeChanged,
-		"base_revision":            state.BaseRevision,
-		"head_revision":            state.HeadRevision,
-		"active":                   state.Active,
-	}
-	data, _ := json.Marshal(payload)
-	return data
-}
-
-func syncProjectStatusCache(projectRoot string, state *RunRuntimeState) error {
-	statusPath := ProjectStatusCachePath(projectRoot)
-	if state == nil {
-		if err := os.Remove(statusPath); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-	data := deriveProjectStatusFromRun(state)
-	if err := os.MkdirAll(filepath.Dir(statusPath), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(statusPath, data, 0o644)
-}
-
-func refreshProjectStatusCache(projectRoot string) error {
-	reg, err := LoadProjectRegistry(projectRoot)
-	if err != nil {
-		return err
-	}
-	if reg.FocusedRun != "" {
-		runDir := goalx.RunDir(projectRoot, reg.FocusedRun)
-		if state, err := loadDerivedRunState(projectRoot, runDir); err == nil && state != nil && (state.Status == "active" || state.Status == "degraded") {
-			runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
-			if err != nil {
-				return err
-			}
-			return syncProjectStatusCache(projectRoot, runtimeState)
-		}
-	}
-	if states, err := listDerivedRunStates(projectRoot); err == nil {
-		openRuns := make([]string, 0)
-		for _, state := range states {
-			if state.Status == "active" || state.Status == "degraded" {
-				openRuns = append(openRuns, state.Name)
-			}
-		}
-		if len(openRuns) == 1 {
-			runDir := goalx.RunDir(projectRoot, openRuns[0])
-			runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
-			if err != nil {
-				return err
-			}
-			return syncProjectStatusCache(projectRoot, runtimeState)
-		}
-	}
-	return syncProjectStatusCache(projectRoot, nil)
 }
 
 func normalizeDiffStat(s string) string {

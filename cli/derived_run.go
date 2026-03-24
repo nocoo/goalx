@@ -125,38 +125,15 @@ func deriveRunIdentitySurface(runDir, fallbackObjective string) (string, int, st
 		}
 	}
 
-	return runID, epoch, deriveRunCharterStatus(runDir, meta, charter, identity), objective
-}
-
-func deriveRunCharterStatus(runDir string, meta *RunMetadata, charter *RunCharter, identity *ControlRunIdentity) string {
-	if meta == nil || charter == nil || identity == nil {
-		return "missing"
+	charterStatus := "missing"
+	if meta != nil && charter != nil && identity != nil {
+		if err := ValidateRunCharterLinkage(meta, charter); err == nil {
+			charterStatus = "ok"
+		} else {
+			charterStatus = "mismatch"
+		}
 	}
-	if err := ValidateRunCharterLinkage(meta, charter); err != nil {
-		return "mismatch"
-	}
-	if strings.TrimSpace(identity.CharterPath) == "" || identity.CharterPath != RunCharterPath(runDir) {
-		return "mismatch"
-	}
-	if strings.TrimSpace(identity.RunID) == "" || identity.Epoch <= 0 || strings.TrimSpace(identity.CharterID) == "" || strings.TrimSpace(identity.CharterDigest) == "" {
-		return "missing"
-	}
-	charterHash, err := hashRunCharter(charter)
-	if err != nil {
-		return "mismatch"
-	}
-	switch {
-	case identity.RunID != meta.RunID:
-		return "mismatch"
-	case identity.Epoch != meta.Epoch:
-		return "mismatch"
-	case identity.CharterID != charter.CharterID:
-		return "mismatch"
-	case identity.CharterDigest != charterHash:
-		return "mismatch"
-	default:
-		return "ok"
-	}
+	return runID, epoch, charterStatus, objective
 }
 
 func listDerivedRunStates(projectRoot string) ([]DerivedRunState, error) {

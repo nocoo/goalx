@@ -10,36 +10,19 @@ import (
 	"time"
 )
 
-const (
-	completionModeVerificationOnly              = "verification_only"
-	completionModeImplementationAndVerification = "implementation_and_verification"
-
-	completionResultDone                           = "done"
-	completionResultIncomplete                     = "incomplete"
-	completionResultPhaseCompleteButGoalIncomplete = "phase_complete_but_goal_incomplete"
-)
-
+// CompletionState records raw facts about the run's code state.
+// All interpretation (satisfaction, mode, result) belongs to the master agent.
 type CompletionState struct {
-	Version           int                   `json:"version"`
-	Result            string                `json:"result,omitempty"`
-	GoalVersion       int                   `json:"goal_version"`
-	AcceptanceStatus  string                `json:"acceptance_status,omitempty"`
-	GoalSatisfied     bool                  `json:"goal_satisfied"`
-	RequiredTotal     int                   `json:"required_total"`
-	RequiredSatisfied int                   `json:"required_satisfied"`
-	RequiredRemaining int                   `json:"required_remaining"`
-	OptionalOpen      int                   `json:"optional_open"`
-	BaseRevision      string                `json:"base_revision,omitempty"`
-	HeadRevision      string                `json:"head_revision,omitempty"`
-	CharterID         string                `json:"charter_id,omitempty"`
-	CharterHash       string                `json:"charter_hash,omitempty"`
-	CodeChanged       bool                  `json:"code_changed"`
-	CompletionMode    string                `json:"completion_mode,omitempty"`
-	ChangedFiles      []string              `json:"changed_files,omitempty"`
-	KeptSession       string                `json:"kept_session,omitempty"`
-	KeptBranch        string                `json:"kept_branch,omitempty"`
-	Items             []CompletionProofItem `json:"items,omitempty"`
-	UpdatedAt         string                `json:"updated_at,omitempty"`
+	Version      int                   `json:"version"`
+	CodeChanged  bool                  `json:"code_changed"`
+	ChangedFiles []string              `json:"changed_files,omitempty"`
+	KeptSession  string                `json:"kept_session,omitempty"`
+	BaseRevision string                `json:"base_revision,omitempty"`
+	HeadRevision string                `json:"head_revision,omitempty"`
+	CharterID    string                `json:"charter_id,omitempty"`
+	CharterHash  string                `json:"charter_hash,omitempty"`
+	Items        []CompletionProofItem `json:"items,omitempty"`
+	UpdatedAt    string                `json:"updated_at,omitempty"`
 }
 
 func CompletionStatePath(runDir string) string {
@@ -64,7 +47,9 @@ func SaveCompletionState(path string, state *CompletionState) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func DetectCompletionState(projectRoot, runDir string, goal *GoalState, acceptance *AcceptanceState) (*CompletionState, error) {
+// DetectCompletionState collects raw facts about the run's code state.
+// It does not derive satisfaction, mode, or result — that's the master's job.
+func DetectCompletionState(projectRoot, runDir string) (*CompletionState, error) {
 	meta, err := EnsureRunMetadata(runDir, projectRoot, "")
 	if err != nil {
 		return nil, err
@@ -74,9 +59,6 @@ func DetectCompletionState(projectRoot, runDir string, goal *GoalState, acceptan
 		return nil, err
 	}
 	if err := ValidateRunCharterLinkage(meta, charter); err != nil {
-		return nil, err
-	}
-	if err := ValidateRunCharterCompletionRules(charter); err != nil {
 		return nil, err
 	}
 	charterHash, err := hashRunCharter(charter)
@@ -105,50 +87,11 @@ func DetectCompletionState(projectRoot, runDir string, goal *GoalState, acceptan
 	}
 	if selection != nil {
 		state.KeptSession = selection.Kept
-		state.KeptBranch = selection.Branch
-		if state.KeptSession != "" || state.KeptBranch != "" {
+		if state.KeptSession != "" {
 			state.CodeChanged = true
 		}
 	}
-	if state.CodeChanged {
-		state.CompletionMode = completionModeImplementationAndVerification
-	} else {
-		state.CompletionMode = completionModeVerificationOnly
-	}
-	if acceptance != nil {
-		state.AcceptanceStatus = acceptanceStatus(acceptance)
-	}
-	if goal != nil {
-		summary := SummarizeGoalState(goal)
-		state.GoalVersion = summary.Version
-		state.RequiredTotal = summary.RequiredTotal
-		state.OptionalOpen = summary.OptionalOpen
-		state.Items = BuildCompletionProofItems(goal, state.CodeChanged)
-		for _, item := range state.Items {
-			switch item.Verdict {
-			case completionVerdictSatisfied:
-				state.RequiredSatisfied++
-			case completionVerdictWaived:
-				if item.UserApproved {
-					state.RequiredSatisfied++
-				}
-			}
-		}
-		state.RequiredRemaining = state.RequiredTotal - state.RequiredSatisfied
-	}
-	state.Result = deriveCompletionResult(state.AcceptanceStatus, state.RequiredTotal, state.RequiredRemaining)
-	state.GoalSatisfied = state.Result == completionResultDone
 	return state, nil
-}
-
-func deriveCompletionResult(acceptanceStatus string, requiredTotal, requiredRemaining int) string {
-	if acceptanceStatus == acceptanceStatusPassed {
-		if requiredTotal > 0 && requiredRemaining == 0 {
-			return completionResultDone
-		}
-		return completionResultPhaseCompleteButGoalIncomplete
-	}
-	return completionResultIncomplete
 }
 
 func gitChangedFilesSince(projectRoot, baseRevision, headRevision string) ([]string, error) {

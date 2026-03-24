@@ -14,29 +14,26 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
+// RunCharter records immutable structural facts about a run.
+// Strategy and governance (completion standard, approval gates, exploration doctrine)
+// live in the master template as semantic guidance, not in Go structs.
 type RunCharter struct {
-	Version                               int                     `json:"version"`
-	CharterID                             string                  `json:"charter_id,omitempty"`
-	RunID                                 string                  `json:"run_id,omitempty"`
-	RootRunID                             string                  `json:"root_run_id,omitempty"`
-	RunName                               string                  `json:"run_name,omitempty"`
-	ProjectID                             string                  `json:"project_id,omitempty"`
-	ProjectRoot                           string                  `json:"project_root,omitempty"`
-	Objective                             string                  `json:"objective,omitempty"`
-	Mode                                  string                  `json:"mode,omitempty"`
-	PhaseKind                             string                  `json:"phase_kind,omitempty"`
-	SourceRun                             string                  `json:"source_run,omitempty"`
-	SourcePhase                           string                  `json:"source_phase,omitempty"`
-	ParentRun                             string                  `json:"parent_run,omitempty"`
-	CompletionStandard                    string                  `json:"completion_standard,omitempty"`
-	PartialCompletionRequiresUserApproval bool                    `json:"partial_completion_requires_user_approval,omitempty"`
-	NarrowScopeRequiresUserApproval       bool                    `json:"narrow_scope_requires_user_approval,omitempty"`
-	RequiredOutcomesMayExpandButNotShrink bool                    `json:"required_outcomes_may_expand_but_not_shrink,omitempty"`
-	AcceptanceIsVerificationOnly          bool                    `json:"acceptance_is_verification_only,omitempty"`
-	ExplorationDoctrine                   ExplorationDoctrine     `json:"exploration_doctrine,omitempty"`
-	RoleContracts                         RunCharterRoleContracts `json:"role_contracts,omitempty"`
-	Paths                                 RunCharterPaths         `json:"paths,omitempty"`
-	CreatedAt                             string                  `json:"created_at,omitempty"`
+	Version       int                     `json:"version"`
+	CharterID     string                  `json:"charter_id,omitempty"`
+	RunID         string                  `json:"run_id,omitempty"`
+	RootRunID     string                  `json:"root_run_id,omitempty"`
+	RunName       string                  `json:"run_name,omitempty"`
+	ProjectID     string                  `json:"project_id,omitempty"`
+	ProjectRoot   string                  `json:"project_root,omitempty"`
+	Objective     string                  `json:"objective,omitempty"`
+	Mode          string                  `json:"mode,omitempty"`
+	PhaseKind     string                  `json:"phase_kind,omitempty"`
+	SourceRun     string                  `json:"source_run,omitempty"`
+	SourcePhase   string                  `json:"source_phase,omitempty"`
+	ParentRun     string                  `json:"parent_run,omitempty"`
+	RoleContracts RunCharterRoleContracts `json:"role_contracts,omitempty"`
+	Paths         RunCharterPaths         `json:"paths,omitempty"`
+	CreatedAt     string                  `json:"created_at,omitempty"`
 }
 
 type RunCharterPaths struct {
@@ -44,12 +41,6 @@ type RunCharterPaths struct {
 	Goal       string `json:"goal,omitempty"`
 	Acceptance string `json:"acceptance,omitempty"`
 	Proof      string `json:"proof,omitempty"`
-}
-
-type ExplorationDoctrine struct {
-	MinimumPaths              int  `json:"minimum_paths,omitempty"`
-	ComparePathsBeforeCommit  bool `json:"compare_paths_before_commit,omitempty"`
-	AllowAutonomousPathSwitch bool `json:"allow_autonomous_path_switch,omitempty"`
 }
 
 type RunCharterRoleContracts struct {
@@ -91,28 +82,18 @@ func NewRunCharter(runDir, runName, objective string, meta *RunMetadata) (*RunCh
 		rootRunID = runID
 	}
 	charter := &RunCharter{
-		Version:                               1,
-		CharterID:                             meta.CharterID,
-		RunID:                                 runID,
-		RootRunID:                             rootRunID,
-		RunName:                               runName,
-		ProjectRoot:                           meta.ProjectRoot,
-		Objective:                             strings.TrimSpace(objective),
-		Mode:                                  "",
-		PhaseKind:                             meta.PhaseKind,
-		SourceRun:                             meta.SourceRun,
-		SourcePhase:                           meta.SourcePhase,
-		ParentRun:                             meta.ParentRun,
-		CompletionStandard:                    "full_goal",
-		PartialCompletionRequiresUserApproval: true,
-		NarrowScopeRequiresUserApproval:       true,
-		RequiredOutcomesMayExpandButNotShrink: true,
-		AcceptanceIsVerificationOnly:          true,
-		ExplorationDoctrine: ExplorationDoctrine{
-			MinimumPaths:              3,
-			ComparePathsBeforeCommit:  true,
-			AllowAutonomousPathSwitch: true,
-		},
+		Version:     1,
+		CharterID:   meta.CharterID,
+		RunID:       runID,
+		RootRunID:   rootRunID,
+		RunName:     runName,
+		ProjectRoot: meta.ProjectRoot,
+		Objective:   strings.TrimSpace(objective),
+		Mode:        "",
+		PhaseKind:   meta.PhaseKind,
+		SourceRun:   meta.SourceRun,
+		SourcePhase: meta.SourcePhase,
+		ParentRun:   meta.ParentRun,
 		RoleContracts: RunCharterRoleContracts{
 			Master: &RoleContract{
 				Kind:    "master",
@@ -277,12 +258,6 @@ func normalizeRunCharter(charter *RunCharter) {
 	}
 	if charter.Version <= 0 {
 		charter.Version = 1
-	}
-	if charter.CompletionStandard == "" {
-		charter.CompletionStandard = "full_goal"
-	}
-	if charter.ExplorationDoctrine.MinimumPaths <= 0 {
-		charter.ExplorationDoctrine.MinimumPaths = 3
 	}
 	if charter.RoleContracts.Master == nil {
 		charter.RoleContracts.Master = &RoleContract{

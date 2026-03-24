@@ -115,12 +115,6 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if flagMode != "" {
 		newSess.Mode = flagMode
-		target, harness, err := defaultSessionExecution(rc.ProjectRoot, rc.Config, flagMode)
-		if err != nil {
-			return err
-		}
-		newSess.Target = &target
-		newSess.Harness = &harness
 	}
 
 	renderCfg := *rc.Config
@@ -133,6 +127,14 @@ func Add(projectRoot string, args []string) (err error) {
 		renderCfg.Parallel = len(renderCfg.Sessions)
 	}
 	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
+	var target goalx.TargetConfig
+	var harness goalx.HarnessConfig
+	if effectiveSession.Target != nil {
+		target = *effectiveSession.Target
+	}
+	if effectiveSession.Harness != nil {
+		harness = *effectiveSession.Harness
+	}
 	sessionIdentity, err := NewSessionIdentity(
 		rc.RunDir,
 		sName,
@@ -140,8 +142,8 @@ func Add(projectRoot string, args []string) (err error) {
 		effectiveSession.Mode,
 		effectiveSession.Engine,
 		effectiveSession.Model,
-		*effectiveSession.Target,
-		*effectiveSession.Harness,
+		target,
+		harness,
 	)
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
@@ -203,13 +205,6 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if err := EnsureEngineTrusted(engine, wtPath); err != nil {
 		return fmt.Errorf("trust bootstrap: %w", err)
-	}
-
-	// Deny Skill tool via project-level settings.json
-	if engine == "claude-code" {
-		if err := ensureSubagentRestrictions(wtPath); err != nil {
-			return fmt.Errorf("subagent restrictions: %w", err)
-		}
 	}
 
 	if err := UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
@@ -350,36 +345,3 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 	return list, nil
 }
 
-func defaultSessionExecution(projectRoot string, cfg *goalx.Config, mode goalx.Mode) (goalx.TargetConfig, goalx.HarnessConfig, error) {
-	switch mode {
-	case goalx.ModeResearch:
-		return goalx.TargetConfig{
-				Files:    []string{"report.md"},
-				Readonly: []string{"."},
-			},
-			goalx.HarnessConfig{Command: "test -s report.md && echo 'ok'"},
-			nil
-	case goalx.ModeDevelop:
-		target := cfg.Target
-		harness := cfg.Harness
-		if cfg.Mode == goalx.ModeResearch {
-			baseCfg, _, err := goalx.LoadRawBaseConfig(projectRoot)
-			if err != nil {
-				return goalx.TargetConfig{}, goalx.HarnessConfig{}, fmt.Errorf("load base config for develop session: %w", err)
-			}
-			if len(baseCfg.Target.Files) > 0 {
-				target = baseCfg.Target
-			} else if inferred := InferTarget(projectRoot); len(inferred) > 0 {
-				target = goalx.TargetConfig{Files: inferred}
-			}
-			if baseCfg.Harness.Command != "" {
-				harness = baseCfg.Harness
-			} else if inferred := InferHarness(projectRoot); inferred != "" {
-				harness = goalx.HarnessConfig{Command: inferred}
-			}
-		}
-		return target, harness, nil
-	default:
-		return goalx.TargetConfig{}, goalx.HarnessConfig{}, fmt.Errorf("unsupported session mode %q", mode)
-	}
-}

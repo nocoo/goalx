@@ -7,7 +7,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestEnsureRuntimeStateStripsObjective(t *testing.T) {
+func TestEnsureRuntimeStateCreatesValidState(t *testing.T) {
 	runDir := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "demo",
@@ -19,16 +19,11 @@ func TestEnsureRuntimeStateStripsObjective(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRuntimeState: %v", err)
 	}
-	if state.Objective != "" {
-		t.Fatalf("state.Objective = %q, want empty", state.Objective)
+	if state.Run != "demo" {
+		t.Fatalf("state.Run = %q, want demo", state.Run)
 	}
-
-	reloaded, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
-	if err != nil {
-		t.Fatalf("LoadRunRuntimeState: %v", err)
-	}
-	if reloaded.Objective != "" {
-		t.Fatalf("reloaded.Objective = %q, want empty", reloaded.Objective)
+	if !state.Active {
+		t.Fatal("state.Active should be true")
 	}
 }
 

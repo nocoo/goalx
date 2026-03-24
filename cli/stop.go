@@ -39,7 +39,6 @@ func Stop(projectRoot string, args []string) error {
 			_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 		}
 		_ = FinalizeControlRun(rc.RunDir, "stopped")
-		_ = refreshProjectStatusCache(rc.ProjectRoot)
 		fmt.Printf("Run '%s' is not active (no tmux session).\n", rc.Name)
 		return nil
 	}
@@ -55,7 +54,6 @@ func Stop(projectRoot string, args []string) error {
 	}
 	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
 	_ = FinalizeControlRun(rc.RunDir, "stopped")
-	_ = refreshProjectStatusCache(rc.ProjectRoot)
 	fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
 	return nil
 }

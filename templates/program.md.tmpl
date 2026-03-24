@@ -6,7 +6,7 @@
 {{end}}
 ## Run State
 
-- Run charter: `{{.CharterPath}}` — immutable objective anchor, exploration doctrine, and completion rules
+- Run charter: `{{.CharterPath}}` — immutable structural record: run IDs, paths, objective, mode, roles
 - Session identity: `{{.SessionIdentityPath}}` — immutable role, mode, engine, target, and harness for this session
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Session inbox: `{{.SessionInboxPath}}` — latest assignment and direction changes
@@ -21,7 +21,7 @@
 Do not rebuild the full chat history unless the current state is ambiguous.
 
 1. Read `{{.SessionIdentityPath}}` to recover your immutable role and execution contract
-2. Read `{{.CharterPath}}` to recover the original objective, exploration doctrine, and completion rules
+2. Read `{{.CharterPath}}` to recover the structural run identity and original objective
 3. Read unread session inbox entries from `{{.SessionInboxPath}}`
 4. Read the recent journal tail: `tail -n 20 {{.JournalPath}}`
 5. Inspect the current worktree state: `git status --short && git log --oneline -5`

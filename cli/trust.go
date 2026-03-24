@@ -35,41 +35,6 @@ func EnsureEngineTrusted(engine, path string) error {
 	}
 }
 
-// ensureSubagentRestrictions writes a project-level .claude/settings.json in
-// the worktree that denies the Skill tool, so subagents cannot invoke skills.
-// This replaces the --disallowedTools CLI flag which is variadic and eats the
-// next positional argument (the prompt).
-func ensureSubagentRestrictions(worktreePath string) error {
-	settingsDir := filepath.Join(worktreePath, ".claude")
-	if err := os.MkdirAll(settingsDir, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", settingsDir, err)
-	}
-	settingsPath := filepath.Join(settingsDir, "settings.json")
-
-	doc := map[string]any{}
-	if data, err := os.ReadFile(settingsPath); err == nil && len(data) > 0 {
-		if err := json.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("parse %s: %w", settingsPath, err)
-		}
-	} else if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read %s: %w", settingsPath, err)
-	}
-
-	perms := coerceObject(doc["permissions"])
-	perms["deny"] = []any{"Skill"}
-	doc["permissions"] = perms
-
-	out, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", settingsPath, err)
-	}
-	out = append(out, '\n')
-	if err := writeFilePreserveMode(settingsPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", settingsPath, err)
-	}
-	return nil
-}
-
 func ensureCodexTrusted(path string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {

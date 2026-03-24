@@ -146,7 +146,7 @@ func TestSaveLeavesRunAndStatusStateUntouched(t *testing.T) {
 	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 }
 
-func TestVerifyDoesNotRewriteRunStateFromStatus(t *testing.T) {
+func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -177,14 +177,15 @@ func TestVerifyDoesNotRewriteRunStateFromStatus(t *testing.T) {
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"develop","objective":"ship feature","active":true,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"develop","active":true,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
+	statusBefore := []byte(`{"run":"verify-run","phase":"working","recommendation":"keep going"}`)
 	if err := os.MkdirAll(filepath.Dir(ProjectStatusCachePath(repo)), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
-	if err := os.WriteFile(ProjectStatusCachePath(repo), []byte(`{"run":"verify-run","phase":"working","recommendation":"keep going"}`), 0o644); err != nil {
+	if err := os.WriteFile(ProjectStatusCachePath(repo), statusBefore, 0o644); err != nil {
 		t.Fatalf("write status cache: %v", err)
 	}
 	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
@@ -199,23 +200,8 @@ func TestVerifyDoesNotRewriteRunStateFromStatus(t *testing.T) {
 		t.Fatalf("Verify: %v", err)
 	}
 
-	runStateAfter, err := os.ReadFile(RunRuntimeStatePath(runDir))
-	if err != nil {
-		t.Fatalf("read run state after verify: %v", err)
-	}
-	text := string(runStateAfter)
-	for _, want := range []string{
-		`"phase": "working"`,
-		`"recommendation": "keep going"`,
-		`"acceptance_status": "passed"`,
-		`"goal_satisfied": true`,
-		`"required_remaining": 0`,
-		`"completion_mode": "verification_only"`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("run state missing %q:\n%s", want, text)
-		}
-	}
+	assertFileUnchanged(t, RunRuntimeStatePath(runDir), runStateBefore)
+	assertFileUnchanged(t, ProjectStatusCachePath(repo), statusBefore)
 }
 
 func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte, []byte) {

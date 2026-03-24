@@ -71,9 +71,6 @@ func Drop(projectRoot string, args []string) error {
 	if err := RemoveRunRegistration(rc.ProjectRoot, rc.Name); err != nil {
 		return fmt.Errorf("remove run registry entry: %w", err)
 	}
-	if err := refreshProjectStatusCache(rc.ProjectRoot); err != nil {
-		return fmt.Errorf("refresh project status cache: %w", err)
-	}
 
 	fmt.Printf("Run '%s' dropped. Removed run data at %s\n", rc.Name, rc.RunDir)
 	return nil

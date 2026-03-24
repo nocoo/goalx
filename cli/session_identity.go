@@ -139,15 +139,8 @@ func normalizeSessionIdentity(identity *SessionIdentity) {
 }
 
 func sessionRoleKind(mode goalx.Mode) string {
-	switch mode {
-	case goalx.ModeResearch:
-		return "master-derived-research"
-	case goalx.ModeDevelop:
-		return "master-derived-develop"
-	default:
-		if trimmed := strings.TrimSpace(string(mode)); trimmed != "" {
-			return "master-derived-" + trimmed
-		}
-		return "master-derived"
+	if trimmed := strings.TrimSpace(string(mode)); trimmed != "" {
+		return trimmed
 	}
+	return "session"
 }

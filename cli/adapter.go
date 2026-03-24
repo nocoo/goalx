@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-// GenerateAdapter configures engine-specific adapter files in a worktree.
+// GenerateAdapter configures a transport-reliability hook in a worktree.
+// The hook ensures the session checks its inbox before exiting, guaranteeing
+// message delivery — this is infrastructure, not policy.
 func GenerateAdapter(engine, worktreePath, inboxPath, cursorPath string) error {
 	if engine != "claude-code" {
 		return nil
@@ -23,30 +25,6 @@ func GenerateAdapter(engine, worktreePath, inboxPath, cursorPath string) error {
 		quotedInboxPath, quotedCursorPath, quotedInboxMessage,
 	)
 	return appendClaudeHook(worktreePath, map[string]string{
-		"event":   "Stop",
-		"command": stopCmd,
-	})
-}
-
-// GenerateMasterAdapter configures a project-level Stop hook for the master
-// agent so it does not exit before the run reaches a verified completion state.
-func GenerateMasterAdapter(engine, projectRoot, runStatePath, proofPath string) error {
-	if engine != "claude-code" {
-		return nil
-	}
-
-	quotedRunStatePath := shellQuote(runStatePath)
-	quotedProofPath := shellQuote(proofPath)
-	quotedRunStateMessage := shellQuote("RUN INCOMPLETE: keep waiting until " + runStatePath + ` reports "phase":"complete"`)
-	quotedVerifyMessage := shellQuote("RUN NOT VERIFIED: done/implement require acceptance_status=passed in " + proofPath)
-	quotedGoalMessage := shellQuote("RUN GOAL INCOMPLETE: done/implement require goal_satisfied=true and required_remaining=0 in " + proofPath)
-	quotedResultMessage := shellQuote("RUN CLOSEOUT RESULT INCOMPLETE: done/implement require result=done in " + proofPath)
-	quotedCompletionMessage := shellQuote("RUN COMPLETION PROVENANCE MISSING: done/implement require completion_mode and code_changed in " + proofPath)
-	stopCmd := fmt.Sprintf(
-		`if [ ! -f %s ] || ! grep -Eq '"phase"[[:space:]]*:[[:space:]]*"complete"' %s; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && { [ ! -f %s ] || ! grep -Eq '"acceptance_status"[[:space:]]*:[[:space:]]*"passed"' %s; }; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && { [ ! -f %s ] || ! grep -Eq '"goal_satisfied"[[:space:]]*:[[:space:]]*true([[:space:]]*[,}])' %s || ! grep -Eq '"required_remaining"[[:space:]]*:[[:space:]]*0([[:space:]]*[,}])' %s; }; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && { [ ! -f %s ] || ! grep -Eq '"result"[[:space:]]*:[[:space:]]*"done"' %s; }; then printf '%%s\n' %s >&2; exit 2; fi; if grep -Eq '"recommendation"[[:space:]]*:[[:space:]]*"(done|implement)"' %s && { [ ! -f %s ] || ! grep -Eq '"completion_mode"[[:space:]]*:[[:space:]]*"(verification_only|implementation_and_verification)"' %s || ! grep -Eq '"code_changed"[[:space:]]*:[[:space:]]*(true|false)([[:space:]]*[,}])' %s; }; then printf '%%s\n' %s >&2; exit 2; fi`,
-		quotedRunStatePath, quotedRunStatePath, quotedRunStateMessage, quotedRunStatePath, quotedProofPath, quotedProofPath, quotedVerifyMessage, quotedRunStatePath, quotedProofPath, quotedProofPath, quotedProofPath, quotedGoalMessage, quotedRunStatePath, quotedProofPath, quotedProofPath, quotedResultMessage, quotedRunStatePath, quotedProofPath, quotedProofPath, quotedProofPath, quotedCompletionMessage,
-	)
-	return appendClaudeHook(projectRoot, map[string]string{
 		"event":   "Stop",
 		"command": stopCmd,
 	})

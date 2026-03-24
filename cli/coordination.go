@@ -42,14 +42,6 @@ type CoordinationDecision struct {
 	ChosenPathReason string `json:"chosen_path_reason,omitempty"`
 }
 
-const (
-	maxCoordinationScopeLen   = 240
-	maxCoordinationReasonLen  = 240
-	maxDecisionFieldLen       = 160
-	maxDispatchableSliceCount = 3
-	maxDispatchableTitleLen   = 96
-	maxDispatchableWhyLen     = 160
-)
 
 func CoordinationPath(runDir string) string {
 	return filepath.Join(runDir, "coordination.json")
@@ -271,105 +263,16 @@ func pickFirstNonEmpty(values ...string) string {
 	return ""
 }
 
+// normalizeCoordinationState ensures structural consistency without
+// truncating or modifying master-written content.
 func normalizeCoordinationState(state *CoordinationState) {
 	if state == nil {
 		return
 	}
 	state.Objective = ""
-	state.PlanSummary = dedupeNonEmptyStrings(state.PlanSummary, maxCoordinationReasonLen)
-	state.Blocked = dedupeNonEmptyStrings(state.Blocked, maxCoordinationReasonLen)
-	state.OpenQuestions = dedupeNonEmptyStrings(state.OpenQuestions, maxCoordinationReasonLen)
 	if state.Sessions == nil {
 		state.Sessions = map[string]CoordinationSession{}
 	}
-	for name, sess := range state.Sessions {
-		sess.State = strings.TrimSpace(sess.State)
-		sess.ExecutionState = strings.TrimSpace(sess.ExecutionState)
-		sess.Scope = summarizeDigestText(sess.Scope, maxCoordinationScopeLen)
-		sess.BlockedBy = summarizeDigestText(sess.BlockedBy, maxCoordinationReasonLen)
-		sess.DispatchableSlices = sanitizeDispatchableSlices(sess.DispatchableSlices)
-		state.Sessions[name] = sess
-	}
-	if state.Decision != nil {
-		state.Decision.RootCause = summarizeDigestText(state.Decision.RootCause, maxDecisionFieldLen)
-		state.Decision.LocalPath = summarizeDigestText(state.Decision.LocalPath, maxDecisionFieldLen)
-		state.Decision.CompatiblePath = summarizeDigestText(state.Decision.CompatiblePath, maxDecisionFieldLen)
-		state.Decision.ArchitecturePath = summarizeDigestText(state.Decision.ArchitecturePath, maxDecisionFieldLen)
-		state.Decision.ChosenPath = summarizeDigestText(state.Decision.ChosenPath, maxDecisionFieldLen)
-		state.Decision.ChosenPathReason = summarizeDigestText(state.Decision.ChosenPathReason, maxDecisionFieldLen)
-	}
-}
-
-func sanitizeDispatchableSlices(src []goalx.DispatchableSlice) []goalx.DispatchableSlice {
-	if len(src) == 0 {
-		return nil
-	}
-	out := make([]goalx.DispatchableSlice, 0, minInt(len(src), maxDispatchableSliceCount))
-	for _, slice := range src {
-		title := summarizeDigestText(slice.Title, maxDispatchableTitleLen)
-		if title == "" {
-			continue
-		}
-		out = append(out, goalx.DispatchableSlice{
-			Title:           title,
-			Why:             summarizeDigestText(slice.Why, maxDispatchableWhyLen),
-			Mode:            summarizeDigestText(slice.Mode, 32),
-			SuggestedOwner:  summarizeDigestText(slice.SuggestedOwner, 48),
-			SuggestedAction: summarizeDigestText(slice.SuggestedAction, 32),
-			Evidence:        dedupeNonEmptyStrings(slice.Evidence, 160),
-		})
-		if len(out) >= maxDispatchableSliceCount {
-			break
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func dedupeNonEmptyStrings(items []string, maxLen int) []string {
-	if len(items) == 0 {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		s := summarizeDigestText(item, maxLen)
-		if s == "" {
-			continue
-		}
-		if _, ok := seen[s]; ok {
-			continue
-		}
-		seen[s] = struct{}{}
-		out = append(out, s)
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func summarizeDigestText(s string, maxLen int) string {
-	s = strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
-	if s == "" || maxLen <= 0 {
-		return s
-	}
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return strings.TrimSpace(s[:maxLen-3]) + "..."
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func mapOrEmpty(src map[string]string) map[string]string {

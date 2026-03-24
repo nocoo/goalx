@@ -125,9 +125,6 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	if err := EnsureEngineTrusted(cfg.Master.Engine, absProjectRoot); err != nil {
 		return fmt.Errorf("trust bootstrap master: %w", err)
 	}
-	if err := GenerateMasterAdapter(cfg.Master.Engine, absProjectRoot, RunRuntimeStatePath(runDir), CompletionStatePath(runDir)); err != nil {
-		return fmt.Errorf("generate master adapter: %w", err)
-	}
 
 	// Initialize durable goal boundary and immutable run identity before rendering protocols.
 	goalState, err := EnsureGoalState(runDir)
@@ -229,8 +226,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	if err := os.WriteFile(filepath.Join(runDir, "master.jsonl"), nil, 0644); err != nil {
 		return fmt.Errorf("init master journal: %w", err)
 	}
-	runState, err := EnsureRuntimeState(runDir, cfg)
-	if err != nil {
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
 		return fmt.Errorf("init runtime state: %w", err)
 	}
 	if _, err := EnsureSessionsRuntimeState(runDir); err != nil {
@@ -238,9 +234,6 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	}
 	if err := RegisterActiveRun(projectRoot, cfg); err != nil {
 		return fmt.Errorf("register active run: %w", err)
-	}
-	if err := syncProjectStatusCache(projectRoot, runState); err != nil {
-		return fmt.Errorf("init project status cache: %w", err)
 	}
 
 	checkSec, warning := normalizeSidecarInterval(cfg.Master.CheckInterval)

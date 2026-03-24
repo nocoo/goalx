@@ -86,22 +86,6 @@ acceptance:
 		}
 	}
 
-	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
-	if err != nil {
-		t.Fatalf("read status.json: %v", err)
-	}
-	statusText := string(statusData)
-	for _, want := range []string{
-		`"acceptance_status":"passed"`,
-		`"goal_satisfied":true`,
-		`"required_remaining":0`,
-		`"completion_mode":"verification_only"`,
-		`"code_changed":false`,
-	} {
-		if !strings.Contains(statusText, want) {
-			t.Fatalf("status.json missing %q:\n%s", want, statusText)
-		}
-	}
 }
 
 func TestVerifyFallsBackToHarnessAndRecordsFailure(t *testing.T) {
@@ -175,77 +159,7 @@ harness:
 	}
 }
 
-func TestVerifyFailsWhenAcceptanceCommandDiffersFromBaselineWithoutScopeMetadata(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := initGitRepo(t)
-	writeAndCommit(t, repo, "README.md", "demo", "base commit")
-	ensureSharedProofEvidence(t)
-
-	runName := "verify-acceptance-scope"
-	runDir := goalx.RunDir(repo, runName)
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatalf("mkdir run dir: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
-		t.Fatalf("mkdir project .goalx: %v", err)
-	}
-
-	snapshot := []byte(`name: verify-acceptance-scope
-mode: develop
-objective: ship feature
-harness:
-  command: "printf 'baseline gate\n'"
-`)
-	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
-		t.Fatalf("write run snapshot: %v", err)
-	}
-	goal := []byte(`{
-  "version": 1,
-  "required": [
-    {
-      "id": "req-1",
-      "text": "ship feature",
-      "source": "user",
-      "state": "claimed",
-      "evidence_paths": ["/tmp/e2e.txt"]
-    }
-  ],
-  "optional": []
-}`)
-	if err := os.WriteFile(GoalPath(runDir), goal, 0o644); err != nil {
-		t.Fatalf("write goal state: %v", err)
-	}
-	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
-		Version:      1,
-		Objective:    "ship feature",
-		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
-	}); err != nil {
-		t.Fatalf("write run metadata: %v", err)
-	}
-	seedRunCharterForTests(t, runDir, runName, repo)
-	state := &AcceptanceState{
-		Version:          1,
-		GoalVersion:      1,
-		DefaultCommand:   "printf 'baseline gate\\n'",
-		EffectiveCommand: "printf 'narrow gate\\n'",
-		LastResult:       AcceptanceResult{Status: acceptanceStatusPending},
-	}
-	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), state); err != nil {
-		t.Fatalf("write acceptance state: %v", err)
-	}
-
-	err := Verify(repo, []string{"--run", runName})
-	if err == nil {
-		t.Fatal("expected Verify to fail")
-	}
-	if !strings.Contains(err.Error(), "change_kind") {
-		t.Fatalf("Verify error = %v, want change_kind failure", err)
-	}
-}
-
-func TestVerifyRecordsImplementationAndVerificationWhenRunChangedCode(t *testing.T) {
+func TestVerifyRecordsAcceptanceWhenRunChangedCode(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -304,75 +218,13 @@ acceptance:
 		t.Fatalf("Verify: %v", err)
 	}
 
-	statusData, err := os.ReadFile(ProjectStatusCachePath(repo))
+	stateData, err := os.ReadFile(filepath.Join(runDir, "acceptance.json"))
 	if err != nil {
-		t.Fatalf("read status.json: %v", err)
+		t.Fatalf("read acceptance state: %v", err)
 	}
-	statusText := string(statusData)
-	for _, want := range []string{
-		`"completion_mode":"implementation_and_verification"`,
-		`"code_changed":true`,
-	} {
-		if !strings.Contains(statusText, want) {
-			t.Fatalf("status.json missing %q:\n%s", want, statusText)
-		}
-	}
-
-	proofData, err := os.ReadFile(CompletionStatePath(runDir))
-	if err != nil {
-		t.Fatalf("read completion proof: %v", err)
-	}
-	if !strings.Contains(string(proofData), `"base_revision": "`+baseRevision+`"`) {
-		t.Fatalf("completion proof missing base revision:\n%s", proofData)
-	}
-}
-
-func TestVerifyFailsWhenRunCharterProvenanceMismatchesMetadata(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := initGitRepo(t)
-	writeAndCommit(t, repo, "README.md", "demo", "base commit")
-	ensureSharedProofEvidence(t)
-
-	runName := "verify-charter-mismatch"
-	runDir := goalx.RunDir(repo, runName)
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatalf("mkdir run dir: %v", err)
-	}
-
-	snapshot := []byte(`name: verify-charter-mismatch
-mode: develop
-objective: ship feature
-acceptance:
-  command: "printf 'e2e ok\n'"
-`)
-	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
-		t.Fatalf("write run snapshot: %v", err)
-	}
-	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
-		Version:      1,
-		Objective:    "ship feature",
-		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
-	}); err != nil {
-		t.Fatalf("write run metadata: %v", err)
-	}
-	seedRunCharterForTests(t, runDir, runName, repo)
-	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
-	if err != nil {
-		t.Fatalf("LoadRunMetadata: %v", err)
-	}
-	meta.CharterHash = "charter_hash_mismatch"
-	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
-		t.Fatalf("SaveRunMetadata mismatch: %v", err)
-	}
-	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
-		t.Fatalf("write goal state: %v", err)
-	}
-
-	err = Verify(repo, []string{"--run", runName})
-	if err == nil || !strings.Contains(err.Error(), "charter") {
-		t.Fatalf("Verify error = %v, want charter provenance failure", err)
+	stateText := string(stateData)
+	if !strings.Contains(stateText, `"status": "passed"`) {
+		t.Fatalf("acceptance state missing passed status:\n%s", stateText)
 	}
 }
 

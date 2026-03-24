@@ -224,15 +224,12 @@ func TestSaveDoesNotMutateRunStateFromProjectStatusCache(t *testing.T) {
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
 
 	runState := &RunRuntimeState{
-		Version:        1,
-		Run:            runName,
-		Mode:           string(goalx.ModeDevelop),
-		Objective:      "ship feature",
-		Phase:          "researching",
-		AcceptanceMet:  false,
-		StartedAt:      "2026-03-23T00:00:00Z",
-		UpdatedAt:      "2026-03-23T00:00:00Z",
-		CompletionMode: "implementation_and_verification",
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeDevelop),
+		Phase:     "researching",
+		StartedAt: "2026-03-23T00:00:00Z",
+		UpdatedAt: "2026-03-23T00:00:00Z",
 	}
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)

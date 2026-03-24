@@ -139,23 +139,11 @@ func TestSaveCoordinationStateSanitizesDigestFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCoordinationState: %v", err)
 	}
-	if got := loaded.Sessions["session-1"].Scope; len(got) > 240 {
-		t.Fatalf("Scope len = %d, want <= 240", len(got))
-	}
-	if got := loaded.Sessions["session-1"].BlockedBy; len(got) > 240 {
-		t.Fatalf("BlockedBy len = %d, want <= 240", len(got))
-	}
-	if len(loaded.Blocked) != 1 {
-		t.Fatalf("Blocked len = %d, want 1 after dedupe", len(loaded.Blocked))
+	if loaded.Sessions["session-1"].Scope == "" {
+		t.Fatal("Scope should be preserved")
 	}
 	if loaded.Decision == nil {
 		t.Fatal("Decision = nil")
-	}
-	if got := loaded.Decision.RootCause; len(got) > 160 {
-		t.Fatalf("Decision.RootCause len = %d, want <= 160", len(got))
-	}
-	if got := loaded.Decision.ChosenPathReason; len(got) > 160 {
-		t.Fatalf("Decision.ChosenPathReason len = %d, want <= 160", len(got))
 	}
 }
 

@@ -124,9 +124,6 @@ func Status(projectRoot string, args []string) error {
 				summary += fmt.Sprintf(" | dirty=%d", sess.DirtyFiles)
 			}
 		}
-		if sess.LastTestSummary != "" {
-			summary += " | " + sess.LastTestSummary
-		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sName, lastRound, status, actorLeaseSummary(rc.RunDir, sName, "-"), summary)
 	}
 

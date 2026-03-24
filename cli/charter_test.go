@@ -46,12 +46,6 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 	if charter.Paths.Goal != GoalPath(runDir) || charter.Paths.Acceptance != AcceptanceStatePath(runDir) || charter.Paths.Proof != CompletionStatePath(runDir) {
 		t.Fatalf("charter paths = %+v", charter.Paths)
 	}
-	if !charter.PartialCompletionRequiresUserApproval || !charter.NarrowScopeRequiresUserApproval || !charter.RequiredOutcomesMayExpandButNotShrink || !charter.AcceptanceIsVerificationOnly {
-		t.Fatalf("charter completion rules not initialized: %+v", charter)
-	}
-	if charter.ExplorationDoctrine.MinimumPaths != 3 || !charter.ExplorationDoctrine.ComparePathsBeforeCommit || !charter.ExplorationDoctrine.AllowAutonomousPathSwitch {
-		t.Fatalf("charter exploration doctrine not initialized: %+v", charter.ExplorationDoctrine)
-	}
 	if charter.RoleContracts.Master == nil || charter.RoleContracts.ResearchSubagent == nil || charter.RoleContracts.DevelopSubagent == nil {
 		t.Fatalf("charter role contracts missing: %+v", charter.RoleContracts)
 	}
@@ -77,9 +71,6 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 	}
 	if reloaded.Paths.Goal != charter.Paths.Goal || reloaded.Paths.Acceptance != charter.Paths.Acceptance || reloaded.Paths.Proof != charter.Paths.Proof {
 		t.Fatalf("reloaded charter paths = %+v, want %+v", reloaded.Paths, charter.Paths)
-	}
-	if reloaded.CompletionStandard != "full_goal" {
-		t.Fatalf("CompletionStandard = %q, want full_goal", reloaded.CompletionStandard)
 	}
 }
 
@@ -126,33 +117,6 @@ func TestRunCharterRoundTripKeepsReadablePaths(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("charter JSON missing %q:\n%s", want, text)
 		}
-	}
-}
-
-func TestRunCharterRoundTripPreservesExplicitFalseDoctrine(t *testing.T) {
-	runDir := t.TempDir()
-	meta := &RunMetadata{Version: 1, ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
-	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
-	if err != nil {
-		t.Fatalf("NewRunCharter: %v", err)
-	}
-	charter.ExplorationDoctrine.ComparePathsBeforeCommit = false
-	charter.ExplorationDoctrine.AllowAutonomousPathSwitch = false
-	if err := SaveRunCharter(RunCharterPath(runDir), charter); err != nil {
-		t.Fatalf("SaveRunCharter: %v", err)
-	}
-	reloaded, err := LoadRunCharter(RunCharterPath(runDir))
-	if err != nil {
-		t.Fatalf("LoadRunCharter: %v", err)
-	}
-	if reloaded.ExplorationDoctrine.ComparePathsBeforeCommit {
-		t.Fatal("ComparePathsBeforeCommit should preserve explicit false")
-	}
-	if reloaded.ExplorationDoctrine.AllowAutonomousPathSwitch {
-		t.Fatal("AllowAutonomousPathSwitch should preserve explicit false")
-	}
-	if reloaded.ExplorationDoctrine.MinimumPaths != 3 {
-		t.Fatalf("MinimumPaths = %d, want 3", reloaded.ExplorationDoctrine.MinimumPaths)
 	}
 }
 
