@@ -58,6 +58,7 @@ func SaveRunMetadata(path string, meta *RunMetadata) error {
 	if meta == nil {
 		return fmt.Errorf("run metadata is nil")
 	}
+	meta.Objective = ""
 	if meta.Version <= 0 {
 		meta.Version = 1
 	}
@@ -89,7 +90,6 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 		}
 		meta = &RunMetadata{
 			Version:         1,
-			Objective:       objective,
 			ProjectRoot:     projectRoot,
 			ProtocolVersion: currentProtocolVersion,
 			RunID:           newRunID(),
@@ -108,8 +108,8 @@ func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, err
 		meta.Version = 1
 		changed = true
 	}
-	if meta.Objective == "" {
-		meta.Objective = objective
+	if meta.Objective != "" {
+		meta.Objective = ""
 		changed = true
 	}
 	if meta.ProjectRoot == "" && projectRoot != "" {

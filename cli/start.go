@@ -145,7 +145,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		return fmt.Errorf("init run metadata: %w", err)
 	}
 	applyRunMetadataPatch(meta, metaPatch)
-	charter, err := NewRunCharter(runDir, cfg.Name, meta)
+	charter, err := NewRunCharter(runDir, cfg.Name, cfg.Objective, meta)
 	if err != nil {
 		return fmt.Errorf("init run charter: %w", err)
 	}

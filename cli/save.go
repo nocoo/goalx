@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	goalx "github.com/vonbai/goalx"
 )
 
 // Save copies run artifacts to user-scoped durable storage.
@@ -116,10 +114,14 @@ func Save(projectRoot string, args []string) error {
 			return err
 		}
 		for _, num := range indexes {
-			effective := goalx.EffectiveSessionConfig(rc.Config, num-1)
+			sName := SessionName(num)
+			identity, err := RequireSessionIdentity(rc.RunDir, sName)
+			if err != nil {
+				return fmt.Errorf("load %s identity: %w", sName, err)
+			}
 			sessionList = append(sessionList, SessionRuntimeState{
-				Name:         SessionName(num),
-				Mode:         string(effective.Mode),
+				Name:         sName,
+				Mode:         identity.Mode,
 				WorktreePath: WorktreePath(rc.RunDir, rc.Config.Name, num),
 			})
 		}

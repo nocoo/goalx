@@ -184,6 +184,8 @@ func seedReviewResearchRun(t *testing.T, targetFiles []string) (string, string) 
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
+	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "codex", goalx.TargetConfig{Files: targetFiles}, goalx.HarnessConfig{})
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
 		t.Fatalf("seed session journal: %v", err)
 	}

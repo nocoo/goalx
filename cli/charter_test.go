@@ -15,7 +15,6 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 
 	meta := &RunMetadata{
 		Version:         1,
-		Objective:       "build durable knowledge base",
 		ProjectRoot:     "/tmp/project",
 		ProtocolVersion: 2,
 		RunID:           "run_abc123",
@@ -28,7 +27,7 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 		ParentRun:       "parent-run",
 	}
 
-	charter, err := NewRunCharter(runDir, "knowledge-base", meta)
+	charter, err := NewRunCharter(runDir, "knowledge-base", "user objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}
@@ -41,8 +40,8 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 	if charter.RunName != "knowledge-base" {
 		t.Fatalf("RunName = %q, want %q", charter.RunName, "knowledge-base")
 	}
-	if charter.Objective != meta.Objective {
-		t.Fatalf("Objective = %q, want %q", charter.Objective, meta.Objective)
+	if charter.Objective != "user objective" {
+		t.Fatalf("Objective = %q, want %q", charter.Objective, "user objective")
 	}
 	if charter.Paths.Goal != GoalPath(runDir) || charter.Paths.Acceptance != AcceptanceStatePath(runDir) || charter.Paths.Proof != CompletionStatePath(runDir) {
 		t.Fatalf("charter paths = %+v", charter.Paths)
@@ -106,8 +105,8 @@ func TestRunCharterHashChangesWithContent(t *testing.T) {
 
 func TestRunCharterRoundTripKeepsReadablePaths(t *testing.T) {
 	runDir := t.TempDir()
-	meta := &RunMetadata{Version: 1, Objective: "ship", ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
-	charter, err := NewRunCharter(runDir, "demo", meta)
+	meta := &RunMetadata{Version: 1, ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}
@@ -132,8 +131,8 @@ func TestRunCharterRoundTripKeepsReadablePaths(t *testing.T) {
 
 func TestRunCharterRoundTripPreservesExplicitFalseDoctrine(t *testing.T) {
 	runDir := t.TempDir()
-	meta := &RunMetadata{Version: 1, Objective: "ship", ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
-	charter, err := NewRunCharter(runDir, "demo", meta)
+	meta := &RunMetadata{Version: 1, ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}
@@ -160,7 +159,6 @@ func TestRunCharterRoundTripPreservesExplicitFalseDoctrine(t *testing.T) {
 func TestValidateRunCharterLinkageRejectsIdentityMismatch(t *testing.T) {
 	meta := &RunMetadata{
 		Version:         1,
-		Objective:       "build durable knowledge base",
 		ProjectRoot:     "/tmp/project",
 		ProtocolVersion: 2,
 		RunID:           "run_abc123",
@@ -172,7 +170,7 @@ func TestValidateRunCharterLinkageRejectsIdentityMismatch(t *testing.T) {
 		SourcePhase:     "research",
 		ParentRun:       "parent-run",
 	}
-	charter, err := NewRunCharter(t.TempDir(), "knowledge-base", meta)
+	charter, err := NewRunCharter(t.TempDir(), "knowledge-base", "user objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

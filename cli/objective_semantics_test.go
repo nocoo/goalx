@@ -72,12 +72,11 @@ func TestLoadDerivedRunStatePrefersCharterObjective(t *testing.T) {
 	cfg := &goalx.Config{
 		Name:      "demo",
 		Mode:      goalx.ModeDevelop,
-		Objective: "stale spec objective",
+		Objective: "charter objective",
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
 	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
 		Version:      1,
-		Objective:    "charter objective",
 		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
 	}); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
@@ -106,12 +105,11 @@ func TestReportUsesCharterObjectiveDisplay(t *testing.T) {
 	cfg := &goalx.Config{
 		Name:      "demo",
 		Mode:      goalx.ModeDevelop,
-		Objective: "stale spec objective",
+		Objective: "charter objective",
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
 	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
 		Version:      1,
-		Objective:    "charter objective",
 		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
 	}); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
@@ -125,8 +123,5 @@ func TestReportUsesCharterObjectiveDisplay(t *testing.T) {
 	})
 	if !strings.Contains(out, "Objective: charter objective") {
 		t.Fatalf("report output missing charter objective:\n%s", out)
-	}
-	if strings.Contains(out, "Objective: stale spec objective") {
-		t.Fatalf("report output still used run-spec objective:\n%s", out)
 	}
 }

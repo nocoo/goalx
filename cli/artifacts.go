@@ -177,17 +177,23 @@ func buildRunArtifactsManifest(runDir string, cfg *goalx.Config) *ArtifactsManif
 		return manifest
 	}
 
-	sessions := goalx.ExpandSessions(cfg)
-	for i := range sessions {
-		sessionName := SessionName(i + 1)
-		effective := goalx.EffectiveSessionConfig(cfg, i)
-		sessionState := ensureSessionArtifactsEntry(manifest, sessionName, string(effective.Mode))
-		if effective.Mode != goalx.ModeResearch || effective.Target == nil {
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return manifest
+	}
+	for _, num := range indexes {
+		sessionName := SessionName(num)
+		identity, err := RequireSessionIdentity(runDir, sessionName)
+		if err != nil {
+			continue
+		}
+		sessionState := ensureSessionArtifactsEntry(manifest, sessionName, identity.Mode)
+		if goalx.Mode(identity.Mode) != goalx.ModeResearch {
 			continue
 		}
 
-		wtPath := WorktreePath(runDir, cfg.Name, i+1)
-		reportPath := findSessionReport(wtPath, effective.Target.Files)
+		wtPath := WorktreePath(runDir, cfg.Name, num)
+		reportPath := findSessionReport(wtPath, identity.Target.Files)
 		if reportPath == "" {
 			continue
 		}

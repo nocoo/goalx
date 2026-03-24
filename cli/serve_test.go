@@ -467,6 +467,7 @@ func TestServeHandlerTellWritesSessionInboxAndNudgesSession(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
 		t.Fatalf("seed session journal: %v", err)
 	}
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "", "", goalx.TargetConfig{}, goalx.HarnessConfig{})
 
 	var gotTarget, gotEngine string
 	app := newServeApp(goalx.ServeConfig{

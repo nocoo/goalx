@@ -60,18 +60,17 @@ func Review(projectRoot string, args []string) error {
 		fmt.Printf("Journal: %s\n", goalx.Summary(entries))
 
 		// Mode-specific output
-		effective := goalx.EffectiveSessionConfig(rc.Config, num-1)
-		if effective.Mode == goalx.ModeResearch {
+		identity, err := RequireSessionIdentity(rc.RunDir, sName)
+		if err != nil {
+			return fmt.Errorf("load %s identity: %w", sName, err)
+		}
+		if goalx.Mode(identity.Mode) == goalx.ModeResearch {
 			reportPath := ""
 			if artifact := FindSessionArtifact(manifest, sName, "report"); artifact != nil {
 				reportPath = artifact.Path
 			}
 			if reportPath == "" {
-				targetFiles := []string(nil)
-				if effective.Target != nil {
-					targetFiles = append(targetFiles, effective.Target.Files...)
-				}
-				reportPath = findSessionReport(wtPath, targetFiles)
+				reportPath = findSessionReport(wtPath, identity.Target.Files)
 			}
 			if reportPath != "" {
 				printFirstLines(reportPath, 20)

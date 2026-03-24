@@ -83,7 +83,7 @@ func writeSavedPhaseSourceFixture(t *testing.T, projectRoot, runName, phaseKind 
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, runName, meta)
+	charter, err := NewRunCharter(runDir, runName, cfg.Objective, meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

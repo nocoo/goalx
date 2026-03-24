@@ -355,6 +355,13 @@ func TestStopTerminalizesControlStateWhenRunIsAlreadyInactive(t *testing.T) {
 	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "cancelled" {
 		t.Fatalf("unexpected deliveries: %+v", deliveries.Items)
 	}
+	sessionsState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	if got := sessionsState.Sessions["session-1"].State; got != "stopped" {
+		t.Fatalf("session-1 state = %q, want stopped", got)
+	}
 }
 
 func TestDropTerminatesSidecarBeforeRemovingRunDir(t *testing.T) {
@@ -514,7 +521,7 @@ func bootstrapSidecarIdentityFixture(t *testing.T, runDir, repo string, cfg *goa
 	if _, err := EnsureAcceptanceState(runDir, cfg, goalState.Version); err != nil {
 		t.Fatalf("EnsureAcceptanceState: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, cfg.Name, meta)
+	charter, err := NewRunCharter(runDir, cfg.Name, cfg.Objective, meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

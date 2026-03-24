@@ -25,7 +25,7 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 		Epoch:           3,
 		CharterID:       "charter_abc123",
 	}
-	charter, err := NewRunCharter(runDir, "knowledge-base", meta)
+	charter, err := NewRunCharter(runDir, "knowledge-base", "knowledge-base objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestNewSessionIdentityRequiresRunCharter(t *testing.T) {
 func TestSessionIdentityRoundTripKeepsSourceAndRole(t *testing.T) {
 	runDir := t.TempDir()
 	meta := &RunMetadata{Version: 1, Objective: "ship", ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
-	charter, err := NewRunCharter(runDir, "demo", meta)
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

@@ -42,10 +42,14 @@ func Status(projectRoot string, args []string) error {
 		}
 		for _, num := range indexes {
 			sName := SessionName(num)
+			identity, err := RequireSessionIdentity(rc.RunDir, sName)
+			if err != nil {
+				return fmt.Errorf("load %s identity: %w", sName, err)
+			}
 			sessionList = append(sessionList, SessionRuntimeState{
 				Name:         sName,
 				State:        "pending",
-				Mode:         string(goalx.EffectiveSessionConfig(rc.Config, num-1).Mode),
+				Mode:         identity.Mode,
 				WorktreePath: WorktreePath(rc.RunDir, rc.Config.Name, num),
 			})
 		}

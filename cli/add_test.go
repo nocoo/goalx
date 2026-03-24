@@ -793,7 +793,7 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 	if _, err := EnsureAcceptanceState(runDir, cfg, goalState.Version); err != nil {
 		t.Fatalf("EnsureAcceptanceState: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, cfg.Name, meta)
+	charter, err := NewRunCharter(runDir, cfg.Name, cfg.Objective, meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

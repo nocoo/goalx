@@ -404,7 +404,7 @@ func seedRunCharterForTests(t *testing.T, runDir, runName, projectRoot string) {
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata normalize: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, runName, meta)
+	charter, err := NewRunCharter(runDir, runName, "", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

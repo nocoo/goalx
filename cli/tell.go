@@ -1,10 +1,6 @@
 package cli
 
-import (
-	"fmt"
-
-	goalx "github.com/vonbai/goalx"
-)
+import "fmt"
 
 const tellUsage = `usage: goalx tell [--run NAME] [master|session-N] "message"`
 
@@ -126,10 +122,13 @@ func deliverTell(projectRoot, runName, target, message string, nudge func(target
 	if err != nil {
 		return "", "", err
 	}
-	effective := goalx.EffectiveSessionConfig(rc.Config, idx-1)
+	identity, err := RequireSessionIdentity(rc.RunDir, target)
+	if err != nil {
+		return "", "", fmt.Errorf("load %s identity: %w", target, err)
+	}
 	if nudge != nil {
 		messageID := fmt.Sprintf("session-inbox:%s:%d", target, msg.ID)
-		if _, err := DeliverControlNudge(rc.RunDir, messageID, messageID, rc.TmuxSession+":"+windowName, effective.Engine, nudge); err != nil {
+		if _, err := DeliverControlNudge(rc.RunDir, messageID, messageID, rc.TmuxSession+":"+windowName, identity.Engine, nudge); err != nil {
 			return "", "", err
 		}
 	}

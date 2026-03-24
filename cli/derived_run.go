@@ -103,9 +103,6 @@ func deriveRunIdentitySurface(runDir, fallbackObjective string) (string, int, st
 		if meta.Epoch > 0 {
 			epoch = meta.Epoch
 		}
-		if strings.TrimSpace(meta.Objective) != "" {
-			objective = strings.TrimSpace(meta.Objective)
-		}
 	}
 
 	charter, _ := LoadRunCharter(RunCharterPath(runDir))

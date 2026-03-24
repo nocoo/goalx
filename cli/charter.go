@@ -78,7 +78,7 @@ func RequireRunCharter(runDir string) (*RunCharter, error) {
 	return charter, nil
 }
 
-func NewRunCharter(runDir, runName string, meta *RunMetadata) (*RunCharter, error) {
+func NewRunCharter(runDir, runName, objective string, meta *RunMetadata) (*RunCharter, error) {
 	if meta == nil {
 		return nil, fmt.Errorf("run metadata is nil")
 	}
@@ -97,7 +97,7 @@ func NewRunCharter(runDir, runName string, meta *RunMetadata) (*RunCharter, erro
 		RootRunID:                             rootRunID,
 		RunName:                               runName,
 		ProjectRoot:                           meta.ProjectRoot,
-		Objective:                             meta.Objective,
+		Objective:                             strings.TrimSpace(objective),
 		Mode:                                  "",
 		PhaseKind:                             meta.PhaseKind,
 		SourceRun:                             meta.SourceRun,
@@ -244,7 +244,6 @@ func ValidateRunCharterLinkage(meta *RunMetadata, charter *RunCharter) error {
 		{name: "run_id", have: meta.RunID, want: charter.RunID},
 		{name: "root_run_id", have: meta.RootRunID, want: charter.RootRunID},
 		{name: "project_root", have: meta.ProjectRoot, want: charter.ProjectRoot},
-		{name: "objective", have: meta.Objective, want: charter.Objective},
 		{name: "source_run", have: meta.SourceRun, want: charter.SourceRun},
 		{name: "source_phase", have: meta.SourcePhase, want: charter.SourcePhase},
 		{name: "parent_run", have: meta.ParentRun, want: charter.ParentRun},

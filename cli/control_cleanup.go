@@ -26,6 +26,9 @@ func FinalizeControlRun(runDir, lifecycle string) error {
 	if err := expireAllControlLeases(runDir); err != nil {
 		return err
 	}
+	if err := finalizeSessionRuntimeStates(runDir, lifecycle, now); err != nil {
+		return err
+	}
 
 	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
 	if err != nil {
@@ -53,6 +56,32 @@ func FinalizeControlRun(runDir, lifecycle string) error {
 		}
 	}
 	return SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries)
+}
+
+func finalizeSessionRuntimeStates(runDir, lifecycle, now string) error {
+	state, err := EnsureSessionsRuntimeState(runDir)
+	if err != nil {
+		return err
+	}
+	if state.Sessions == nil {
+		state.Sessions = map[string]SessionRuntimeState{}
+	}
+	if len(state.Sessions) == 0 {
+		indexes, err := existingSessionIndexes(runDir)
+		if err != nil {
+			return err
+		}
+		for _, num := range indexes {
+			name := SessionName(num)
+			state.Sessions[name] = SessionRuntimeState{Name: name}
+		}
+	}
+	for name, session := range state.Sessions {
+		session.State = lifecycle
+		session.UpdatedAt = now
+		state.Sessions[name] = session
+	}
+	return SaveSessionsRuntimeState(SessionsRuntimeStatePath(runDir), state)
 }
 
 func expireAllControlLeases(runDir string) error {

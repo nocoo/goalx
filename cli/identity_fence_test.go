@@ -28,7 +28,7 @@ func TestIdentityFencePathAndDerivation(t *testing.T) {
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, "demo", meta)
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestRefreshIdentityFenceDetectsChangedGoalContent(t *testing.T) {
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
-	charter, err := NewRunCharter(runDir, "demo", meta)
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
 	if err != nil {
 		t.Fatalf("NewRunCharter: %v", err)
 	}

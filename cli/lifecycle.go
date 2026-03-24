@@ -38,6 +38,10 @@ func Park(projectRoot string, args []string) error {
 	if !ok {
 		return fmt.Errorf("session %q out of range for run %q", sessionName, rc.Name)
 	}
+	sessionIdentity, err := RequireSessionIdentity(rc.RunDir, sessionName)
+	if err != nil {
+		return fmt.Errorf("load session identity: %w", err)
+	}
 
 	coord, err := EnsureCoordinationState(rc.RunDir, rc.Config.Objective)
 	if err != nil {
@@ -65,7 +69,7 @@ func Park(projectRoot string, args []string) error {
 		return fmt.Errorf("snapshot session runtime: %w", err)
 	}
 	snapshot.State = "parked"
-	snapshot.Mode = string(goalx.EffectiveSessionConfig(rc.Config, idx-1).Mode)
+	snapshot.Mode = sessionIdentity.Mode
 	snapshot.Branch = fmt.Sprintf("goalx/%s/%d", rc.Config.Name, idx)
 	snapshot.OwnerScope = digest.Scope
 	snapshot.BlockedBy = digest.BlockedBy
