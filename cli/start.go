@@ -241,6 +241,8 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		ControlRunStatePath:    ControlRunStatePath(runDir),
 		MasterLeasePath:        ControlLeasePath(runDir, "master"),
 		SidecarLeasePath:       ControlLeasePath(runDir, "sidecar"),
+		LivenessPath:           LivenessPath(runDir),
+		WorktreeSnapshotPath:   WorktreeSnapshotPath(runDir),
 		ControlRemindersPath:   ControlRemindersPath(runDir),
 		ControlDeliveriesPath:  ControlDeliveriesPath(runDir),
 		MasterJournalPath:      filepath.Join(runDir, "master.jsonl"),

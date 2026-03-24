@@ -47,6 +47,8 @@ type ProtocolData struct {
 	ControlRunStatePath    string
 	MasterLeasePath        string
 	SidecarLeasePath       string
+	LivenessPath           string
+	WorktreeSnapshotPath   string
 	ControlRemindersPath   string
 	ControlDeliveriesPath  string
 	MasterJournalPath      string

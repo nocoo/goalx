@@ -566,6 +566,8 @@ func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
 		MasterInboxPath:       "/tmp/control/master-inbox.jsonl",
 		MasterCursorPath:      "/tmp/control/master-cursor.json",
 		ControlRunStatePath:   "/tmp/control/run-state.json",
+		LivenessPath:          "/tmp/control/liveness.json",
+		WorktreeSnapshotPath:  "/tmp/control/worktree-snapshot.json",
 		ControlRemindersPath:  "/tmp/control/reminders.json",
 		ControlDeliveriesPath: "/tmp/control/deliveries.json",
 		StatusPath:            "/tmp/status.json",
@@ -806,6 +808,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		MasterInboxPath:       "/tmp/control/inbox/master.jsonl",
 		MasterCursorPath:      "/tmp/control/master-cursor.json",
 		ControlRunStatePath:   "/tmp/control/run-state.json",
+		LivenessPath:          "/tmp/control/liveness.json",
+		WorktreeSnapshotPath:  "/tmp/control/worktree-snapshot.json",
 		ControlRemindersPath:  "/tmp/control/reminders.json",
 		ControlDeliveriesPath: "/tmp/control/deliveries.json",
 		CompletionProofPath:   "/tmp/proof/completion.json",
@@ -826,6 +830,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"inbox/master.jsonl",
 		"master-cursor.json",
 		"run-state.json",
+		"liveness.json",
+		"worktree-snapshot.json",
 		"reminders.json",
 		"deliveries.json",
 		"proof/completion.json",
@@ -855,6 +861,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.",
 		"Keep detailed hypotheses, traces, and path comparisons in journals, not the coordination digest.",
 		"Avoid sync-only liveness narration.",
+		"Sessions without dedicated worktrees share the run worktree.",
+		"Use `goalx add --worktree` for parallel isolation.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

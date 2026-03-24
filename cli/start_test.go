@@ -438,6 +438,10 @@ esac
 		"| Research | claude-code/opus, codex/gpt-5.4 | multi-perspective |",
 		"| Develop | codex/gpt-5.4 | speed |",
 		"CLI overrides take precedence.",
+		"Liveness state: `" + LivenessPath(runDir) + "`",
+		"Worktree snapshot: `" + WorktreeSnapshotPath(runDir) + "`",
+		"Sessions without dedicated worktrees share the run worktree.",
+		"Use `goalx add --worktree` for parallel isolation.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("master.md missing %q:\n%s", want, text)
