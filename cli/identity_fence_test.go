@@ -136,3 +136,86 @@ func TestIdentityFenceContentHashChangesWithFileContent(t *testing.T) {
 		t.Fatalf("content hash did not change: %q", first)
 	}
 }
+
+func TestRefreshIdentityFenceDetectsChangedGoalContent(t *testing.T) {
+	runDir := t.TempDir()
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+
+	meta := &RunMetadata{
+		Version:         1,
+		Objective:       "ship feature",
+		ProjectRoot:     repo,
+		ProtocolVersion: 2,
+		RunID:           "run_abc123",
+		RootRunID:       "run_root123",
+		Epoch:           2,
+	}
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	charter, err := NewRunCharter(runDir, "demo", meta)
+	if err != nil {
+		t.Fatalf("NewRunCharter: %v", err)
+	}
+	if err := SaveRunCharter(RunCharterPath(runDir), charter); err != nil {
+		t.Fatalf("SaveRunCharter: %v", err)
+	}
+	digest, err := hashRunCharter(charter)
+	if err != nil {
+		t.Fatalf("hashRunCharter: %v", err)
+	}
+	meta.CharterID = charter.CharterID
+	meta.CharterHash = digest
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata charter linkage: %v", err)
+	}
+	goal := NewGoalState()
+	if err := SaveGoalState(GoalPath(runDir), goal); err != nil {
+		t.Fatalf("SaveGoalState initial: %v", err)
+	}
+	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+		Version:          1,
+		GoalVersion:      goal.Version,
+		DefaultCommand:   "go test ./...",
+		EffectiveCommand: "go test ./...",
+		ChangeKind:       acceptanceChangeSame,
+		LastResult:       AcceptanceResult{Status: acceptanceStatusPending},
+	}); err != nil {
+		t.Fatalf("SaveAcceptanceState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{Version: 1, Objective: "ship feature"}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	initial, err := NewIdentityFence(runDir, meta)
+	if err != nil {
+		t.Fatalf("NewIdentityFence initial: %v", err)
+	}
+	if err := SaveIdentityFence(IdentityFencePath(runDir), initial); err != nil {
+		t.Fatalf("SaveIdentityFence initial: %v", err)
+	}
+
+	goal.Required = append(goal.Required, GoalItem{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, State: goalItemStateOpen})
+	goal.Version++
+	if err := SaveGoalState(GoalPath(runDir), goal); err != nil {
+		t.Fatalf("SaveGoalState updated: %v", err)
+	}
+
+	updated, changed, err := RefreshIdentityFence(runDir, meta)
+	if err != nil {
+		t.Fatalf("RefreshIdentityFence: %v", err)
+	}
+	if !changed {
+		t.Fatal("RefreshIdentityFence should report changed goal content")
+	}
+	if updated.GoalHash == initial.GoalHash {
+		t.Fatalf("GoalHash = %q, want change from %q", updated.GoalHash, initial.GoalHash)
+	}
+	reloaded, err := LoadIdentityFence(IdentityFencePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadIdentityFence: %v", err)
+	}
+	if reloaded.GoalHash != updated.GoalHash {
+		t.Fatalf("reloaded fence goal hash = %q, want %q", reloaded.GoalHash, updated.GoalHash)
+	}
+}

@@ -67,6 +67,25 @@ func NewIdentityFence(runDir string, meta *RunMetadata) (*IdentityFence, error) 
 	return fence, nil
 }
 
+func RefreshIdentityFence(runDir string, meta *RunMetadata) (*IdentityFence, bool, error) {
+	path := IdentityFencePath(runDir)
+	current, err := LoadIdentityFence(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, false, err
+	}
+	next, err := NewIdentityFence(runDir, meta)
+	if err != nil {
+		return nil, false, err
+	}
+	changed := current == nil || !sameIdentityFence(current, next)
+	if changed {
+		if err := SaveIdentityFence(path, next); err != nil {
+			return nil, false, err
+		}
+	}
+	return next, changed, nil
+}
+
 func LoadIdentityFence(path string) (*IdentityFence, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -116,4 +135,16 @@ func hashFileContents(path string) (string, error) {
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func sameIdentityFence(a, b *IdentityFence) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.RunID == b.RunID &&
+		a.Epoch == b.Epoch &&
+		a.CharterHash == b.CharterHash &&
+		a.GoalHash == b.GoalHash &&
+		a.AcceptanceHash == b.AcceptanceHash &&
+		a.CoordinationHash == b.CoordinationHash
 }

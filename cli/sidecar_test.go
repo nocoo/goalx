@@ -27,6 +27,7 @@ func TestRunSidecarTickRenewsLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
 	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
 	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
 		t.Fatalf("EnsureRuntimeState: %v", err)
 	}
@@ -86,6 +87,7 @@ func TestRunSidecarTickDeliversDueMasterWakeReminder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
 	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
 	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
 		t.Fatalf("EnsureRuntimeState: %v", err)
 	}
@@ -126,6 +128,116 @@ func TestRunSidecarTickDeliversDueMasterWakeReminder(t *testing.T) {
 	}
 	if deliveries.Items[0].Status != "sent" || deliveries.Items[0].DedupeKey != "master-wake" {
 		t.Fatalf("unexpected delivery: %+v", deliveries.Items[0])
+	}
+}
+
+func TestRunSidecarTickQueuesRefreshContextWhenIdentityFenceChanges(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+
+	coord, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState: %v", err)
+	}
+	coord.Version++
+	coord.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	coord.OpenQuestions = append(coord.OpenQuestions, "new priority")
+	if err := SaveCoordinationState(CoordinationPath(runDir), coord); err != nil {
+		t.Fatalf("SaveCoordinationState updated: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 0; fi\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 2*time.Minute, 4242); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders: %v", err)
+	}
+	found := false
+	for _, item := range reminders.Items {
+		if item.DedupeKey == "refresh-context" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected refresh-context reminder after identity fence change: %+v", reminders.Items)
+	}
+}
+
+func TestRunSidecarTickDoesNotQueueRefreshContextWhenIdentityFenceUnchanged(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 0; fi\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 2*time.Minute, 4242); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders: %v", err)
+	}
+	for _, item := range reminders.Items {
+		if item.DedupeKey == "refresh-context" {
+			t.Fatalf("unexpected refresh-context reminder without fence change: %+v", reminders.Items)
+		}
 	}
 }
 
@@ -299,6 +411,7 @@ func TestSidecarRenewsLeaseUntilContextStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
 	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
 	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
 		t.Fatalf("EnsureRuntimeState: %v", err)
 	}
@@ -350,6 +463,7 @@ func TestSidecarStopsWhenRunIdentityChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
 	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
 	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
 		t.Fatalf("EnsureRuntimeState: %v", err)
 	}
@@ -384,5 +498,46 @@ func TestSidecarStopsWhenRunIdentityChanges(t *testing.T) {
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("sidecar did not stop after run identity changed")
+	}
+}
+
+func bootstrapSidecarIdentityFixture(t *testing.T, runDir, repo string, cfg *goalx.Config, meta *RunMetadata) {
+	t.Helper()
+
+	goalState, err := EnsureGoalState(runDir)
+	if err != nil {
+		t.Fatalf("EnsureGoalState: %v", err)
+	}
+	if err := EnsureGoalLog(runDir); err != nil {
+		t.Fatalf("EnsureGoalLog: %v", err)
+	}
+	if _, err := EnsureAcceptanceState(runDir, cfg, goalState.Version); err != nil {
+		t.Fatalf("EnsureAcceptanceState: %v", err)
+	}
+	charter, err := NewRunCharter(runDir, cfg.Name, meta)
+	if err != nil {
+		t.Fatalf("NewRunCharter: %v", err)
+	}
+	if err := SaveRunCharter(RunCharterPath(runDir), charter); err != nil {
+		t.Fatalf("SaveRunCharter: %v", err)
+	}
+	digest, err := hashRunCharter(charter)
+	if err != nil {
+		t.Fatalf("hashRunCharter: %v", err)
+	}
+	meta.CharterID = charter.CharterID
+	meta.CharterHash = digest
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if _, err := EnsureCoordinationState(runDir, cfg.Objective); err != nil {
+		t.Fatalf("EnsureCoordinationState: %v", err)
+	}
+	fence, err := NewIdentityFence(runDir, meta)
+	if err != nil {
+		t.Fatalf("NewIdentityFence: %v", err)
+	}
+	if err := SaveIdentityFence(IdentityFencePath(runDir), fence); err != nil {
+		t.Fatalf("SaveIdentityFence: %v", err)
 	}
 }

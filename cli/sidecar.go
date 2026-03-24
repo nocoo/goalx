@@ -135,6 +135,15 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 	if err := RenewControlLease(runDir, "sidecar", runID, epoch, ttl, "process", pid); err != nil {
 		return err
 	}
+	_, changed, err := RefreshIdentityFence(runDir, meta)
+	if err != nil {
+		return err
+	}
+	if changed {
+		if err := queueRefreshContextReminder(runDir, goalx.TmuxSessionName(projectRoot, runName)); err != nil {
+			return err
+		}
+	}
 	if err := queueMasterWakeReminder(runDir, goalx.TmuxSessionName(projectRoot, runName)); err != nil {
 		return err
 	}
@@ -143,6 +152,14 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 		return err
 	}
 	return DeliverDueControlReminders(runDir, cfg.Master.Engine, interval, sendAgentNudge)
+}
+
+func queueRefreshContextReminder(runDir, tmuxSession string) error {
+	if !SessionExists(tmuxSession) {
+		return nil
+	}
+	_, err := QueueControlReminder(runDir, "refresh-context", "identity-fence-changed", tmuxSession+":master")
+	return err
 }
 
 func defaultLaunchRunSidecar(projectRoot, runName string, interval time.Duration) error {
