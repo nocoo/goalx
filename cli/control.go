@@ -17,6 +17,7 @@ type MasterInboxMessage struct {
 	Type      string `json:"type"`
 	Source    string `json:"source"`
 	Body      string `json:"body"`
+	Urgent    bool   `json:"urgent,omitempty"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -99,10 +100,14 @@ func ensureEmptyFile(path string) error {
 }
 
 func AppendMasterInboxMessage(runDir, typ, source, body string) (MasterInboxMessage, error) {
-	return AppendControlInboxMessage(runDir, "master", typ, source, body)
+	return appendControlInboxMessage(runDir, "master", typ, source, body, false)
 }
 
 func AppendControlInboxMessage(runDir, target, typ, source, body string) (MasterInboxMessage, error) {
+	return appendControlInboxMessage(runDir, target, typ, source, body, false)
+}
+
+func appendControlInboxMessage(runDir, target, typ, source, body string, urgent bool) (MasterInboxMessage, error) {
 	if err := EnsureMasterControl(runDir); err != nil {
 		return MasterInboxMessage{}, err
 	}
@@ -124,6 +129,7 @@ func AppendControlInboxMessage(runDir, target, typ, source, body string) (Master
 		Type:      typ,
 		Source:    source,
 		Body:      body,
+		Urgent:    urgent,
 		CreatedAt: time.Now().Format(time.RFC3339),
 	}
 	f, err := os.OpenFile(inboxPath, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -189,6 +195,28 @@ func unreadControlInboxCount(inboxPath, cursorPath string) int {
 		return int(lastID)
 	}
 	return int(lastID - cursor.LastSeenID)
+}
+
+func hasUrgentUnread(runDir string) bool {
+	cursor, _ := LoadMasterCursorState(MasterCursorPath(runDir))
+	lastSeen := int64(0)
+	if cursor != nil {
+		lastSeen = cursor.LastSeenID
+	}
+	data, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		return false
+	}
+	for _, line := range splitNonEmptyLines(string(data)) {
+		var msg MasterInboxMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+		if msg.ID > lastSeen && msg.Urgent {
+			return true
+		}
+	}
+	return false
 }
 
 func nextMasterInboxID(path string) (int64, error) {
