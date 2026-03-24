@@ -89,6 +89,16 @@ func TestParseLaunchOptionsLeavesParallelUnsetByDefault(t *testing.T) {
 	}
 }
 
+func TestParseLaunchOptionsAcceptsNoSnapshotFlag(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{"audit auth", "--no-snapshot"}, goalx.ModeResearch, true)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if !opts.NoSnapshot {
+		t.Fatal("NoSnapshot = false, want true")
+	}
+}
+
 func TestParseStatusArgs(t *testing.T) {
 	run, session, err := parseStatusArgs([]string{"--run", "demo", "session-1"})
 	if err != nil {

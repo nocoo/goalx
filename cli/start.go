@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	goalx "github.com/vonbai/goalx"
@@ -13,12 +16,13 @@ import (
 func Start(projectRoot string, args []string) (err error) {
 	var cfg *goalx.Config
 	var engines map[string]goalx.EngineConfig
+	var opts startOptions
 	if len(args) > 0 {
 		if wantsHelp(args) {
 			fmt.Println(launchUsage("start"))
 			return nil
 		}
-		opts, err := parseStartArgs(args)
+		opts, err = parseStartArgs(args)
 		if err != nil {
 			return err
 		}
@@ -40,10 +44,10 @@ func Start(projectRoot string, args []string) (err error) {
 	} else {
 		return fmt.Errorf("goalx start requires either an objective with flags or --config PATH for an explicit manual draft")
 	}
-	return startWithConfig(projectRoot, cfg, engines, nil)
+	return startWithConfig(projectRoot, cfg, engines, nil, opts.NoSnapshot)
 }
 
-func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, metaPatch *RunMetadata) (err error) {
+func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, metaPatch *RunMetadata, noSnapshot bool) (err error) {
 	// 2. Auto-generate name if missing
 	if cfg.Name == "" {
 		cfg.Name = goalx.Slugify(cfg.Objective)
@@ -58,7 +62,10 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	runDir := goalx.RunDir(projectRoot, cfg.Name)
 	tmuxSess := goalx.TmuxSessionName(projectRoot, cfg.Name)
 	absProjectRoot, _ := filepath.Abs(projectRoot)
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", cfg.Name)
 	tmuxCreated := false
+	runWorktreeCreated := false
 	defer func() {
 		if err == nil {
 			return
@@ -66,6 +73,16 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		if tmuxCreated {
 			if killErr := KillSession(tmuxSess); killErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: cleanup tmux session %s: %v\n", tmuxSess, killErr)
+			}
+		}
+		if runWorktreeCreated {
+			if rmErr := RemoveWorktree(absProjectRoot, runWT); rmErr != nil && !os.IsNotExist(rmErr) {
+				fmt.Fprintf(os.Stderr, "warning: cleanup run worktree %s: %v\n", runWT, rmErr)
+			}
+		}
+		if exists, branchErr := branchExists(absProjectRoot, runBranch); branchErr == nil && exists {
+			if delErr := DeleteBranch(absProjectRoot, runBranch); delErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: cleanup run branch %s: %v\n", runBranch, delErr)
 			}
 		}
 		if rmErr := os.RemoveAll(runDir); rmErr != nil && !os.IsNotExist(rmErr) {
@@ -81,12 +98,17 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		return fmt.Errorf("tmux session already exists: %s (goalx stop first)", tmuxSess)
 	}
 
-	// 5b. Warn if working tree has uncommitted changes (future session worktrees are created from HEAD)
+	// 5b. Snapshot tracked changes so the run worktree starts from the current source-root state.
+	snapshotCommit := ""
 	if dirty, err := hasDirtyWorktree(projectRoot); err == nil && dirty {
-		fmt.Fprintln(os.Stderr, "⚠ Working tree has uncommitted changes that won't be visible to future sessions.")
-		fmt.Fprintln(os.Stderr, "  goalx add creates worktrees from the latest commit (HEAD).")
-		fmt.Fprintln(os.Stderr, "  Consider: git add -A && git commit -m 'wip' before letting the master spawn workers.")
-		fmt.Fprintln(os.Stderr, "")
+		if noSnapshot {
+			fmt.Fprintln(os.Stderr, "⚠ Working tree has uncommitted changes (--no-snapshot: skipping auto-commit)")
+		} else {
+			snapshotCommit, err = autoSnapshotTrackedChanges(projectRoot, cfg.Name)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// 6. Create run directory structure
@@ -109,6 +131,10 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	if err := SaveRunSpec(runDir, cfg); err != nil {
 		return fmt.Errorf("write run spec: %w", err)
 	}
+	if err := CreateWorktree(absProjectRoot, runWT, runBranch); err != nil {
+		return fmt.Errorf("create run worktree: %w", err)
+	}
+	runWorktreeCreated = true
 
 	// 9. Resolve master engine command
 	masterCmd, err := goalx.ResolveEngineCommand(engines, cfg.Master.Engine, cfg.Master.Model)
@@ -122,7 +148,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	acceptanceStatePath := AcceptanceStatePath(runDir)
 	statusPath := ProjectStatusCachePath(projectRoot)
 
-	if err := EnsureEngineTrusted(cfg.Master.Engine, absProjectRoot); err != nil {
+	if err := EnsureEngineTrusted(cfg.Master.Engine, runWT); err != nil {
 		return fmt.Errorf("trust bootstrap master: %w", err)
 	}
 
@@ -142,6 +168,9 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		return fmt.Errorf("init run metadata: %w", err)
 	}
 	applyRunMetadataPatch(meta, metaPatch)
+	if snapshotCommit != "" {
+		meta.SnapshotCommit = snapshotCommit
+	}
 	charter, err := NewRunCharter(runDir, cfg.Name, cfg.Objective, meta)
 	if err != nil {
 		return fmt.Errorf("init run charter: %w", err)
@@ -192,7 +221,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		Context:                cfg.Context,
 		Preferences:            cfg.Preferences,
 		TmuxSession:            tmuxSess,
-		ProjectRoot:            absProjectRoot,
+		ProjectRoot:            runWT,
 		SummaryPath:            filepath.Join(runDir, "summary.md"),
 		CharterPath:            RunCharterPath(runDir),
 		GoalPath:               goalPath,
@@ -252,7 +281,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	}
 	masterLeaseTTL := time.Duration(checkSec) * time.Second * 2
 	masterLaunch := buildMasterLaunchCommandWithEnv(launchEnv.Env, goalxBin, cfg.Name, runDir, meta.RunID, meta.Epoch, masterLeaseTTL, masterCmd, masterPrompt)
-	if err := NewSessionWithCommand(tmuxSess, "master", absProjectRoot, masterLaunch); err != nil {
+	if err := NewSessionWithCommand(tmuxSess, "master", runWT, masterLaunch); err != nil {
 		return fmt.Errorf("tmux new-session: %w", err)
 	}
 	tmuxCreated = true
@@ -269,6 +298,37 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	fmt.Printf("  run dir: %s\n", runDir)
 	fmt.Printf("  attach: goalx attach [--run %s] [master|session-N]\n", cfg.Name)
 	return nil
+}
+
+func autoSnapshotTrackedChanges(projectRoot, runName string) (string, error) {
+	addOut, err := exec.Command("git", "-C", projectRoot, "add", "-u").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git add -u: %w: %s", err, strings.TrimSpace(string(addOut)))
+	}
+	if err := exec.Command("git", "-C", projectRoot, "diff", "--cached", "--quiet").Run(); err == nil {
+		fmt.Fprintln(os.Stderr, "ℹ Auto-snapshot: no tracked changes to commit")
+		return "", nil
+	} else {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+			return "", fmt.Errorf("git diff --cached --quiet: %w", err)
+		}
+	}
+
+	commitOut, err := exec.Command("git", "-C", projectRoot, "commit", "-m", fmt.Sprintf("goalx: snapshot before %s", runName)).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git commit auto-snapshot: %w: %s", err, strings.TrimSpace(string(commitOut)))
+	}
+	snapshotCommit, err := gitHeadRevision(projectRoot)
+	if err != nil {
+		return "", err
+	}
+	shortCommit := snapshotCommit
+	if len(shortCommit) > 8 {
+		shortCommit = shortCommit[:8]
+	}
+	fmt.Fprintf(os.Stderr, "✓ Auto-snapshot: %s\n", shortCommit)
+	return snapshotCommit, nil
 }
 
 func applyRunMetadataPatch(meta *RunMetadata, patch *RunMetadata) {

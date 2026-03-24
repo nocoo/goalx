@@ -68,5 +68,5 @@ func Explore(projectRoot string, args []string) error {
 		return nil
 	}
 
-	return startWithConfig(projectRoot, cfg, engines, phaseRunMetadataPatch(source, "explore"))
+	return startWithConfig(projectRoot, cfg, engines, phaseRunMetadataPatch(source, "explore"), false)
 }

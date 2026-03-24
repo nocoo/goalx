@@ -58,6 +58,7 @@ func TestSaveRunMetadataPreservesCharterFields(t *testing.T) {
 		Epoch:           3,
 		BaseRevision:    "base",
 		PhaseKind:       "research",
+		SnapshotCommit:  "abc1234",
 		CharterID:       "charter_abc",
 		CharterHash:     "sha256:abc",
 	}
@@ -77,6 +78,9 @@ func TestSaveRunMetadataPreservesCharterFields(t *testing.T) {
 	}
 	if reloaded.CharterHash != meta.CharterHash {
 		t.Fatalf("CharterHash = %q, want %q", reloaded.CharterHash, meta.CharterHash)
+	}
+	if reloaded.SnapshotCommit != meta.SnapshotCommit {
+		t.Fatalf("SnapshotCommit = %q, want %q", reloaded.SnapshotCommit, meta.SnapshotCommit)
 	}
 }
 

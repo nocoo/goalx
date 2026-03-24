@@ -75,5 +75,5 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		return nil
 	}
 
-	return startWithConfig(projectRoot, cfg, engines, phaseRunMetadataPatch(source, "implement"))
+	return startWithConfig(projectRoot, cfg, engines, phaseRunMetadataPatch(source, "implement"), false)
 }

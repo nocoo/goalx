@@ -117,7 +117,7 @@ esac
 		t.Fatalf("run dir should be removed, stat err = %v", statErr)
 	}
 
-	branch := "goalx/demo/1"
+	branch := "goalx/demo/root"
 	if err := exec.Command("git", "-C", repo, "rev-parse", "--verify", branch).Run(); err == nil {
 		t.Fatalf("branch %s should be deleted during cleanup", branch)
 	}
@@ -542,9 +542,11 @@ esac
 	if err != nil {
 		t.Fatalf("read fake tmux log: %v", err)
 	}
+	runDir := goalx.RunDir(repo, cfg.Name)
+	runWT := RunWorktreePath(runDir)
 	logText := string(logData)
 	for _, want := range []string{
-		"new-session -d -s " + goalx.TmuxSessionName(repo, cfg.Name) + " -n master -c " + repo + " env ",
+		"new-session -d -s " + goalx.TmuxSessionName(repo, cfg.Name) + " -n master -c " + runWT + " env ",
 		"/bin/bash -c ",
 		"lease-loop --run",
 		"--holder",
@@ -562,8 +564,6 @@ esac
 	if strings.Contains(logText, "TMUX_PANE='%99'") {
 		t.Fatalf("start launch should not propagate TMUX_PANE:\n%s", logText)
 	}
-
-	runDir := goalx.RunDir(repo, cfg.Name)
 	launchEnvData, err := os.ReadFile(filepath.Join(runDir, "control", "launch-env.json"))
 	if err != nil {
 		t.Fatalf("read launch env snapshot: %v", err)
@@ -580,5 +580,121 @@ esac
 	}
 	if strings.Contains(launchEnvText, `"TMUX_PANE"`) {
 		t.Fatalf("launch env snapshot should not persist TMUX_PANE:\n%s", launchEnvText)
+	}
+	if _, err := os.Stat(runWT); err != nil {
+		t.Fatalf("run worktree missing: %v", err)
+	}
+}
+
+func TestStartAutoSnapshotsTrackedChangesIntoRunWorktree(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("dirty tracked\n"), 0o644); err != nil {
+		t.Fatalf("write dirty README: %v", err)
+	}
+
+	goalxDir := filepath.Join(repo, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "snapshot-demo",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
+		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "codex",
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	binDir := t.TempDir()
+	stateDir := t.TempDir()
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+state="${GOALX_FAKE_TMUX_STATE:?}"
+mkdir -p "$state"
+cmd="$1"
+shift
+case "$cmd" in
+  has-session)
+    target="$2"
+    if [ -f "$state/session_$target" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  new-session)
+    name=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "-s" ]; then
+        shift
+        name="$1"
+        break
+      fi
+      shift
+    done
+    : > "$state/session_$name"
+    exit 0
+    ;;
+  kill-session)
+    target="$2"
+    rm -f "$state/session_$target"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
+
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error { return nil }
+
+	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, cfg.Name)
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+	if meta.SnapshotCommit == "" {
+		t.Fatal("SnapshotCommit empty, want auto-snapshot commit hash")
+	}
+	head := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))
+	if meta.SnapshotCommit != head {
+		t.Fatalf("SnapshotCommit = %q, want HEAD %q", meta.SnapshotCommit, head)
+	}
+	if got := strings.TrimSpace(gitOutput(t, repo, "log", "-1", "--pretty=%s")); got != "goalx: snapshot before snapshot-demo" {
+		t.Fatalf("latest commit subject = %q", got)
+	}
+
+	runWT := RunWorktreePath(runDir)
+	data, err = os.ReadFile(filepath.Join(runWT, "README.md"))
+	if err != nil {
+		t.Fatalf("read run worktree README: %v", err)
+	}
+	if string(data) != "dirty tracked\n" {
+		t.Fatalf("run worktree README = %q, want dirty tracked contents", string(data))
 	}
 }

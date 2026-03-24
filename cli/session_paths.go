@@ -16,6 +16,11 @@ func JournalPath(runDir, sessionName string) string {
 	return filepath.Join(runDir, "journals", sessionName+".jsonl")
 }
 
+// RunWorktreePath returns the run-scoped root worktree path.
+func RunWorktreePath(runDir string) string {
+	return filepath.Join(runDir, "worktrees", "root")
+}
+
 // WorktreePath returns the worktree directory for a session.
 func WorktreePath(runDir, cfgName string, num int) string {
 	return filepath.Join(runDir, "worktrees", cfgName+"-"+strconv.Itoa(num))

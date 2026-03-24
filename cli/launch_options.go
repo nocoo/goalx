@@ -21,6 +21,7 @@ type launchOptions struct {
 	Auditor      string
 	Subs         []string
 	Preset       string
+	NoSnapshot   bool
 }
 
 type startInitOptions = launchOptions
@@ -163,6 +164,8 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 			}
 			i++
 			opts.Preset = args[i]
+		case "--no-snapshot":
+			opts.NoSnapshot = true
 		case "--engine", "--model":
 			return opts, fmt.Errorf("%s is ambiguous; use --master, --research-role, --develop-role, or --sub", args[i])
 		default:
@@ -182,10 +185,18 @@ func parseStartArgs(args []string) (startOptions, error) {
 		return opts, nil
 	}
 	if args[0] == "--config" {
-		if len(args) != 2 {
+		if len(args) < 2 {
 			return opts, fmt.Errorf("usage: goalx start --config PATH")
 		}
 		opts.ConfigPath = args[1]
+		for i := 2; i < len(args); i++ {
+			switch args[i] {
+			case "--no-snapshot":
+				opts.NoSnapshot = true
+			default:
+				return opts, fmt.Errorf("unknown flag %q", args[i])
+			}
+		}
 		return opts, nil
 	}
 	launch, err := parseLaunchOptions(args, goalx.ModeDevelop, true)

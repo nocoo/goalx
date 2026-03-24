@@ -23,7 +23,7 @@ func Research(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load base config: %w", err)
 	}
-	return startWithConfig(projectRoot, cfg, engines, nil)
+	return startWithConfig(projectRoot, cfg, engines, nil, opts.NoSnapshot)
 }
 
 func loadLaunchEngines(projectRoot string) (*goalx.Config, map[string]goalx.EngineConfig, error) {

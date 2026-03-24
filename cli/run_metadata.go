@@ -25,6 +25,7 @@ type RunMetadata struct {
 	RootRunID       string `json:"root_run_id,omitempty"`
 	Epoch           int    `json:"epoch,omitempty"`
 	BaseRevision    string `json:"base_revision,omitempty"`
+	SnapshotCommit  string `json:"snapshot_commit,omitempty"`
 	PhaseKind       string `json:"phase_kind,omitempty"`
 	SourceRun       string `json:"source_run,omitempty"`
 	SourcePhase     string `json:"source_phase,omitempty"`
