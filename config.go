@@ -347,7 +347,7 @@ func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	// Auto-detect preset from available engines only when no preset is configured.
 	// If the user explicitly set a preset (even "codex"), respect it.
 	if cfg.Preset == "" {
-		cfg.Preset = detectPresetFromEnvironment(BuiltinDefaults.Preset)
+		cfg.Preset = DetectPresetFromEnvironment()
 	}
 
 	// Apply preset to fill in role defaults.
@@ -361,10 +361,10 @@ func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	return &cfg
 }
 
-// detectPresetFromEnvironment checks which engines are available and picks
+// DetectPresetFromEnvironment checks which engines are available and picks
 // the best preset. If both claude and codex are installed, use "hybrid"
 // (master=opus, sessions=codex). If only one is available, use its preset.
-func detectPresetFromEnvironment(current string) string {
+func DetectPresetFromEnvironment() string {
 	hasClaude := commandExists("claude")
 	hasCodex := commandExists("codex")
 	switch {
@@ -375,7 +375,7 @@ func detectPresetFromEnvironment(current string) string {
 	case hasCodex:
 		return "codex"
 	default:
-		return current // keep whatever was configured
+		return "codex" // fallback
 	}
 }
 
@@ -460,6 +460,22 @@ func applyPreset(cfg *Config) {
 // ApplyPreset fills missing master/role defaults from the selected preset.
 func ApplyPreset(cfg *Config) {
 	applyPreset(cfg)
+}
+
+// ForceApplyPreset overwrites master/role engine/model from the preset,
+// even if they were already filled. Used when auto-detection changes the
+// preset after an initial applyPreset with a different (fallback) preset.
+func ForceApplyPreset(cfg *Config) {
+	preset, ok := Presets[cfg.Preset]
+	if !ok {
+		return
+	}
+	cfg.Master.Engine = preset.Master.Engine
+	cfg.Master.Model = preset.Master.Model
+	cfg.Roles.Research.Engine = preset.Research.Engine
+	cfg.Roles.Research.Model = preset.Research.Model
+	cfg.Roles.Develop.Engine = preset.Develop.Engine
+	cfg.Roles.Develop.Model = preset.Develop.Model
 }
 
 // ValidateConfig checks the config before creating any side effects.
