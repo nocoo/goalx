@@ -30,16 +30,48 @@ GoalX creates a run directory, launches the master transport session, and starts
 ```bash
 git clone https://github.com/vonbai/goalx.git
 cd goalx
-go build -o /usr/local/bin/goalx ./cmd/goalx
+make install        # builds to /usr/local/bin/goalx
+make skill-sync     # copies skill to ~/.claude/skills/goalx/ (optional, for Claude Code users)
 ```
-
-Always install to `/usr/local/bin/goalx`. Do not use `go install` for GoalX.
 
 ### Requirements
 
 - Go 1.24+
 - tmux
 - One of: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex)
+
+### Zero-Config Experience
+
+GoalX auto-detects installed engines and picks the best preset:
+
+| Available Engines | Auto Preset | Master | Sessions |
+|-------------------|------------|--------|----------|
+| Claude Code + Codex | hybrid | claude-code/opus | codex/gpt-5.4 |
+| Claude Code only | claude | claude-code/opus | claude-code/sonnet |
+| Codex only | codex | codex/gpt-5.4 | codex/gpt-5.4 |
+
+No config file needed. Just install and run.
+
+### Optional: Custom Config
+
+Override defaults in `~/.goalx/config.yaml` (user-level) or `.goalx/config.yaml` (project-level):
+
+```yaml
+# ~/.goalx/config.yaml — only needed to override auto-detected defaults
+master:
+  engine: claude-code
+  model: opus
+roles:
+  research: { engine: codex, model: gpt-5.4, effort: high }
+  develop:  { engine: codex, model: gpt-5.4, effort: medium }
+```
+
+Project-level config is for project-specific harness only:
+```yaml
+# .goalx/config.yaml — project-specific
+harness:
+  command: "go build ./... && go test ./... && go vet ./..."
+```
 
 ## Quick Start
 

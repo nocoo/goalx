@@ -3,6 +3,7 @@ package goalx
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -343,6 +344,12 @@ func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay 
 func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
 
+	// Auto-detect preset from available engines only when no preset is configured.
+	// If the user explicitly set a preset (even "codex"), respect it.
+	if cfg.Preset == "" {
+		cfg.Preset = detectPresetFromEnvironment(BuiltinDefaults.Preset)
+	}
+
 	// Apply preset to fill in role defaults.
 	applyPreset(&cfg)
 
@@ -352,6 +359,29 @@ func finalizeLoadedConfig(projectRoot string, cfg Config) *Config {
 	}
 
 	return &cfg
+}
+
+// detectPresetFromEnvironment checks which engines are available and picks
+// the best preset. If both claude and codex are installed, use "hybrid"
+// (master=opus, sessions=codex). If only one is available, use its preset.
+func detectPresetFromEnvironment(current string) string {
+	hasClaude := commandExists("claude")
+	hasCodex := commandExists("codex")
+	switch {
+	case hasClaude && hasCodex:
+		return "hybrid"
+	case hasClaude:
+		return "claude"
+	case hasCodex:
+		return "codex"
+	default:
+		return current // keep whatever was configured
+	}
+}
+
+func commandExists(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
 }
 
 // LoadRawBaseConfig loads built-in, user, and project config layers without
