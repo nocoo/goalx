@@ -1,18 +1,18 @@
 package goalx
 
-import (
-	"errors"
-	"testing"
-)
+import "testing"
 
 type resolverTestLayers struct {
 	Base           Config
+	ManualDraft    *Config
 	DetectedPreset string
 }
 
 type resolverTestRequest struct {
-	Preset string
-	Mode   Mode
+	Preset       string
+	Mode         Mode
+	MasterEngine string
+	MasterModel  string
 }
 
 type resolverTestResult struct {
@@ -20,12 +20,41 @@ type resolverTestResult struct {
 	Config Config
 }
 
-var errResolverNotImplemented = errors.New("resolver not implemented")
-
 func resolveConfigFixture(layers resolverTestLayers, req resolverTestRequest) (resolverTestResult, error) {
-	_ = layers
-	_ = req
-	return resolverTestResult{}, errResolverNotImplemented
+	base := layers.Base
+	catalogPresets := copyPresetCatalog(Presets)
+	catalogDimensions := copyStringCatalog(BuiltinDimensions)
+	attachCatalogs(&base, catalogPresets, catalogDimensions)
+
+	oldDetect := detectPresetForResolve
+	detectPresetForResolve = func() string {
+		return layers.DetectedPreset
+	}
+	defer func() {
+		detectPresetForResolve = oldDetect
+	}()
+
+	resolved, err := ResolveConfig(&ConfigLayers{
+		Config:     base,
+		Engines:    copyEngines(BuiltinEngines),
+		Presets:    catalogPresets,
+		Dimensions: catalogDimensions,
+	}, ResolveRequest{
+		ManualDraft: layers.ManualDraft,
+		Mode:        req.Mode,
+		Preset:      req.Preset,
+		MasterOverride: &MasterConfig{
+			Engine: req.MasterEngine,
+			Model:  req.MasterModel,
+		},
+	})
+	if err != nil {
+		return resolverTestResult{}, err
+	}
+	return resolverTestResult{
+		Preset: resolved.Config.Preset,
+		Config: resolved.Config,
+	}, nil
 }
 
 func TestResolveConfigSemantics(t *testing.T) {
@@ -63,6 +92,31 @@ func TestResolveConfigSemantics(t *testing.T) {
 			},
 		},
 		{
+			name: "shared config baseline applies before detection",
+			layers: resolverTestLayers{
+				Base: Config{
+					Name:      "demo",
+					Mode:      ModeDevelop,
+					Objective: "lock config state",
+					Preset:    "claude-h",
+					Target:    TargetConfig{Files: []string{"README.md"}},
+					Harness:   HarnessConfig{Command: "go test ./..."},
+				},
+				DetectedPreset: "hybrid",
+			},
+			req: resolverTestRequest{
+				Mode: ModeDevelop,
+			},
+			want: resolverTestResult{
+				Preset: "claude-h",
+				Config: Config{
+					Preset: "claude-h",
+					Mode:   ModeDevelop,
+					Master: MasterConfig{Engine: "claude-code", Model: "opus"},
+				},
+			},
+		},
+		{
 			name: "unset preset uses the discovered preset",
 			layers: resolverTestLayers{
 				Base: Config{
@@ -83,6 +137,63 @@ func TestResolveConfigSemantics(t *testing.T) {
 					Preset: "claude",
 					Mode:   ModeDevelop,
 					Master: MasterConfig{Engine: "claude-code", Model: "opus"},
+				},
+			},
+		},
+		{
+			name: "manual draft overlay wins over shared config baseline",
+			layers: resolverTestLayers{
+				Base: Config{
+					Name:      "demo",
+					Mode:      ModeDevelop,
+					Objective: "lock config state",
+					Preset:    "codex",
+					Target:    TargetConfig{Files: []string{"README.md"}},
+					Harness:   HarnessConfig{Command: "go test ./..."},
+				},
+				ManualDraft: &Config{
+					Preset: "claude-h",
+				},
+				DetectedPreset: "hybrid",
+			},
+			req: resolverTestRequest{
+				Mode: ModeDevelop,
+			},
+			want: resolverTestResult{
+				Preset: "claude-h",
+				Config: Config{
+					Preset: "claude-h",
+					Mode:   ModeDevelop,
+					Master: MasterConfig{Engine: "claude-code", Model: "opus"},
+				},
+			},
+		},
+		{
+			name: "cli override wins over manual draft role defaults",
+			layers: resolverTestLayers{
+				Base: Config{
+					Name:      "demo",
+					Mode:      ModeDevelop,
+					Objective: "lock config state",
+					Target:    TargetConfig{Files: []string{"README.md"}},
+					Harness:   HarnessConfig{Command: "go test ./..."},
+				},
+				ManualDraft: &Config{
+					Preset: "claude",
+				},
+				DetectedPreset: "hybrid",
+			},
+			req: resolverTestRequest{
+				Mode:         ModeDevelop,
+				MasterEngine: "codex",
+				MasterModel:  "gpt-5.4",
+			},
+			want: resolverTestResult{
+				Preset: "claude",
+				Config: Config{
+					Preset: "claude",
+					Mode:   ModeDevelop,
+					Master: MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 				},
 			},
 		},
