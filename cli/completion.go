@@ -11,10 +11,11 @@ import (
 )
 
 // CompletionState records raw facts about the run's code state.
-// All interpretation (satisfaction, mode, result) belongs to the master agent.
+// All interpretation (satisfaction, mode, whether code "changed") belongs
+// to the master agent — the framework only stores file lists, revisions,
+// and session references.
 type CompletionState struct {
 	Version      int                   `json:"version"`
-	CodeChanged  bool                  `json:"code_changed"`
 	ChangedFiles []string              `json:"changed_files,omitempty"`
 	KeptSession  string                `json:"kept_session,omitempty"`
 	BaseRevision string                `json:"base_revision,omitempty"`
@@ -74,7 +75,6 @@ func DetectCompletionState(projectRoot, runDir string) (*CompletionState, error)
 		return nil, err
 	}
 	selection, _ := loadSelectionFile(filepath.Join(runDir, "selection.json"))
-	codeChanged := len(changedFiles) > 0
 
 	state := &CompletionState{
 		Version:      1,
@@ -83,13 +83,9 @@ func DetectCompletionState(projectRoot, runDir string) (*CompletionState, error)
 		CharterID:    charter.CharterID,
 		CharterHash:  charterHash,
 		ChangedFiles: changedFiles,
-		CodeChanged:  codeChanged,
 	}
 	if selection != nil {
 		state.KeptSession = selection.Kept
-		if state.KeptSession != "" {
-			state.CodeChanged = true
-		}
 	}
 	return state, nil
 }

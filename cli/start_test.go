@@ -323,15 +323,17 @@ esac
 	}
 	stateText := string(stateData)
 	for _, want := range []string{
-		`"status": "pending"`,
 		`"default_command": "test -f README.md"`,
 		`"effective_command": "test -f README.md"`,
-		`"change_kind": "same"`,
 		`"goal_version": 1`,
 	} {
 		if !strings.Contains(stateText, want) {
 			t.Fatalf("acceptance state missing %q:\n%s", want, stateText)
 		}
+	}
+	// Framework must not auto-derive status or change_kind
+	if strings.Contains(stateText, `"status"`) {
+		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
 	}
 }
 

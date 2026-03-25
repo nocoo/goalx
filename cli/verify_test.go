@@ -74,16 +74,18 @@ acceptance:
 	}
 	stateText := string(stateData)
 	for _, want := range []string{
-		`"status": "passed"`,
 		`"default_command": "printf 'e2e ok\n'"`,
 		`"effective_command": "printf 'e2e ok\n'"`,
-		`"change_kind": "same"`,
 		`"goal_version": 1`,
 		`"exit_code": 0`,
 	} {
 		if !strings.Contains(stateText, want) {
 			t.Fatalf("acceptance state missing %q:\n%s", want, stateText)
 		}
+	}
+	// Framework must NOT derive status from exit code — that's the master's job
+	if strings.Contains(stateText, `"status"`) {
+		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
 	}
 
 }
@@ -197,13 +199,19 @@ harness:
 	}
 	stateText := string(stateData)
 	for _, want := range []string{
-		`"status": "failed"`,
 		`"default_command": "test -f DOES-NOT-EXIST"`,
 		`"effective_command": "test -f DOES-NOT-EXIST"`,
 	} {
 		if !strings.Contains(stateText, want) {
 			t.Fatalf("acceptance state missing %q:\n%s", want, stateText)
 		}
+	}
+	// Framework records exit code, not derived status
+	if !strings.Contains(stateText, `"exit_code"`) {
+		t.Fatalf("acceptance state missing exit_code:\n%s", stateText)
+	}
+	if strings.Contains(stateText, `"status"`) {
+		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
 	}
 }
 
@@ -271,8 +279,11 @@ acceptance:
 		t.Fatalf("read acceptance state: %v", err)
 	}
 	stateText := string(stateData)
-	if !strings.Contains(stateText, `"status": "passed"`) {
-		t.Fatalf("acceptance state missing passed status:\n%s", stateText)
+	if !strings.Contains(stateText, `"exit_code": 0`) {
+		t.Fatalf("acceptance state missing exit_code 0:\n%s", stateText)
+	}
+	if strings.Contains(stateText, `"status"`) {
+		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
 	}
 }
 

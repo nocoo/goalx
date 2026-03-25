@@ -72,10 +72,9 @@ func Verify(projectRoot string, args []string) error {
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	exitCode := 0
-	gateStatus := acceptanceStatusFailed
 	switch {
 	case runErr == nil:
-		gateStatus = acceptanceStatusPassed
+		// exit code 0
 	case errors.Is(runErr, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded:
 		exitCode = 124
 	case runErr != nil:
@@ -87,7 +86,6 @@ func Verify(projectRoot string, args []string) error {
 		}
 	}
 	state.LastResult = AcceptanceResult{
-		Status:       gateStatus,
 		CheckedAt:    now,
 		ExitCode:     &exitCode,
 		EvidencePath: evidencePath,
