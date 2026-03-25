@@ -508,6 +508,149 @@ func TestSidecarStopsWhenRunIdentityChanges(t *testing.T) {
 	}
 }
 
+func TestSidecarFinalizesCompletedRunWhenMasterSessionIsGone(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+
+	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState: %v", err)
+	}
+	runState.Active = true
+	runState.Phase = "complete"
+	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := RenewControlLease(runDir, "master", "run_demo", 1, time.Minute, "tmux", exitedProcessPID(t)); err != nil {
+		t.Fatalf("RenewControlLease master: %v", err)
+	}
+	if err := RenewControlLease(runDir, "session-1", "run_demo", 1, time.Minute, "tmux", exitedProcessPID(t)); err != nil {
+		t.Fatalf("RenewControlLease session-1: %v", err)
+	}
+	if err := SaveControlReminders(ControlRemindersPath(runDir), &ControlReminders{
+		Version: 1,
+		Items: []ControlReminder{
+			{ReminderID: "rem-1", DedupeKey: "master-wake", Reason: "control-cycle", Target: "gx-demo:master"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlReminders: %v", err)
+	}
+	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
+		Version: 1,
+		Items: []ControlDelivery{
+			{DeliveryID: "del-1", DedupeKey: "master-wake", Status: "failed", Target: "gx-demo:master"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 1; fi\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- runSidecarLoop(ctx, repo, runName, runDir, meta.RunID, meta.Epoch, 50*time.Millisecond)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runSidecarLoop: %v", err)
+		}
+	case <-time.After(300 * time.Millisecond):
+		cancel()
+		<-done
+		t.Fatal("sidecar did not stop after completed run lost its master session")
+	}
+
+	runState, err = LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState after: %v", err)
+	}
+	if runState.Active {
+		t.Fatalf("run state still active: %+v", runState)
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState after: %v", err)
+	}
+	if controlState.LifecycleState != "completed" {
+		t.Fatalf("lifecycle_state = %q, want completed", controlState.LifecycleState)
+	}
+
+	lease, err := LoadControlLease(ControlLeasePath(runDir, "master"))
+	if err != nil {
+		t.Fatalf("LoadControlLease master: %v", err)
+	}
+	if lease.PID != 0 || lease.RunID != "" {
+		t.Fatalf("master lease not expired: %+v", lease)
+	}
+	lease, err = LoadControlLease(ControlLeasePath(runDir, "sidecar"))
+	if err != nil {
+		t.Fatalf("LoadControlLease sidecar: %v", err)
+	}
+	if lease.PID != 0 || lease.RunID != "" {
+		t.Fatalf("sidecar lease not expired: %+v", lease)
+	}
+
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders after: %v", err)
+	}
+	if len(reminders.Items) != 1 || !reminders.Items[0].Suppressed {
+		t.Fatalf("unexpected reminders after finalize: %+v", reminders.Items)
+	}
+
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlDeliveries after: %v", err)
+	}
+	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "cancelled" {
+		t.Fatalf("unexpected deliveries after finalize: %+v", deliveries.Items)
+	}
+
+	reg, err := LoadProjectRegistry(repo)
+	if err != nil {
+		t.Fatalf("LoadProjectRegistry: %v", err)
+	}
+	if _, ok := reg.ActiveRuns[runName]; ok {
+		t.Fatalf("run %q still registered active after completion", runName)
+	}
+}
+
 func bootstrapSidecarIdentityFixture(t *testing.T, runDir, repo string, cfg *goalx.Config, meta *RunMetadata) {
 	t.Helper()
 

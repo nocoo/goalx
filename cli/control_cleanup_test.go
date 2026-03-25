@@ -103,3 +103,67 @@ esac
 
 	waitForProcessExit(t, childPID)
 }
+
+func TestStopSucceedsWhenTmuxSessionAlreadyExited(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+
+	origStopSidecar := stopRunSidecar
+	defer func() { stopRunSidecar = origStopSidecar }()
+	stopRunSidecar = func(runDir string) error { return nil }
+
+	fakeBin := t.TempDir()
+	statePath := filepath.Join(fakeBin, "tmux-session")
+	if err := os.WriteFile(statePath, []byte("live\n"), 0o644); err != nil {
+		t.Fatalf("write tmux state: %v", err)
+	}
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+case "$1" in
+  has-session)
+    if [ -f "$TMUX_STATE_PATH" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  kill-session)
+    rm -f "$TMUX_STATE_PATH"
+    exit 1
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("TMUX_STATE_PATH", statePath)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := Stop(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	runState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if runState.LifecycleState != "stopped" {
+		t.Fatalf("lifecycle_state = %q, want stopped", runState.LifecycleState)
+	}
+}

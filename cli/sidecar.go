@@ -21,6 +21,7 @@ var launchRunSidecar = defaultLaunchRunSidecar
 var stopRunSidecar = defaultStopRunSidecar
 
 var errSidecarStale = errors.New("sidecar run is stale")
+var errSidecarCompleted = errors.New("sidecar run completed")
 
 func Sidecar(projectRoot string, args []string) error {
 	runName, interval, err := parseSidecarArgs(args)
@@ -96,6 +97,10 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 			exitReason = errSidecarStale.Error()
 			return nil
 		}
+		if errors.Is(err, errSidecarCompleted) {
+			exitReason = errSidecarCompleted.Error()
+			return nil
+		}
 		return reportError(err)
 	}
 	ticker := time.NewTicker(interval)
@@ -116,6 +121,10 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 				if errors.Is(err, errSidecarStale) {
 					shouldExpire = false
 					exitReason = errSidecarStale.Error()
+					return nil
+				}
+				if errors.Is(err, errSidecarCompleted) {
+					exitReason = errSidecarCompleted.Error()
 					return nil
 				}
 				return reportError(err)
@@ -141,6 +150,17 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 		}
 		return err
 	}
+	tmuxSession := goalx.TmuxSessionName(projectRoot, runName)
+	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		return err
+	}
+	if runState != nil && runState.Phase == "complete" && !SessionExists(tmuxSession) {
+		if err := finalizeCompletedRunFromSidecar(projectRoot, runName, runDir); err != nil {
+			return err
+		}
+		return errSidecarCompleted
+	}
 	ttl := interval * 2
 	if ttl < time.Second {
 		ttl = time.Second
@@ -153,7 +173,7 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 		return err
 	}
 	if changed {
-		if err := queueRefreshContextReminder(runDir, goalx.TmuxSessionName(projectRoot, runName)); err != nil {
+		if err := queueRefreshContextReminder(runDir, tmuxSession); err != nil {
 			return err
 		}
 	}
@@ -171,15 +191,15 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 	if err != nil {
 		return err
 	}
-	runState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
 	if err != nil {
 		return err
 	}
 	urgentUnread := hasUrgentUnread(runDir)
-	urgentTicks := runState.UrgentUnreadTicks
+	urgentTicks := controlState.UrgentUnreadTicks
 	if urgentUnread {
 		urgentTicks++
-		tmuxTarget := goalx.TmuxSessionName(projectRoot, runName) + ":master"
+		tmuxTarget := tmuxSession + ":master"
 		if urgentTicks == 1 {
 			if err := SendEscape(tmuxTarget); err != nil {
 				return err
@@ -189,7 +209,7 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 				return err
 			}
 		} else if urgentTicks >= 3 {
-			if err := relaunchMaster(projectRoot, runDir, goalx.TmuxSessionName(projectRoot, runName), cfg); err != nil {
+			if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
 				return err
 			}
 			urgentTicks = 0
@@ -197,14 +217,14 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 	} else {
 		urgentTicks = 0
 	}
-	if urgentTicks != runState.UrgentUnreadTicks {
-		runState.UrgentUnreadTicks = urgentTicks
-		runState.UpdatedAt = ""
-		if err := SaveControlRunState(ControlRunStatePath(runDir), runState); err != nil {
+	if urgentTicks != controlState.UrgentUnreadTicks {
+		controlState.UrgentUnreadTicks = urgentTicks
+		controlState.UpdatedAt = ""
+		if err := SaveControlRunState(ControlRunStatePath(runDir), controlState); err != nil {
 			return err
 		}
 	}
-	if err := queueMasterWakeReminder(runDir, goalx.TmuxSessionName(projectRoot, runName)); err != nil {
+	if err := queueMasterWakeReminder(runDir, tmuxSession); err != nil {
 		return err
 	}
 	return DeliverDueControlReminders(runDir, cfg.Master.Engine, interval, sendAgentNudge)

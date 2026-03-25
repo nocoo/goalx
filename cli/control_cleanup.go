@@ -7,11 +7,23 @@ import (
 	"time"
 )
 
+type finalizeControlRunOptions struct {
+	killLeasedProcesses bool
+	skipKillHolders     map[string]bool
+	skipExpireHolders   map[string]bool
+}
+
 func FinalizeControlRun(runDir, lifecycle string) error {
+	return finalizeControlRun(runDir, lifecycle, finalizeControlRunOptions{killLeasedProcesses: true})
+}
+
+func finalizeControlRun(runDir, lifecycle string, opts finalizeControlRunOptions) error {
 	if err := EnsureControlState(runDir); err != nil {
 		return err
 	}
-	killAllLeasedProcesses(runDir)
+	if opts.killLeasedProcesses {
+		killLeasedProcesses(runDir, opts.skipKillHolders)
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -25,7 +37,7 @@ func FinalizeControlRun(runDir, lifecycle string) error {
 		return err
 	}
 
-	if err := expireAllControlLeases(runDir); err != nil {
+	if err := expireControlLeases(runDir, opts.skipExpireHolders); err != nil {
 		return err
 	}
 	if err := finalizeSessionRuntimeStates(runDir, lifecycle, now); err != nil {
@@ -61,12 +73,20 @@ func FinalizeControlRun(runDir, lifecycle string) error {
 }
 
 func killAllLeasedProcesses(runDir string) {
+	killLeasedProcesses(runDir, nil)
+}
+
+func killLeasedProcesses(runDir string, skipHolders map[string]bool) {
 	entries, err := os.ReadDir(ControlLeasesDir(runDir))
 	if err != nil {
 		return
 	}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		holder := strings.TrimSuffix(entry.Name(), ".json")
+		if shouldSkipControlHolder(skipHolders, holder) {
 			continue
 		}
 		lease, err := LoadControlLease(filepath.Join(ControlLeasesDir(runDir), entry.Name()))
@@ -103,10 +123,20 @@ func finalizeSessionRuntimeStates(runDir, lifecycle, now string) error {
 }
 
 func expireAllControlLeases(runDir string) error {
-	if err := ExpireControlLease(runDir, "master"); err != nil {
+	return expireControlLeases(runDir, nil)
+}
+
+func expireControlLeases(runDir string, skipHolders map[string]bool) error {
+	expire := func(holder string) error {
+		if shouldSkipControlHolder(skipHolders, holder) {
+			return nil
+		}
+		return ExpireControlLease(runDir, holder)
+	}
+	if err := expire("master"); err != nil {
 		return err
 	}
-	if err := ExpireControlLease(runDir, "sidecar"); err != nil {
+	if err := expire("sidecar"); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(ControlLeasesDir(runDir))
@@ -121,7 +151,7 @@ func expireAllControlLeases(runDir string) error {
 			continue
 		}
 		holder := strings.TrimSuffix(entry.Name(), ".json")
-		if holder == "" || holder == "master" || holder == "sidecar" {
+		if holder == "" || holder == "master" || holder == "sidecar" || shouldSkipControlHolder(skipHolders, holder) {
 			continue
 		}
 		if err := ExpireControlLease(runDir, holder); err != nil {
@@ -129,4 +159,34 @@ func expireAllControlLeases(runDir string) error {
 		}
 	}
 	return nil
+}
+
+func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		return err
+	}
+	if runState != nil {
+		runState.Active = false
+		runState.UpdatedAt = now
+		if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
+			return err
+		}
+	}
+
+	if err := MarkRunInactive(projectRoot, runName); err != nil {
+		return err
+	}
+
+	return finalizeControlRun(runDir, "completed", finalizeControlRunOptions{
+		killLeasedProcesses: true,
+		skipKillHolders:     map[string]bool{"sidecar": true},
+		skipExpireHolders:   map[string]bool{"sidecar": true},
+	})
+}
+
+func shouldSkipControlHolder(skipHolders map[string]bool, holder string) bool {
+	return skipHolders != nil && skipHolders[holder]
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -104,6 +105,9 @@ func TestStartWithExplicitManualConfig(t *testing.T) {
 	})
 
 	installStartFakeTmux(t)
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error { return nil }
 
 	draftPath := filepath.Join(repo, ".goalx", "goalx.yaml")
 	if err := Start(repo, []string{"--config", draftPath}); err != nil {

@@ -663,6 +663,10 @@ esac
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
 
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error { return nil }
+
 	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

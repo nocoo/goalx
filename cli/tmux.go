@@ -86,6 +86,20 @@ func KillSession(session string) error {
 	return exec.Command("tmux", "kill-session", "-t", session).Run()
 }
 
+// KillSessionIfExists treats an already-exited tmux session as a successful kill.
+func KillSessionIfExists(session string) error {
+	if !SessionExists(session) {
+		return nil
+	}
+	if err := KillSession(session); err != nil {
+		if !SessionExists(session) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // KillWindow destroys a single window in a tmux session.
 func KillWindow(session, window string) error {
 	target := session + ":" + window

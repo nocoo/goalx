@@ -78,7 +78,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 			return
 		}
 		if tmuxCreated {
-			if killErr := KillSession(tmuxSess); killErr != nil {
+			if killErr := KillSessionIfExists(tmuxSess); killErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: cleanup tmux session %s: %v\n", tmuxSess, killErr)
 			}
 		}

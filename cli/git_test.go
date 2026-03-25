@@ -299,6 +299,64 @@ func TestDropRemovesRunDirectoryAndBranch(t *testing.T) {
 	}
 }
 
+func TestDropSkipsSourceRootGitCleanupWhenProjectRootMissing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	runName := "drop-run"
+	runDir := goalx.RunDir(repo, runName)
+	for _, dir := range []string{
+		filepath.Join(runDir, "journals"),
+		filepath.Join(runDir, "worktrees"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nharness:\n  command: \"test -f base.txt\"\n")
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session journal: %v", err)
+	}
+
+	branch := "goalx/drop-run/1"
+	worktreePath := filepath.Join(runDir, "worktrees", "drop-run-1")
+	if err := CreateWorktree(repo, worktreePath, branch); err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+	runBranch := "goalx/drop-run/root"
+	runWorktreePath := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWorktreePath, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+
+	origStopSidecar := stopRunSidecar
+	defer func() { stopRunSidecar = origStopSidecar }()
+	stopRunSidecar = func(runDir string) error { return nil }
+
+	if err := os.RemoveAll(repo); err != nil {
+		t.Fatalf("remove repo: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Drop(repo, []string{"--run", runName}); err != nil {
+			t.Fatalf("Drop: %v", err)
+		}
+	})
+
+	if strings.Contains(out, "Warning: remove") || strings.Contains(out, "Warning: delete branch") {
+		t.Fatalf("drop output should not warn when source root is missing:\n%s", out)
+	}
+	if _, err := os.Stat(runDir); !os.IsNotExist(err) {
+		t.Fatalf("run dir still exists: %v", err)
+	}
+}
+
 func TestDropRefusesUnsavedRunWithArtifacts(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
