@@ -253,7 +253,6 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		Mode:                   cfg.Mode,
 		Engines:                engines,
 		Master:                 cfg.Master,
-		Harness:                cfg.Harness,
 		Budget:                 cfg.Budget,
 		Target:                 cfg.Target,
 		Context:                cfg.Context,

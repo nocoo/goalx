@@ -198,7 +198,7 @@ harness:
 	if err != nil {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
-	if !strings.Contains(string(out), "You are running in Codex CLI with file system access and shell execution.") {
+	if !strings.Contains(string(out), "You are running in Codex CLI.") {
 		t.Fatalf("rendered protocol missing codex engine guidance:\n%s", string(out))
 	}
 }
@@ -694,7 +694,8 @@ harness:
 	for _, want := range []string{
 		"## Mode: Research",
 		"Research mode typically focuses on producing reports; code modification controlled by target config.",
-		"Agent tool",
+		"## Native Helpers",
+		"You are running in Claude Code.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
@@ -908,7 +909,7 @@ harness:
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	if !strings.Contains(text, "You are running in Claude Code with access to:") {
+	if !strings.Contains(text, "You are running in Claude Code.") {
 		t.Fatalf("rendered protocol missing claude research engine guidance:\n%s", text)
 	}
 	if _, err := os.Stat(filepath.Join(runWT, ".claude", "hooks.json")); err != nil {

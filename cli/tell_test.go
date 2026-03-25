@@ -268,7 +268,7 @@ func TestRenderSubagentProtocolIncludesSessionInboxAckPath(t *testing.T) {
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
 		JournalPath:       "/tmp/journals/session-1.jsonl",
 		Target:            goalx.TargetConfig{Files: []string{"."}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 	}
 
 	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {

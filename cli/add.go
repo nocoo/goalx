@@ -278,7 +278,7 @@ func Add(projectRoot string, args []string) (err error) {
 		Engine:              sessionIdentity.Engine,
 		Sessions:            sessionDataList,
 		Target:              sessionIdentity.Target,
-		Harness:             rc.Config.Harness,
+		LocalValidationCommand: strings.TrimSpace(rc.Config.Harness.Command),
 		Context:             rc.Config.Context,
 		Budget:              rc.Config.Budget,
 		SessionName:         sName,

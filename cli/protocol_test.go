@@ -18,7 +18,7 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		SessionName:       "session-1",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
@@ -41,9 +41,12 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Session inbox: `/tmp/control/inbox/session-1.jsonl`",
 		"Session cursor: `/tmp/control/session-1-cursor.json`",
 		"Objective: ship it",
-		"Gate: `go test ./...`",
+		"Local validation command: `go test ./...`",
+		"`goalx context --run demo`",
+		"`goalx afford --run demo`",
 		"## Resume From Durable State",
 		"Do not rebuild the full chat history",
+		"Read the current run guidance surfaces above",
 		"Read the recent journal tail",
 		"Read unread session inbox entries",
 		"Inspect the current worktree state",
@@ -83,11 +86,12 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Your Tools",
-		"Agent tool",
-		"WebSearch/WebFetch",
-		"When you have 2+ independent research or analysis angles",
-		"collapse the results back into this session's journal, report, or dispatchable_slices",
+		"## Native Helpers",
+		"You are running in Claude Code.",
+		"Native subagents are transient helpers inside this session.",
+		"short parallel reading, review, doc/API checks, or adversarial cross-checks",
+		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
+		"Web search is available when local evidence is insufficient.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
@@ -105,7 +109,7 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -121,8 +125,12 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"You are running in Codex CLI with file system access and shell execution.",
-		"Rely on the current filesystem and durable run state.",
+		"## Native Helpers",
+		"You are running in Codex CLI.",
+		"Native subagents are transient helpers inside this session.",
+		"This engine only starts native subagents when you explicitly invoke them.",
+		"Do not give them durable ownership.",
+		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
 		"re-check `/tmp/control/inbox/session-1.jsonl` before idling",
 	} {
 		if !strings.Contains(text, want) {
@@ -130,8 +138,8 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
-		"2+ independent research or analysis angles",
-		"collapse the results back into this session's journal, report, or dispatchable_slices",
+		"Agent tool",
+		"WebSearch/WebFetch",
 	} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered codex protocol should not inherit claude-only agent guidance %q", unwanted)
@@ -149,7 +157,7 @@ func TestRenderSubagentProtocolIncludesOptimizerDoctrineInDevelopMode(t *testing
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -204,15 +212,14 @@ func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 	}
 	modeSection := sectionBetween(string(out), "## Mode: Research", "## Context")
 	for _, want := range []string{
-		"findings will be verified by the master",
-		"Quantify",
-		"Every major finding MUST have a Counter-evidence section",
+		"Produce evidence-backed findings until the master stops you",
+		"Quantify what you can",
+		"Every major finding must include counter-evidence or failed alternative explanations.",
 		"## Key Findings",
 		"## Recommendation",
 		"## Priority Fix List (if applicable)",
 		"dispatchable_slices",
 		"directly adopt",
-		"Each round should produce NEW insight",
 		"Do not declare yourself done",
 	} {
 		if !strings.Contains(modeSection, want) {
@@ -266,7 +273,7 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -285,9 +292,9 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	for _, want := range []string{
 		"one coherent capability slice at a time",
 		"Your code will be reviewed. Every change must be justified and minimal.",
-		"Run the full gate",
-		"Atomic commit",
+		"If a local validation command is configured, run it before handing work back:",
 		"Keep changes minimal and correct. Do not add unrelated improvements, but do not cut corners on the change you are making.",
+		"Respect file ownership from the current inbox assignment.",
 		"go test ./...",
 	} {
 		if !strings.Contains(modeSection, want) {
@@ -312,7 +319,7 @@ func TestRenderSubagentProtocolIncludesQualityJournalAndSelfCheck(t *testing.T) 
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -403,7 +410,7 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 		ProjectRoot:         "/tmp/project",
 		SessionName:         "session-1",
 		Target:              goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:             goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:         "/tmp/journal.jsonl",
 		SessionInboxPath:    "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath:   "/tmp/control/session-1-cursor.json",
@@ -474,9 +481,8 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 		"goal-log.jsonl",
 		"goalx verify --run demo",
 		"goalx add --run demo",
-		"goalx tell --run demo session-N",
-		"goalx park --run demo session-N",
-		"goalx resume --run demo session-N",
+		"goalx afford --run demo",
+		"canonical command surface",
 		"orchestrator",
 		"check evidence density, clear evidence, and actionability of findings",
 		"If any required item is uncovered, that is a scheduling bug.",
@@ -716,7 +722,7 @@ func TestRenderSubagentProtocolEncouragesBetterArchitecturePathsInDevelopMode(t 
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -752,7 +758,7 @@ func TestRenderSubagentProtocolTreatsAutoModeAsDevelop(t *testing.T) {
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
 		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
-		Harness:           goalx.HarnessConfig{Command: "go test ./..."},
+		LocalValidationCommand: "go test ./...",
 		JournalPath:       "/tmp/journal.jsonl",
 		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath: "/tmp/control/session-1-cursor.json",
@@ -890,7 +896,7 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 		"## Objective",
 		"- Run: demo",
 		"goalx save demo && goalx debate --from demo",
-		"goalx save demo && goalx implement --from demo",
+		"Replace `goalx debate --from demo` with `goalx implement --from demo` or `goalx explore --from demo`",
 		"goalx stop --run demo",
 		"## Status",
 		"You drive the transition.",
@@ -975,7 +981,8 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 		"Goal items are your working decomposition, not the definition of done.",
 		"If a session produced valuable work outside the original items, that work matters.",
 		"If a session shows no journal output for 15+ minutes while its lease is healthy",
-		"Research completion: write findings to /tmp/run/reports, update goal items, stop sessions. No acceptance gate or proof manifest required.",
+		"Research runs usually close out through reports and goal updates; develop runs usually close out through reviewed code, verification evidence, and `goalx keep`.",
+		"Run `goalx verify --run demo` when you need fresh acceptance evidence.",
 		"goalx dimension [--run NAME] <session-N|all> --set depth,adversarial",
 		"goalx dimension [--run NAME] <session-N> --add creative",
 		"goalx dimension [--run NAME] <session-N> --remove depth",
@@ -1071,9 +1078,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"proof/completion.json",
 		"dispatchable_slices",
 		"goalx add --run demo --mode research",
-		"goalx tell --run demo session-N",
-		"goalx park --run demo session-N",
-		"goalx resume --run demo session-N",
+		"goalx afford --run demo",
+		"canonical command surface",
 		"temporary research session",
 		"Research-mode sessions produce evidence and reports, not mergeable code changes.",
 		"Check the coordination digest version each control cycle.",
@@ -1088,9 +1094,10 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Do not wait on one session if other independent required work can proceed.",
 		"Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.",
 		"Improvement backlog",
-		"Only use Claude native subagents for quick read-only checks or validation under 30 seconds.",
-		"Do not use native subagents for primary research, implementation, or durable ownership.",
-		"`goalx add` remains the durable path",
+		"Native subagents are transient helpers inside the current master session.",
+		"Do not give them durable ownership.",
+		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
+		"Summarize every native-helper result back into durable GoalX state before moving on.",
 		"Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.",
 		"If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.",
 		"Keep detailed hypotheses, traces, and path comparisons in journals, not the coordination digest.",
@@ -1279,16 +1286,49 @@ func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Only use Claude native subagents for quick read-only checks or validation under 30 seconds.",
-		"Do not use native subagents for primary research, implementation, or durable ownership.",
-		"If the task needs a worktree, durable tracking, or more than a quick check, use `goalx add`.",
+		"Claude Code native subagents are available in this session.",
+		"Native subagents are transient helpers inside the current master session.",
+		"Do not give them durable ownership.",
+		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
-	if strings.Contains(text, "short-lived information gathering") {
-		t.Fatalf("rendered master protocol should not keep the old permissive native-subagent wording:\n%s", text)
+	if strings.Contains(text, "under 30 seconds") {
+		t.Fatalf("rendered master protocol should not keep time-threshold native-subagent wording:\n%s", text)
+	}
+}
+
+func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "codex exec",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Codex CLI native subagents are available in this session.",
+		"This engine only starts native subagents when you explicitly invoke them.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
 	}
 }
 
