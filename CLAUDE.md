@@ -44,7 +44,7 @@ Charter records immutable structural facts: run IDs, paths, objective text, mode
 - **Language**: Go (1.24+)
 - **Build + Test**: `make check` (or `go build ./... && go test ./... -count=1 && go vet ./...`)
 - **Install**: `make install` (builds to `/usr/local/bin/goalx`)
-- **Skill sync**: `make skill-sync` (copies skill/ to ~/.claude/skills/goalx/)
+- **Skill sync**: `make skill-sync` (copies skill/ to ~/.claude/skills/goalx/ and ~/.codex/skills/goalx/)
 - **Auto-detect**: Framework auto-detects claude/codex at startup, picks best preset (hybrid > claude > codex)
 - **Templates**: `templates/*.md.tmpl` — protocol contracts rendered at launch
 - **State**: `~/.goalx/runs/<project>/<run>/` — all durable run state (user-scoped, not in project dir)

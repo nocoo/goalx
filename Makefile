@@ -17,7 +17,12 @@ install:
 	go build -o /usr/local/bin/goalx ./cmd/goalx
 
 skill-sync:
-	@mkdir -p ~/.claude/skills/goalx/references
-	cp skill/SKILL.md ~/.claude/skills/goalx/SKILL.md
-	cp skill/references/advanced-control.md ~/.claude/skills/goalx/references/advanced-control.md
-	@echo "✓ skill synced to ~/.claude/skills/goalx/"
+	@set -e; \
+	for dest in "$$HOME/.claude/skills/goalx" "$$HOME/.codex/skills/goalx"; do \
+		rm -rf "$$dest"; \
+		mkdir -p "$$dest/references" "$$dest/agents"; \
+		cp skill/SKILL.md "$$dest/SKILL.md"; \
+		cp -R skill/references/. "$$dest/references/"; \
+		cp -R skill/agents/. "$$dest/agents/"; \
+		echo "✓ skill synced to $$dest/"; \
+	done

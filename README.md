@@ -31,7 +31,7 @@ GoalX creates a run directory, launches the master transport session, and starts
 git clone https://github.com/vonbai/goalx.git
 cd goalx
 make install        # builds to /usr/local/bin/goalx
-make skill-sync     # copies skill to ~/.claude/skills/goalx/ (optional, for Claude Code users)
+make skill-sync     # copies GoalX skill files to ~/.claude/skills/goalx/ and ~/.codex/skills/goalx/
 ```
 
 ### Requirements
@@ -364,8 +364,13 @@ The OpenClaw agent calls GoalX HTTP API to start research, check progress, and m
 For local interactive use in Claude Code:
 
 ```bash
-mkdir -p ~/.claude/skills/goalx
-cp -R skill/. ~/.claude/skills/goalx/
+mkdir -p ~/.claude/skills/goalx/{references,agents} ~/.codex/skills/goalx/{references,agents}
+cp skill/SKILL.md ~/.claude/skills/goalx/SKILL.md
+cp -R skill/references/. ~/.claude/skills/goalx/references/
+cp -R skill/agents/. ~/.claude/skills/goalx/agents/
+cp skill/SKILL.md ~/.codex/skills/goalx/SKILL.md
+cp -R skill/references/. ~/.codex/skills/goalx/references/
+cp -R skill/agents/. ~/.codex/skills/goalx/agents/
 ```
 
 Copy the whole directory so `references/advanced-control.md` stays available. Then ask Claude to use the GoalX skill for tasks such as `goalx observe` or `goalx auto "objective"`.
