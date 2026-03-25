@@ -703,6 +703,272 @@ harness:
 	}
 }
 
+func TestAddRoutesByModeAndEffortWhenEngineModelNotExplicit(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: auto
+objective: implement audit fixes
+roles:
+  research:
+    engine: claude-code
+    model: opus
+  develop:
+    engine: codex
+    model: gpt-5.4
+routing:
+  profiles:
+    research_deep:
+      engine: claude-code
+      model: opus
+      effort: high
+  rules:
+    - role: research
+      efforts: [high, max]
+      profile: research_deep
+parallel: 1
+sessions:
+  - hint: first
+    mode: develop
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-1 journal: %v", err)
+	}
+
+	if err := Add(repo, []string{"investigate auth regression", "--mode", "research", "--effort", "high", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-2 identity missing")
+	}
+	if identity.Mode != string(goalx.ModeResearch) {
+		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeResearch)
+	}
+	if identity.RouteRole != "research" {
+		t.Fatalf("route_role = %q, want research", identity.RouteRole)
+	}
+	if identity.RouteProfile != "research_deep" {
+		t.Fatalf("route_profile = %q, want research_deep", identity.RouteProfile)
+	}
+	if identity.Engine != "claude-code" || identity.Model != "opus" {
+		t.Fatalf("engine/model = %q/%q, want claude-code/opus", identity.Engine, identity.Model)
+	}
+	if identity.RequestedEffort != goalx.EffortHigh {
+		t.Fatalf("requested_effort = %q, want high", identity.RequestedEffort)
+	}
+	if identity.EffectiveEffort == "" {
+		t.Fatalf("effective_effort empty in %+v", identity)
+	}
+}
+
+func TestAddExplicitEngineModelBypassesRouting(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: auto
+objective: implement audit fixes
+roles:
+  research:
+    engine: claude-code
+    model: opus
+routing:
+  profiles:
+    research_deep:
+      engine: claude-code
+      model: opus
+      effort: high
+  rules:
+    - role: research
+      efforts: [high, max]
+      profile: research_deep
+parallel: 0
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+
+	if err := Add(repo, []string{"investigate auth regression", "--mode", "research", "--engine", "codex", "--model", "gpt-5.4", "--effort", "high", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	if identity.Mode != string(goalx.ModeResearch) {
+		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeResearch)
+	}
+	if identity.Engine != "codex" || identity.Model != "gpt-5.4" {
+		t.Fatalf("engine/model = %q/%q, want codex/gpt-5.4", identity.Engine, identity.Model)
+	}
+	if identity.RouteProfile != "" {
+		t.Fatalf("route_profile = %q, want empty for explicit override", identity.RouteProfile)
+	}
+	if identity.RouteRole != "" {
+		t.Fatalf("route_role = %q, want empty for explicit override", identity.RouteRole)
+	}
+	if identity.RequestedEffort != goalx.EffortHigh {
+		t.Fatalf("requested_effort = %q, want high", identity.RequestedEffort)
+	}
+	if identity.EffectiveEffort == "" {
+		t.Fatalf("effective_effort empty in %+v", identity)
+	}
+}
+
+func TestAddRejectsUnknownFlag(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+parallel: 0
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+
+	err := Add(repo, []string{"second direction", "--mode", "develop", "--unknown", "value", "--run", runName})
+	if err == nil || !strings.Contains(err.Error(), `unknown flag "--unknown"`) {
+		t.Fatalf("Add error = %v, want unknown flag", err)
+	}
+	if _, statErr := os.Stat(SessionIdentityPath(runDir, "session-1")); !os.IsNotExist(statErr) {
+		t.Fatalf("unexpected session identity created, stat err = %v", statErr)
+	}
+}
+
+func TestAddRejectsUnknownRouteProfile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+routing:
+  profiles:
+    build_fast:
+      engine: codex
+      model: gpt-5.4-mini
+      effort: minimal
+parallel: 0
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+
+	err := Add(repo, []string{"second direction", "--mode", "develop", "--route-profile", "missing-profile", "--run", runName})
+	if err == nil || !strings.Contains(err.Error(), `unknown route profile "missing-profile"`) {
+		t.Fatalf("Add error = %v, want unknown route profile", err)
+	}
+	if _, statErr := os.Stat(SessionIdentityPath(runDir, "session-1")); !os.IsNotExist(statErr) {
+		t.Fatalf("unexpected session identity created, stat err = %v", statErr)
+	}
+}
+
+func TestAddRejectsExplicitEngineModelWithoutMode(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: auto
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+parallel: 0
+target:
+  files: ["src/"]
+harness:
+  command: "go test ./..."
+`)
+	runName, _ := writeAddRunFixture(t, repo, string(snapshot))
+
+	err := Add(repo, []string{"second direction", "--engine", "codex", "--model", "gpt-5.4", "--run", runName})
+	if err == nil || !strings.Contains(err.Error(), "--mode is required") {
+		t.Fatalf("Add error = %v, want missing --mode", err)
+	}
+}
+
 func TestAddRequiresDurableIdentityForExistingSessions(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

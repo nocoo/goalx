@@ -105,6 +105,9 @@ func TestBuildAffordancesIncludesSessionTellAndAttachCommands(t *testing.T) {
 	for _, want := range []string{
 		`goalx tell --run guidance-run session-N "message"`,
 		`goalx attach --run guidance-run session-N`,
+		`goalx add --run guidance-run --mode research --effort high --worktree "sub-goal"`,
+		`goalx add --run guidance-run --mode develop --effort medium --worktree "sub-goal"`,
+		`goalx add --run guidance-run --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("affordance commands missing %q:\n%s", want, joined)

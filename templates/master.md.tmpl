@@ -117,7 +117,7 @@ Write findings to `{{.ReportsDir}}`.
 | Simple | {{.Preferences.Simple.Guidance}} |
 {{- end}}
 
-Use routing profiles, routing rules, and these preferences together when choosing engines. CLI overrides take precedence. You may deviate if circumstances warrant it, but decide explicitly and record why.
+Use routing profiles, routing rules, and these preferences together when choosing engines. Prefer route-first session launches. Explicit `--engine/--model` bypasses routing. Use them only when intentionally overriding run config, and record why.
 {{- end}}
 
 ## Strategy
@@ -278,7 +278,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Read current GoalX affordances: `goalx afford --run {{.RunName}}`
 - Use `goalx afford --run {{.RunName}}` as the canonical command surface for dispatch, tell, park, resume, keep, save, and transitions.
 - Record acceptance results: `goalx verify --run {{.RunName}}`
-- Launch or replace a durable worker: `goalx add --run {{.RunName}} --mode research "sub-goal"` or `goalx add --run {{.RunName}} --engine ENGINE --model MODEL "sub-goal"`
+- Launch a route-first research worker: `goalx add --run {{.RunName}} --mode research --effort high --worktree "sub-goal"`
+- Launch a route-first develop worker: `goalx add --run {{.RunName}} --mode develop --effort medium --worktree "sub-goal"`
+- Launch an explicit override worker: `goalx add --run {{.RunName}} --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`
+- Explicit `--engine/--model` bypasses routing. Use it only for intentional overrides.
 - Save artifacts: `goalx save {{.RunName}}`
 - Stop current run before restarting if needed: `goalx stop --run {{.RunName}}`
 - Transport wake text is only a trigger. Real instructions live in the control files above.

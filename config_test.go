@@ -255,6 +255,48 @@ func TestResolveSessionRouteExplicitProfileBeatsRules(t *testing.T) {
 	}
 }
 
+func TestResolveSessionRouteRejectsUnknownExplicitProfile(t *testing.T) {
+	cfg := &Config{
+		Routing: RoutingTableConfig{
+			Profiles: map[string]ExecutionProfile{
+				"build_fast": {Engine: "codex", Model: "gpt-5.4-mini", Effort: EffortMinimal},
+			},
+		},
+	}
+
+	_, err := ResolveSessionRoute(cfg, SessionConfig{
+		Mode:         ModeDevelop,
+		RouteProfile: "missing-profile",
+	})
+	if err == nil || !strings.Contains(err.Error(), `unknown route profile "missing-profile"`) {
+		t.Fatalf("ResolveSessionRoute error = %v, want unknown route profile", err)
+	}
+}
+
+func TestResolveSessionRouteExplicitEngineModelDoesNotBackfillRouteRole(t *testing.T) {
+	cfg := &Config{
+		Roles: RoleDefaultsConfig{
+			Research: SessionConfig{Engine: "claude-code", Model: "opus", Effort: EffortHigh},
+		},
+	}
+
+	resolved, err := ResolveSessionRoute(cfg, SessionConfig{
+		Mode:   ModeResearch,
+		Engine: "codex",
+		Model:  "gpt-5.4",
+		Effort: EffortHigh,
+	})
+	if err != nil {
+		t.Fatalf("ResolveSessionRoute: %v", err)
+	}
+	if resolved.RouteRole != "" {
+		t.Fatalf("route_role = %q, want unset for explicit override", resolved.RouteRole)
+	}
+	if resolved.Engine != "codex" || resolved.Model != "gpt-5.4" {
+		t.Fatalf("engine/model = %s/%s, want codex/gpt-5.4", resolved.Engine, resolved.Model)
+	}
+}
+
 func TestResolveSessionRouteLeavesUnspecifiedSessionsUnassigned(t *testing.T) {
 	cfg := &Config{
 		Mode: ModeAuto,

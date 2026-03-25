@@ -266,6 +266,46 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 	}
 }
 
+func TestStatusShowsSessionLaunchFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "build_fast", "", goalx.TargetConfig{})
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	identity.RouteRole = "develop"
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-1",
+		State: "active",
+		Mode:  string(goalx.ModeDevelop),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte("{\"round\":1,\"status\":\"active\",\"desc\":\"working\"}\n"), 0o644); err != nil {
+		t.Fatalf("write session journal: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"mode=develop",
+		"engine=codex/gpt-5.4-mini",
+		"effort=high/xhigh",
+		"route=develop/build_fast",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusPrefersLatestJournalStateOverStaleRuntimeActive(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

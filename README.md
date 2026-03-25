@@ -159,7 +159,7 @@ goalx auto → master-led run
 
 Every run gets its own isolated git worktree (`goalx/<run>/root` branch). Master and sessions work in this worktree, not on the main branch. Dirty tracked files are auto-committed before worktree creation (`--no-snapshot` to skip). Gitignored files (CLAUDE.md, docs/, .claude/) are copied into the worktree for a complete project mirror.
 
-Session worktrees are optional: `goalx add "task"` runs in the shared run worktree; `goalx add --worktree "task"` creates an isolated session worktree for parallel work. `--from RUN` inherits the source run's worktree code, not just context.
+Session worktrees are optional: `goalx add --mode develop "task"` runs in the shared run worktree; `goalx add --mode develop --worktree "task"` creates an isolated session worktree for parallel work. Use `--mode` for the session kind and optional `--effort` / `--route-profile` for route-first dispatch; explicit `--engine/--model` is an override path that bypasses routing. `--from RUN` inherits the source run's worktree code, not just context.
 
 Merging to the main branch is a user decision: `goalx keep` from outside the run. Master merges sessions into the run worktree but does not merge to main.
 

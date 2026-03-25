@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -134,6 +135,13 @@ func Status(projectRoot string, args []string) error {
 				summary += fmt.Sprintf(" | dirty=%d", sess.DirtyFiles)
 			}
 		}
+		if launch := sessionLaunchFacts(rc.RunDir, sName); launch != "" {
+			if summary == "no entries" {
+				summary = launch
+			} else {
+				summary += " | " + launch
+			}
+		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sName, lastRound, status, actorLeaseSummary(rc.RunDir, sName, "-"), summary)
 	}
 
@@ -230,6 +238,41 @@ func controlQueueSummary(runDir string) (int, int) {
 		}
 	}
 	return remindersDue, deliveriesFailed
+}
+
+func sessionLaunchFacts(runDir, sessionName string) string {
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, sessionName))
+	if err != nil || identity == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, 4)
+	if identity.Mode != "" {
+		parts = append(parts, "mode="+identity.Mode)
+	}
+	if identity.Engine != "" || identity.Model != "" {
+		engineModel := strings.Trim(identity.Engine+"/"+identity.Model, "/")
+		if engineModel != "" {
+			parts = append(parts, "engine="+engineModel)
+		}
+	}
+	switch {
+	case identity.RequestedEffort != "" && identity.EffectiveEffort != "":
+		parts = append(parts, fmt.Sprintf("effort=%s/%s", identity.RequestedEffort, identity.EffectiveEffort))
+	case identity.RequestedEffort != "":
+		parts = append(parts, "effort="+string(identity.RequestedEffort))
+	case identity.EffectiveEffort != "":
+		parts = append(parts, "effort="+identity.EffectiveEffort)
+	}
+	switch {
+	case identity.RouteRole != "" && identity.RouteProfile != "":
+		parts = append(parts, "route="+identity.RouteRole+"/"+identity.RouteProfile)
+	case identity.RouteRole != "":
+		parts = append(parts, "route="+identity.RouteRole)
+	case identity.RouteProfile != "":
+		parts = append(parts, "route="+identity.RouteProfile)
+	}
+	return strings.Join(parts, " ")
 }
 
 func actorLeaseSummary(runDir, holder, missing string) string {

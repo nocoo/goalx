@@ -41,7 +41,7 @@ Usage:
   goalx drop    [--run RUN]           Cleanup branch + worktree
   goalx report  [--run RUN]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
-  goalx add     "direction" [--run RUN] Add a session to a running run
+  goalx add     "direction" [--run RUN] --mode MODE [flags] Add a session to a running run
   goalx dimension [--run RUN] <session-N|all> Adjust runtime dimension assignments
   goalx tell    [--run RUN] [target] "message" Send a durable instruction to master or a session
   goalx ack-session [--run RUN] <session>      Acknowledge latest processed session inbox entry

@@ -1078,6 +1078,9 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"proof/completion.json",
 		"dispatchable_slices",
 		"goalx add --run demo --mode research",
+		"goalx add --run demo --mode research --effort high",
+		"goalx add --run demo --mode develop --effort medium",
+		"goalx add --run demo --mode research --engine ENGINE --model MODEL --effort LEVEL",
 		"goalx afford --run demo",
 		"canonical command surface",
 		"temporary research session",
@@ -1104,6 +1107,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Avoid sync-only liveness narration.",
 		"Sessions without dedicated worktrees share the run worktree.",
 		"Use `goalx add --worktree` for parallel isolation.",
+		"Explicit `--engine/--model` bypasses routing.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)

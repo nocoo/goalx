@@ -67,8 +67,10 @@ Prefer durable GoalX commands over direct transport input:
 
 - `goalx tell --run NAME "direction"` to redirect the master or a session
 - `goalx tell --urgent --run NAME "message"` to send an urgent message through the durable inbox
-- `goalx add --run NAME "direction"` to create a session manually
-- `goalx add --run NAME --mode research "question"` to add a temporary research session
+- `goalx add --run NAME --mode develop "direction"` to create a session manually in develop mode
+- `goalx add --run NAME --mode research --effort high "question"` to add a routed research session
+- `goalx add --run NAME --mode develop --route-profile PROFILE "task"` to force a specific routing profile
+- `goalx add --run NAME --mode research --engine ENGINE --model MODEL --effort LEVEL "task"` only when you intentionally want to bypass routing
 - `goalx research "goal" --effort high` to start a direct research run with research-role defaults plus explicit reasoning depth
 - `goalx develop "goal" --effort medium` to start a direct develop run with develop-role defaults plus explicit reasoning depth
 - `goalx debate --from RUN` to start a debate phase from a saved research run

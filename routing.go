@@ -1,6 +1,9 @@
 package goalx
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func ResolveRouteProfile(cfg *Config, routeRole string, dimensions []ResolvedDimension, effort EffortLevel) (string, ExecutionProfile, bool) {
 	if cfg == nil {
@@ -41,7 +44,16 @@ func ResolveSessionRoute(cfg *Config, session SessionConfig) (SessionConfig, err
 	}
 
 	resolved := session
-	roleDefault := explicitRoleSession(cfg, resolved.Mode, resolved.RouteRole)
+	routeRole := strings.TrimSpace(resolved.RouteRole)
+	if routeRole == "" {
+		switch resolved.Mode {
+		case ModeResearch:
+			routeRole = "research"
+		case ModeDevelop:
+			routeRole = "develop"
+		}
+	}
+	roleDefault := explicitRoleSession(cfg, resolved.Mode, routeRole)
 	resolvedDimensions, err := resolveDimensionSpecsWithCatalog(resolveDimensionCatalog(cfg), resolved.Dimensions)
 	if err != nil {
 		return SessionConfig{}, err
@@ -55,7 +67,11 @@ func ResolveSessionRoute(cfg *Config, session SessionConfig) (SessionConfig, err
 	}
 
 	if strings.TrimSpace(resolved.RouteProfile) != "" {
-		profile := cfg.Routing.Profiles[resolved.RouteProfile]
+		profile, ok := cfg.Routing.Profiles[resolved.RouteProfile]
+		if !ok {
+			return SessionConfig{}, fmt.Errorf("unknown route profile %q", resolved.RouteProfile)
+		}
+		resolved.RouteRole = routeRole
 		applyProfile(&resolved, profile)
 		return fillRoleDefaults(resolved, roleDefault), nil
 	}
@@ -64,12 +80,14 @@ func ResolveSessionRoute(cfg *Config, session SessionConfig) (SessionConfig, err
 	if requestedEffort == "" {
 		requestedEffort = roleDefault.Effort
 	}
-	if profileName, profile, ok := ResolveRouteProfile(cfg, resolved.RouteRole, resolvedDimensions, requestedEffort); ok {
+	if profileName, profile, ok := ResolveRouteProfile(cfg, routeRole, resolvedDimensions, requestedEffort); ok {
+		resolved.RouteRole = routeRole
 		resolved.RouteProfile = profileName
 		applyProfile(&resolved, profile)
 		return fillRoleDefaults(resolved, roleDefault), nil
 	}
 
+	resolved.RouteRole = routeRole
 	return fillRoleDefaults(resolved, roleDefault), nil
 }
 

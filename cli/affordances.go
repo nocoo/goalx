@@ -129,6 +129,30 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Summary: "Attach to a tmux window for inspection or emergency manual intervention.",
 			Command: buildAttachCommand(runName, normalizedTarget),
 		},
+		{
+			ID:      "add-research",
+			Kind:    "control",
+			Summary: "Launch a route-first research worker.",
+			Command: fmt.Sprintf(`goalx add --run %s --mode research --effort high --worktree "sub-goal"`, runName),
+		},
+		{
+			ID:      "add-develop",
+			Kind:    "control",
+			Summary: "Launch a route-first develop worker.",
+			Command: fmt.Sprintf(`goalx add --run %s --mode develop --effort medium --worktree "sub-goal"`, runName),
+		},
+		{
+			ID:      "add-override",
+			Kind:    "control",
+			Summary: "Launch an explicit engine/model override worker.",
+			Command: fmt.Sprintf(`goalx add --run %s --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`, runName),
+		},
+		{
+			ID:      "replace",
+			Kind:    "control",
+			Summary: "Replace a stale or unsuitable durable worker.",
+			Command: fmt.Sprintf("goalx replace --run %s session-N --mode research --effort high", runName),
+		},
 	}
 	if index != nil {
 		doc.Items = append(doc.Items, AffordanceItem{

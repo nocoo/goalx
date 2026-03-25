@@ -126,6 +126,9 @@ func printObserveSessionQueue(runDir, sessionName string) {
 		}
 	}
 	fmt.Println()
+	if launch := sessionLaunchFacts(runDir, sessionName); launch != "" {
+		fmt.Printf("Launch: %s\n", launch)
+	}
 }
 
 func printPaneCapture(tmuxSession, window string) {

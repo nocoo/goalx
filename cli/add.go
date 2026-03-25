@@ -10,7 +10,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree]`
+const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree]`
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
@@ -29,6 +29,8 @@ func Add(projectRoot string, args []string) (err error) {
 
 	// Extract flags from rest args
 	var flagEngine, flagModel string
+	var explicitEngine, explicitModel bool
+	var flagEffort goalx.EffortLevel
 	var flagMode goalx.Mode
 	var flagRouteRole, flagRouteProfile string
 	var flagDimensions []string
@@ -42,12 +44,24 @@ func Add(projectRoot string, args []string) (err error) {
 			}
 			i++
 			flagEngine = rest[i]
+			explicitEngine = true
 		case "--model":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("missing value for --model")
 			}
 			i++
 			flagModel = rest[i]
+			explicitModel = true
+		case "--effort":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(rest[i])
+			if err != nil {
+				return err
+			}
+			flagEffort = level
 		case "--mode":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("missing value for --mode")
@@ -80,20 +94,51 @@ func Add(projectRoot string, args []string) (err error) {
 		case "--worktree":
 			useWorktree = true
 		default:
+			if strings.HasPrefix(rest[i], "-") {
+				return fmt.Errorf("unknown flag %q", rest[i])
+			}
 			hintParts = append(hintParts, rest[i])
 		}
 	}
 	if len(hintParts) == 0 {
 		return fmt.Errorf(addUsage)
 	}
-	if (flagEngine == "") != (flagModel == "") {
+	if explicitEngine != explicitModel {
 		return fmt.Errorf("--engine and --model must be provided together")
+	}
+	switch strings.TrimSpace(flagRouteRole) {
+	case "research":
+		if flagMode == "" {
+			flagMode = goalx.ModeResearch
+		} else if flagMode != goalx.ModeResearch {
+			return fmt.Errorf("--route-role research requires --mode research")
+		}
+	case "develop":
+		if flagMode == "" {
+			flagMode = goalx.ModeDevelop
+		} else if flagMode != goalx.ModeDevelop {
+			return fmt.Errorf("--route-role develop requires --mode develop")
+		}
+	}
+	if flagMode == "" {
+		return fmt.Errorf("--mode is required")
+	}
+	if explicitEngine && flagRouteRole != "" {
+		return fmt.Errorf("--route-role cannot be combined with --engine/--model")
+	}
+	if explicitEngine && flagRouteProfile != "" {
+		return fmt.Errorf("--route-profile cannot be combined with --engine/--model")
 	}
 	hint := strings.Join(hintParts, " ")
 
 	rc, err := ResolveRun(projectRoot, runName)
 	if err != nil {
 		return err
+	}
+	if flagRouteProfile != "" {
+		if _, ok := rc.Config.Routing.Profiles[flagRouteProfile]; !ok {
+			return fmt.Errorf("unknown route profile %q", flagRouteProfile)
+		}
 	}
 
 	// Check run is active
@@ -129,6 +174,9 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if flagMode != "" {
 		newSess.Mode = flagMode
+	}
+	if flagEffort != "" {
+		newSess.Effort = flagEffort
 	}
 	if len(flagDimensions) > 0 {
 		if _, err := goalx.ResolveDimensionSpecs(flagDimensions); err != nil {
@@ -272,34 +320,34 @@ func Add(projectRoot string, args []string) (err error) {
 	// Render protocol
 	protocolPath := filepath.Join(rc.RunDir, fmt.Sprintf("program-%d.md", newNum))
 	subData := ProtocolData{
-		RunName:             rc.Config.Name,
-		Objective:           rc.Config.Objective,
-		Mode:                goalx.Mode(sessionIdentity.Mode),
-		Engine:              sessionIdentity.Engine,
-		Sessions:            sessionDataList,
-		Target:              sessionIdentity.Target,
+		RunName:                rc.Config.Name,
+		Objective:              rc.Config.Objective,
+		Mode:                   goalx.Mode(sessionIdentity.Mode),
+		Engine:                 sessionIdentity.Engine,
+		Sessions:               sessionDataList,
+		Target:                 sessionIdentity.Target,
 		LocalValidationCommand: strings.TrimSpace(rc.Config.Harness.Command),
-		Context:             rc.Config.Context,
-		Budget:              rc.Config.Budget,
-		SessionName:         sName,
-		SessionIndex:        newNum - 1,
-		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, sName, sessionIdentity.Dimensions),
-		JournalPath:         journalPath,
-		CharterPath:         RunCharterPath(rc.RunDir),
-		SessionIdentityPath: sessionIdentityPath,
-		SessionInboxPath:    ControlInboxPath(rc.RunDir, sName),
-		SessionCursorPath:   SessionCursorPath(rc.RunDir, sName),
-		WorktreePath:        wtPath,
-		GoalPath:            GoalPath(rc.RunDir),
-		GoalLogPath:         GoalLogPath(rc.RunDir),
-		IdentityFencePath:   IdentityFencePath(rc.RunDir),
-		AcceptanceNotesPath: existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
-		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
-		CompletionProofPath: CompletionStatePath(rc.RunDir),
-		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
-		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
-		ProjectRoot:         absProjectRoot,
+		Context:                rc.Config.Context,
+		Budget:                 rc.Config.Budget,
+		SessionName:            sName,
+		SessionIndex:           newNum - 1,
+		CurrentDimensions:      CurrentSessionDimensions(rc.RunDir, sName, sessionIdentity.Dimensions),
+		JournalPath:            journalPath,
+		CharterPath:            RunCharterPath(rc.RunDir),
+		SessionIdentityPath:    sessionIdentityPath,
+		SessionInboxPath:       ControlInboxPath(rc.RunDir, sName),
+		SessionCursorPath:      SessionCursorPath(rc.RunDir, sName),
+		WorktreePath:           wtPath,
+		GoalPath:               GoalPath(rc.RunDir),
+		GoalLogPath:            GoalLogPath(rc.RunDir),
+		IdentityFencePath:      IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath:    AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath:    CompletionStatePath(rc.RunDir),
+		RunStatePath:           RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:            absProjectRoot,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, newNum-1); err != nil {
 		return fmt.Errorf("render protocol: %w", err)
