@@ -49,3 +49,11 @@ func loadEngineCatalog(projectRoot string) (map[string]goalx.EngineConfig, error
 	}
 	return layers.Engines, nil
 }
+
+func loadDimensionCatalog(projectRoot string) (map[string]string, error) {
+	layers, err := goalx.LoadConfigLayers(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+	return layers.Dimensions, nil
+}

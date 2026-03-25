@@ -28,6 +28,7 @@ Usage:
   goalx keep    [--run NAME] <session> Merge/preserve session
   goalx park    [--run NAME] <session> Park a session for later reuse
   goalx resume  [--run NAME] <session> Resume a parked session
+  goalx replace [--run NAME] <session> [flags] Replace a session with a new routed owner
   goalx focus   [--run NAME]           Set the default run for this project
   goalx archive [--run RUN] <session> Git tag + preserve
   goalx save    [--run RUN]           Save run artifacts to user-scoped durable storage
@@ -134,6 +135,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Park(cwd, args)
 	case "resume":
 		return cli.Resume(cwd, args)
+	case "replace":
+		return cli.Replace(cwd, args)
 	case "focus":
 		return cli.Focus(cwd, args)
 	case "archive":

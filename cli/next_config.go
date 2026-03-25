@@ -28,6 +28,7 @@ type nextConfigJSON struct {
 	MasterEngine  string              `json:"master_engine,omitempty"`
 	MasterModel   string              `json:"master_model,omitempty"`
 	MasterEffort  goalx.EffortLevel   `json:"master_effort,omitempty"`
+	RouteRole     string              `json:"route_role,omitempty"`
 	RouteProfile  string              `json:"route_profile,omitempty"`
 	QuotaState    string              `json:"quota_state,omitempty"`
 	Sessions      []sessionConfigJSON `json:"sessions,omitempty"`
@@ -54,10 +55,11 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.Context = normalizeNextConfigContext(validated.Context)
 	validated.MasterEngine = strings.TrimSpace(validated.MasterEngine)
 	validated.MasterModel = strings.TrimSpace(validated.MasterModel)
+	validated.RouteRole = strings.TrimSpace(validated.RouteRole)
 	validated.RouteProfile = strings.TrimSpace(validated.RouteProfile)
 	validated.QuotaState = strings.TrimSpace(validated.QuotaState)
 	validated.Sessions = normalizeNextConfigSessions(validated.Sessions)
-	validated.Dimensions = normalizeNextConfigHints(validated.Dimensions, 0)
+	validated.Dimensions = normalizeNextConfigDimensions(validated.Dimensions)
 	if level, err := goalx.ParseEffortLevel(string(validated.Effort)); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.effort=%q (%v)\n", validated.Effort, err)
 		validated.Effort = ""
@@ -108,7 +110,7 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		}
 	}
 	if len(validated.Dimensions) > 0 {
-		if _, err := goalx.ResolveDimensions(validated.Dimensions); err != nil {
+		if _, err := goalx.ResolveDimensionSpecs(validated.Dimensions); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: ignoring next_config.dimensions: %v\n", err)
 			validated.Dimensions = nil
 		}
@@ -143,49 +145,33 @@ func nextConfigBudget(fallback time.Duration, nc *nextConfigJSON) time.Duration 
 	return fallback
 }
 
-func nextConfigHints(fallback []string, parallel int, nc *nextConfigJSON) []string {
+func nextConfigDimensions(fallback []string, nc *nextConfigJSON) []string {
 	if nc == nil {
-		return normalizeNextConfigHints(fallback, parallel)
+		return normalizeNextConfigDimensions(fallback)
 	}
-	dimensionHints := nextConfigDimensionHints(nc)
-	if len(dimensionHints) == 0 {
-		return normalizeNextConfigHints(fallback, parallel)
+	if len(nc.Dimensions) == 0 {
+		return normalizeNextConfigDimensions(fallback)
 	}
-	return normalizeNextConfigHints(dimensionHints, parallel)
+	return normalizeNextConfigDimensions(nc.Dimensions)
 }
 
-func normalizeNextConfigHints(hints []string, parallel int) []string {
-	if len(hints) == 0 {
+func normalizeNextConfigDimensions(values []string) []string {
+	if len(values) == 0 {
 		return nil
 	}
 
-	normalized := make([]string, 0, len(hints))
-	for _, hint := range hints {
-		hint = strings.TrimSpace(hint)
-		if hint == "" {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
 			continue
 		}
-		normalized = append(normalized, hint)
+		normalized = append(normalized, value)
 	}
 	if len(normalized) == 0 {
 		return nil
 	}
-	if parallel > 0 && len(normalized) > parallel {
-		return normalized[:parallel]
-	}
 	return normalized
-}
-
-func nextConfigDimensionHints(nc *nextConfigJSON) []string {
-	if nc == nil || len(nc.Dimensions) == 0 {
-		return nil
-	}
-	hints, err := goalx.ResolveDimensions(nc.Dimensions)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.dimensions: %v\n", err)
-		return nil
-	}
-	return hints
 }
 
 func resolveNextEngineModel(engines map[string]goalx.EngineConfig, defaultEngine, defaultModel string, nc *nextConfigJSON) (string, string) {

@@ -62,6 +62,7 @@ type ProtocolData struct {
 	// Subagent-specific (used in program.md.tmpl)
 	SessionName         string
 	SessionIndex        int // 0-based index of this session in the Sessions slice
+	CurrentDimensions   []goalx.ResolvedDimension
 	JournalPath         string
 	SessionIdentityPath string
 	SessionInboxPath    string
@@ -81,6 +82,9 @@ type SessionData struct {
 	Model             string
 	Mode              goalx.Mode
 	Hint              string
+	RouteRole         string
+	RouteProfile      string
+	Dimensions        []goalx.ResolvedDimension
 	EngineCommand     string
 	Prompt            string
 }

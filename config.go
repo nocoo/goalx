@@ -85,13 +85,16 @@ type ServeConfig struct {
 }
 
 type SessionConfig struct {
-	Hint    string         `yaml:"hint,omitempty"`
-	Engine  string         `yaml:"engine,omitempty"`
-	Model   string         `yaml:"model,omitempty"`
-	Effort  EffortLevel    `yaml:"effort,omitempty"`
-	Mode    Mode           `yaml:"mode,omitempty"`
-	Target  *TargetConfig  `yaml:"target,omitempty"`
-	Harness *HarnessConfig `yaml:"harness,omitempty"`
+	Hint         string         `yaml:"hint,omitempty"`
+	Engine       string         `yaml:"engine,omitempty"`
+	Model        string         `yaml:"model,omitempty"`
+	Effort       EffortLevel    `yaml:"effort,omitempty"`
+	Mode         Mode           `yaml:"mode,omitempty"`
+	RouteRole    string         `yaml:"route_role,omitempty"`
+	RouteProfile string         `yaml:"route_profile,omitempty"`
+	Dimensions   []string       `yaml:"dimensions,omitempty"`
+	Target       *TargetConfig  `yaml:"target,omitempty"`
+	Harness      *HarnessConfig `yaml:"harness,omitempty"`
 }
 
 type PreferencesConfig struct {
@@ -126,9 +129,17 @@ type ExecutionProfile struct {
 	Effort EffortLevel `yaml:"effort,omitempty"`
 }
 
+type RoutingRule struct {
+	Role          string        `yaml:"role,omitempty"`
+	AllDimensions []string      `yaml:"all_dimensions,omitempty"`
+	AnyDimensions []string      `yaml:"any_dimensions,omitempty"`
+	Efforts       []EffortLevel `yaml:"efforts,omitempty"`
+	Profile       string        `yaml:"profile,omitempty"`
+}
+
 type RoutingTableConfig struct {
-	Profiles map[string]ExecutionProfile  `yaml:"profiles,omitempty"`
-	Table    map[string]map[string]string `yaml:"table,omitempty"`
+	Profiles map[string]ExecutionProfile `yaml:"profiles,omitempty"`
+	Rules    []RoutingRule               `yaml:"rules,omitempty"`
 }
 
 // EngineConfig defines how to launch an AI engine.
@@ -284,22 +295,17 @@ var BuiltinDefaults = Config{
 				Effort: EffortLow,
 			},
 		},
-		Table: map[string]map[string]string{
-			"research": {
-				"low":    "build_fast",
-				"medium": "research_deep",
-				"high":   "research_max",
-			},
-			"develop": {
-				"low":    "build_fast",
-				"medium": "build_balanced",
-				"high":   "research_deep",
-			},
-			"simple": {
-				"low":    "build_fast",
-				"medium": "build_fast",
-				"high":   "build_balanced",
-			},
+		Rules: []RoutingRule{
+			{Role: "simple", Efforts: []EffortLevel{EffortMinimal, EffortLow, EffortMedium}, Profile: "build_fast"},
+			{Role: "simple", Efforts: []EffortLevel{EffortHigh, EffortMax}, Profile: "build_balanced"},
+			{Role: "develop", Efforts: []EffortLevel{EffortMinimal, EffortLow}, Profile: "build_fast"},
+			{Role: "develop", Efforts: []EffortLevel{EffortMedium}, Profile: "build_balanced"},
+			{Role: "develop", AnyDimensions: []string{"audit", "adversarial"}, Efforts: []EffortLevel{EffortHigh, EffortMax}, Profile: "research_deep"},
+			{Role: "develop", Efforts: []EffortLevel{EffortHigh, EffortMax}, Profile: "research_deep"},
+			{Role: "research", Efforts: []EffortLevel{EffortMinimal, EffortLow}, Profile: "build_fast"},
+			{Role: "research", Efforts: []EffortLevel{EffortMedium}, Profile: "research_deep"},
+			{Role: "research", AnyDimensions: []string{"depth", "comparative"}, Efforts: []EffortLevel{EffortHigh, EffortMax}, Profile: "research_max"},
+			{Role: "research", Efforts: []EffortLevel{EffortHigh, EffortMax}, Profile: "research_deep"},
 		},
 	},
 	Master: MasterConfig{
@@ -327,6 +333,21 @@ func validateEffortLevel(level EffortLevel, field string) error {
 	}
 	if normalized == "" {
 		return nil
+	}
+	return nil
+}
+
+func validateUniqueNames(values []string, field string) error {
+	seen := make(map[string]bool, len(values))
+	for _, raw := range values {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			return fmt.Errorf("%s must not contain empty values", field)
+		}
+		if seen[name] {
+			return fmt.Errorf("%s contains duplicate value %q", field, name)
+		}
+		seen[name] = true
 	}
 	return nil
 }
@@ -506,10 +527,26 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 			}
 		}
 	}
-	for role, dimensions := range cfg.Routing.Table {
-		for dimension, profileName := range dimensions {
-			if _, ok := cfg.Routing.Profiles[profileName]; !ok {
-				return fmt.Errorf("routing.table.%s.%s references unknown profile %q", role, dimension, profileName)
+	for i, rule := range cfg.Routing.Rules {
+		field := fmt.Sprintf("routing.rules[%d]", i)
+		if strings.TrimSpace(rule.Role) == "" {
+			return fmt.Errorf("%s.role is required", field)
+		}
+		if strings.TrimSpace(rule.Profile) == "" {
+			return fmt.Errorf("%s.profile is required", field)
+		}
+		if _, ok := cfg.Routing.Profiles[rule.Profile]; !ok {
+			return fmt.Errorf("%s references unknown profile %q", field, rule.Profile)
+		}
+		if err := validateUniqueNames(rule.AllDimensions, field+".all_dimensions"); err != nil {
+			return err
+		}
+		if err := validateUniqueNames(rule.AnyDimensions, field+".any_dimensions"); err != nil {
+			return err
+		}
+		for j, effort := range rule.Efforts {
+			if err := validateEffortLevel(effort, fmt.Sprintf("%s.efforts[%d]", field, j)); err != nil {
+				return err
 			}
 		}
 	}
@@ -523,8 +560,16 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 		if sess.Mode != "" && sess.Mode != ModeResearch && sess.Mode != ModeDevelop {
 			return fmt.Errorf("session-%d mode must be 'research' or 'develop', got %q", i+1, sess.Mode)
 		}
+		if sess.RouteProfile != "" {
+			if _, ok := cfg.Routing.Profiles[sess.RouteProfile]; !ok {
+				return fmt.Errorf("session-%d route_profile references unknown profile %q", i+1, sess.RouteProfile)
+			}
+		}
 		if err := validateEffortLevel(sess.Effort, fmt.Sprintf("session-%d.effort", i+1)); err != nil {
 			return err
+		}
+		if _, err := resolveDimensionSpecsWithCatalog(resolveDimensionCatalog(cfg), sess.Dimensions); err != nil {
+			return fmt.Errorf("session-%d dimensions: %w", i+1, err)
 		}
 		if err := validateLaunchRequest(engines, LaunchRequest{
 			Engine: sess.Engine,
@@ -695,15 +740,12 @@ func EffectiveSessionConfig(cfg *Config, idx int) SessionConfig {
 		out = sessions[idx]
 	}
 	out.Mode = ResolveSessionMode(cfg.Mode, out.Mode)
-	roleDefault := defaultRoleSession(cfg, out.Mode)
-	if out.Engine == "" {
-		out.Engine = roleDefault.Engine
+	if len(out.Dimensions) > 0 {
+		out.Dimensions = append([]string(nil), out.Dimensions...)
 	}
-	if out.Model == "" {
-		out.Model = roleDefault.Model
-	}
-	if out.Effort == "" {
-		out.Effort = roleDefault.Effort
+	resolved, err := ResolveSessionRoute(cfg, out)
+	if err == nil {
+		out = resolved
 	}
 
 	target := cfg.Target
@@ -858,8 +900,8 @@ func mergeConfig(base, overlay *Config) {
 	if len(overlay.Routing.Profiles) > 0 {
 		base.Routing.Profiles = copyProfiles(overlay.Routing.Profiles)
 	}
-	if len(overlay.Routing.Table) > 0 {
-		base.Routing.Table = copyRoutingTable(overlay.Routing.Table)
+	if len(overlay.Routing.Rules) > 0 {
+		base.Routing.Rules = copyRoutingRules(overlay.Routing.Rules)
 	}
 	if overlay.Parallel > 0 {
 		base.Parallel = overlay.Parallel
@@ -978,14 +1020,13 @@ func copyProfiles(src map[string]ExecutionProfile) map[string]ExecutionProfile {
 	return dst
 }
 
-func copyRoutingTable(src map[string]map[string]string) map[string]map[string]string {
-	dst := make(map[string]map[string]string, len(src))
-	for role, dims := range src {
-		cloned := make(map[string]string, len(dims))
-		for dim, profile := range dims {
-			cloned[dim] = profile
-		}
-		dst[role] = cloned
+func copyRoutingRules(src []RoutingRule) []RoutingRule {
+	dst := make([]RoutingRule, len(src))
+	for i, rule := range src {
+		rule.AllDimensions = append([]string(nil), rule.AllDimensions...)
+		rule.AnyDimensions = append([]string(nil), rule.AnyDimensions...)
+		rule.Efforts = append([]EffortLevel(nil), rule.Efforts...)
+		dst[i] = rule
 	}
 	return dst
 }
@@ -1025,6 +1066,10 @@ func FilterExternalContextFiles(projectRoot string, files []string) []string {
 		seen[normalized] = true
 	}
 	return filtered
+}
+
+func (c *Config) DimensionCatalog() map[string]string {
+	return copyStringCatalog(resolveDimensionCatalog(c))
 }
 
 func pathWithin(path, root string) bool {

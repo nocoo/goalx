@@ -101,12 +101,17 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 	if cfg.Budget.MaxDuration != 20*60*1_000_000_000 {
 		t.Fatalf("budget = %v, want 20m", cfg.Budget.MaxDuration)
 	}
-	if len(cfg.Sessions) != 4 || cfg.Sessions[3].Hint != goalx.BuiltinDimensions["perfectionist"] {
-		t.Fatalf("sessions = %#v, want hinted sessions from dimensions", cfg.Sessions)
+	if len(cfg.Sessions) != 4 {
+		t.Fatalf("sessions = %#v, want 4 seeded sessions", cfg.Sessions)
+	}
+	for i, session := range cfg.Sessions {
+		if got, want := session.Dimensions, []string{"depth", "adversarial", "evidence", "perfectionist"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] || got[3] != want[3] {
+			t.Fatalf("session[%d].dimensions = %#v, want %#v", i, got, want)
+		}
 	}
 }
 
-func TestImplementResolvesNextConfigDimensionsIntoHints(t *testing.T) {
+func TestImplementAttachesNextConfigDimensionsToSessions(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -134,17 +139,12 @@ func TestImplementResolvesNextConfigDimensionsIntoHints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	wantHints := []string{
-		goalx.BuiltinDimensions["depth"],
-		goalx.BuiltinDimensions["adversarial"],
-		goalx.BuiltinDimensions["evidence"],
+	if len(cfg.Sessions) != 3 {
+		t.Fatalf("sessions = %#v, want 3 seeded sessions", cfg.Sessions)
 	}
-	if len(cfg.Sessions) != len(wantHints) {
-		t.Fatalf("sessions = %#v, want %#v", cfg.Sessions, wantHints)
-	}
-	for i := range wantHints {
-		if cfg.Sessions[i].Hint != wantHints[i] {
-			t.Fatalf("sessions[%d].hint = %q, want %q", i, cfg.Sessions[i].Hint, wantHints[i])
+	for i := range cfg.Sessions {
+		if got, want := cfg.Sessions[i].Dimensions, []string{"depth", "adversarial", "evidence"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+			t.Fatalf("sessions[%d].dimensions = %#v, want %#v", i, got, want)
 		}
 	}
 }

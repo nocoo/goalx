@@ -137,10 +137,12 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 		t.Fatalf("budget = %v, want 15m", cfg.Budget.MaxDuration)
 	}
 	if len(cfg.Sessions) != 3 {
-		t.Fatalf("sessions = %#v, want 3 hinted sessions", cfg.Sessions)
+		t.Fatalf("sessions = %#v, want 3 seeded sessions", cfg.Sessions)
 	}
-	if cfg.Sessions[2].Hint != goalx.BuiltinDimensions["evidence"] {
-		t.Fatalf("session[2].hint = %q, want evidence dimension", cfg.Sessions[2].Hint)
+	for i, session := range cfg.Sessions {
+		if got, want := session.Dimensions, []string{"depth", "adversarial", "evidence"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+			t.Fatalf("session[%d].dimensions = %#v, want %#v", i, got, want)
+		}
 	}
 }
 

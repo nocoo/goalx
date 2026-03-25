@@ -101,7 +101,7 @@ goalx keep
 goalx result
 ```
 
-Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an explicit phase-specific run with role defaults, optional `--effort`, or role-specific engine/model overrides. Use `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` to continue from saved runs. Use `--dimension NAMES` only to seed launch-time hints; the canonical runtime control is `goalx dimension`. Only use `goalx init` / `goalx start --config PATH` when you explicitly want config-first or low-level control. GoalX now launches master and sessions from the current process environment at the moment of each start/add/resume/relaunch, so runtime behavior follows the active caller environment instead of a persisted snapshot file. Starting a new run also makes it the focused default run for later commands in the same project. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin a different default run. Bare `--run NAME` resolution is local-first within the current project; for cross-project targeting, use `--run <project-id>/<run>`. `--parallel` is optional: if you omit it, GoalX keeps project/preset defaults; if nothing else sets it, the initial fan-out is `1`. That value is initial planning guidance, not a permanent ceiling on later master dispatch.
+Default to `goalx auto`. Use `goalx research` / `goalx develop` when you want an explicit phase-specific run with role defaults, optional `--effort`, or role-specific engine/model overrides. Use `goalx debate --from RUN`, `goalx implement --from RUN`, and `goalx explore --from RUN` to continue from saved runs. Use `--dimension SPEC` only to seed launch-time viewpoints; the canonical runtime control is `goalx dimension`, and `goalx replace` is the handoff path when the routed owner must change. Only use `goalx init` / `goalx start --config PATH` when you explicitly want config-first or low-level control. GoalX now launches master and sessions from the current process environment at the moment of each start/add/resume/relaunch, so runtime behavior follows the active caller environment instead of a persisted snapshot file. Starting a new run also makes it the focused default run for later commands in the same project. Use `goalx focus --run NAME` when a project has multiple active runs and you want to pin a different default run. Bare `--run NAME` resolution is local-first within the current project; for cross-project targeting, use `--run <project-id>/<run>`. `--parallel` is optional: if you omit it, GoalX keeps project/preset defaults; if nothing else sets it, the initial fan-out is `1`. That value is initial planning guidance, not a permanent ceiling on later master dispatch.
 
 ## Commands
 
@@ -226,8 +226,9 @@ goalx research "objective" --sub claude-code/opus:2 --sub codex/gpt-5.4:1 --effo
 # Override role defaults
 goalx research "objective" --master codex/gpt-5.4 --research-role claude-code/opus --develop-role codex/gpt-5.4-mini --master-effort medium --research-effort high --develop-effort medium
 
-# N workers + 1 auditor pattern
-goalx develop "objective" --preset claude-h --parallel 3 --dimension feasibility,adversarial --auditor codex/gpt-5.4 --effort medium
+# N workers + routed review pattern
+goalx develop "objective" --preset claude-h --parallel 3 --dimension feasibility --dimension adversarial --route-role develop --effort medium
+goalx replace --run demo session-2 --route-profile research_deep
 ```
 
 ## Architecture
@@ -243,7 +244,7 @@ goalx/
 ├── cli/                # All CLI commands
 │   ├── auto.go         # Init + start, then exit
 │   ├── dimension.go    # Runtime dimension mutation command
-│   ├── session_identity.go # Requested/effective effort + route profile
+│   ├── session_identity.go # Requested/effective effort + route/dimension identity
 │   ├── start.go        # Session launch + worktree setup
 │   ├── observe.go      # Live transport capture + control summary
 │   └── ...
@@ -291,10 +292,27 @@ routing:
     build_balanced:  { engine: codex, model: gpt-5.4, effort: medium }
     build_fast:      { engine: codex, model: gpt-5.4-mini, effort: minimal }
     fallback_safe:   { engine: claude-code, model: sonnet, effort: low }
-  table:
-    research: { low: build_fast, medium: research_deep, high: research_max }
-    develop:  { low: build_fast, medium: build_balanced, high: research_deep }
-    simple:   { low: build_fast, medium: build_fast, high: build_balanced }
+  rules:
+    - role: simple
+      efforts: [minimal, low, medium]
+      profile: build_fast
+    - role: simple
+      efforts: [high, max]
+      profile: build_balanced
+    - role: develop
+      efforts: [medium]
+      profile: build_balanced
+    - role: develop
+      any_dimensions: [audit, adversarial]
+      efforts: [high, max]
+      profile: research_deep
+    - role: research
+      efforts: [medium]
+      profile: research_deep
+    - role: research
+      any_dimensions: [depth, comparative]
+      efforts: [high, max]
+      profile: research_max
 preferences:
   research:
     guidance: "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。"
@@ -304,7 +322,7 @@ preferences:
     guidance: "轻量任务用 fast。"
 ```
 
-`routing.profiles` defines reusable engine/model/effort bundles. `routing.table` maps `role + dimension` to a profile name. `preferences.*.guidance` is human guidance for the agent, not a routing alias.
+`routing.profiles` defines reusable engine/model/effort bundles. `routing.rules` is an ordered ruleset over `route_role + dimensions + effort`. `preferences.*.guidance` is human guidance for the agent, not a routing alias.
 
 ### Engine Presets
 
@@ -338,6 +356,7 @@ Common endpoints:
 - `POST /projects/:name/goalx/observe` — capture live progress
 - `POST /projects/:name/goalx/status` — summarize progress
 - `POST /projects/:name/goalx/add` — add a session to a running run
+- `POST /projects/:name/goalx/replace` — replace a session with a new routed owner
 - `POST /projects/:name/goalx/debate` — start a debate phase from `from`
 - `POST /projects/:name/goalx/implement` — start an implementation phase from `from`
 - `POST /projects/:name/goalx/explore` — start a follow-up research phase from `from`

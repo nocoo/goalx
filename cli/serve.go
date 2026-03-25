@@ -50,6 +50,10 @@ type serveActionRequest struct {
 	Name           string            `json:"name"`
 	Context        []string          `json:"context"`
 	Dimensions     []string          `json:"dimensions"`
+	RouteRole      string            `json:"route_role"`
+	RouteProfile   string            `json:"route_profile"`
+	Engine         string            `json:"engine"`
+	Model          string            `json:"model"`
 	Run            string            `json:"run"`
 	From           string            `json:"from"`
 	Session        string            `json:"session"`
@@ -637,6 +641,34 @@ func (a *serveApp) runServeAction(projectRoot, action string, req serveActionReq
 			args := buildServeRunArgs(req.Run)
 			args = append(args, req.Session)
 			return Resume(projectRoot, args)
+		case "replace":
+			if strings.TrimSpace(req.Session) == "" {
+				return fmt.Errorf("session is required")
+			}
+			args := buildServeRunArgs(req.Run)
+			args = append(args, req.Session)
+			if req.RouteRole != "" {
+				args = append(args, "--route-role", req.RouteRole)
+			}
+			if req.RouteProfile != "" {
+				args = append(args, "--route-profile", req.RouteProfile)
+			}
+			for _, dimension := range req.Dimensions {
+				args = append(args, "--dimension", dimension)
+			}
+			if req.Mode != "" {
+				args = append(args, "--mode", req.Mode)
+			}
+			if req.Engine != "" {
+				args = append(args, "--engine", req.Engine)
+			}
+			if req.Model != "" {
+				args = append(args, "--model", req.Model)
+			}
+			if req.Effort != "" {
+				args = append(args, "--effort", string(req.Effort))
+			}
+			return Replace(projectRoot, args)
 		case "drop":
 			return Drop(projectRoot, buildServeRunArgs(req.Run))
 		case "debate":

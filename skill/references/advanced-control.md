@@ -76,12 +76,13 @@ Prefer durable GoalX commands over direct transport input:
 - `goalx explore --from RUN` to start a follow-up research phase from a saved run
 - `--master engine/model`, `--research-role engine/model`, and `--develop-role engine/model` to override role defaults
 - `--effort LEVEL`, `--master-effort LEVEL`, `--research-effort LEVEL`, and `--develop-effort LEVEL` to control provider-aware reasoning depth
-- `--dimension depth,adversarial` to seed launch-time hints for a new run or phase
+- `--dimension depth,adversarial` to seed launch-time viewpoints for a new run or phase
 - `goalx dimension --run NAME session-2 --set depth,adversarial` to change live runtime dimensions after launch
 - `--parallel N` to change the initial fan-out for this run or phase; omit it to keep project/preset defaults
 - `--write-config` only when the user explicitly wants to generate `.goalx/goalx.yaml` first, then continue with `goalx start --config .goalx/goalx.yaml`
 - `goalx park --run NAME session-N` to pause a session without losing its worktree
 - `goalx resume --run NAME session-N` to restart a parked session
+- `goalx replace --run NAME session-N --route-profile PROFILE` to hand the same slice to a new routed owner
 - `goalx keep --run NAME session-N` to merge a develop session branch
 
 `--parallel` is not a permanent cap. Master may still add or resume more durable sessions later if the goal warrants it.
@@ -89,8 +90,8 @@ Prefer durable GoalX commands over direct transport input:
 ## Effort, Routing, and Runtime Dimensions
 
 - Use `--dimension` at launch and `goalx dimension` at runtime.
-- Routing profiles are config entries under `routing.profiles`; `routing.table` maps `role + dimension` to one of those profiles.
-- Session identity records `requested_effort`, `effective_effort`, `route_profile`, and the role/mode decision for each worker.
+- Routing profiles are config entries under `routing.profiles`; ordered `routing.rules` match `route_role + dimensions + effort` to one of those profiles.
+- Session identity records `requested_effort`, `effective_effort`, `route_role`, `route_profile`, resolved dimensions, and replacement lineage for each worker.
 
 ## Urgent Delivery and Recovery
 

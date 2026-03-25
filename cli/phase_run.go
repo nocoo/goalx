@@ -23,11 +23,11 @@ type savedPhaseSource struct {
 }
 
 type phaseActionSpec struct {
-	Kind          string
-	Mode          goalx.Mode
-	NoContextErr  string
-	DraftHeader   string
-	DefaultHints  func(*savedPhaseSource) []string
+	Kind         string
+	Mode         goalx.Mode
+	NoContextErr string
+	DraftHeader  string
+	DefaultHints func(*savedPhaseSource) []string
 }
 
 func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error) {
@@ -128,12 +128,13 @@ func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions,
 	if err != nil {
 		return err
 	}
-	hints, err := applyPhaseDimensions(spec.DefaultHints(source), cfg.Parallel, opts)
+	dimensions, err := applyPhaseDimensions(opts)
 	if err != nil {
 		return err
 	}
 
-	applySessionHints(cfg, hints)
+	applySessionHints(cfg, spec.DefaultHints(source))
+	applySessionDimensions(cfg, dimensions, opts)
 	cfg.Context = goalx.ContextConfig{Files: contextFiles, Refs: cfg.Context.Refs}
 
 	if opts.WriteConfig {
@@ -271,15 +272,14 @@ func mergePhaseContext(base []string, extra []string) ([]string, error) {
 	return merged, nil
 }
 
-func applyPhaseDimensions(defaultHints []string, parallel int, opts phaseOptions) ([]string, error) {
+func applyPhaseDimensions(opts phaseOptions) ([]string, error) {
 	if len(opts.Dimensions) == 0 {
-		return nextConfigHints(defaultHints, parallel, nil), nil
+		return nil, nil
 	}
-	hints, err := goalx.ResolveDimensions(opts.Dimensions)
-	if err != nil {
+	if _, err := goalx.ResolveDimensionSpecs(opts.Dimensions); err != nil {
 		return nil, err
 	}
-	return normalizeNextConfigHints(hints, parallel), nil
+	return append([]string(nil), opts.Dimensions...), nil
 }
 
 func applySessionHints(cfg *goalx.Config, hints []string) {
@@ -299,6 +299,43 @@ func applySessionHints(cfg *goalx.Config, hints []string) {
 	for i, hint := range hints {
 		cfg.Sessions[i] = goalx.SessionConfig{Hint: hint, Mode: sessionMode}
 	}
+}
+
+func applySessionDimensions(cfg *goalx.Config, dimensions []string, opts phaseOptions) {
+	if cfg == nil {
+		return
+	}
+	if len(dimensions) == 0 && opts.RouteRole == "" && opts.RouteProfile == "" && opts.Effort == "" {
+		return
+	}
+	size := cfg.Parallel
+	if size < len(cfg.Sessions) {
+		size = len(cfg.Sessions)
+	}
+	if size == 0 {
+		size = 1
+	}
+	sessions := make([]goalx.SessionConfig, size)
+	copy(sessions, cfg.Sessions)
+	sessionMode := goalx.ResolveSessionMode(cfg.Mode, "")
+	for i := range sessions {
+		if sessions[i].Mode == "" {
+			sessions[i].Mode = sessionMode
+		}
+		if len(dimensions) > 0 {
+			sessions[i].Dimensions = append([]string(nil), dimensions...)
+		}
+		if opts.RouteRole != "" {
+			sessions[i].RouteRole = opts.RouteRole
+		}
+		if opts.RouteProfile != "" {
+			sessions[i].RouteProfile = opts.RouteProfile
+		}
+		if opts.Effort != "" && sessions[i].Effort == "" {
+			sessions[i].Effort = opts.Effort
+		}
+	}
+	cfg.Sessions = sessions
 }
 
 func writePhaseConfig(projectRoot string, cfg *goalx.Config, header string) error {

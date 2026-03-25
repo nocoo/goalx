@@ -109,6 +109,34 @@ func TestParseLaunchOptionsAcceptsNoSnapshotFlag(t *testing.T) {
 	}
 }
 
+func TestParseLaunchOptionsSupportsRepeatedDimensionsAndRoutingFlags(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{
+		"audit auth",
+		"--dimension", "audit",
+		"--dimension", "adversarial,user",
+		"--route-role", "develop",
+		"--route-profile", "build_balanced",
+	}, goalx.ModeResearch, true)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if got, want := opts.Dimensions, []string{"audit", "adversarial", "user"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("dimensions = %#v, want %#v", got, want)
+	}
+	if opts.RouteRole != "develop" {
+		t.Fatalf("route role = %q, want develop", opts.RouteRole)
+	}
+	if opts.RouteProfile != "build_balanced" {
+		t.Fatalf("route profile = %q, want build_balanced", opts.RouteProfile)
+	}
+}
+
+func TestParseLaunchOptionsRejectsRemovedAuditorFlag(t *testing.T) {
+	if _, err := parseLaunchOptions([]string{"audit auth", "--auditor", "codex/gpt-5.4"}, goalx.ModeResearch, true); err == nil {
+		t.Fatal("expected error for removed --auditor flag")
+	}
+}
+
 func TestParseStatusArgs(t *testing.T) {
 	run, session, err := parseStatusArgs([]string{"--run", "demo", "session-1"})
 	if err != nil {

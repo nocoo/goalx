@@ -78,13 +78,13 @@ No sessions yet. Launch them yourself with `goalx add`.
 {{end}}
 {{end}}
 
-{{if .Routing.Table}}
-### Routing Table
+{{if .Routing.Rules}}
+### Routing Rules
 
-| Role | Dimension | Profile |
-|------|-----------|---------|
-{{range $role, $dimensions := .Routing.Table}}{{range $dimension, $profile := $dimensions}}| {{$role}} | {{$dimension}} | {{$profile}} |
-{{end}}{{end}}
+| Role | All Dimensions | Any Dimensions | Efforts | Profile |
+|------|----------------|----------------|---------|---------|
+{{range $rule := .Routing.Rules}}| {{$rule.Role}} | {{join $rule.AllDimensions ", "}} | {{join $rule.AnyDimensions ", "}} | {{range $i, $effort := $rule.Efforts}}{{if $i}}, {{end}}{{$effort}}{{end}} | {{$rule.Profile}} |
+{{end}}
 {{end}}
 
 {{if .DimensionsCatalog}}
@@ -120,7 +120,7 @@ Write findings to `{{.ReportsDir}}`.
 | Simple | {{.Preferences.Simple.Guidance}} |
 {{- end}}
 
-Use routing profiles, the routing table, and these preferences together when choosing engines. CLI overrides take precedence. You may deviate if circumstances warrant it, but decide explicitly and record why.
+Use routing profiles, the routing rules, and these preferences together when choosing engines. CLI overrides take precedence. You may deviate if circumstances warrant it, but decide explicitly and record why.
 {{- end}}
 
 ## Strategy

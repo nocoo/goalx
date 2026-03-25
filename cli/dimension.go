@@ -8,14 +8,16 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	goalx "github.com/vonbai/goalx"
 )
 
-const dimensionUsage = "usage: goalx dimension [--run NAME] <session-N|all> (--set NAMES | --add NAME | --remove NAME)"
+const dimensionUsage = "usage: goalx dimension [--run NAME] <session-N|all> (--set SPECS | --add SPEC | --remove SPEC)"
 
 type DimensionsState struct {
-	Version   int                 `json:"version"`
-	Sessions  map[string][]string `json:"sessions,omitempty"`
-	UpdatedAt string              `json:"updated_at,omitempty"`
+	Version   int                                  `json:"version"`
+	Sessions  map[string][]goalx.ResolvedDimension `json:"sessions,omitempty"`
+	UpdatedAt string                               `json:"updated_at,omitempty"`
 }
 
 type dimensionMutation struct {
@@ -50,13 +52,20 @@ func Dimension(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	catalog, err := loadDimensionCatalog(rc.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("load dimension catalog: %w", err)
+	}
 
 	state, err := EnsureDimensionsState(rc.RunDir)
 	if err != nil {
 		return err
 	}
 	for _, sessionName := range targets {
-		next := applyDimensionMutation(state.Sessions[sessionName], mutation.action, mutation.values)
+		next, err := applyDimensionMutation(state.Sessions[sessionName], mutation.action, mutation.values, catalog)
+		if err != nil {
+			return err
+		}
 		if len(next) == 0 {
 			delete(state.Sessions, sessionName)
 			continue
@@ -87,7 +96,7 @@ func parseDimensionMutation(args []string) (dimensionMutation, error) {
 	}
 
 	allowEmpty := mutation.action == "--set"
-	values, err := parseDimensionNames(args[2], allowEmpty)
+	values, err := parseDimensionSpecs(args[2], allowEmpty)
 	if err != nil {
 		return dimensionMutation{}, err
 	}
@@ -138,54 +147,70 @@ func resolveDimensionTargets(runDir, target, action string) ([]string, error) {
 	return []string{target}, nil
 }
 
-func parseDimensionNames(raw string, allowEmpty bool) ([]string, error) {
-	parts := strings.Split(raw, ",")
-	names := make([]string, 0, len(parts))
-	for _, part := range parts {
-		name := strings.TrimSpace(part)
-		if name == "" {
-			continue
-		}
-		if !slices.Contains(names, name) {
-			names = append(names, name)
+func parseDimensionSpecs(raw string, allowEmpty bool) ([]string, error) {
+	specs := splitListFlag(raw)
+	unique := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		if !slices.Contains(unique, spec) {
+			unique = append(unique, spec)
 		}
 	}
-	if len(names) == 0 && !allowEmpty {
+	if len(unique) == 0 && !allowEmpty {
 		return nil, fmt.Errorf(dimensionUsage)
 	}
-	return names, nil
+	return unique, nil
 }
 
-func applyDimensionMutation(current []string, action string, values []string) []string {
+func applyDimensionMutation(current []goalx.ResolvedDimension, action string, values []string, catalog map[string]string) ([]goalx.ResolvedDimension, error) {
+	specs, err := goalx.ResolveDimensionSpecs(values, catalog)
+	if err != nil {
+		return nil, err
+	}
 	switch action {
 	case "--set":
-		return append([]string(nil), values...)
+		return append([]goalx.ResolvedDimension(nil), specs...), nil
 	case "--add":
-		next := append([]string(nil), current...)
-		for _, value := range values {
-			if !slices.Contains(next, value) {
-				next = append(next, value)
+		next := append([]goalx.ResolvedDimension(nil), current...)
+		for _, spec := range specs {
+			replaced := false
+			for i := range next {
+				if next[i].Name == spec.Name {
+					next[i] = spec
+					replaced = true
+					break
+				}
+			}
+			if !replaced {
+				next = append(next, spec)
 			}
 		}
-		return next
+		return next, nil
 	case "--remove":
-		next := make([]string, 0, len(current))
-		for _, value := range current {
-			if !slices.Contains(values, value) {
-				next = append(next, value)
+		removeNames := make(map[string]bool, len(specs))
+		for _, spec := range specs {
+			removeNames[spec.Name] = true
+		}
+		next := make([]goalx.ResolvedDimension, 0, len(current))
+		for _, spec := range current {
+			if !removeNames[spec.Name] {
+				next = append(next, spec)
 			}
 		}
-		return next
+		return next, nil
 	default:
-		return append([]string(nil), current...)
+		return append([]goalx.ResolvedDimension(nil), current...), nil
 	}
 }
 
-func formatDimensions(values []string) string {
+func formatDimensions(values []goalx.ResolvedDimension) string {
 	if len(values) == 0 {
 		return "(none)"
 	}
-	return strings.Join(values, ",")
+	names := make([]string, 0, len(values))
+	for _, value := range values {
+		names = append(names, value.Name)
+	}
+	return strings.Join(names, ",")
 }
 
 func LoadDimensionsState(path string) (*DimensionsState, error) {
@@ -200,7 +225,7 @@ func LoadDimensionsState(path string) (*DimensionsState, error) {
 	state := &DimensionsState{}
 	if len(strings.TrimSpace(string(data))) == 0 {
 		state.Version = 1
-		state.Sessions = map[string][]string{}
+		state.Sessions = map[string][]goalx.ResolvedDimension{}
 		return state, nil
 	}
 	if err := json.Unmarshal(data, state); err != nil {
@@ -225,17 +250,58 @@ func EnsureDimensionsState(runDir string) (*DimensionsState, error) {
 	if err != nil {
 		return nil, err
 	}
-	if state != nil {
-		return state, nil
+	created := false
+	if state == nil {
+		state = &DimensionsState{
+			Version:  1,
+			Sessions: map[string][]goalx.ResolvedDimension{},
+		}
+		created = true
 	}
-	state = &DimensionsState{
-		Version:  1,
-		Sessions: map[string][]string{},
-	}
-	if err := SaveDimensionsState(path, state); err != nil {
+	seeded, err := seedDimensionsStateFromIdentity(runDir, state)
+	if err != nil {
 		return nil, err
 	}
+	if created || seeded {
+		if err := SaveDimensionsState(path, state); err != nil {
+			return nil, err
+		}
+	}
 	return state, nil
+}
+
+func CurrentSessionDimensions(runDir, sessionName string, fallback []goalx.ResolvedDimension) []goalx.ResolvedDimension {
+	state, err := LoadDimensionsState(ControlDimensionsPath(runDir))
+	if err == nil && state != nil {
+		if current := state.Sessions[sessionName]; len(current) > 0 {
+			return append([]goalx.ResolvedDimension(nil), current...)
+		}
+	}
+	return append([]goalx.ResolvedDimension(nil), fallback...)
+}
+
+func seedDimensionsStateFromIdentity(runDir string, state *DimensionsState) (bool, error) {
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return false, err
+	}
+	seeded := false
+	for _, idx := range indexes {
+		sessionName := SessionName(idx)
+		if len(state.Sessions[sessionName]) > 0 {
+			continue
+		}
+		identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, sessionName))
+		if err != nil {
+			return false, err
+		}
+		if identity == nil || len(identity.Dimensions) == 0 {
+			continue
+		}
+		state.Sessions[sessionName] = append([]goalx.ResolvedDimension(nil), identity.Dimensions...)
+		seeded = true
+	}
+	return seeded, nil
 }
 
 func normalizeDimensionsState(state *DimensionsState) {
@@ -243,17 +309,21 @@ func normalizeDimensionsState(state *DimensionsState) {
 		state.Version = 1
 	}
 	if state.Sessions == nil {
-		state.Sessions = map[string][]string{}
+		state.Sessions = map[string][]goalx.ResolvedDimension{}
 		return
 	}
 	for sessionName, values := range state.Sessions {
-		normalized := make([]string, 0, len(values))
+		normalized := make([]goalx.ResolvedDimension, 0, len(values))
+		seen := make(map[string]bool, len(values))
 		for _, value := range values {
-			value = strings.TrimSpace(value)
-			if value == "" || slices.Contains(normalized, value) {
+			value.Name = strings.TrimSpace(value.Name)
+			value.Guidance = strings.TrimSpace(value.Guidance)
+			value.Source = strings.TrimSpace(value.Source)
+			if value.Name == "" || value.Guidance == "" || seen[value.Name] {
 				continue
 			}
 			normalized = append(normalized, value)
+			seen[value.Name] = true
 		}
 		if len(normalized) == 0 {
 			delete(state.Sessions, sessionName)

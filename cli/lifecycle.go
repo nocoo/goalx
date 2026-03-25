@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	goalx "github.com/vonbai/goalx"
@@ -170,6 +171,10 @@ func Resume(projectRoot string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config for engine resolution: %w", err)
 	}
+	dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("load dimension catalog: %w", err)
+	}
 	spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
 		Engine: sessionIdentity.Engine,
 		Model:  sessionIdentity.Model,
@@ -188,7 +193,7 @@ func Resume(projectRoot string, args []string) error {
 	}
 	current := coord.Sessions[sessionName]
 
-	sessionDataList, err := buildSessionDataList(rc.RunDir, rc.Config, engines)
+	sessionDataList, err := buildSessionDataList(rc.RunDir, rc.Config, engines, dimensionsCatalog)
 	if err != nil {
 		return fmt.Errorf("build session roster: %w", err)
 	}
@@ -204,6 +209,7 @@ func Resume(projectRoot string, args []string) error {
 		Budget:              rc.Config.Budget,
 		SessionName:         sessionName,
 		SessionIndex:        idx - 1,
+		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, sessionName, sessionIdentity.Dimensions),
 		JournalPath:         JournalPath(rc.RunDir, sessionName),
 		CharterPath:         RunCharterPath(rc.RunDir),
 		SessionIdentityPath: SessionIdentityPath(rc.RunDir, sessionName),
@@ -270,6 +276,354 @@ func Resume(projectRoot string, args []string) error {
 	}
 
 	fmt.Printf("Resumed %s in run '%s'\n", sessionName, rc.Name)
+	return nil
+}
+
+func Replace(projectRoot string, args []string) error {
+	const usage = "usage: goalx replace [--run NAME] <session-name> [--mode MODE] [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--route-role ROLE] [--route-profile PROFILE] [--dimension SPEC]..."
+	if printUsageIfHelp(args, usage) {
+		return nil
+	}
+	runName, rest, err := extractRunFlag(args)
+	if err != nil {
+		return err
+	}
+	if len(rest) == 0 {
+		return fmt.Errorf(usage)
+	}
+
+	oldSessionName := strings.TrimSpace(rest[0])
+	if oldSessionName == "" {
+		return fmt.Errorf(usage)
+	}
+	opts := goalx.SessionConfig{}
+	var explicitEngine, explicitModel bool
+	for i := 1; i < len(rest); i++ {
+		switch rest[i] {
+		case "--mode":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --mode")
+			}
+			i++
+			switch goalx.Mode(rest[i]) {
+			case goalx.ModeResearch, goalx.ModeDevelop:
+				opts.Mode = goalx.Mode(rest[i])
+			default:
+				return fmt.Errorf("invalid --mode %q (expected research or develop)", rest[i])
+			}
+		case "--engine":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --engine")
+			}
+			i++
+			opts.Engine = strings.TrimSpace(rest[i])
+			explicitEngine = true
+		case "--model":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --model")
+			}
+			i++
+			opts.Model = strings.TrimSpace(rest[i])
+			explicitModel = true
+		case "--effort":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --effort")
+			}
+			i++
+			level, err := goalx.ParseEffortLevel(rest[i])
+			if err != nil {
+				return err
+			}
+			opts.Effort = level
+		case "--route-role":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --route-role")
+			}
+			i++
+			opts.RouteRole = strings.TrimSpace(rest[i])
+		case "--route-profile":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --route-profile")
+			}
+			i++
+			opts.RouteProfile = strings.TrimSpace(rest[i])
+		case "--dimension":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --dimension")
+			}
+			i++
+			opts.Dimensions = append(opts.Dimensions, splitListFlag(rest[i])...)
+		default:
+			return fmt.Errorf("unknown flag %q", rest[i])
+		}
+	}
+	if explicitEngine != explicitModel {
+		return fmt.Errorf("--engine and --model must be provided together")
+	}
+
+	rc, err := ResolveRun(projectRoot, runName)
+	if err != nil {
+		return err
+	}
+	if !SessionExists(rc.TmuxSession) {
+		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
+	}
+	if _, err := parseSessionIndex(oldSessionName); err != nil {
+		return err
+	}
+	oldIdentity, err := RequireSessionIdentity(rc.RunDir, oldSessionName)
+	if err != nil {
+		return fmt.Errorf("load session identity: %w", err)
+	}
+
+	coord, err := EnsureCoordinationState(rc.RunDir, rc.Config.Objective)
+	if err != nil {
+		return err
+	}
+	current := coord.Sessions[oldSessionName]
+	digest := inferSessionCoordination(JournalPath(rc.RunDir, oldSessionName))
+	scope := digest.Scope
+	if scope == "" {
+		scope = current.Scope
+	}
+	if scope == "" {
+		scope = oldSessionName
+	}
+
+	if err := Park(projectRoot, append(buildServeRunArgs(rc.Name), oldSessionName)); err != nil {
+		return err
+	}
+
+	sessionState, err := EnsureSessionsRuntimeState(rc.RunDir)
+	if err != nil {
+		return fmt.Errorf("load session runtime state: %w", err)
+	}
+	oldSnapshot := sessionState.Sessions[oldSessionName]
+	workdir := sessionWorkdir(rc.RunDir, rc.Config.Name, oldSessionName, sessionState)
+	if info, err := os.Stat(workdir); err != nil || !info.IsDir() {
+		if err == nil {
+			err = fmt.Errorf("%s is not a directory", workdir)
+		}
+		return fmt.Errorf("replacement requires existing workdir: %w", err)
+	}
+
+	newNum, err := nextAvailableSessionIndex(rc.ProjectRoot, rc.RunDir, rc.Config.Name)
+	if err != nil {
+		return err
+	}
+	newSessionName := SessionName(newNum)
+	journalPath := JournalPath(rc.RunDir, newSessionName)
+	sessionIdentityPath := SessionIdentityPath(rc.RunDir, newSessionName)
+	windowName := sessionWindowName(rc.Config.Name, newNum)
+
+	oldDimensions := goalx.ResolveDimensionNames(oldIdentity.Dimensions)
+	newSession := goalx.SessionConfig{
+		Hint:         scope,
+		Mode:         goalx.Mode(oldIdentity.Mode),
+		Effort:       oldIdentity.RequestedEffort,
+		RouteRole:    oldIdentity.RouteRole,
+		RouteProfile: oldIdentity.RouteProfile,
+		Dimensions:   append([]string(nil), oldDimensions...),
+		Target:       &oldIdentity.Target,
+	}
+	routeChanged := opts.Mode != "" || opts.Effort != "" || opts.RouteRole != "" || opts.RouteProfile != "" || len(opts.Dimensions) > 0
+	if !routeChanged && !(explicitEngine || explicitModel) {
+		newSession.Engine = oldIdentity.Engine
+		newSession.Model = oldIdentity.Model
+	}
+	if opts.Mode != "" {
+		newSession.Mode = opts.Mode
+	}
+	if opts.Effort != "" {
+		newSession.Effort = opts.Effort
+	}
+	if opts.RouteRole != "" {
+		newSession.RouteRole = opts.RouteRole
+	}
+	if opts.RouteProfile != "" {
+		newSession.RouteProfile = opts.RouteProfile
+	}
+	if len(opts.Dimensions) > 0 {
+		newSession.Dimensions = append([]string(nil), opts.Dimensions...)
+	}
+	if explicitEngine {
+		newSession.Engine = opts.Engine
+	}
+	if explicitModel {
+		newSession.Model = opts.Model
+	}
+	if routeChanged && !(explicitEngine || explicitModel) {
+		newSession.Engine = ""
+		newSession.Model = ""
+	}
+
+	renderCfg := *rc.Config
+	renderCfg.Sessions = append([]goalx.SessionConfig(nil), goalx.ExpandSessions(rc.Config)...)
+	for len(renderCfg.Sessions) < newNum {
+		renderCfg.Sessions = append(renderCfg.Sessions, goalx.SessionConfig{})
+	}
+	renderCfg.Sessions[newNum-1] = newSession
+	if renderCfg.Parallel < len(renderCfg.Sessions) {
+		renderCfg.Parallel = len(renderCfg.Sessions)
+	}
+	effectiveSession := goalx.EffectiveSessionConfig(&renderCfg, newNum-1)
+	var target goalx.TargetConfig
+	if effectiveSession.Target != nil {
+		target = *effectiveSession.Target
+	}
+	sessionIdentity, err := NewSessionIdentity(
+		rc.RunDir,
+		newSessionName,
+		sessionRoleKind(effectiveSession.Mode),
+		effectiveSession.Mode,
+		effectiveSession.Engine,
+		effectiveSession.Model,
+		effectiveSession.Effort,
+		"",
+		effectiveSession.RouteProfile,
+		"",
+		target,
+	)
+	if err != nil {
+		return fmt.Errorf("create session identity: %w", err)
+	}
+	sessionIdentity.RouteRole = effectiveSession.RouteRole
+	sessionIdentity.ReplacesSession = oldSessionName
+	if len(effectiveSession.Dimensions) > 0 {
+		dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
+		if err != nil {
+			return fmt.Errorf("load dimension catalog: %w", err)
+		}
+		resolvedDimensions, err := goalx.ResolveDimensionSpecs(effectiveSession.Dimensions, dimensionsCatalog)
+		if err != nil {
+			return fmt.Errorf("resolve replacement dimensions: %w", err)
+		}
+		sessionIdentity.Dimensions = resolvedDimensions
+	}
+
+	engines, err := loadEngineCatalog(rc.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("load config for engine resolution: %w", err)
+	}
+	launchSpec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: sessionIdentity.Engine,
+		Model:  sessionIdentity.Model,
+		Effort: effectiveSession.Effort,
+	})
+	if err != nil {
+		return fmt.Errorf("resolve engine: %w", err)
+	}
+	sessionIdentity.EffectiveEffort = launchSpec.EffectiveEffort
+	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
+		return fmt.Errorf("write session identity: %w", err)
+	}
+	if err := os.WriteFile(journalPath, nil, 0o644); err != nil {
+		return fmt.Errorf("init journal: %w", err)
+	}
+	if err := EnsureSessionControl(rc.RunDir, newSessionName); err != nil {
+		return fmt.Errorf("init session control: %w", err)
+	}
+	if err := GenerateAdapter(sessionIdentity.Engine, workdir, ControlInboxPath(rc.RunDir, newSessionName), SessionCursorPath(rc.RunDir, newSessionName)); err != nil {
+		return fmt.Errorf("generate adapter: %w", err)
+	}
+	if err := EnsureEngineTrusted(sessionIdentity.Engine, workdir); err != nil {
+		return fmt.Errorf("trust bootstrap: %w", err)
+	}
+
+	dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("load dimension catalog: %w", err)
+	}
+	sessionDataList, err := buildSessionDataList(rc.RunDir, &renderCfg, engines, dimensionsCatalog)
+	if err != nil {
+		return fmt.Errorf("build session roster: %w", err)
+	}
+	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
+	subData := ProtocolData{
+		RunName:             rc.Config.Name,
+		Objective:           rc.Config.Objective,
+		Mode:                effectiveSession.Mode,
+		Engine:              sessionIdentity.Engine,
+		Sessions:            sessionDataList,
+		Target:              target,
+		Harness:             rc.Config.Harness,
+		Context:             rc.Config.Context,
+		Budget:              rc.Config.Budget,
+		SessionName:         newSessionName,
+		SessionIndex:        newNum - 1,
+		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, newSessionName, sessionIdentity.Dimensions),
+		JournalPath:         journalPath,
+		CharterPath:         RunCharterPath(rc.RunDir),
+		SessionIdentityPath: sessionIdentityPath,
+		SessionInboxPath:    ControlInboxPath(rc.RunDir, newSessionName),
+		SessionCursorPath:   SessionCursorPath(rc.RunDir, newSessionName),
+		WorktreePath:        oldSnapshot.WorktreePath,
+		GoalPath:            GoalPath(rc.RunDir),
+		GoalLogPath:         GoalLogPath(rc.RunDir),
+		IdentityFencePath:   IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath: existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath: CompletionStatePath(rc.RunDir),
+		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:         absProjectRoot,
+	}
+	if err := RenderSubagentProtocol(subData, rc.RunDir, newNum-1); err != nil {
+		return fmt.Errorf("render protocol: %w", err)
+	}
+
+	meta, err := EnsureRunMetadata(rc.RunDir, rc.ProjectRoot, rc.Config.Objective)
+	if err != nil {
+		return fmt.Errorf("load run metadata: %w", err)
+	}
+	goalxBin, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve goalx executable: %w", err)
+	}
+	checkSec, _ := normalizeSidecarInterval(rc.Config.Master.CheckInterval)
+	sessionLeaseTTL := time.Duration(checkSec) * time.Second * 2
+	engineCmd := launchSpec.Command
+	if sessionIdentity.Engine == "claude-code" {
+		engineCmd += " --disable-slash-commands"
+	}
+	protocolPath := filepath.Join(rc.RunDir, sessionNameToProgramFile(newNum))
+	prompt := goalx.ResolvePrompt(engines, sessionIdentity.Engine, protocolPath)
+	launchCmd := buildLeaseWrappedLaunchCommand(goalxBin, rc.Name, rc.RunDir, newSessionName, meta.RunID, meta.Epoch, sessionLeaseTTL, engineCmd, prompt)
+	if err := NewWindowWithCommand(rc.TmuxSession, windowName, workdir, launchCmd); err != nil {
+		return fmt.Errorf("create tmux window: %w", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	coord, err = EnsureCoordinationState(rc.RunDir, rc.Config.Objective)
+	if err != nil {
+		return err
+	}
+	coord.Sessions[newSessionName] = CoordinationSession{
+		State:     "active",
+		Scope:     scope,
+		UpdatedAt: now,
+	}
+	coord.Version++
+	coord.UpdatedAt = now
+	if err := SaveCoordinationState(CoordinationPath(rc.RunDir), coord); err != nil {
+		return err
+	}
+	if err := UpsertSessionRuntimeState(rc.RunDir, SessionRuntimeState{
+		Name:         newSessionName,
+		State:        "active",
+		Mode:         sessionIdentity.Mode,
+		Branch:       oldSnapshot.Branch,
+		WorktreePath: oldSnapshot.WorktreePath,
+		OwnerScope:   scope,
+	}); err != nil {
+		return fmt.Errorf("update session runtime state: %w", err)
+	}
+	if _, err := AppendMasterInboxMessage(rc.RunDir, "session_replaced", "goalx replace", fmt.Sprintf("%s was replaced by %s.", oldSessionName, newSessionName)); err == nil {
+		_, _ = DeliverControlNudge(rc.RunDir, "session-replaced:"+oldSessionName, "session-replaced:"+newSessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudge)
+	}
+
+	fmt.Printf("Replaced %s with %s in run '%s'\n", oldSessionName, newSessionName, rc.Name)
 	return nil
 }
 

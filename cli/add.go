@@ -10,7 +10,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension NAME] [--worktree]`
+const addUsage = `usage: goalx add "research direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree]`
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
@@ -30,6 +30,8 @@ func Add(projectRoot string, args []string) (err error) {
 	// Extract flags from rest args
 	var flagEngine, flagModel string
 	var flagMode goalx.Mode
+	var flagRouteRole, flagRouteProfile string
+	var flagDimensions []string
 	useWorktree := false
 	var hintParts []string
 	for i := 0; i < len(rest); i++ {
@@ -62,11 +64,19 @@ func Add(projectRoot string, args []string) (err error) {
 				return fmt.Errorf("missing value for --dimension")
 			}
 			i++
-			hints, err := goalx.ResolveDimensions(strings.Split(rest[i], ","))
-			if err != nil {
-				return err
+			flagDimensions = append(flagDimensions, splitListFlag(rest[i])...)
+		case "--route-role":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --route-role")
 			}
-			hintParts = append(hintParts, hints...)
+			i++
+			flagRouteRole = rest[i]
+		case "--route-profile":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --route-profile")
+			}
+			i++
+			flagRouteProfile = rest[i]
 		case "--worktree":
 			useWorktree = true
 		default:
@@ -75,6 +85,9 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if len(hintParts) == 0 {
 		return fmt.Errorf(addUsage)
+	}
+	if (flagEngine == "") != (flagModel == "") {
+		return fmt.Errorf("--engine and --model must be provided together")
 	}
 	hint := strings.Join(hintParts, " ")
 
@@ -117,6 +130,18 @@ func Add(projectRoot string, args []string) (err error) {
 	if flagMode != "" {
 		newSess.Mode = flagMode
 	}
+	if len(flagDimensions) > 0 {
+		if _, err := goalx.ResolveDimensionSpecs(flagDimensions); err != nil {
+			return err
+		}
+		newSess.Dimensions = append([]string(nil), flagDimensions...)
+	}
+	if flagRouteRole != "" {
+		newSess.RouteRole = flagRouteRole
+	}
+	if flagRouteProfile != "" {
+		newSess.RouteProfile = flagRouteProfile
+	}
 
 	renderCfg := *rc.Config
 	renderCfg.Sessions = append([]goalx.SessionConfig(nil), goalx.ExpandSessions(rc.Config)...)
@@ -141,12 +166,24 @@ func Add(projectRoot string, args []string) (err error) {
 		effectiveSession.Model,
 		effectiveSession.Effort,
 		"",
-		"",
+		effectiveSession.RouteProfile,
 		"",
 		target,
 	)
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
+	}
+	sessionIdentity.RouteRole = effectiveSession.RouteRole
+	dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("load dimension catalog: %w", err)
+	}
+	if len(effectiveSession.Dimensions) > 0 {
+		resolvedDimensions, err := goalx.ResolveDimensionSpecs(effectiveSession.Dimensions, dimensionsCatalog)
+		if err != nil {
+			return fmt.Errorf("resolve session dimensions: %w", err)
+		}
+		sessionIdentity.Dimensions = resolvedDimensions
 	}
 	engine := sessionIdentity.Engine
 	model := sessionIdentity.Model
@@ -227,7 +264,7 @@ func Add(projectRoot string, args []string) (err error) {
 	}); err != nil {
 		return fmt.Errorf("prime session runtime state: %w", err)
 	}
-	sessionDataList, err := buildSessionDataList(rc.RunDir, &renderCfg, engines)
+	sessionDataList, err := buildSessionDataList(rc.RunDir, &renderCfg, engines, dimensionsCatalog)
 	if err != nil {
 		return fmt.Errorf("build session roster: %w", err)
 	}
@@ -246,6 +283,7 @@ func Add(projectRoot string, args []string) (err error) {
 		Budget:              rc.Config.Budget,
 		SessionName:         sName,
 		SessionIndex:        newNum - 1,
+		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, sName, sessionIdentity.Dimensions),
 		JournalPath:         journalPath,
 		CharterPath:         RunCharterPath(rc.RunDir),
 		SessionIdentityPath: sessionIdentityPath,
@@ -311,7 +349,7 @@ func Add(projectRoot string, args []string) (err error) {
 	return nil
 }
 
-func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]goalx.EngineConfig) ([]SessionData, error) {
+func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, dimensionsCatalog map[string]string) ([]SessionData, error) {
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
 		return nil, err
@@ -341,6 +379,15 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 		if identity.Mode != "" {
 			mode = goalx.Mode(identity.Mode)
 		}
+		dimensions := append([]goalx.ResolvedDimension(nil), identity.Dimensions...)
+		if len(dimensions) == 0 && len(effective.Dimensions) > 0 {
+			resolvedDimensions, err := goalx.ResolveDimensionSpecs(effective.Dimensions, dimensionsCatalog)
+			if err != nil {
+				return nil, fmt.Errorf("resolve %s dimensions: %w", sName, err)
+			}
+			dimensions = resolvedDimensions
+		}
+		dimensions = CurrentSessionDimensions(runDir, sName, dimensions)
 		spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
 			Engine: engine,
 			Model:  model,
@@ -360,6 +407,10 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 			Engine:            engine,
 			Model:             model,
 			Mode:              mode,
+			Hint:              effective.Hint,
+			RouteRole:         identity.RouteRole,
+			RouteProfile:      identity.RouteProfile,
+			Dimensions:        dimensions,
 			EngineCommand:     spec.Command,
 		})
 	}

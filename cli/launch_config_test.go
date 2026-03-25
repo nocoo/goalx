@@ -133,8 +133,7 @@ func TestBuildLaunchConfigAutoDefaultsPreconfiguredSessionsToDevelopMode(t *test
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
 		Mode:      goalx.ModeAuto,
-		Subs:      []string{"codex/codex"},
-		Auditor:   "codex/codex",
+		Subs:      []string{"codex/codex:2"},
 	})
 	if err != nil {
 		t.Fatalf("buildLaunchConfig: %v", err)
@@ -419,8 +418,7 @@ func TestResolveLaunchConfigAutoDefaultsPreconfiguredSessionsToDevelopMode(t *te
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
 		Mode:      goalx.ModeAuto,
-		Subs:      []string{"codex/codex"},
-		Auditor:   "codex/codex",
+		Subs:      []string{"codex/codex:2"},
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -470,5 +468,29 @@ target:
 	}
 	if cfg.Roles.Develop.Effort != goalx.EffortMedium {
 		t.Fatalf("develop effort = %q, want %q", cfg.Roles.Develop.Effort, goalx.EffortMedium)
+	}
+}
+
+func TestResolveLaunchConfigDimensionsDoNotIncreaseParallel(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+preset: codex
+parallel: 1
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+
+	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective:  "audit auth",
+		Mode:       goalx.ModeDevelop,
+		Dimensions: []string{"audit", "adversarial", "evidence"},
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	if resolvedCfg.Config.Parallel != 1 {
+		t.Fatalf("parallel = %d, want 1", resolvedCfg.Config.Parallel)
 	}
 }

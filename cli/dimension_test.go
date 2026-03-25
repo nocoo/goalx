@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -35,9 +34,8 @@ func TestDimensionSetAppliesToAllSessions(t *testing.T) {
 	}
 	for _, sessionName := range []string{"session-1", "session-2"} {
 		got := state.Sessions[sessionName]
-		want := []string{"depth", "adversarial"}
-		if !slices.Equal(got, want) {
-			t.Fatalf("%s dimensions = %#v, want %#v", sessionName, got, want)
+		if len(got) != 2 || got[0].Name != "depth" || got[1].Name != "adversarial" {
+			t.Fatalf("%s dimensions = %#v, want depth+adversarial", sessionName, got)
 		}
 	}
 	if state.UpdatedAt == "" {
@@ -57,9 +55,14 @@ func TestDimensionAddAndRemoveUpdateNamedSession(t *testing.T) {
 	}
 	if err := SaveDimensionsState(ControlDimensionsPath(runDir), &DimensionsState{
 		Version: 1,
-		Sessions: map[string][]string{
-			"session-1": []string{"depth", "evidence"},
-			"session-2": []string{"comparative"},
+		Sessions: map[string][]goalx.ResolvedDimension{
+			"session-1": {
+				{Name: "depth", Guidance: goalx.BuiltinDimensions["depth"], Source: goalx.DimensionSourceBuiltin},
+				{Name: "evidence", Guidance: goalx.BuiltinDimensions["evidence"], Source: goalx.DimensionSourceBuiltin},
+			},
+			"session-2": {
+				{Name: "comparative", Guidance: goalx.BuiltinDimensions["comparative"], Source: goalx.DimensionSourceBuiltin},
+			},
 		},
 	}); err != nil {
 		t.Fatalf("SaveDimensionsState: %v", err)
@@ -79,11 +82,11 @@ func TestDimensionAddAndRemoveUpdateNamedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDimensionsState: %v", err)
 	}
-	if got, want := state.Sessions["session-1"], []string{"evidence", "creative"}; !slices.Equal(got, want) {
-		t.Fatalf("session-1 dimensions = %#v, want %#v", got, want)
+	if got := state.Sessions["session-1"]; len(got) != 2 || got[0].Name != "evidence" || got[1].Name != "creative" {
+		t.Fatalf("session-1 dimensions = %#v, want evidence+creative", got)
 	}
-	if got, want := state.Sessions["session-2"], []string{"comparative"}; !slices.Equal(got, want) {
-		t.Fatalf("session-2 dimensions = %#v, want %#v", got, want)
+	if got := state.Sessions["session-2"]; len(got) != 1 || got[0].Name != "comparative" {
+		t.Fatalf("session-2 dimensions = %#v, want comparative", got)
 	}
 }
 

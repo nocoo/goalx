@@ -141,7 +141,7 @@ func TestPresetMixed(t *testing.T) {
 	}
 }
 
-func TestBuiltinDefaultsIncludeRoutingAndPreferences(t *testing.T) {
+func TestBuiltinDefaultsIncludeRoutingRulesAndPreferences(t *testing.T) {
 	profile := BuiltinDefaults.Routing.Profiles["research_deep"]
 	if profile.Engine != "claude-code" || profile.Model != "opus" || profile.Effort != EffortHigh {
 		t.Fatalf("research_deep = %#v, want claude-code/opus/high", profile)
@@ -152,11 +152,14 @@ func TestBuiltinDefaultsIncludeRoutingAndPreferences(t *testing.T) {
 	if got := BuiltinDefaults.Routing.Profiles["build_fast"]; got.Engine != "codex" || got.Model != "gpt-5.4-mini" || got.Effort != EffortMinimal {
 		t.Fatalf("build_fast = %#v, want codex/gpt-5.4-mini/minimal", got)
 	}
-	if got := BuiltinDefaults.Routing.Table["develop"]["medium"]; got != "build_balanced" {
-		t.Fatalf("routing.table.develop.medium = %q, want build_balanced", got)
+	if got := BuiltinDimensions["audit"]; got == "" {
+		t.Fatal("builtin audit dimension missing")
 	}
-	if got := BuiltinDefaults.Routing.Table["simple"]["high"]; got != "build_balanced" {
-		t.Fatalf("routing.table.simple.high = %q, want build_balanced", got)
+	if len(BuiltinDefaults.Routing.Rules) == 0 {
+		t.Fatal("routing.rules is empty")
+	}
+	if BuiltinDefaults.Routing.Rules[0].Role == "" || BuiltinDefaults.Routing.Rules[0].Profile == "" {
+		t.Fatalf("routing.rules[0] = %#v", BuiltinDefaults.Routing.Rules[0])
 	}
 	if got := BuiltinDefaults.Preferences.Research.Guidance; got != "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。" {
 		t.Fatalf("research guidance = %q", got)
@@ -178,17 +181,77 @@ func TestLoadConfigUsesBuiltinRoutingAndPreferencesWhenUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadResolvedConfigForTest: %v", err)
 	}
-	if got := cfg.Routing.Table["research"]["medium"]; got != "research_deep" {
-		t.Fatalf("routing.table.research.medium = %q, want research_deep", got)
+	if len(cfg.Routing.Rules) == 0 {
+		t.Fatal("routing.rules is empty")
 	}
-	if got := cfg.Routing.Table["develop"]["high"]; got != "research_deep" {
-		t.Fatalf("routing.table.develop.high = %q, want research_deep", got)
+	if got := cfg.Routing.Rules[0].Role; got == "" {
+		t.Fatalf("routing.rules[0].role = %q, want non-empty", got)
 	}
 	if got := cfg.Preferences.Research.Guidance; got != "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。" {
 		t.Fatalf("research guidance = %q", got)
 	}
 	if got := cfg.Preferences.Simple.Guidance; got != "轻量任务用 fast。" {
 		t.Fatalf("simple guidance = %q", got)
+	}
+	if got := cfg.dimensionCatalog["audit"]; got == "" {
+		t.Fatal("resolved config missing builtin audit dimension")
+	}
+}
+
+func TestResolveRouteProfileMatchesRulesInOrder(t *testing.T) {
+	cfg := &Config{
+		Routing: RoutingTableConfig{
+			Profiles: map[string]ExecutionProfile{
+				"build_fast":    {Engine: "codex", Model: "gpt-5.4-mini", Effort: EffortMinimal},
+				"research_deep": {Engine: "claude-code", Model: "opus", Effort: EffortHigh},
+				"research_max":  {Engine: "claude-code", Model: "opus", Effort: EffortMax},
+			},
+			Rules: []RoutingRule{
+				{Role: "develop", AnyDimensions: []string{"audit"}, Efforts: []EffortLevel{EffortHigh}, Profile: "research_deep"},
+				{Role: "develop", Efforts: []EffortLevel{EffortHigh}, Profile: "research_max"},
+			},
+		},
+	}
+
+	profileName, profile, ok := ResolveRouteProfile(cfg, "develop", []ResolvedDimension{{Name: "audit"}}, EffortHigh)
+	if !ok {
+		t.Fatal("ResolveRouteProfile did not match")
+	}
+	if profileName != "research_deep" {
+		t.Fatalf("profileName = %q, want research_deep", profileName)
+	}
+	if profile.Engine != "claude-code" || profile.Model != "opus" || profile.Effort != EffortHigh {
+		t.Fatalf("profile = %#v, want claude-code/opus/high", profile)
+	}
+}
+
+func TestResolveSessionRouteExplicitProfileBeatsRules(t *testing.T) {
+	cfg := &Config{
+		Routing: RoutingTableConfig{
+			Profiles: map[string]ExecutionProfile{
+				"build_fast":    {Engine: "codex", Model: "gpt-5.4-mini", Effort: EffortMinimal},
+				"research_deep": {Engine: "claude-code", Model: "opus", Effort: EffortHigh},
+			},
+			Rules: []RoutingRule{
+				{Role: "develop", AnyDimensions: []string{"audit"}, Efforts: []EffortLevel{EffortHigh}, Profile: "research_deep"},
+			},
+		},
+	}
+
+	resolved, err := ResolveSessionRoute(cfg, SessionConfig{
+		RouteRole:    "develop",
+		RouteProfile: "build_fast",
+		Dimensions:   []string{"audit"},
+		Effort:       EffortHigh,
+	})
+	if err != nil {
+		t.Fatalf("ResolveSessionRoute: %v", err)
+	}
+	if resolved.RouteProfile != "build_fast" {
+		t.Fatalf("route_profile = %q, want build_fast", resolved.RouteProfile)
+	}
+	if resolved.Engine != "codex" || resolved.Model != "gpt-5.4-mini" || resolved.Effort != EffortMinimal {
+		t.Fatalf("resolved = %#v, want codex/gpt-5.4-mini/minimal", resolved)
 	}
 }
 
@@ -643,8 +706,8 @@ harness:
 	if got := cfg.Routing.Profiles["research_deep"]; got.Engine != "claude-code" || got.Model != "opus" || got.Effort != EffortHigh {
 		t.Fatalf("research_deep = %#v, want claude-code/opus/high", got)
 	}
-	if got := cfg.Routing.Table["develop"]["low"]; got != "build_fast" {
-		t.Fatalf("routing.table.develop.low = %q, want build_fast", got)
+	if len(cfg.Routing.Rules) == 0 {
+		t.Fatal("routing.rules is empty")
 	}
 	if cfg.Harness.Command != "go build ./... && go test ./..." {
 		t.Fatalf("harness.command = %q, want project harness", cfg.Harness.Command)

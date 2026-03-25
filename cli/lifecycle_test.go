@@ -381,6 +381,93 @@ esac
 	}
 }
 
+func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	logPath := installFakeTmux(t, "master session-1")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	cfg.Routing = goalx.BuiltinDefaults.Routing
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	coord, err := EnsureCoordinationState(runDir, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureCoordinationState: %v", err)
+	}
+	coord.Sessions["session-1"] = CoordinationSession{
+		State: "active",
+		Scope: "db race triage",
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), coord); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+
+	if err := Replace(repo, []string{"--run", runName, "session-1", "--route-profile", "research_deep"}); err != nil {
+		t.Fatalf("Replace: %v", err)
+	}
+
+	oldState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	if got := oldState.Sessions["session-1"].State; got != "parked" {
+		t.Fatalf("session-1 state = %q, want parked", got)
+	}
+	if got := oldState.Sessions["session-2"].State; got != "active" {
+		t.Fatalf("session-2 state = %q, want active", got)
+	}
+	if oldState.Sessions["session-2"].WorktreePath != WorktreePath(runDir, runName, 1) {
+		t.Fatalf("session-2 worktree = %q, want %q", oldState.Sessions["session-2"].WorktreePath, WorktreePath(runDir, runName, 1))
+	}
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("replacement identity missing")
+	}
+	if identity.ReplacesSession != "session-1" {
+		t.Fatalf("replaces_session = %q, want session-1", identity.ReplacesSession)
+	}
+	if identity.RouteProfile != "research_deep" {
+		t.Fatalf("route_profile = %q, want research_deep", identity.RouteProfile)
+	}
+	if identity.Engine != "claude-code" || identity.Model != "opus" || identity.RequestedEffort != goalx.EffortHigh {
+		t.Fatalf("identity = %+v, want claude-code/opus/high", identity)
+	}
+
+	coord, err = LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState: %v", err)
+	}
+	if got := coord.Sessions["session-2"].Scope; got != "db race triage" {
+		t.Fatalf("session-2 scope = %q, want db race triage", got)
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	logText := string(logData)
+	tmuxSession := goalx.TmuxSessionName(repo, runName)
+	if !strings.Contains(logText, "kill-window -t "+tmuxSession+":session-1") {
+		t.Fatalf("tmux log missing kill-window for session-1:\n%s", logText)
+	}
+	if !strings.Contains(logText, "new-window -t "+tmuxSession+" -n session-2 -c "+WorktreePath(runDir, runName, 1)+" env ") {
+		t.Fatalf("tmux log missing new-window for session-2:\n%s", logText)
+	}
+}
+
 func TestStatusShowsParkedSessionStateFromCoordination(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

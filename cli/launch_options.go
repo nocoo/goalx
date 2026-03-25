@@ -15,6 +15,8 @@ type launchOptions struct {
 	Name           string
 	ContextPaths   []string
 	Dimensions     []string
+	RouteRole      string
+	RouteProfile   string
 	Effort         goalx.EffortLevel
 	Master         string
 	ResearchRole   string
@@ -22,7 +24,6 @@ type launchOptions struct {
 	MasterEffort   goalx.EffortLevel
 	ResearchEffort goalx.EffortLevel
 	DevelopEffort  goalx.EffortLevel
-	Auditor        string
 	Subs           []string
 	Preset         string
 	NoSnapshot     bool
@@ -49,7 +50,7 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
        goalx start --config PATH
 
 advanced/manual path:
@@ -57,23 +58,23 @@ advanced/manual path:
 
 notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  role defaults are separate: --master, --research-role, --develop-role.`
+ role defaults are separate: --master, --research-role, --develop-role.`
 	case "init":
-		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  role defaults are separate: --master, --research-role, --develop-role.`
+ role defaults are separate: --master, --research-role, --develop-role.`
 	case "auto":
-		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   master decides mode unless you pass --research or --develop.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  role defaults are separate: --master, --research-role, --develop-role.`
+ role defaults are separate: --master, --research-role, --develop-role.`
 	case "research", "develop":
-		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension NAMES] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--auditor ENGINE/MODEL] [--sub ENGINE/MODEL[:N]]
+		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
 
 notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
@@ -131,7 +132,19 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 				return opts, fmt.Errorf("missing value for --dimension")
 			}
 			i++
-			opts.Dimensions = strings.Split(args[i], ",")
+			opts.Dimensions = append(opts.Dimensions, splitListFlag(args[i])...)
+		case "--route-role":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --route-role")
+			}
+			i++
+			opts.RouteRole = strings.TrimSpace(args[i])
+		case "--route-profile":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --route-profile")
+			}
+			i++
+			opts.RouteProfile = strings.TrimSpace(args[i])
 		case "--master":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --master")
@@ -190,12 +203,6 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 				return opts, err
 			}
 			opts.DevelopEffort = level
-		case "--auditor":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --auditor")
-			}
-			i++
-			opts.Auditor = args[i]
 		case "--sub":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --sub")
@@ -217,6 +224,19 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 		}
 	}
 	return opts, nil
+}
+
+func splitListFlag(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {

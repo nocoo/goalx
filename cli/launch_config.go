@@ -113,19 +113,25 @@ func applyLaunchSessionOverrides(cfg *goalx.Config, opts launchOptions, dimensio
 
 	cfg.Sessions = nil
 	if len(opts.Dimensions) > 0 {
-		hints, err := goalx.ResolveDimensions(opts.Dimensions, dimensions)
-		if err != nil {
+		if _, err := goalx.ResolveDimensionSpecs(opts.Dimensions, dimensions); err != nil {
 			return err
 		}
-		if cfg.Parallel < len(hints) {
-			cfg.Parallel = len(hints)
+	}
+
+	if len(opts.Subs) == 0 && (len(opts.Dimensions) > 0 || opts.RouteRole != "" || opts.RouteProfile != "" || opts.Effort != "") {
+		size := cfg.Parallel
+		if size < 1 {
+			size = 1
 		}
-		cfg.Sessions = make([]goalx.SessionConfig, cfg.Parallel)
+		cfg.Sessions = make([]goalx.SessionConfig, size)
 		sessionMode := goalx.ResolveSessionMode(cfg.Mode, "")
-		for i, hint := range hints {
+		for i := range cfg.Sessions {
 			cfg.Sessions[i] = goalx.SessionConfig{
-				Hint: hint,
-				Mode: sessionMode,
+				Mode:         sessionMode,
+				Effort:       opts.Effort,
+				RouteRole:    opts.RouteRole,
+				RouteProfile: opts.RouteProfile,
+				Dimensions:   append([]string(nil), opts.Dimensions...),
 			}
 		}
 	}
@@ -149,27 +155,18 @@ func applyLaunchSessionOverrides(cfg *goalx.Config, opts launchOptions, dimensio
 			}
 			for j := 0; j < n; j++ {
 				cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
-					Engine: engine,
-					Model:  model,
-					Mode:   sessionMode,
+					Engine:       engine,
+					Model:        model,
+					Mode:         sessionMode,
+					Effort:       opts.Effort,
+					RouteRole:    opts.RouteRole,
+					RouteProfile: opts.RouteProfile,
+					Dimensions:   append([]string(nil), opts.Dimensions...),
 				})
 			}
 		}
 	}
 
-	if opts.Auditor != "" {
-		engine, model, err := parseEngineModelValue("--auditor", opts.Auditor)
-		if err != nil {
-			return err
-		}
-		cfg.Sessions = append(cfg.Sessions, goalx.SessionConfig{
-			Engine: engine,
-			Model:  model,
-			Effort: opts.Effort,
-			Mode:   goalx.ResolveSessionMode(cfg.Mode, ""),
-			Hint:   "Auditor: Review and challenge other sessions' work. Find flaws, missed edge cases, and incorrect assumptions.",
-		})
-	}
 	return nil
 }
 

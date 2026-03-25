@@ -57,8 +57,8 @@ Common path:
 14. Treat `run-charter.json` as the immutable doctrine anchor, `sessions/session-N/identity.json` as the durable worker identity, and `control/identity-fence.json` as the low-disturbance refresh signal.
 15. Treat missing charter or session-identity artifacts as a broken live run. Do not invent compatibility behavior around them.
 16. Launch behavior follows the current caller environment at the moment of `goalx start`, `goalx add`, `goalx resume`, or master relaunch. Do not invent or depend on a persisted launch-env snapshot file.
-17. Use `--dimension` for launch-time hints and `goalx dimension` for runtime mutation.
-18. Routing profiles are config-driven. Define reusable bundles under `routing.profiles` and map `role + dimension` to profile names under `routing.table`.
+17. Use `--dimension` for launch-time viewpoint specs and `goalx dimension` for runtime mutation. Dimensions are open-ended; builtin names are just the shared catalog.
+18. Routing profiles are config-driven. Define reusable bundles under `routing.profiles`, then use ordered `routing.rules` over `route_role + dimensions + effort` to select them. `goalx replace` is the route-upgrade / ownership-handoff primitive.
 19. `goalx stop` kills all leased processes and their descendant process trees before destroying the tmux session. `goalx drop` does the same cleanup, then removes worktrees, branches, and the run directory.
 
 ## Common Commands
@@ -98,21 +98,27 @@ Common path:
 
 ## Routing and Runtime Dimensions
 
-Routing is config-driven. Keep reusable engine/model/effort bundles in `routing.profiles`, then map `role + dimension` to a profile name in `routing.table`:
+Routing is config-driven. Keep reusable engine/model/effort bundles in `routing.profiles`, then define ordered `routing.rules`:
 
 ```yaml
 routing:
   profiles:
     research_deep: { engine: claude-code, model: opus, effort: high }
     build_fast: { engine: codex, model: gpt-5.4-mini, effort: minimal }
-  table:
-    research: { depth: research_deep, breadth: build_fast }
-    develop:  { feasibility: build_fast }
+  rules:
+    - role: research
+      any_dimensions: [depth]
+      efforts: [high, max]
+      profile: research_deep
+    - role: develop
+      any_dimensions: [feasibility]
+      efforts: [minimal, low]
+      profile: build_fast
 ```
 
 - `preferences.*.guidance` remains semantic guidance for the agent; it is not a routing alias.
-- Use `--dimension NAMES` only when you want to seed initial hints during `auto`, `research`, `develop`, `debate`, `implement`, or `explore`.
-- Runtime assignments live in `control/dimensions.json` and are changed with `goalx dimension`.
+- Use `--dimension SPEC` when you want to seed initial session viewpoints during `auto`, `research`, `develop`, `debate`, `implement`, or `explore`.
+- Runtime assignments live in `control/dimensions.json` as resolved dimension objects and are changed with `goalx dimension`.
 
 ```bash
 goalx dimension [--run NAME] <session-N|all> --set depth,adversarial

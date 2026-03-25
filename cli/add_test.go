@@ -78,7 +78,7 @@ harness:
 	}
 }
 
-func TestAddUsesBuiltinStrategyAsHint(t *testing.T) {
+func TestAddAttachesDimensionsWithoutReplacingDirection(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -114,11 +114,10 @@ harness:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"--dimension", "adversarial", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"audit root cause", "--dimension", "adversarial", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
-	want := goalx.BuiltinDimensions["adversarial"]
 	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
 	if err != nil {
 		t.Fatalf("load sessions runtime state: %v", err)
@@ -127,8 +126,18 @@ harness:
 	if !ok {
 		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
 	}
-	if sess.OwnerScope != want {
-		t.Fatalf("session-2 owner scope = %q, want %q", sess.OwnerScope, want)
+	if sess.OwnerScope != "audit root cause" {
+		t.Fatalf("session-2 owner scope = %q, want %q", sess.OwnerScope, "audit root cause")
+	}
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-2 identity missing")
+	}
+	if got := identity.Dimensions; len(got) != 1 || got[0].Name != "adversarial" || got[0].Guidance != goalx.BuiltinDimensions["adversarial"] {
+		t.Fatalf("session-2 dimensions = %#v, want resolved adversarial dimension", got)
 	}
 }
 

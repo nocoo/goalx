@@ -12,19 +12,22 @@ import (
 )
 
 type SessionIdentity struct {
-	Version         int                `json:"version"`
-	SessionName     string             `json:"session_name,omitempty"`
-	RoleKind        string             `json:"role_kind,omitempty"`
-	Mode            string             `json:"mode,omitempty"`
-	Engine          string             `json:"engine,omitempty"`
-	Model           string             `json:"model,omitempty"`
-	RequestedEffort goalx.EffortLevel  `json:"requested_effort,omitempty"`
-	EffectiveEffort string             `json:"effective_effort,omitempty"`
-	RouteProfile    string             `json:"route_profile,omitempty"`
-	QuotaState      string             `json:"quota_state,omitempty"`
-	Target          goalx.TargetConfig `json:"target,omitempty"`
-	OriginCharterID string             `json:"origin_charter_id,omitempty"`
-	CreatedAt       string             `json:"created_at,omitempty"`
+	Version         int                       `json:"version"`
+	SessionName     string                    `json:"session_name,omitempty"`
+	RoleKind        string                    `json:"role_kind,omitempty"`
+	Mode            string                    `json:"mode,omitempty"`
+	Engine          string                    `json:"engine,omitempty"`
+	Model           string                    `json:"model,omitempty"`
+	RequestedEffort goalx.EffortLevel         `json:"requested_effort,omitempty"`
+	EffectiveEffort string                    `json:"effective_effort,omitempty"`
+	RouteRole       string                    `json:"route_role,omitempty"`
+	RouteProfile    string                    `json:"route_profile,omitempty"`
+	Dimensions      []goalx.ResolvedDimension `json:"dimensions,omitempty"`
+	ReplacesSession string                    `json:"replaces_session,omitempty"`
+	QuotaState      string                    `json:"quota_state,omitempty"`
+	Target          goalx.TargetConfig        `json:"target,omitempty"`
+	OriginCharterID string                    `json:"origin_charter_id,omitempty"`
+	CreatedAt       string                    `json:"created_at,omitempty"`
 }
 
 func SessionIdentityPath(runDir, sessionName string) string {

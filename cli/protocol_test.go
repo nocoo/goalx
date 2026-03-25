@@ -951,8 +951,8 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 			Profiles: map[string]goalx.ExecutionProfile{
 				"deep-research": {Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
 			},
-			Table: map[string]map[string]string{
-				"research": {"depth": "deep-research"},
+			Rules: []goalx.RoutingRule{
+				{Role: "research", AnyDimensions: []string{"depth"}, Profile: "deep-research"},
 			},
 		},
 		DimensionsCatalog: map[string]string{
