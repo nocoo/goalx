@@ -634,13 +634,6 @@ func TestLoadConfigProjectEnvelopeOverridesUserEnvelope(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	origPresets := clonePresetMap(Presets)
-	origDimensions := cloneStringMap(BuiltinDimensions)
-	defer func() {
-		Presets = origPresets
-		BuiltinDimensions = origDimensions
-	}()
-
 	userGoalxDir := filepath.Join(home, ".goalx")
 	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
 		t.Fatalf("mkdir user config dir: %v", err)
@@ -699,6 +692,10 @@ harness:
 		t.Fatalf("write run config: %v", err)
 	}
 
+	layers, err := LoadConfigLayers(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers: %v", err)
+	}
 	cfg, engines, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
@@ -715,8 +712,106 @@ harness:
 	if engines["codex"].Models["fast"] != "project-fast" {
 		t.Fatalf("engines[codex].models[fast] = %q, want project-fast", engines["codex"].Models["fast"])
 	}
-	if BuiltinDimensions["architecture"] != "project architecture strategy" {
-		t.Fatalf("BuiltinDimensions[architecture] = %q, want project override", BuiltinDimensions["architecture"])
+	if layers.Presets["project-dev"].Master.Engine != "codex" || layers.Presets["project-dev"].Master.Model != "fast" {
+		t.Fatalf("layers.presets[project-dev].master = %#v, want codex/fast", layers.Presets["project-dev"].Master)
+	}
+	if layers.Dimensions["architecture"] != "project architecture strategy" {
+		t.Fatalf("layers.dimensions[architecture] = %q, want project override", layers.Dimensions["architecture"])
+	}
+	if _, ok := Presets["project-dev"]; ok {
+		t.Fatalf("global Presets leaked project-dev entry")
+	}
+	if _, ok := BuiltinDimensions["architecture"]; ok {
+		t.Fatalf("global BuiltinDimensions leaked architecture entry")
+	}
+}
+
+func TestLoadConfigLayersSequentialProjectsKeepCatalogsLocal(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+
+	projectA := t.TempDir()
+	projectAGoalxDir := filepath.Join(projectA, ".goalx")
+	if err := os.MkdirAll(projectAGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project A config dir: %v", err)
+	}
+	projectACfg := []byte(strings.TrimSpace(`
+engines:
+  codex:
+    command: "codex --project-a {model_id}"
+    prompt: "Read {protocol}"
+    models:
+      fast: project-a-fast
+presets:
+  project-a:
+    master: {engine: codex, model: fast}
+dimensions:
+  architecture: "project A architecture"
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectAGoalxDir, "config.yaml"), projectACfg, 0o644); err != nil {
+		t.Fatalf("write project A config: %v", err)
+	}
+
+	projectB := t.TempDir()
+	projectBGoalxDir := filepath.Join(projectB, ".goalx")
+	if err := os.MkdirAll(projectBGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project B config dir: %v", err)
+	}
+	projectBCfg := []byte(strings.TrimSpace(`
+engines:
+  codex:
+    command: "codex --project-b {model_id}"
+    prompt: "Read {protocol}"
+    models:
+      fast: project-b-fast
+presets:
+  project-b:
+    master: {engine: claude-code, model: opus}
+dimensions:
+  architecture: "project B architecture"
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectBGoalxDir, "config.yaml"), projectBCfg, 0o644); err != nil {
+		t.Fatalf("write project B config: %v", err)
+	}
+
+	layersA, err := LoadConfigLayers(projectA)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers(projectA): %v", err)
+	}
+	layersB, err := LoadConfigLayers(projectB)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers(projectB): %v", err)
+	}
+
+	if got := layersA.Presets["project-a"].Master.Engine; got != "codex" {
+		t.Fatalf("layersA.presets[project-a].master.engine = %q, want codex", got)
+	}
+	if _, ok := layersA.Presets["project-b"]; ok {
+		t.Fatalf("layersA.presets unexpectedly contains project-b")
+	}
+	if got := layersA.Dimensions["architecture"]; got != "project A architecture" {
+		t.Fatalf("layersA.dimensions[architecture] = %q, want project A architecture", got)
+	}
+	if got := layersA.Engines["codex"].Command; got != "codex --project-a {model_id}" {
+		t.Fatalf("layersA.engines[codex].command = %q, want project A override", got)
+	}
+
+	if got := layersB.Presets["project-b"].Master.Engine; got != "claude-code" {
+		t.Fatalf("layersB.presets[project-b].master.engine = %q, want claude-code", got)
+	}
+	if _, ok := layersB.Presets["project-a"]; ok {
+		t.Fatalf("layersB.presets unexpectedly contains project-a")
+	}
+	if got := layersB.Dimensions["architecture"]; got != "project B architecture" {
+		t.Fatalf("layersB.dimensions[architecture] = %q, want project B architecture", got)
+	}
+	if got := layersB.Engines["codex"].Command; got != "codex --project-b {model_id}" {
+		t.Fatalf("layersB.engines[codex].command = %q, want project B override", got)
 	}
 }
 

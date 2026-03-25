@@ -40,6 +40,9 @@ type Config struct {
 	Budget      BudgetConfig       `yaml:"budget,omitempty"`
 	Master      MasterConfig       `yaml:"master,omitempty"`
 	Serve       ServeConfig        `yaml:"serve,omitempty"`
+
+	presetCatalog    map[string]PresetConfig
+	dimensionCatalog map[string]string
 }
 
 type TargetConfig struct {
@@ -300,30 +303,14 @@ func LoadYAML[T any](path string) (T, error) {
 }
 
 func loadBaseConfigRaw(projectRoot string) (Config, map[string]EngineConfig, error) {
-	cfg := BuiltinDefaults
-	engines := copyEngines(BuiltinEngines)
-
-	// Layer 2: user config
-	home, _ := os.UserHomeDir()
-	userCfg, err := LoadYAML[UserConfig](filepath.Join(home, ".goalx", "config.yaml"))
+	layers, err := LoadConfigLayers(projectRoot)
 	if err != nil {
-		return Config{}, nil, fmt.Errorf("user config: %w", err)
+		return Config{}, nil, err
 	}
-	applyConfigEnvelope(&cfg, &engines, &userCfg)
-
-	// Layer 3: project config
-	projectConfigPath := filepath.Join(projectRoot, ".goalx", "config.yaml")
-	projEnvelope, err := LoadYAML[UserConfig](projectConfigPath)
-	if err != nil {
-		return Config{}, nil, fmt.Errorf("project config: %w", err)
-	}
-	applyConfigEnvelope(&cfg, &engines, &projEnvelope)
-	cfg.Context.Files = filterExternalContextFiles(projectRoot, cfg.Context.Files)
-
-	return cfg, engines, nil
+	return layers.Config, layers.Engines, nil
 }
 
-func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay *UserConfig) {
+func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, presets *map[string]PresetConfig, dimensions *map[string]string, overlay *UserConfig) {
 	if cfg == nil || overlay == nil {
 		return
 	}
@@ -333,11 +320,15 @@ func applyConfigEnvelope(cfg *Config, engines *map[string]EngineConfig, overlay 
 			(*engines)[k] = v
 		}
 	}
-	for k, v := range overlay.Presets {
-		Presets[k] = v
+	if presets != nil {
+		for k, v := range overlay.Presets {
+			(*presets)[k] = v
+		}
 	}
-	for k, v := range overlay.Dimensions {
-		BuiltinDimensions[k] = v
+	if dimensions != nil {
+		for k, v := range overlay.Dimensions {
+			(*dimensions)[k] = v
+		}
 	}
 }
 
@@ -429,9 +420,13 @@ func LoadConfigWithManualDraft(projectRoot, draftPath string) (*Config, map[stri
 
 // applyPreset fills in missing master/role defaults from the selected preset.
 func applyPreset(cfg *Config) {
-	preset, ok := Presets[cfg.Preset]
+	catalog := presetCatalogFor(cfg)
+	preset, ok := catalog[cfg.Preset]
 	if !ok {
-		preset = Presets["codex"]
+		preset, ok = catalog["codex"]
+		if !ok {
+			preset = Presets["codex"]
+		}
 	}
 
 	// Master
@@ -457,6 +452,13 @@ func applyPreset(cfg *Config) {
 	}
 }
 
+func presetCatalogFor(cfg *Config) map[string]PresetConfig {
+	if cfg != nil && len(cfg.presetCatalog) > 0 {
+		return cfg.presetCatalog
+	}
+	return Presets
+}
+
 // ApplyPreset fills missing master/role defaults from the selected preset.
 func ApplyPreset(cfg *Config) {
 	applyPreset(cfg)
@@ -466,7 +468,7 @@ func ApplyPreset(cfg *Config) {
 // even if they were already filled. Used when auto-detection changes the
 // preset after an initial applyPreset with a different (fallback) preset.
 func ForceApplyPreset(cfg *Config) {
-	preset, ok := Presets[cfg.Preset]
+	preset, ok := presetCatalogFor(cfg)[cfg.Preset]
 	if !ok {
 		return
 	}

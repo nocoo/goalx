@@ -15,12 +15,15 @@ var BuiltinDimensions = map[string]string{
 	"user":          "User perspective: Think from the end user's point of view. What's the experience like? What's confusing? What's missing? Focus on usability and developer ergonomics.",
 }
 
-// ResolveDimensions converts dimension names to session guidance strings.
-// It checks BuiltinDimensions (which may include user-defined entries merged at
-// config load time) and also accepts additional custom dimensions passed in.
+// ResolveDimensions converts dimension names to session guidance strings using
+// the built-in catalog plus any additional custom dimensions passed in.
 func ResolveDimensions(names []string, custom ...map[string]string) ([]string, error) {
-	merged := make(map[string]string, len(BuiltinDimensions))
-	for k, v := range BuiltinDimensions {
+	return resolveDimensionsWithCatalog(BuiltinDimensions, names, custom...)
+}
+
+func resolveDimensionsWithCatalog(base map[string]string, names []string, custom ...map[string]string) ([]string, error) {
+	merged := make(map[string]string, len(base))
+	for k, v := range base {
 		merged[k] = v
 	}
 	for _, m := range custom {
