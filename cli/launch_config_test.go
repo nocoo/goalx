@@ -193,6 +193,9 @@ target:
 }
 
 func TestBuildLaunchConfigPreviewAllowsPlaceholderDraftValues(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
 	projectRoot := t.TempDir()
 
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{

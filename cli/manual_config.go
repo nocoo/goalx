@@ -34,11 +34,11 @@ func LoadManualDraftConfig(projectRoot, draftPath string) (*goalx.Config, map[st
 	if err != nil {
 		return nil, nil, fmt.Errorf("manual draft config: %w", err)
 	}
-	draft.Context.Files = goalx.FilterExternalContextFiles(projectRoot, draft.Context.Files)
 	resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{ManualDraft: &draft})
 	if err != nil {
 		return nil, nil, err
 	}
+	resolved.Config.Context.Files = goalx.FilterExternalContextFiles(projectRoot, resolved.Config.Context.Files)
 	return &resolved.Config, resolved.Engines, nil
 }
 

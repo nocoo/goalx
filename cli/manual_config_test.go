@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,5 +168,42 @@ func TestLoadManualDraftConfigRejectsPreviewPlaceholders(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "harness.command is required") {
 		t.Fatalf("error = %v, want harness placeholder validation", err)
+	}
+}
+
+func TestLoadManualDraftConfigDraftContextReplacesSharedContextBeforeFiltering(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	sharedExternal := filepath.Join(t.TempDir(), "shared.md")
+	if err := os.WriteFile(sharedExternal, []byte("shared"), 0o644); err != nil {
+		t.Fatalf("write shared external context: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	projectCfg := fmt.Sprintf("context:\n  files: [%q]\nharness:\n  command: \"go test ./...\"\ntarget:\n  files: [\".\"]\n", sharedExternal)
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte(projectCfg), 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, "README.md"), []byte("demo"), 0o644); err != nil {
+		t.Fatalf("write local README: %v", err)
+	}
+	writeRootConfigFixture(t, projectRoot, goalx.Config{
+		Name:      "draft-context",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship it",
+		Target:    goalx.TargetConfig{Files: []string{"."}},
+		Harness:   goalx.HarnessConfig{Command: "go test ./..."},
+		Context:   goalx.ContextConfig{Files: []string{"README.md"}},
+	})
+
+	cfg, _, err := LoadManualDraftConfig(projectRoot, filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("LoadManualDraftConfig: %v", err)
+	}
+	if len(cfg.Context.Files) != 0 {
+		t.Fatalf("context.files = %#v, want local draft context to replace shared external context before filtering", cfg.Context.Files)
 	}
 }

@@ -29,13 +29,13 @@ func loadResolvedConfigForTest(projectRoot, draftPath string) (*Config, map[stri
 		if err != nil {
 			return nil, nil, fmt.Errorf("manual draft config: %w", err)
 		}
-		draft.Context.Files = FilterExternalContextFiles(projectRoot, draft.Context.Files)
 		req.ManualDraft = &draft
 	}
 	resolved, err := ResolveConfigPreview(layers, req)
 	if err != nil {
 		return nil, nil, err
 	}
+	resolved.Config.Context.Files = FilterExternalContextFiles(projectRoot, resolved.Config.Context.Files)
 	return &resolved.Config, resolved.Engines, nil
 }
 
