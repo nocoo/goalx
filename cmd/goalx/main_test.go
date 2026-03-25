@@ -273,6 +273,44 @@ func TestRunCommandDispatchesLeaseLoop(t *testing.T) {
 	}
 }
 
+func TestRunCommandCanonicalizesRunWorktreeToSourceProjectRoot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	sourceRoot := t.TempDir()
+	runDir := goalx.RunDir(sourceRoot, "demo-run")
+	worktreeRoot := filepath.Join(runDir, "worktrees", "root")
+	if err := os.MkdirAll(worktreeRoot, 0o755); err != nil {
+		t.Fatalf("mkdir worktree root: %v", err)
+	}
+	if err := cli.SaveRunMetadata(cli.RunMetadataPath(runDir), &cli.RunMetadata{
+		Version:         1,
+		ProjectRoot:     sourceRoot,
+		ProtocolVersion: 2,
+		RunID:           "run_demo",
+		RootRunID:       "run_demo",
+		Epoch:           1,
+	}); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+
+	oldContext := mainContext
+	defer func() { mainContext = oldContext }()
+
+	gotRoot := ""
+	mainContext = func(projectRoot string, args []string) error {
+		gotRoot = projectRoot
+		return nil
+	}
+
+	if err := runCommand(filepath.Join(worktreeRoot, "src"), "context", []string{"--run", "demo-run"}); err != nil {
+		t.Fatalf("runCommand context: %v", err)
+	}
+	if gotRoot != sourceRoot {
+		t.Fatalf("project root = %q, want %q", gotRoot, sourceRoot)
+	}
+}
+
 func TestRunCommandDispatchesWait(t *testing.T) {
 	oldWait := mainWait
 	defer func() { mainWait = oldWait }()

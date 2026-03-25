@@ -39,13 +39,8 @@ func Observe(projectRoot string, args []string) error {
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
 	printStatusControlSummary(rc)
 
-	// Show run runtime summary if available
-	statusPath := RunRuntimeStatePath(rc.RunDir)
-	if data, err := os.ReadFile(statusPath); err == nil && len(data) > 0 {
-		fmt.Println("### Status (from master)")
-		fmt.Println(strings.TrimSpace(string(data)))
-		fmt.Println()
-	}
+	printObserveStatusSection("### Run runtime state", RunRuntimeStatePath(rc.RunDir))
+	printObserveStatusSection("### Project status cache", ProjectStatusCachePath(rc.ProjectRoot))
 
 	if !SessionExists(rc.TmuxSession) {
 		fmt.Println("### transport")
@@ -103,6 +98,19 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	return nil
+}
+
+func printObserveStatusSection(title, path string) {
+	if strings.TrimSpace(path) == "" {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
+		return
+	}
+	fmt.Println(title)
+	fmt.Println(strings.TrimSpace(string(data)))
+	fmt.Println()
 }
 
 func printPaneCapture(tmuxSession, window string) {

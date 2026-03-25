@@ -72,7 +72,7 @@ func Status(projectRoot string, args []string) error {
 			if last.Round > 0 {
 				lastRound = fmt.Sprintf("%d", last.Round)
 			}
-			if status == "pending" && last.Status != "" {
+			if last.Status != "" && (status == "pending" || status == "active") {
 				status = last.Status
 			}
 		}
@@ -154,11 +154,6 @@ func printStatusControlSummary(rc *RunContext) {
 			if actor, ok := activity.Actors["sidecar"]; ok && actor.Lease != "" {
 				sidecarLease = actor.Lease
 			}
-		}
-		if unread == 0 && remindersDue == 0 && deliveriesFailed == 0 {
-			unread = activity.Queue.MasterUnread
-			remindersDue = activity.Queue.RemindersDue
-			deliveriesFailed = activity.Queue.DeliveriesFailed
 		}
 	}
 	runID := "-"

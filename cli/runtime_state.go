@@ -225,7 +225,7 @@ func mergeSessionRuntimeState(dst *SessionRuntimeState, src SessionRuntimeState)
 	if src.OwnerScope != "" {
 		dst.OwnerScope = src.OwnerScope
 	}
-	if src.BlockedBy != "" || src.State == "blocked" {
+	if src.BlockedBy != "" || src.State != "" {
 		dst.BlockedBy = src.BlockedBy
 	}
 	if src.DirtyFiles != 0 || src.DiffStat != "" {
@@ -261,7 +261,39 @@ func SnapshotSessionRuntime(runDir, sessionName, worktreePath string) (SessionRu
 		LastRound:        lastRound,
 		LastJournalState: lastJournalState,
 	}
+	if len(journalEntries) > 0 {
+		last := journalEntries[len(journalEntries)-1]
+		snapshot.State = last.Status
+		snapshot.OwnerScope = last.OwnerScope
+		snapshot.BlockedBy = last.BlockedBy
+	}
 	return snapshot, nil
+}
+
+func RefreshSessionRuntimeProjection(runDir, runName string) error {
+	state, err := EnsureSessionsRuntimeState(runDir)
+	if err != nil {
+		return err
+	}
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return err
+	}
+	for _, idx := range indexes {
+		sessionName := SessionName(idx)
+		worktreePath := resolvedSessionWorktreePath(runDir, runName, sessionName, state)
+		snapshot, err := SnapshotSessionRuntime(runDir, sessionName, worktreePath)
+		if err != nil {
+			return err
+		}
+		if session, ok := state.Sessions[sessionName]; ok && session.Mode != "" {
+			snapshot.Mode = session.Mode
+		}
+		if err := UpsertSessionRuntimeState(runDir, snapshot); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func snapshotWorktreeState(worktreePath string) (int, string, error) {

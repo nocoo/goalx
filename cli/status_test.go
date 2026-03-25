@@ -210,3 +210,113 @@ func TestStatusPrefersCanonicalControlFactsOverStaleActivitySnapshot(t *testing.
 		}
 	}
 }
+
+func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	if _, err := AppendMasterInboxMessage(runDir, "tell", "user", "fresh work"); err != nil {
+		t.Fatalf("AppendMasterInboxMessage: %v", err)
+	}
+	if err := SaveMasterCursorState(MasterCursorPath(runDir), &MasterCursorState{LastSeenID: 1}); err != nil {
+		t.Fatalf("SaveMasterCursorState: %v", err)
+	}
+	if err := RenewControlLease(runDir, "master", meta.RunID, meta.Epoch, time.Minute, "tmux", 1234); err != nil {
+		t.Fatalf("RenewControlLease master: %v", err)
+	}
+	if err := ExpireControlLease(runDir, "sidecar"); err != nil {
+		t.Fatalf("ExpireControlLease sidecar: %v", err)
+	}
+	if err := SaveActivitySnapshot(runDir, &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Run: ActivityRunInfo{
+			ProjectID:   goalx.ProjectID(repo),
+			RunName:     cfg.Name,
+			RunID:       meta.RunID,
+			Epoch:       meta.Epoch,
+			TmuxSession: goalx.TmuxSessionName(repo, cfg.Name),
+		},
+		Queue: ActivityQueue{
+			MasterUnread:     7,
+			RemindersDue:     3,
+			DeliveriesFailed: 2,
+		},
+	}); err != nil {
+		t.Fatalf("SaveActivitySnapshot: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"run_id=" + meta.RunID,
+		"epoch=1",
+		"unread_inbox=0",
+		"reminders_due=0",
+		"deliveries_failed=0",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestStatusPrefersLatestJournalStateOverStaleRuntimeActive(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir repo: %v", err)
+	}
+
+	cfg := goalx.Config{
+		Name:      "status-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, &cfg)
+	if err := SaveProjectRegistry(repo, &ProjectRegistry{
+		Version:    1,
+		FocusedRun: cfg.Name,
+		ActiveRuns: map[string]ProjectRunRef{
+			cfg.Name: {Name: cfg.Name, State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveProjectRegistry: %v", err)
+	}
+	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{Version: 1, ProjectRoot: repo, RunID: "run_status", RootRunID: "run_status", Epoch: 1, ProtocolVersion: 2}); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	seedRunCharterForTests(t, runDir, cfg.Name, repo)
+	if _, err := EnsureSessionsRuntimeState(runDir); err != nil {
+		t.Fatalf("EnsureSessionsRuntimeState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-1",
+		State: "active",
+		Mode:  string(goalx.ModeResearch),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.HarnessConfig{})
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte(`{"round":2,"desc":"awaiting master","status":"idle"}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write session journal: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "session-1  2           idle") {
+		t.Fatalf("status output did not surface latest journal idle state:\n%s", out)
+	}
+}

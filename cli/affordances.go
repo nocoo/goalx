@@ -172,6 +172,9 @@ func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
 }
 
 func RefreshRunGuidance(projectRoot, runName, runDir string) error {
+	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
+		return err
+	}
 	activity, err := BuildActivitySnapshot(projectRoot, runName, runDir)
 	if err != nil {
 		return err

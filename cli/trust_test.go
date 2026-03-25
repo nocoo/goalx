@@ -226,3 +226,143 @@ func TestEnsureEngineTrustedClaudeInheritsSourceMCPConfig(t *testing.T) {
 		t.Fatalf("disabledMcpjsonServers = %#v, want [legacy]", disabled)
 	}
 }
+
+func TestEnsureEngineTrustedClaudeMergesGlobalMCPConfigIntoWorktree(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	worktree := filepath.Join(t.TempDir(), "wt")
+	runGit(t, repo, "worktree", "add", worktree, "-b", "feature")
+
+	claudePath := filepath.Join(home, ".claude.json")
+	initial := map[string]any{
+		"mcpServers": map[string]any{
+			"context7": map[string]any{"type": "stdio", "command": "npx"},
+		},
+		"enabledMcpjsonServers": []any{"context7"},
+		"projects": map[string]any{
+			repo: map[string]any{
+				"mcpServers": map[string]any{
+					"local": map[string]any{"type": "http", "url": "http://127.0.0.1:3000"},
+				},
+				"enabledMcpjsonServers":  []any{"local"},
+				"disabledMcpjsonServers": []any{"legacy"},
+			},
+		},
+	}
+	raw, err := json.Marshal(initial)
+	if err != nil {
+		t.Fatalf("marshal initial json: %v", err)
+	}
+	if err := os.WriteFile(claudePath, raw, 0o644); err != nil {
+		t.Fatalf("write claude json: %v", err)
+	}
+
+	if err := EnsureEngineTrusted("claude-code", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted: %v", err)
+	}
+
+	out, err := os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatalf("read claude json: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("unmarshal claude json: %v", err)
+	}
+	entry := doc["projects"].(map[string]any)[worktree].(map[string]any)
+	servers := entry["mcpServers"].(map[string]any)
+	if _, ok := servers["context7"]; !ok {
+		t.Fatalf("mcpServers missing global context7: %#v", servers)
+	}
+	if _, ok := servers["local"]; !ok {
+		t.Fatalf("mcpServers missing source local: %#v", servers)
+	}
+
+	enabled := entry["enabledMcpjsonServers"].([]any)
+	if len(enabled) != 2 || enabled[0] != "context7" || enabled[1] != "local" {
+		t.Fatalf("enabledMcpjsonServers = %#v, want [context7 local]", enabled)
+	}
+	disabled := entry["disabledMcpjsonServers"].([]any)
+	if len(disabled) != 1 || disabled[0] != "legacy" {
+		t.Fatalf("disabledMcpjsonServers = %#v, want [legacy]", disabled)
+	}
+}
+
+func TestEnsureEngineTrustedClaudeOnlyAddsContext7ToolsWhenConfigured(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	worktree := filepath.Join(t.TempDir(), "wt")
+	claudePath := filepath.Join(home, ".claude.json")
+	initial := map[string]any{
+		"projects": map[string]any{
+			worktree: map[string]any{},
+		},
+	}
+	raw, err := json.Marshal(initial)
+	if err != nil {
+		t.Fatalf("marshal initial json: %v", err)
+	}
+	if err := os.WriteFile(claudePath, raw, 0o644); err != nil {
+		t.Fatalf("write claude json: %v", err)
+	}
+
+	if err := EnsureEngineTrusted("claude-code", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted first: %v", err)
+	}
+
+	out, err := os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatalf("read claude json after first: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("unmarshal claude json after first: %v", err)
+	}
+	entry := doc["projects"].(map[string]any)[worktree].(map[string]any)
+	tools := entry["allowedTools"].([]any)
+	for _, tool := range tools {
+		if s, ok := tool.(string); ok && strings.HasPrefix(s, "mcp__context7__") {
+			t.Fatalf("unexpected context7 tool without configured server: %#v", tools)
+		}
+	}
+
+	doc["mcpServers"] = map[string]any{
+		"context7": map[string]any{"type": "stdio", "command": "npx"},
+	}
+	raw, err = json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal updated claude json: %v", err)
+	}
+	if err := os.WriteFile(claudePath, raw, 0o644); err != nil {
+		t.Fatalf("rewrite claude json: %v", err)
+	}
+
+	if err := EnsureEngineTrusted("claude-code", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted second: %v", err)
+	}
+	out, err = os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatalf("read claude json after second: %v", err)
+	}
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("unmarshal claude json after second: %v", err)
+	}
+	entry = doc["projects"].(map[string]any)[worktree].(map[string]any)
+	tools = entry["allowedTools"].([]any)
+	counts := map[string]int{}
+	for _, tool := range tools {
+		if s, ok := tool.(string); ok {
+			counts[s]++
+		}
+	}
+	for _, want := range []string{"mcp__context7__resolve-library-id", "mcp__context7__query-docs"} {
+		if counts[want] != 1 {
+			t.Fatalf("allowedTools %q count = %d, want 1; got %#v", want, counts[want], tools)
+		}
+	}
+}

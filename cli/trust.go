@@ -13,6 +13,9 @@ var claudeAllowedTools = []string{
 	"Bash", "Read", "Write", "Edit", "Glob", "Grep",
 	"WebFetch", "WebSearch", "Agent",
 	"TaskCreate", "TaskUpdate", "LSP", "NotebookEdit", "EnterPlanMode",
+}
+
+var claudeContext7Tools = []string{
 	"mcp__context7__resolve-library-id",
 	"mcp__context7__query-docs",
 }
@@ -79,20 +82,37 @@ func ensureClaudeTrusted(path string) error {
 	projects := coerceObject(doc["projects"])
 	entry := coerceObject(projects[path])
 	sourceEntry := claudeSourceProjectEntry(path, projects)
+	globalServers := coerceObject(doc["mcpServers"])
+	globalEnabled := coerceArray(doc["enabledMcpjsonServers"])
+	globalDisabled := coerceArray(doc["disabledMcpjsonServers"])
+	globalContextURIs := coerceArray(doc["mcpContextUris"])
 
-	entry["allowedTools"] = mergeAllowedTools(
-		mergeUniqueStrings(coerceArray(sourceEntry["allowedTools"]), coerceArray(entry["allowedTools"])),
-		claudeAllowedTools,
+	entry["mcpContextUris"] = mergeUniqueStrings(
+		globalContextURIs,
+		coerceArray(sourceEntry["mcpContextUris"]),
+		coerceArray(entry["mcpContextUris"]),
 	)
-	entry["mcpContextUris"] = coerceArray(entry["mcpContextUris"])
-	entry["mcpServers"] = mergeObjects(coerceObject(sourceEntry["mcpServers"]), coerceObject(entry["mcpServers"]))
+	entry["mcpServers"] = mergeObjects(
+		mergeObjects(globalServers, coerceObject(sourceEntry["mcpServers"])),
+		coerceObject(entry["mcpServers"]),
+	)
 	entry["enabledMcpjsonServers"] = mergeUniqueStrings(
+		globalEnabled,
 		coerceArray(sourceEntry["enabledMcpjsonServers"]),
 		coerceArray(entry["enabledMcpjsonServers"]),
 	)
 	entry["disabledMcpjsonServers"] = mergeUniqueStrings(
+		globalDisabled,
 		coerceArray(sourceEntry["disabledMcpjsonServers"]),
 		coerceArray(entry["disabledMcpjsonServers"]),
+	)
+	requiredTools := append([]string(nil), claudeAllowedTools...)
+	if _, ok := coerceObject(entry["mcpServers"])["context7"]; ok {
+		requiredTools = append(requiredTools, claudeContext7Tools...)
+	}
+	entry["allowedTools"] = mergeAllowedTools(
+		mergeUniqueStrings(coerceArray(sourceEntry["allowedTools"]), coerceArray(entry["allowedTools"])),
+		requiredTools,
 	)
 	entry["hasTrustDialogAccepted"] = true
 	entry["projectOnboardingSeenCount"] = 1

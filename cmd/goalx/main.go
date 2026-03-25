@@ -110,6 +110,8 @@ func main() {
 var errUnknownCommand = errors.New("unknown command")
 
 func runCommand(cwd, cmd string, args []string) error {
+	cwd = cli.CanonicalProjectRoot(cwd)
+
 	switch cmd {
 	case "start":
 		return runWithSignalCleanup(cwd, func() error { return mainStart(cwd, args) })

@@ -67,6 +67,23 @@ func TestAppendMasterInboxMessageAssignsMonotonicIDs(t *testing.T) {
 	}
 }
 
+func TestUnreadControlInboxCountReturnsZeroWhenCursorCaughtUp(t *testing.T) {
+	runDir := t.TempDir()
+	if err := EnsureMasterControl(runDir); err != nil {
+		t.Fatalf("EnsureMasterControl: %v", err)
+	}
+	if _, err := AppendMasterInboxMessage(runDir, "tell", "user", "focus on e2e"); err != nil {
+		t.Fatalf("AppendMasterInboxMessage: %v", err)
+	}
+	if err := SaveMasterCursorState(MasterCursorPath(runDir), &MasterCursorState{LastSeenID: 1}); err != nil {
+		t.Fatalf("SaveMasterCursorState: %v", err)
+	}
+
+	if got := unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)); got != 0 {
+		t.Fatalf("unreadControlInboxCount = %d, want 0", got)
+	}
+}
+
 func TestSendAgentNudgeAlwaysUsesExplicitWakePayload(t *testing.T) {
 	origSend := sendAgentKeys
 	defer func() { sendAgentKeys = origSend }()

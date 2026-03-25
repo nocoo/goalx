@@ -216,6 +216,76 @@ func TestRunSidecarTickQueuesRefreshContextWhenIdentityFenceChanges(t *testing.T
 	}
 }
 
+func TestRunSidecarTickProjectsSessionJournalStateIntoRuntime(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.HarnessConfig{})
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:         "session-1",
+		State:        "active",
+		Mode:         string(goalx.ModeResearch),
+		WorktreePath: WorktreePath(runDir, cfg.Name, 1),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := os.MkdirAll(WorktreePath(runDir, cfg.Name, 1), 0o755); err != nil {
+		t.Fatalf("mkdir session worktree: %v", err)
+	}
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte(`{"round":2,"desc":"awaiting master","status":"idle","owner_scope":"db race triage"}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write session journal: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 1; fi\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 2*time.Minute, 4242); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	sess := state.Sessions["session-1"]
+	if sess.State != "idle" {
+		t.Fatalf("session state = %q, want idle", sess.State)
+	}
+	if sess.LastJournalState != "idle" {
+		t.Fatalf("session last journal state = %q, want idle", sess.LastJournalState)
+	}
+	if sess.LastRound != 2 {
+		t.Fatalf("session last round = %d, want 2", sess.LastRound)
+	}
+	if sess.OwnerScope != "db race triage" {
+		t.Fatalf("session owner scope = %q, want db race triage", sess.OwnerScope)
+	}
+}
+
 func TestRunSidecarTickDoesNotQueueRefreshContextWhenIdentityFenceUnchanged(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

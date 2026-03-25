@@ -191,8 +191,14 @@ func unreadControlInboxCount(inboxPath, cursorPath string) int {
 			lastID = msg.ID
 		}
 	}
-	if cursor == nil || lastID <= cursor.LastSeenID {
+	if lastID == 0 {
+		return 0
+	}
+	if cursor == nil {
 		return int(lastID)
+	}
+	if lastID <= cursor.LastSeenID {
+		return 0
 	}
 	return int(lastID - cursor.LastSeenID)
 }
