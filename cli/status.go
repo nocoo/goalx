@@ -110,17 +110,9 @@ func Status(projectRoot string, args []string) error {
 		}
 		inboxState := readControlInboxState(ControlInboxPath(rc.RunDir, sName), SessionCursorPath(rc.RunDir, sName))
 		if inboxState.Unread > 0 {
-			if status == "idle" || status == "pending" {
-				status = "inbox-pending"
-			}
 			queueSummary := fmt.Sprintf("unread=%d cursor=%d/%d", inboxState.Unread, inboxState.LastSeenID, inboxState.LastID)
-			if delivery, ok := latestSessionDelivery(rc.RunDir, sName); ok {
-				if delivery.AttemptedAt != "" {
-					queueSummary += " last_nudge=" + delivery.AttemptedAt
-				}
-				if delivery.Status != "" {
-					queueSummary += " last_delivery=" + delivery.Status
-				}
+			if transport := loadTransportTargetFacts(rc.RunDir, sName); transport.Target != "" {
+				queueSummary += formatTransportQueueFacts(transport)
 			}
 			if summary == "no entries" {
 				summary = queueSummary
@@ -140,6 +132,13 @@ func Status(projectRoot string, args []string) error {
 				summary = launch
 			} else {
 				summary += " | " + launch
+			}
+		}
+		if transport := sessionTransportFactsSummary(rc.RunDir, sName); transport != "" {
+			if summary == "no entries" {
+				summary = transport
+			} else {
+				summary += " | " + transport
 			}
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sName, lastRound, status, actorLeaseSummary(rc.RunDir, sName, "-"), summary)
@@ -219,7 +218,7 @@ func controlQueueSummary(runDir string) (int, int) {
 
 	if reminders, err := LoadControlReminders(ControlRemindersPath(runDir)); err == nil && reminders != nil {
 		for _, item := range reminders.Items {
-			if item.Suppressed || item.AckedAt != "" {
+			if item.Suppressed || item.ResolvedAt != "" {
 				continue
 			}
 			if item.CooldownUntil != "" {
@@ -273,6 +272,35 @@ func sessionLaunchFacts(runDir, sessionName string) string {
 		parts = append(parts, "route="+identity.RouteProfile)
 	}
 	return strings.Join(parts, " ")
+}
+
+func sessionTransportFactsSummary(runDir, sessionName string) string {
+	facts := loadTransportTargetFacts(runDir, sessionName)
+	parts := make([]string, 0, 3)
+	if facts.TransportState != "" {
+		parts = append(parts, "transport="+facts.TransportState)
+	}
+	if facts.InputContainsWake {
+		parts = append(parts, "input_wake=true")
+	}
+	if facts.QueuedMessageVisible {
+		parts = append(parts, "queued=true")
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatTransportQueueFacts(facts TransportTargetFacts) string {
+	parts := make([]string, 0, 3)
+	if facts.LastSubmitAttemptAt != "" {
+		parts = append(parts, " submit_at="+facts.LastSubmitAttemptAt)
+	}
+	if facts.TransportState != "" {
+		parts = append(parts, " transport="+facts.TransportState)
+	}
+	if facts.LastTransportAcceptAt != "" {
+		parts = append(parts, " accepted_at="+facts.LastTransportAcceptAt)
+	}
+	return strings.Join(parts, "")
 }
 
 func actorLeaseSummary(runDir, holder, missing string) string {

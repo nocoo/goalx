@@ -94,7 +94,7 @@ func Park(projectRoot string, args []string) error {
 			}
 		}
 		if _, err := AppendMasterInboxMessage(rc.RunDir, "session_parked", "goalx park", fmt.Sprintf("%s was parked for reuse.", sessionName)); err == nil {
-			_, _ = DeliverControlNudge(rc.RunDir, "session-parked:"+sessionName, "session-parked:"+sessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudge)
+			_, _ = DeliverControlNudge(rc.RunDir, "session-parked:"+sessionName, "session-parked:"+sessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudgeDetailed)
 		}
 	}
 	_ = ExpireControlLease(rc.RunDir, sessionName)
@@ -201,34 +201,34 @@ func Resume(projectRoot string, args []string) error {
 		return fmt.Errorf("build session roster: %w", err)
 	}
 	subData := ProtocolData{
-		RunName:             rc.Config.Name,
-		Objective:           rc.Config.Objective,
-		Mode:                goalx.Mode(sessionIdentity.Mode),
-		Engine:              sessionIdentity.Engine,
-		Sessions:            sessionDataList,
-		Target:              sessionIdentity.Target,
-		LocalValidationCommand: strings.TrimSpace(rc.Config.Harness.Command),
-		Context:             rc.Config.Context,
-		Budget:              rc.Config.Budget,
-		SessionName:         sessionName,
-		SessionIndex:        idx - 1,
-		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, sessionName, sessionIdentity.Dimensions),
-		JournalPath:         JournalPath(rc.RunDir, sessionName),
-		CharterPath:         RunCharterPath(rc.RunDir),
-		SessionIdentityPath: SessionIdentityPath(rc.RunDir, sessionName),
-		SessionInboxPath:    ControlInboxPath(rc.RunDir, sessionName),
-		SessionCursorPath:   SessionCursorPath(rc.RunDir, sessionName),
-		WorktreePath:        wtPath,
-		GoalPath:            GoalPath(rc.RunDir),
-		GoalLogPath:         GoalLogPath(rc.RunDir),
-		IdentityFencePath:   IdentityFencePath(rc.RunDir),
-		AcceptanceNotesPath: existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
-		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
-		CompletionProofPath: CompletionStatePath(rc.RunDir),
-		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
-		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
-		ProjectRoot:         absProjectRoot,
+		RunName:                rc.Config.Name,
+		Objective:              rc.Config.Objective,
+		Mode:                   goalx.Mode(sessionIdentity.Mode),
+		Engine:                 sessionIdentity.Engine,
+		Sessions:               sessionDataList,
+		Target:                 sessionIdentity.Target,
+		LocalValidationCommand: sessionIdentity.LocalValidationCommand,
+		Context:                rc.Config.Context,
+		Budget:                 rc.Config.Budget,
+		SessionName:            sessionName,
+		SessionIndex:           idx - 1,
+		CurrentDimensions:      CurrentSessionDimensions(rc.RunDir, sessionName, sessionIdentity.Dimensions),
+		JournalPath:            JournalPath(rc.RunDir, sessionName),
+		CharterPath:            RunCharterPath(rc.RunDir),
+		SessionIdentityPath:    SessionIdentityPath(rc.RunDir, sessionName),
+		SessionInboxPath:       ControlInboxPath(rc.RunDir, sessionName),
+		SessionCursorPath:      SessionCursorPath(rc.RunDir, sessionName),
+		WorktreePath:           wtPath,
+		GoalPath:               GoalPath(rc.RunDir),
+		GoalLogPath:            GoalLogPath(rc.RunDir),
+		IdentityFencePath:      IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath:    AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath:    CompletionStatePath(rc.RunDir),
+		RunStatePath:           RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:            absProjectRoot,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, idx-1); err != nil {
 		return fmt.Errorf("render protocol: %w", err)
@@ -275,7 +275,7 @@ func Resume(projectRoot string, args []string) error {
 		return fmt.Errorf("update session runtime state: %w", err)
 	}
 	if _, err := AppendMasterInboxMessage(rc.RunDir, "session_resumed", "goalx resume", fmt.Sprintf("%s was resumed for reuse.", sessionName)); err == nil {
-		_, _ = DeliverControlNudge(rc.RunDir, "session-resumed:"+sessionName, "session-resumed:"+sessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudge)
+		_, _ = DeliverControlNudge(rc.RunDir, "session-resumed:"+sessionName, "session-resumed:"+sessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudgeDetailed)
 	}
 	if err := RefreshRunGuidance(rc.ProjectRoot, rc.Name, rc.RunDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)
@@ -520,6 +520,7 @@ func Replace(projectRoot string, args []string) error {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
 	sessionIdentity.EffectiveEffort = launchSpec.EffectiveEffort
+	sessionIdentity.LocalValidationCommand = resolveSessionLocalValidationCommand(effectiveSession)
 	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
 		return fmt.Errorf("write session identity: %w", err)
 	}
@@ -546,34 +547,34 @@ func Replace(projectRoot string, args []string) error {
 	}
 	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
 	subData := ProtocolData{
-		RunName:             rc.Config.Name,
-		Objective:           rc.Config.Objective,
-		Mode:                effectiveSession.Mode,
-		Engine:              sessionIdentity.Engine,
-		Sessions:            sessionDataList,
-		Target:              target,
-		LocalValidationCommand: strings.TrimSpace(rc.Config.Harness.Command),
-		Context:             rc.Config.Context,
-		Budget:              rc.Config.Budget,
-		SessionName:         newSessionName,
-		SessionIndex:        newNum - 1,
-		CurrentDimensions:   CurrentSessionDimensions(rc.RunDir, newSessionName, sessionIdentity.Dimensions),
-		JournalPath:         journalPath,
-		CharterPath:         RunCharterPath(rc.RunDir),
-		SessionIdentityPath: sessionIdentityPath,
-		SessionInboxPath:    ControlInboxPath(rc.RunDir, newSessionName),
-		SessionCursorPath:   SessionCursorPath(rc.RunDir, newSessionName),
-		WorktreePath:        oldSnapshot.WorktreePath,
-		GoalPath:            GoalPath(rc.RunDir),
-		GoalLogPath:         GoalLogPath(rc.RunDir),
-		IdentityFencePath:   IdentityFencePath(rc.RunDir),
-		AcceptanceNotesPath: existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
-		AcceptanceStatePath: AcceptanceStatePath(rc.RunDir),
-		CompletionProofPath: CompletionStatePath(rc.RunDir),
-		RunStatePath:        RunRuntimeStatePath(rc.RunDir),
-		SessionsStatePath:   SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath: ProjectRegistryPath(rc.ProjectRoot),
-		ProjectRoot:         absProjectRoot,
+		RunName:                rc.Config.Name,
+		Objective:              rc.Config.Objective,
+		Mode:                   effectiveSession.Mode,
+		Engine:                 sessionIdentity.Engine,
+		Sessions:               sessionDataList,
+		Target:                 target,
+		LocalValidationCommand: sessionIdentity.LocalValidationCommand,
+		Context:                rc.Config.Context,
+		Budget:                 rc.Config.Budget,
+		SessionName:            newSessionName,
+		SessionIndex:           newNum - 1,
+		CurrentDimensions:      CurrentSessionDimensions(rc.RunDir, newSessionName, sessionIdentity.Dimensions),
+		JournalPath:            journalPath,
+		CharterPath:            RunCharterPath(rc.RunDir),
+		SessionIdentityPath:    sessionIdentityPath,
+		SessionInboxPath:       ControlInboxPath(rc.RunDir, newSessionName),
+		SessionCursorPath:      SessionCursorPath(rc.RunDir, newSessionName),
+		WorktreePath:           oldSnapshot.WorktreePath,
+		GoalPath:               GoalPath(rc.RunDir),
+		GoalLogPath:            GoalLogPath(rc.RunDir),
+		IdentityFencePath:      IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath:    AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath:    CompletionStatePath(rc.RunDir),
+		RunStatePath:           RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:            absProjectRoot,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, newNum-1); err != nil {
 		return fmt.Errorf("render protocol: %w", err)
@@ -626,7 +627,7 @@ func Replace(projectRoot string, args []string) error {
 		return fmt.Errorf("update session runtime state: %w", err)
 	}
 	if _, err := AppendMasterInboxMessage(rc.RunDir, "session_replaced", "goalx replace", fmt.Sprintf("%s was replaced by %s.", oldSessionName, newSessionName)); err == nil {
-		_, _ = DeliverControlNudge(rc.RunDir, "session-replaced:"+oldSessionName, "session-replaced:"+newSessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudge)
+		_, _ = DeliverControlNudge(rc.RunDir, "session-replaced:"+oldSessionName, "session-replaced:"+newSessionName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudgeDetailed)
 	}
 	if err := RefreshRunGuidance(rc.ProjectRoot, rc.Name, rc.RunDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)

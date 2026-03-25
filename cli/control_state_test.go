@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -155,5 +156,26 @@ func TestLoadControlStateLeavesFilesUntouched(t *testing.T) {
 		if string(got) != string(want) {
 			t.Fatalf("%s changed:\nwant %s\ngot  %s", path, string(want), string(got))
 		}
+	}
+}
+
+func TestSaveControlRunStateDoesNotPersistRecommendationField(t *testing.T) {
+	runDir := t.TempDir()
+	path := ControlRunStatePath(runDir)
+	if err := SaveControlRunState(path, &ControlRunState{
+		Version:        1,
+		LifecycleState: "active",
+		Phase:          "working",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read control run state: %v", err)
+	}
+	text := string(data)
+	if strings.Contains(text, `"recommendation"`) {
+		t.Fatalf("control run state should not persist recommendation:\n%s", text)
 	}
 }

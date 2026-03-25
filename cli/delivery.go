@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+type TransportDeliveryOutcome struct {
+	SubmitMode     string
+	TransportState string
+}
+
+type TransportDeliverFunc func(target, engine string) (TransportDeliveryOutcome, error)
+
 func latestSessionDelivery(runDir, sessionName string) (ControlDelivery, bool) {
 	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
 	if err != nil || deliveries == nil {
@@ -47,22 +54,55 @@ func latestSessionInboxDelivery(runDir, sessionName string) (ControlDelivery, bo
 	return latest, found
 }
 
-func deliveryWithin(delivery ControlDelivery, window time.Duration, now time.Time) bool {
-	if window <= 0 || strings.TrimSpace(delivery.AttemptedAt) == "" {
+func latestTargetDelivery(runDir, logicalTarget string) (ControlDelivery, bool) {
+	logicalTarget = strings.TrimSpace(logicalTarget)
+	if logicalTarget == "" {
+		return ControlDelivery{}, false
+	}
+	if logicalTarget == "master" {
+		deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+		if err != nil || deliveries == nil {
+			return ControlDelivery{}, false
+		}
+		var latest ControlDelivery
+		found := false
+		for _, item := range deliveries.Items {
+			if !strings.HasPrefix(item.DedupeKey, "master-") && !strings.HasPrefix(item.DedupeKey, "session-") {
+				continue
+			}
+			if !strings.Contains(item.Target, ":master") {
+				continue
+			}
+			if !found || item.AttemptedAt > latest.AttemptedAt {
+				latest = item
+				found = true
+			}
+		}
+		return latest, found
+	}
+	return latestSessionDelivery(runDir, logicalTarget)
+}
+
+func deliveryAcceptedWithin(delivery ControlDelivery, window time.Duration, now time.Time) bool {
+	return deliveryTimestampWithin(delivery.AcceptedAt, window, now)
+}
+
+func deliveryTimestampWithin(ts string, window time.Duration, now time.Time) bool {
+	if window <= 0 || strings.TrimSpace(ts) == "" {
 		return false
 	}
-	at, err := time.Parse(time.RFC3339, delivery.AttemptedAt)
+	at, err := time.Parse(time.RFC3339, strings.TrimSpace(ts))
 	if err != nil {
 		return false
 	}
 	return now.Sub(at) < window
 }
 
-func DeliverControlNudge(runDir, messageID, dedupeKey, target, engine string, deliver func(target, engine string) error) (*ControlDelivery, error) {
+func DeliverControlNudge(runDir, messageID, dedupeKey, target, engine string, deliver TransportDeliverFunc) (*ControlDelivery, error) {
 	return deliverControlNudge(runDir, messageID, dedupeKey, target, engine, true, deliver)
 }
 
-func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, ackOnSuccess bool, deliver func(target, engine string) error) (*ControlDelivery, error) {
+func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, dedupeOnSuccess bool, deliver TransportDeliverFunc) (*ControlDelivery, error) {
 	if err := EnsureControlState(runDir); err != nil {
 		return nil, err
 	}
@@ -110,7 +150,7 @@ func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, ac
 	if item.DeliveryID == "" {
 		item.DeliveryID = newControlObjectID("delivery")
 	}
-	if item.Status == "sent" && item.AckedAt != "" {
+	if dedupeOnSuccess && item.Status == "sent" && item.AcceptedAt != "" {
 		if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); err != nil {
 			return nil, err
 		}
@@ -121,16 +161,23 @@ func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, ac
 	now := time.Now().UTC().Format(time.RFC3339)
 	item.AttemptedAt = now
 	item.Status = "pending"
+	item.SubmitMode = ""
+	item.TransportState = ""
 	item.LastError = ""
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); err != nil {
 		return nil, err
 	}
 
+	outcome := TransportDeliveryOutcome{}
 	if deliver != nil {
-		if err := deliver(target, engine); err != nil {
+		result, err := deliver(target, engine)
+		outcome = result
+		if err != nil {
 			item.Status = "failed"
+			item.SubmitMode = outcome.SubmitMode
+			item.TransportState = ""
 			item.LastError = err.Error()
-			item.AckedAt = ""
+			item.AcceptedAt = ""
 			if saveErr := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); saveErr != nil {
 				return nil, saveErr
 			}
@@ -139,10 +186,16 @@ func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, ac
 		}
 	}
 
+	item.SubmitMode = outcome.SubmitMode
+	item.TransportState = strings.TrimSpace(outcome.TransportState)
 	item.Status = "sent"
+	if item.TransportState != "" {
+		item.Status = item.TransportState
+	}
 	item.LastError = ""
-	if ackOnSuccess {
-		item.AckedAt = now
+	item.AcceptedAt = ""
+	if item.Status == "sent" {
+		item.AcceptedAt = now
 	}
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); err != nil {
 		return nil, err

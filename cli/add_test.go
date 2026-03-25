@@ -38,7 +38,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -109,7 +109,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -178,7 +178,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -200,6 +200,65 @@ harness:
 	}
 	if !strings.Contains(string(out), "You are running in Codex CLI.") {
 		t.Fatalf("rendered protocol missing codex engine guidance:\n%s", string(out))
+	}
+}
+
+func TestAddRendersSessionLocalValidationOverride(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: fast
+parallel: 1
+sessions:
+  - hint: first
+    mode: develop
+  - hint: second
+    mode: develop
+    local_validation:
+      command: "test -s report.md"
+target:
+  files: ["."]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	if err := os.RemoveAll(filepath.Join(runDir, "sessions", "session-2")); err != nil {
+		t.Fatalf("remove seeded session-2 identity: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-1 journal: %v", err)
+	}
+
+	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-2.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	if !strings.Contains(text, "test -s report.md") {
+		t.Fatalf("rendered protocol missing session local validation override:\n%s", text)
+	}
+	if strings.Contains(text, "go test ./...") {
+		t.Fatalf("rendered protocol should not fall back to run local validation when session override exists:\n%s", text)
 	}
 }
 
@@ -233,7 +292,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 acceptance:
   command: "go test -run E2E ./..."
@@ -317,7 +376,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -404,7 +463,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -475,7 +534,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -531,7 +590,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -590,7 +649,7 @@ roles:
 parallel: 3
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -652,7 +711,7 @@ sessions:
     mode: develop
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -743,7 +802,7 @@ sessions:
     mode: develop
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -816,7 +875,7 @@ routing:
 parallel: 0
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -876,7 +935,7 @@ roles:
 parallel: 0
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -920,7 +979,7 @@ routing:
 parallel: 0
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -958,7 +1017,7 @@ roles:
 parallel: 0
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, _ := writeAddRunFixture(t, repo, string(snapshot))
@@ -996,7 +1055,7 @@ sessions:
     mode: develop
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -1053,7 +1112,7 @@ sessions:
     mode: develop
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -1097,7 +1156,7 @@ roles:
 parallel: 1
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -1210,7 +1269,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
@@ -1357,6 +1416,7 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 		if err != nil {
 			t.Fatalf("NewSessionIdentity %s: %v", SessionName(i+1), err)
 		}
+		identity.LocalValidationCommand = resolveSessionLocalValidationCommand(effective)
 		if err := SaveSessionIdentity(SessionIdentityPath(runDir, SessionName(i+1)), identity); err != nil {
 			t.Fatalf("SaveSessionIdentity %s: %v", SessionName(i+1), err)
 		}

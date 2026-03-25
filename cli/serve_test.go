@@ -511,16 +511,16 @@ func TestServeHandlerTellWritesSessionInboxAndNudgesSession(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
 		t.Fatalf("seed session journal: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "", "", goalx.TargetConfig{}, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "", "", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 
 	var gotTarget, gotEngine string
 	app := newServeApp(goalx.ServeConfig{
 		Token:      "secret-token",
 		Workspaces: map[string]string{"goalx": workspace},
 	})
-	app.sendNudge = func(target, engine string) error {
+	app.sendNudge = func(target, engine string) (TransportDeliveryOutcome, error) {
 		gotTarget, gotEngine = target, engine
-		return nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/tell", bytes.NewBufferString(`{"run":"auth-audit","session":"session-1","message":"focus on authz regressions"}`))
@@ -570,9 +570,9 @@ func TestServeHandlerTellWritesMasterInboxAndUsesControlNudge(t *testing.T) {
 		Token:      "secret-token",
 		Workspaces: map[string]string{"goalx": workspace},
 	})
-	app.sendNudge = func(target, engine string) error {
+	app.sendNudge = func(target, engine string) (TransportDeliveryOutcome, error) {
 		gotTarget, gotEngine = target, engine
-		return nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/projects/goalx/goalx/tell", bytes.NewBufferString(`{"run":"auth-audit","message":"focus on the final acceptance gap"}`))

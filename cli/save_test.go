@@ -39,7 +39,7 @@ func TestSaveUsesConfiguredResearchTargetFile(t *testing.T) {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
 
 	want := "saved custom report"
 	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte(want+"\n"), 0o644); err != nil {
@@ -84,14 +84,14 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 		Objective: "inspect",
 		Sessions: []goalx.SessionConfig{
 			{
-				Hint:    "investigate",
-				Mode:    goalx.ModeResearch,
-				Target:  &goalx.TargetConfig{Files: []string{"missing.md"}, Readonly: []string{"."}},
-				Harness: &goalx.HarnessConfig{Command: "test -s missing.md"},
+				Hint:            "investigate",
+				Mode:            goalx.ModeResearch,
+				Target:          &goalx.TargetConfig{Files: []string{"missing.md"}, Readonly: []string{"."}},
+				LocalValidation: &goalx.LocalValidationConfig{Command: "test -s missing.md"},
 			},
 		},
-		Target:  goalx.TargetConfig{Files: []string{"src/"}},
-		Harness: goalx.HarnessConfig{Command: "go test ./..."},
+		Target:          goalx.TargetConfig{Files: []string{"src/"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},
 	}
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -101,7 +101,7 @@ func TestSaveWritesArtifactsManifestForResearchSession(t *testing.T) {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", *cfg.Sessions[0].Target, *cfg.Sessions[0].Harness)
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", *cfg.Sessions[0].Target, *cfg.Sessions[0].LocalValidation)
 
 	want := "saved manifest report"
 	reportPath := filepath.Join(wtPath, "analysis.txt")
@@ -239,7 +239,7 @@ func TestSaveDoesNotMutateRunStateFromRunStatusRecord(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(statusPath), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
-	if err := os.WriteFile(statusPath, []byte(`{"run":"demo","phase":"complete","acceptance_met":true}`), 0o644); err != nil {
+	if err := os.WriteFile(statusPath, []byte(`{"run":"demo","phase":"complete","required_remaining":0}`), 0o644); err != nil {
 		t.Fatalf("write run status record: %v", err)
 	}
 
@@ -276,8 +276,8 @@ func TestSaveDoesNotMutateRunStateFromRunStatusRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read saved status record: %v", err)
 	}
-	if string(savedStatus) != `{"run":"demo","phase":"complete","acceptance_met":true}` {
-		t.Fatalf("saved status record mismatch:\nwant: %s\ngot:  %s", `{"run":"demo","phase":"complete","acceptance_met":true}`, string(savedStatus))
+	if string(savedStatus) != `{"run":"demo","phase":"complete","required_remaining":0}` {
+		t.Fatalf("saved status record mismatch:\nwant: %s\ngot:  %s", `{"run":"demo","phase":"complete","required_remaining":0}`, string(savedStatus))
 	}
 }
 
@@ -309,7 +309,7 @@ func TestSaveDoesNotGuessReportWhenManifestExistsWithoutDeclaredReport(t *testin
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
 	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte("guessed report\n"), 0o644); err != nil {
 		t.Fatalf("write notes.md: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestSaveDoesNotCreateActiveRunArtifactsManifest(t *testing.T) {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
 	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte("custom report\n"), 0o644); err != nil {
 		t.Fatalf("write notes.md: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestSavePrefersRunReportsDirOverWorktreeFallback(t *testing.T) {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
 
 	if err := os.WriteFile(filepath.Join(wtPath, "notes.md"), []byte("legacy worktree report\n"), 0o644); err != nil {
 		t.Fatalf("write notes.md: %v", err)
@@ -458,13 +458,14 @@ func seedSaveRunProvenance(t *testing.T, projectRoot, runDir, runName, objective
 	seedRunCharterForTests(t, runDir, runName, projectRoot)
 }
 
-func seedSaveSessionIdentity(t *testing.T, runDir, sessionName string, mode goalx.Mode, engine, model string, target goalx.TargetConfig, harness goalx.HarnessConfig) {
+func seedSaveSessionIdentity(t *testing.T, runDir, sessionName string, mode goalx.Mode, engine, model string, target goalx.TargetConfig, localValidation goalx.LocalValidationConfig) {
 	t.Helper()
 
 	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(mode), mode, engine, model, "", "", "", "", target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
+	identity.LocalValidationCommand = localValidation.Command
 	if err := SaveSessionIdentity(SessionIdentityPath(runDir, sessionName), identity); err != nil {
 		t.Fatalf("SaveSessionIdentity: %v", err)
 	}

@@ -13,31 +13,23 @@ const maxNextConfigParallel = 10
 const maxNextConfigIterations = 20
 
 type nextConfigJSON struct {
-	Parallel      int                 `json:"parallel,omitempty"`
-	Engine        string              `json:"engine,omitempty"`
-	Model         string              `json:"model,omitempty"`
-	Effort        goalx.EffortLevel   `json:"effort,omitempty"`
-	Preset        string              `json:"preset,omitempty"`
-	Dimensions    []string            `json:"dimensions,omitempty"`
-	BudgetSeconds int                 `json:"budget_seconds,omitempty"`
-	Objective     string              `json:"objective,omitempty"`
-	Harness       string              `json:"harness,omitempty"`
-	Mode          string              `json:"mode,omitempty"`
-	MaxIterations int                 `json:"max_iterations,omitempty"`
-	Context       []string            `json:"context,omitempty"`
-	MasterEngine  string              `json:"master_engine,omitempty"`
-	MasterModel   string              `json:"master_model,omitempty"`
-	MasterEffort  goalx.EffortLevel   `json:"master_effort,omitempty"`
-	RouteRole     string              `json:"route_role,omitempty"`
-	RouteProfile  string              `json:"route_profile,omitempty"`
-	QuotaState    string              `json:"quota_state,omitempty"`
-	Sessions      []sessionConfigJSON `json:"sessions,omitempty"`
-}
-
-type sessionConfigJSON struct {
-	Hint   string `json:"hint,omitempty"`
-	Engine string `json:"engine,omitempty"`
-	Model  string `json:"model,omitempty"`
+	Parallel      int               `json:"parallel,omitempty"`
+	Engine        string            `json:"engine,omitempty"`
+	Model         string            `json:"model,omitempty"`
+	Effort        goalx.EffortLevel `json:"effort,omitempty"`
+	Preset        string            `json:"preset,omitempty"`
+	Dimensions    []string          `json:"dimensions,omitempty"`
+	BudgetSeconds int               `json:"budget_seconds,omitempty"`
+	Objective     string            `json:"objective,omitempty"`
+	Mode          string            `json:"mode,omitempty"`
+	MaxIterations int               `json:"max_iterations,omitempty"`
+	Context       []string          `json:"context,omitempty"`
+	MasterEngine  string            `json:"master_engine,omitempty"`
+	MasterModel   string            `json:"master_model,omitempty"`
+	MasterEffort  goalx.EffortLevel `json:"master_effort,omitempty"`
+	RouteRole     string            `json:"route_role,omitempty"`
+	RouteProfile  string            `json:"route_profile,omitempty"`
+	QuotaState    string            `json:"quota_state,omitempty"`
 }
 
 func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON {
@@ -50,7 +42,6 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.Model = strings.TrimSpace(validated.Model)
 	validated.Preset = strings.TrimSpace(validated.Preset)
 	validated.Objective = strings.TrimSpace(validated.Objective)
-	validated.Harness = strings.TrimSpace(validated.Harness)
 	validated.Mode = strings.TrimSpace(validated.Mode)
 	validated.Context = normalizeNextConfigContext(validated.Context)
 	validated.MasterEngine = strings.TrimSpace(validated.MasterEngine)
@@ -58,7 +49,6 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 	validated.RouteRole = strings.TrimSpace(validated.RouteRole)
 	validated.RouteProfile = strings.TrimSpace(validated.RouteProfile)
 	validated.QuotaState = strings.TrimSpace(validated.QuotaState)
-	validated.Sessions = normalizeNextConfigSessions(validated.Sessions)
 	validated.Dimensions = normalizeNextConfigDimensions(validated.Dimensions)
 	if level, err := goalx.ParseEffortLevel(string(validated.Effort)); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.effort=%q (%v)\n", validated.Effort, err)
@@ -116,10 +106,6 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		}
 	}
 	validated.MasterEngine, validated.MasterModel = validateNamedEngineModelPair(engines, validated.MasterEngine, validated.MasterModel, "next_config.master")
-	for i := range validated.Sessions {
-		label := fmt.Sprintf("next_config.sessions[%d]", i)
-		validated.Sessions[i].Engine, validated.Sessions[i].Model = validateNamedEngineModelPair(engines, validated.Sessions[i].Engine, validated.Sessions[i].Model, label)
-	}
 
 	return &validated
 }
@@ -259,27 +245,6 @@ func normalizeNextConfigContext(paths []string) []string {
 			continue
 		}
 		normalized = append(normalized, path)
-	}
-	if len(normalized) == 0 {
-		return nil
-	}
-	return normalized
-}
-
-func normalizeNextConfigSessions(sessions []sessionConfigJSON) []sessionConfigJSON {
-	if len(sessions) == 0 {
-		return nil
-	}
-
-	normalized := make([]sessionConfigJSON, 0, len(sessions))
-	for _, session := range sessions {
-		session.Hint = strings.TrimSpace(session.Hint)
-		session.Engine = strings.TrimSpace(session.Engine)
-		session.Model = strings.TrimSpace(session.Model)
-		if session.Hint == "" && session.Engine == "" && session.Model == "" {
-			continue
-		}
-		normalized = append(normalized, session)
 	}
 	if len(normalized) == 0 {
 		return nil

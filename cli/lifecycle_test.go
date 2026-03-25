@@ -294,7 +294,7 @@ func TestResumeUsesDurableSessionIdentityInsteadOfCurrentConfig(t *testing.T) {
 		Model:  "opus",
 		Mode:   goalx.ModeResearch,
 		Target: &goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
-		Harness: &goalx.HarnessConfig{
+		LocalValidation: &goalx.LocalValidationConfig{
 			Command: "test -s report.md",
 		},
 		Hint: "mutated after park",
@@ -317,6 +317,16 @@ func TestResumeUsesDurableSessionIdentityInsteadOfCurrentConfig(t *testing.T) {
 	}
 	if !strings.Contains(logText, "exec codex ") {
 		t.Fatalf("resume launch should use durable session identity engine:\n%s", logText)
+	}
+	protocolText, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	if !strings.Contains(string(protocolText), "go test ./...") {
+		t.Fatalf("resume protocol missing durable local validation command:\n%s", string(protocolText))
+	}
+	if strings.Contains(string(protocolText), "test -s report.md") {
+		t.Fatalf("resume protocol should not recompute session local validation from current config:\n%s", string(protocolText))
 	}
 }
 
@@ -642,8 +652,8 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 		Sessions: []goalx.SessionConfig{
 			{Hint: "db race triage"},
 		},
-		Target:  goalx.TargetConfig{Files: []string{"."}},
-		Harness: goalx.HarnessConfig{Command: "go test ./..."},
+		Target:          goalx.TargetConfig{Files: []string{"."}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},
 	}
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -706,6 +716,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
+	identity.LocalValidationCommand = goalx.ResolveLocalValidationCommand(&cfg)
 	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
 		t.Fatalf("SaveSessionIdentity: %v", err)
 	}

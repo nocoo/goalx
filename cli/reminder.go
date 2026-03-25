@@ -16,13 +16,35 @@ func QueueControlReminderWithEngine(runDir, dedupeKey, reason, target, engine st
 	}
 	for i := range reminders.Items {
 		item := &reminders.Items[i]
-		if item.DedupeKey == dedupeKey && !item.Suppressed && item.AckedAt == "" {
-			if item.Engine == "" && engine != "" {
-				item.Engine = engine
-				if err := SaveControlReminders(ControlRemindersPath(runDir), reminders); err != nil {
-					return nil, err
-				}
+		if item.DedupeKey != dedupeKey {
+			continue
+		}
+		changed := false
+		if item.Reason != reason {
+			item.Reason = reason
+			changed = true
+		}
+		if item.Target != target {
+			item.Target = target
+			changed = true
+		}
+		if item.Engine != engine {
+			item.Engine = engine
+			changed = true
+		}
+		if item.Suppressed || item.ResolvedAt != "" {
+			item.Suppressed = false
+			item.ResolvedAt = ""
+			item.CooldownUntil = ""
+			item.Attempts = 0
+			changed = true
+		}
+		if changed {
+			if err := SaveControlReminders(ControlRemindersPath(runDir), reminders); err != nil {
+				return nil, err
 			}
+		}
+		if !item.Suppressed && item.ResolvedAt == "" {
 			copy := *item
 			return &copy, nil
 		}
@@ -65,7 +87,7 @@ func SuppressControlReminder(runDir, dedupeKey string) error {
 	return SaveControlReminders(ControlRemindersPath(runDir), reminders)
 }
 
-func DeliverDueControlReminders(runDir, engine string, interval time.Duration, deliver func(target, engine string) error) error {
+func DeliverDueControlReminders(runDir, engine string, interval time.Duration, deliver TransportDeliverFunc) error {
 	if err := EnsureControlState(runDir); err != nil {
 		return err
 	}
@@ -77,7 +99,7 @@ func DeliverDueControlReminders(runDir, engine string, interval time.Duration, d
 	changed := false
 	for i := range reminders.Items {
 		item := &reminders.Items[i]
-		if item.Suppressed || item.AckedAt != "" {
+		if item.Suppressed || item.ResolvedAt != "" {
 			continue
 		}
 		if item.CooldownUntil != "" {
@@ -90,9 +112,9 @@ func DeliverDueControlReminders(runDir, engine string, interval time.Duration, d
 		if deliveryEngine == "" {
 			deliveryEngine = engine
 		}
-		_, _ = deliverControlNudge(runDir, item.ReminderID, item.DedupeKey, item.Target, deliveryEngine, false, deliver)
+		delivery, _ := deliverControlNudge(runDir, item.ReminderID, item.DedupeKey, item.Target, deliveryEngine, false, deliver)
 		item.Attempts++
-		item.CooldownUntil = now.Add(controlReminderCooldown(interval)).Format(time.RFC3339)
+		item.CooldownUntil = now.Add(controlReminderCooldown(interval, item.Attempts, delivery)).Format(time.RFC3339)
 		changed = true
 	}
 	if !changed {
@@ -101,9 +123,35 @@ func DeliverDueControlReminders(runDir, engine string, interval time.Duration, d
 	return SaveControlReminders(ControlRemindersPath(runDir), reminders)
 }
 
-func controlReminderCooldown(interval time.Duration) time.Duration {
-	if interval < time.Minute {
-		return time.Minute
+func controlReminderCooldown(interval time.Duration, attempts int, delivery *ControlDelivery) time.Duration {
+	base := interval
+	if base < time.Minute {
+		base = time.Minute
 	}
-	return interval
+	if delivery == nil {
+		return base
+	}
+	switch delivery.Status {
+	case "buffered":
+		cooldown := interval / 4
+		if cooldown < 5*time.Second {
+			cooldown = 5 * time.Second
+		}
+		if cooldown > 30*time.Second {
+			cooldown = 30 * time.Second
+		}
+		return cooldown
+	case "sent":
+		return base
+	case "failed":
+		multiplier := attempts
+		if multiplier < 1 {
+			multiplier = 1
+		}
+		if multiplier > 4 {
+			multiplier = 4
+		}
+		return time.Duration(multiplier) * base
+	}
+	return base
 }

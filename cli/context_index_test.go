@@ -28,6 +28,9 @@ func TestBuildContextIndexIncludesRunAnchors(t *testing.T) {
 	if index.CharterPath != RunCharterPath(runDir) {
 		t.Fatalf("charter_path = %q, want %q", index.CharterPath, RunCharterPath(runDir))
 	}
+	if index.TransportFactsPath != TransportFactsPath(runDir) {
+		t.Fatalf("transport_facts_path = %q, want %q", index.TransportFactsPath, TransportFactsPath(runDir))
+	}
 	if index.Master.Engine != "codex" || index.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %+v, want codex/gpt-5.4", index.Master)
 	}

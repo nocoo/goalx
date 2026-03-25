@@ -84,15 +84,118 @@ func TestUnreadControlInboxCountReturnsZeroWhenCursorCaughtUp(t *testing.T) {
 	}
 }
 
-func TestSendAgentNudgeAlwaysUsesExplicitWakePayload(t *testing.T) {
+func TestSendAgentNudgeCodexStagesPayloadAndSubmitSeparately(t *testing.T) {
 	origSend := sendAgentKeys
+	origCapture := captureAgentPane
 	defer func() { sendAgentKeys = origSend }()
+	defer func() { captureAgentPane = origCapture }()
+
+	var calls []struct {
+		target string
+		keys   string
+		submit string
+	}
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		calls = append(calls, struct {
+			target string
+			keys   string
+			submit string
+		}{target: target, keys: keys, submit: submitKey})
+		return nil
+	}
+	captureAgentPane = func(target string) (string, error) {
+		return "idle prompt", nil
+	}
+
+	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
+		t.Fatalf("SendAgentNudge: %v", err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("sendAgentKeys calls = %d, want 2", len(calls))
+	}
+	if calls[0].target != "gx-demo:master" || calls[0].keys != masterWakeMessage || calls[0].submit != "" {
+		t.Fatalf("first codex send = %+v, want wake payload without submit", calls[0])
+	}
+	if calls[1].target != "gx-demo:master" || calls[1].keys != "" || calls[1].submit != "Enter" {
+		t.Fatalf("second codex send = %+v, want Enter-only submit", calls[1])
+	}
+}
+
+func TestSendAgentNudgeCodexRepairsBufferedWakeWithEnterOnly(t *testing.T) {
+	origSend := sendAgentKeys
+	origCapture := captureAgentPane
+	defer func() { sendAgentKeys = origSend }()
+	defer func() { captureAgentPane = origCapture }()
+
+	var calls []struct {
+		target string
+		keys   string
+		submit string
+	}
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		calls = append(calls, struct {
+			target string
+			keys   string
+			submit string
+		}{target: target, keys: keys, submit: submitKey})
+		return nil
+	}
+	captureAgentPane = func(target string) (string, error) {
+		return "› goalx-wake\n  gpt-5.4 xhigh", nil
+	}
+
+	outcome, err := SendAgentNudgeDetailed("gx-demo:session-2", "codex")
+	if err != nil {
+		t.Fatalf("SendAgentNudgeDetailed: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("sendAgentKeys calls = %d, want 1", len(calls))
+	}
+	if calls[0].target != "gx-demo:session-2" || calls[0].keys != "" || calls[0].submit != "Enter" {
+		t.Fatalf("codex repair send = %+v, want Enter-only submit", calls[0])
+	}
+	if outcome.SubmitMode != "enter_only_repair" || outcome.TransportState != "buffered" {
+		t.Fatalf("codex repair outcome = %+v, want enter_only_repair/buffered", outcome)
+	}
+}
+
+func TestSendAgentNudgeClaudeTreatsQueuedWakeAsAccepted(t *testing.T) {
+	origSend := sendAgentKeys
+	origCapture := captureAgentPane
+	defer func() { sendAgentKeys = origSend }()
+	defer func() { captureAgentPane = origCapture }()
+
+	called := false
+	sendAgentKeys = func(target, keys, submitKey string) error {
+		called = true
+		return nil
+	}
+	captureAgentPane = func(target string) (string, error) {
+		return "❯ goalx-wake\nPress up to edit queued messages", nil
+	}
+
+	outcome, err := SendAgentNudgeDetailed("gx-demo:session-2", "claude-code")
+	if err != nil {
+		t.Fatalf("SendAgentNudgeDetailed: %v", err)
+	}
+	if called {
+		t.Fatal("sendAgentKeys called, want queued Claude wake treated as already accepted")
+	}
+	if outcome.SubmitMode != "accepted_existing_queue" || outcome.TransportState != "sent" {
+		t.Fatalf("claude queued outcome = %+v, want accepted_existing_queue/sent", outcome)
+	}
+}
+
+func TestSendAgentNudgeNonCodexUsesExplicitWakePayload(t *testing.T) {
+	origSend := sendAgentKeys
+	origCapture := captureAgentPane
+	defer func() { sendAgentKeys = origSend }()
+	defer func() { captureAgentPane = origCapture }()
 
 	tests := []struct {
 		name   string
 		engine string
 	}{
-		{name: "codex", engine: "codex"},
 		{name: "claude", engine: "claude-code"},
 	}
 
@@ -102,6 +205,9 @@ func TestSendAgentNudgeAlwaysUsesExplicitWakePayload(t *testing.T) {
 			sendAgentKeys = func(target, keys, submitKey string) error {
 				gotTarget, gotKeys, gotSubmit = target, keys, submitKey
 				return nil
+			}
+			captureAgentPane = func(target string) (string, error) {
+				return "idle prompt", nil
 			}
 
 			if err := SendAgentNudge("gx-demo:master", tt.engine); err != nil {
@@ -139,7 +245,7 @@ func TestPulseQueuesMasterWakeReminderWithoutLegacyHeartbeatState(t *testing.T) 
 	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-run\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"pulse-run","mode":"develop","objective":"ship it","active":false,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"pulse-run","mode":"develop","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
@@ -210,7 +316,7 @@ func TestPulseDedupesMasterWakeReminderAcrossRepeatedCycles(t *testing.T) {
 	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-lag\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"pulse-lag","mode":"develop","objective":"ship it","active":false,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"pulse-lag","mode":"develop","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}

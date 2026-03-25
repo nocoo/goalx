@@ -462,9 +462,9 @@ func TestValidateConfigOK(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
-		Master:  MasterConfig{Engine: "claude-code", Model: "opus"},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
+		Master:          MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 	if err := ValidateConfig(cfg, BuiltinEngines); err != nil {
 		t.Errorf("expected no error, got: %v", err)
@@ -479,18 +479,18 @@ func TestValidateConfigAcceptsAutoMode(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
-		Master:  MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
+		Master:          MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
 	if err := ValidateConfig(cfg, BuiltinEngines); err != nil {
 		t.Fatalf("expected auto mode to validate, got: %v", err)
 	}
 }
 
-func TestResolveAcceptanceCommandDoesNotFallBackToHarness(t *testing.T) {
+func TestResolveAcceptanceCommandDoesNotFallBackToLocalValidation(t *testing.T) {
 	cfg := &Config{
-		Harness: HarnessConfig{Command: "go test ./..."},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 	}
 
 	if got := ResolveAcceptanceCommand(cfg); got != "" {
@@ -500,8 +500,8 @@ func TestResolveAcceptanceCommandDoesNotFallBackToHarness(t *testing.T) {
 
 func TestResolveAcceptanceCommandUsesAcceptanceOverride(t *testing.T) {
 	cfg := &Config{
-		Harness:    HarnessConfig{Command: "go test ./..."},
-		Acceptance: AcceptanceConfig{Command: "go test -run E2E ./..."},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
+		Acceptance:      AcceptanceConfig{Command: "go test -run E2E ./..."},
 	}
 
 	if got := ResolveAcceptanceCommand(cfg); got != "go test -run E2E ./..." {
@@ -524,9 +524,9 @@ func TestValidateConfigPlaceholder(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
-		Target:  TargetConfig{Files: []string{"TODO: specify"}},
-		Harness: HarnessConfig{Command: "go test"},
-		Master:  MasterConfig{Engine: "claude-code", Model: "opus"},
+		Target:          TargetConfig{Files: []string{"TODO: specify"}},
+		LocalValidation: LocalValidationConfig{Command: "go test"},
+		Master:          MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 	if err := ValidateConfig(cfg, BuiltinEngines); err == nil {
 		t.Error("expected error for placeholder in target.files")
@@ -541,11 +541,11 @@ func TestValidateConfigAllowsSessionOverridesWithParallel(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
-		Parallel: 2,
-		Sessions: []SessionConfig{{Hint: "a"}},
-		Target:   TargetConfig{Files: []string{"src/"}},
-		Harness:  HarnessConfig{Command: "go test"},
-		Master:   MasterConfig{Engine: "claude-code", Model: "opus"},
+		Parallel:        2,
+		Sessions:        []SessionConfig{{Hint: "a"}},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test"},
+		Master:          MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 	if err := ValidateConfig(cfg, BuiltinEngines); err != nil {
 		t.Fatalf("ValidateConfig: %v", err)
@@ -560,8 +560,8 @@ func TestValidateConfigRejectsAcceptancePlaceholder(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 		Acceptance: AcceptanceConfig{
 			Command: "TODO: add e2e command",
 		},
@@ -612,7 +612,7 @@ name: demo
 objective: ship it
 target:
   files: [README.md]
-harness:
+local_validation:
   command: go test ./...
 serve:
   notification_url: http://run.example/hook
@@ -675,7 +675,7 @@ mode: develop
 objective: ship it
 target:
   files: [README.md]
-harness:
+local_validation:
   command: go test ./...
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
@@ -740,7 +740,7 @@ preferences:
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
 	projectCfg := []byte(strings.TrimSpace(`
-harness:
+local_validation:
   command: go build ./... && go test ./...
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
@@ -775,12 +775,12 @@ harness:
 	if len(cfg.Routing.Rules) == 0 {
 		t.Fatal("routing.rules is empty")
 	}
-	if cfg.Harness.Command != "go build ./... && go test ./..." {
-		t.Fatalf("harness.command = %q, want project harness", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "go build ./... && go test ./..." {
+		t.Fatalf("local_validation.command = %q, want project local validation", cfg.LocalValidation.Command)
 	}
 }
 
-func TestLoadConfigMergesHarnessTimeoutWithoutCommand(t *testing.T) {
+func TestLoadConfigMergesLocalValidationTimeoutWithoutCommand(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -790,7 +790,7 @@ func TestLoadConfigMergesHarnessTimeoutWithoutCommand(t *testing.T) {
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
 	projectCfg := []byte(strings.TrimSpace(`
-harness:
+local_validation:
   timeout: 30s
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
@@ -801,8 +801,8 @@ harness:
 	if err != nil {
 		t.Fatalf("LoadRawBaseConfig: %v", err)
 	}
-	if cfg.Harness.Timeout != 30*time.Second {
-		t.Fatalf("harness.timeout = %v, want %v", cfg.Harness.Timeout, 30*time.Second)
+	if cfg.LocalValidation.Timeout != 30*time.Second {
+		t.Fatalf("local_validation.timeout = %v, want %v", cfg.LocalValidation.Timeout, 30*time.Second)
 	}
 }
 
@@ -852,7 +852,7 @@ mode: develop
 objective: ship it
 target:
   files: [README.md]
-harness:
+local_validation:
   command: go test ./...
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
@@ -929,7 +929,7 @@ preset: project-dev
 objective: ship it
 target:
   files: [README.md]
-harness:
+local_validation:
   command: go test ./...
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), runCfg, 0o644); err != nil {
@@ -1097,7 +1097,7 @@ mode: develop
 objective: lock config state
 target:
   files: [README.md]
-harness:
+local_validation:
   command: go test ./...
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), projectCfg, 0o644); err != nil {
@@ -1151,7 +1151,7 @@ func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 		Target: TargetConfig{
 			Files: []string{"report.md"},
 		},
-		Harness: HarnessConfig{Command: "test -s report.md"},
+		LocalValidation: LocalValidationConfig{Command: "test -s report.md"},
 		Context: ContextConfig{
 			Files: []string{repoFile, runRef, externalRef},
 		},
@@ -1185,9 +1185,9 @@ func TestValidateConfigRejectsOldCodexModels(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "codex", Model: "gpt-5.2"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test"},
-		Master:  MasterConfig{Engine: "claude-code", Model: "opus"},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test"},
+		Master:          MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 	err := ValidateConfig(cfg, BuiltinEngines)
 	if err == nil {
@@ -1206,9 +1206,9 @@ func TestValidateConfigRejectsCrossEngineModelAlias(t *testing.T) {
 		Roles: RoleDefaultsConfig{
 			Develop: SessionConfig{Engine: "codex", Model: "codex"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test"},
-		Master:  MasterConfig{Engine: "codex", Model: "opus"},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test"},
+		Master:          MasterConfig{Engine: "codex", Model: "opus"},
 	}
 
 	err := ValidateConfig(cfg, BuiltinEngines)
@@ -1222,13 +1222,13 @@ func TestValidateConfigRejectsCrossEngineModelAlias(t *testing.T) {
 
 func TestMergeConfig(t *testing.T) {
 	base := Config{
-		Name:    "base",
-		Mode:    ModeDevelop,
-		Harness: HarnessConfig{Command: "make test"},
+		Name:            "base",
+		Mode:            ModeDevelop,
+		LocalValidation: LocalValidationConfig{Command: "make test"},
 	}
 	overlay := Config{
-		Objective: "new objective",
-		Harness:   HarnessConfig{Command: "go test"},
+		Objective:       "new objective",
+		LocalValidation: LocalValidationConfig{Command: "go test"},
 	}
 	mergeConfig(&base, &overlay)
 	if base.Name != "base" {
@@ -1237,8 +1237,8 @@ func TestMergeConfig(t *testing.T) {
 	if base.Objective != "new objective" {
 		t.Error("objective should be overridden")
 	}
-	if base.Harness.Command != "go test" {
-		t.Error("harness should be overridden")
+	if base.LocalValidation.Command != "go test" {
+		t.Error("local_validation should be overridden")
 	}
 }
 
@@ -1377,16 +1377,16 @@ func cloneStringMap(src map[string]string) map[string]string {
 
 func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 	cfg := &Config{
-		Mode:    ModeDevelop,
-		Roles:   RoleDefaultsConfig{Research: SessionConfig{Engine: "claude-code", Model: "opus"}},
-		Target:  TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
+		Mode:            ModeDevelop,
+		Roles:           RoleDefaultsConfig{Research: SessionConfig{Engine: "claude-code", Model: "opus"}},
+		Target:          TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
 			{
-				Hint:    "investigate root cause",
-				Mode:    ModeResearch,
-				Target:  &TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
-				Harness: &HarnessConfig{Command: "test -s report.md"},
+				Hint:            "investigate root cause",
+				Mode:            ModeResearch,
+				Target:          &TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
+				LocalValidation: &LocalValidationConfig{Command: "test -s report.md"},
 			},
 		},
 	}
@@ -1398,17 +1398,17 @@ func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 	if !reflect.DeepEqual(got.Target.Files, []string{"report.md"}) {
 		t.Fatalf("Target.Files = %#v, want report target", got.Target.Files)
 	}
-	if got.Harness.Command != "test -s report.md" {
-		t.Fatalf("Harness.Command = %q, want research harness", got.Harness.Command)
+	if got.LocalValidation.Command != "test -s report.md" {
+		t.Fatalf("LocalValidation.Command = %q, want research local validation", got.LocalValidation.Command)
 	}
 }
 
 func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	cfg := &Config{
-		Mode:    ModeDevelop,
-		Roles:   RoleDefaultsConfig{Develop: SessionConfig{Engine: "codex", Model: "fast"}},
-		Target:  TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
+		Mode:            ModeDevelop,
+		Roles:           RoleDefaultsConfig{Develop: SessionConfig{Engine: "codex", Model: "fast"}},
+		Target:          TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
 			{Hint: "implement fix"},
 		},
@@ -1421,8 +1421,8 @@ func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	if !reflect.DeepEqual(got.Target.Files, []string{"src/"}) {
 		t.Fatalf("Target.Files = %#v, want inherited run target", got.Target.Files)
 	}
-	if got.Harness.Command != "go test ./..." {
-		t.Fatalf("Harness.Command = %q, want inherited run harness", got.Harness.Command)
+	if got.LocalValidation.Command != "go test ./..." {
+		t.Fatalf("LocalValidation.Command = %q, want inherited run local validation", got.LocalValidation.Command)
 	}
 	if got.Engine != "" || got.Model != "" {
 		t.Fatalf("Engine/Model = %s/%s, want unset engine/model", got.Engine, got.Model)
@@ -1440,8 +1440,8 @@ func TestEffectiveSessionConfigUsesModeSpecificRoleDefaults(t *testing.T) {
 			{Mode: ModeResearch},
 			{Mode: ModeDevelop},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 	}
 
 	gotResearch := EffectiveSessionConfig(cfg, 0)
@@ -1462,8 +1462,8 @@ func TestEffectiveSessionConfigLeavesAutoRunSessionsUnsetByDefault(t *testing.T)
 			Research: SessionConfig{Engine: "claude-code", Model: "opus"},
 			Develop:  SessionConfig{Engine: "codex", Model: "fast"},
 		},
-		Target:  TargetConfig{Files: []string{"src/"}},
-		Harness: HarnessConfig{Command: "go test ./..."},
+		Target:          TargetConfig{Files: []string{"src/"}},
+		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 	}
 
 	got := EffectiveSessionConfig(cfg, 0)
@@ -1483,7 +1483,7 @@ func TestEffectiveSessionConfigRequiresExplicitRoutingForRoleDefaults(t *testing
 			Research: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 		Target: TargetConfig{Files: []string{"report.md"}},
-		Harness: HarnessConfig{
+		LocalValidation: LocalValidationConfig{
 			Command: "test -s report.md",
 		},
 	}

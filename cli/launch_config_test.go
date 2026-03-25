@@ -113,8 +113,8 @@ func TestBuildLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) {
 	if len(cfg.Target.Files) == 1 && cfg.Target.Files[0] == "report.md" {
 		t.Fatalf("research launch should not hardcode report.md target: %#v", cfg.Target.Files)
 	}
-	if cfg.Harness.Command == "test -s report.md && echo 'ok'" {
-		t.Fatalf("research launch should not hardcode report harness")
+	if cfg.LocalValidation.Command == "test -s report.md && echo 'ok'" {
+		t.Fatalf("research launch should not hardcode report local validation")
 	}
 }
 
@@ -161,7 +161,7 @@ roles:
     effort: high
   develop:
     effort: medium
-harness:
+local_validation:
   command: go test ./...
 target:
   files: ["."]
@@ -191,7 +191,7 @@ target:
 	}
 }
 
-func TestBuildLaunchConfigPreviewLeavesTargetAndHarnessUnsetWhenUnconfigured(t *testing.T) {
+func TestBuildLaunchConfigPreviewLeavesTargetAndLocalValidationUnsetWhenUnconfigured(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -207,8 +207,8 @@ func TestBuildLaunchConfigPreviewLeavesTargetAndHarnessUnsetWhenUnconfigured(t *
 	if len(cfg.Target.Files) != 0 {
 		t.Fatalf("target.files = %#v, want unset target", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "" {
-		t.Fatalf("harness.command = %q, want unset harness", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "" {
+		t.Fatalf("local_validation.command = %q, want unset local_validation", cfg.LocalValidation.Command)
 	}
 
 	layers, err := goalx.LoadConfigLayers(projectRoot)
@@ -236,7 +236,7 @@ func TestBuildLaunchConfigResearchAndDevelopMatchResolverDefaults(t *testing.T) 
 name: shared
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -292,7 +292,7 @@ func TestResolveLaunchConfigIgnoresSharedSessionsForDirectLaunch(t *testing.T) {
 preset: codex
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 sessions:
   - engine: nope
@@ -314,7 +314,7 @@ sessions:
 	}
 }
 
-func TestResolveLaunchConfigPreservesHarnessTimeoutWithoutInferringCommand(t *testing.T) {
+func TestResolveLaunchConfigPreservesLocalValidationTimeoutWithoutInferringCommand(t *testing.T) {
 	projectRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(projectRoot, "go.mod"), []byte("module example.com/demo\n\ngo 1.24\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
@@ -323,7 +323,7 @@ func TestResolveLaunchConfigPreservesHarnessTimeoutWithoutInferringCommand(t *te
 preset: codex
 target:
   files: ["."]
-harness:
+local_validation:
   timeout: 30s
 `)
 
@@ -334,11 +334,11 @@ harness:
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
 	}
-	if resolvedCfg.Config.Harness.Command != "" {
-		t.Fatalf("harness.command = %q, want empty", resolvedCfg.Config.Harness.Command)
+	if resolvedCfg.Config.LocalValidation.Command != "" {
+		t.Fatalf("local_validation.command = %q, want empty", resolvedCfg.Config.LocalValidation.Command)
 	}
-	if resolvedCfg.Config.Harness.Timeout != 30*time.Second {
-		t.Fatalf("harness.timeout = %v, want %v", resolvedCfg.Config.Harness.Timeout, 30*time.Second)
+	if resolvedCfg.Config.LocalValidation.Timeout != 30*time.Second {
+		t.Fatalf("local_validation.timeout = %v, want %v", resolvedCfg.Config.LocalValidation.Timeout, 30*time.Second)
 	}
 }
 
@@ -359,7 +359,7 @@ roles:
     model: fast
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -398,8 +398,8 @@ func TestResolveLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) 
 	if len(cfg.Target.Files) == 1 && cfg.Target.Files[0] == "report.md" {
 		t.Fatalf("research launch should not hardcode report.md target: %#v", cfg.Target.Files)
 	}
-	if cfg.Harness.Command == "test -s report.md && echo 'ok'" {
-		t.Fatalf("research launch should not hardcode report harness")
+	if cfg.LocalValidation.Command == "test -s report.md && echo 'ok'" {
+		t.Fatalf("research launch should not hardcode report local validation")
 	}
 }
 
@@ -440,7 +440,7 @@ roles:
     effort: high
   develop:
     effort: medium
-harness:
+local_validation:
   command: go test ./...
 target:
   files: ["."]
@@ -475,7 +475,7 @@ preset: codex
 parallel: 1
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 

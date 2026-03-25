@@ -32,8 +32,13 @@ type ControlInboxState struct {
 	Unread     int
 }
 
-var sendAgentNudge = SendAgentNudge
+var sendAgentNudge = func(target, engine string) error {
+	_, err := SendAgentNudgeDetailed(target, engine)
+	return err
+}
+var sendAgentNudgeDetailed = SendAgentNudgeDetailed
 var sendAgentKeys = sendKeysWithSubmit
+var captureAgentPane = CapturePaneTargetOutput
 
 func ControlDir(runDir string) string {
 	return filepath.Join(runDir, "control")
@@ -304,5 +309,105 @@ func SaveMasterCursorState(path string, state *MasterCursorState) error {
 }
 
 func SendAgentNudge(target, engine string) error {
-	return sendAgentKeys(target, masterWakeMessage, "Enter")
+	_, err := SendAgentNudgeDetailed(target, engine)
+	return err
+}
+
+func SendAgentNudgeDetailed(target, engine string) (TransportDeliveryOutcome, error) {
+	before := inspectTransportTarget(target, "", "", engine)
+	switch strings.TrimSpace(engine) {
+	case "codex":
+		if before.InputContainsWake {
+			if err := sendAgentKeys(target, "", "Enter"); err != nil {
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+			}
+			time.Sleep(150 * time.Millisecond)
+			after := inspectTransportTarget(target, "", "", engine)
+			return TransportDeliveryOutcome{
+				SubmitMode:     "enter_only_repair",
+				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+			}, nil
+		}
+		if err := sendAgentKeys(target, masterWakeMessage, ""); err != nil {
+			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter"}, err
+		}
+		time.Sleep(150 * time.Millisecond)
+		if err := sendAgentKeys(target, "", "Enter"); err != nil {
+			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter"}, err
+		}
+		time.Sleep(150 * time.Millisecond)
+		after := inspectTransportTarget(target, "", "", engine)
+		if after.InputContainsWake && !after.WorkingVisible {
+			if err := sendAgentKeys(target, "", "Enter"); err != nil {
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+			}
+			time.Sleep(150 * time.Millisecond)
+			after = inspectTransportTarget(target, "", "", engine)
+			return TransportDeliveryOutcome{
+				SubmitMode:     "enter_only_repair",
+				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+			}, nil
+		}
+		return TransportDeliveryOutcome{
+			SubmitMode:     "payload_then_enter",
+			TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+		}, nil
+	case "claude-code":
+		if before.QueuedMessageVisible {
+			return TransportDeliveryOutcome{SubmitMode: "accepted_existing_queue", TransportState: "sent"}, nil
+		}
+		if before.InputContainsWake {
+			if err := sendAgentKeys(target, "", "Enter"); err != nil {
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+			}
+			time.Sleep(150 * time.Millisecond)
+			after := inspectTransportTarget(target, "", "", engine)
+			return TransportDeliveryOutcome{
+				SubmitMode:     "enter_only_repair",
+				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+			}, nil
+		}
+	}
+	if err := sendAgentKeys(target, masterWakeMessage, "Enter"); err != nil {
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter"}, err
+	}
+	time.Sleep(150 * time.Millisecond)
+	after := inspectTransportTarget(target, "", "", engine)
+	return TransportDeliveryOutcome{
+		SubmitMode:     "payload_enter",
+		TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+	}, nil
+}
+
+func classifyTransportOutcome(engine string, before, after TransportTargetFacts, submitted bool) string {
+	if after.InputContainsWake {
+		return "buffered"
+	}
+	switch engine {
+	case "claude-code":
+		if after.QueuedMessageVisible || after.WorkingVisible {
+			return "sent"
+		}
+		if submitted {
+			return "sent"
+		}
+	case "codex":
+		if after.WorkingVisible {
+			return "sent"
+		}
+		if submitted && !after.InputContainsWake {
+			return "sent"
+		}
+	default:
+		if after.WorkingVisible {
+			return "sent"
+		}
+		if submitted {
+			return "sent"
+		}
+	}
+	if before.InputContainsWake && !after.InputContainsWake {
+		return "sent"
+	}
+	return ""
 }

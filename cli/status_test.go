@@ -94,7 +94,7 @@ func TestStatusShowsControlQueueAndLeaseSummary(t *testing.T) {
 		Version: 1,
 		Items: []ControlReminder{
 			{ReminderID: "rem-1", DedupeKey: "master-wake", Reason: "control-cycle", Target: "gx-demo:master"},
-			{ReminderID: "rem-2", DedupeKey: "acked", Reason: "control-cycle", Target: "gx-demo:master", AckedAt: "2026-03-23T00:00:00Z"},
+			{ReminderID: "rem-2", DedupeKey: "acked", Reason: "control-cycle", Target: "gx-demo:master", ResolvedAt: "2026-03-23T00:00:00Z"},
 		},
 	}); err != nil {
 		t.Fatalf("SaveControlReminders: %v", err)
@@ -266,6 +266,52 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 	}
 }
 
+func TestStatusShowsSessionTransportFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "build_fast", "", goalx.TargetConfig{})
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	identity.RouteRole = "develop"
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-1",
+		State: "idle",
+		Mode:  string(goalx.ModeDevelop),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version: 1,
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				TransportState:    "buffered",
+				InputContainsWake: true,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"transport=buffered",
+		"input_wake=true",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusShowsSessionLaunchFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 
@@ -345,7 +391,7 @@ func TestStatusPrefersLatestJournalStateOverStaleRuntimeActive(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte(`{"round":2,"desc":"awaiting master","status":"idle"}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write session journal: %v", err)
 	}
@@ -378,10 +424,25 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
 		Version: 1,
 		Items: []ControlDelivery{
-			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "sent", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z"},
+			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "sent", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z", AcceptedAt: "2026-03-25T00:00:01Z"},
 		},
 	}); err != nil {
 		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version: 1,
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				Target:                "session-1",
+				Window:                "session-1",
+				Engine:                "codex",
+				TransportState:        "sent",
+				LastSubmitAttemptAt:   "2026-03-25T00:00:00Z",
+				LastTransportAcceptAt: "2026-03-25T00:00:01Z",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
 	}
 
 	out := captureStdout(t, func() {
@@ -391,11 +452,12 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"inbox-pending",
+		"idle",
 		"unread=1",
 		"cursor=0/1",
-		"last_nudge=2026-03-25T00:00:00Z",
-		"last_delivery=sent",
+		"submit_at=2026-03-25T00:00:00Z",
+		"transport=sent",
+		"accepted_at=2026-03-25T00:00:01Z",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)

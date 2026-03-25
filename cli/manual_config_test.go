@@ -71,11 +71,11 @@ func TestStartRequiresExplicitManualConfig(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
 	writeRootConfigFixture(t, repo, goalx.Config{
-		Name:      "manual-draft",
-		Mode:      goalx.ModeResearch,
-		Objective: "audit auth flow",
-		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
+		Name:            "manual-draft",
+		Mode:            goalx.ModeResearch,
+		Objective:       "audit auth flow",
+		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 	})
 
 	installStartFakeTmux(t)
@@ -96,12 +96,12 @@ func TestStartWithExplicitManualConfig(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
 	writeRootConfigFixture(t, repo, goalx.Config{
-		Name:      "manual-draft",
-		Mode:      goalx.ModeResearch,
-		Objective: "audit auth flow",
-		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
-		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Name:            "manual-draft",
+		Mode:            goalx.ModeResearch,
+		Objective:       "audit auth flow",
+		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	})
 
 	installStartFakeTmux(t)
@@ -149,7 +149,7 @@ func TestStartWithExplicitManualConfigRequiresExistingFile(t *testing.T) {
 	}
 }
 
-func TestLoadManualDraftConfigAllowsUnsetTargetAndHarness(t *testing.T) {
+func TestLoadManualDraftConfigAllowsUnsetTargetAndLocalValidation(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -171,8 +171,8 @@ func TestLoadManualDraftConfigAllowsUnsetTargetAndHarness(t *testing.T) {
 	if len(cfg.Target.Files) != 0 {
 		t.Fatalf("target.files = %#v, want unset target", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "" {
-		t.Fatalf("harness.command = %q, want unset harness", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "" {
+		t.Fatalf("local_validation.command = %q, want unset local_validation", cfg.LocalValidation.Command)
 	}
 }
 
@@ -188,7 +188,7 @@ func TestLoadManualDraftConfigDraftContextReplacesSharedContextBeforeFiltering(t
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
-	projectCfg := fmt.Sprintf("context:\n  files: [%q]\nharness:\n  command: \"go test ./...\"\ntarget:\n  files: [\".\"]\n", sharedExternal)
+	projectCfg := fmt.Sprintf("context:\n  files: [%q]\nlocal_validation:\n  command: \"go test ./...\"\ntarget:\n  files: [\".\"]\n", sharedExternal)
 	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte(projectCfg), 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
@@ -196,12 +196,12 @@ func TestLoadManualDraftConfigDraftContextReplacesSharedContextBeforeFiltering(t
 		t.Fatalf("write local README: %v", err)
 	}
 	writeRootConfigFixture(t, projectRoot, goalx.Config{
-		Name:      "draft-context",
-		Mode:      goalx.ModeDevelop,
-		Objective: "ship it",
-		Target:    goalx.TargetConfig{Files: []string{"."}},
-		Harness:   goalx.HarnessConfig{Command: "go test ./..."},
-		Context:   goalx.ContextConfig{Files: []string{"README.md"}},
+		Name:            "draft-context",
+		Mode:            goalx.ModeDevelop,
+		Objective:       "ship it",
+		Target:          goalx.TargetConfig{Files: []string{"."}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},
+		Context:         goalx.ContextConfig{Files: []string{"README.md"}},
 	})
 
 	cfg, _, err := LoadManualDraftConfig(projectRoot, filepath.Join(projectRoot, ".goalx", "goalx.yaml"))

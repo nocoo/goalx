@@ -165,38 +165,38 @@ func Add(projectRoot string, args []string) (err error) {
 		}
 	}()
 
-	newSess := goalx.SessionConfig{Hint: hint}
-	if flagEngine != "" {
-		newSess.Engine = flagEngine
-	}
-	if flagModel != "" {
-		newSess.Model = flagModel
-	}
-	if flagMode != "" {
-		newSess.Mode = flagMode
-	}
-	if flagEffort != "" {
-		newSess.Effort = flagEffort
-	}
-	if len(flagDimensions) > 0 {
-		if _, err := goalx.ResolveDimensionSpecs(flagDimensions); err != nil {
-			return err
-		}
-		newSess.Dimensions = append([]string(nil), flagDimensions...)
-	}
-	if flagRouteRole != "" {
-		newSess.RouteRole = flagRouteRole
-	}
-	if flagRouteProfile != "" {
-		newSess.RouteProfile = flagRouteProfile
-	}
-
 	renderCfg := *rc.Config
 	renderCfg.Sessions = append([]goalx.SessionConfig(nil), goalx.ExpandSessions(rc.Config)...)
 	for len(renderCfg.Sessions) < newNum {
 		renderCfg.Sessions = append(renderCfg.Sessions, goalx.SessionConfig{})
 	}
-	renderCfg.Sessions[newNum-1] = newSess
+	sessionCfg := renderCfg.Sessions[newNum-1]
+	sessionCfg.Hint = hint
+	if flagEngine != "" {
+		sessionCfg.Engine = flagEngine
+	}
+	if flagModel != "" {
+		sessionCfg.Model = flagModel
+	}
+	if flagMode != "" {
+		sessionCfg.Mode = flagMode
+	}
+	if flagEffort != "" {
+		sessionCfg.Effort = flagEffort
+	}
+	if len(flagDimensions) > 0 {
+		if _, err := goalx.ResolveDimensionSpecs(flagDimensions); err != nil {
+			return err
+		}
+		sessionCfg.Dimensions = append([]string(nil), flagDimensions...)
+	}
+	if flagRouteRole != "" {
+		sessionCfg.RouteRole = flagRouteRole
+	}
+	if flagRouteProfile != "" {
+		sessionCfg.RouteProfile = flagRouteProfile
+	}
+	renderCfg.Sessions[newNum-1] = sessionCfg
 	if renderCfg.Parallel < len(renderCfg.Sessions) {
 		renderCfg.Parallel = len(renderCfg.Sessions)
 	}
@@ -221,6 +221,7 @@ func Add(projectRoot string, args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
 	}
+	sessionIdentity.LocalValidationCommand = resolveSessionLocalValidationCommand(effectiveSession)
 	sessionIdentity.RouteRole = effectiveSession.RouteRole
 	dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
 	if err != nil {
@@ -326,7 +327,7 @@ func Add(projectRoot string, args []string) (err error) {
 		Engine:                 sessionIdentity.Engine,
 		Sessions:               sessionDataList,
 		Target:                 sessionIdentity.Target,
-		LocalValidationCommand: strings.TrimSpace(rc.Config.Harness.Command),
+		LocalValidationCommand: sessionIdentity.LocalValidationCommand,
 		Context:                rc.Config.Context,
 		Budget:                 rc.Config.Budget,
 		SessionName:            sName,
@@ -386,7 +387,7 @@ func Add(projectRoot string, args []string) (err error) {
 	if _, err := AppendMasterInboxMessage(rc.RunDir, "session_added", "goalx add", masterMsg); err != nil {
 		return fmt.Errorf("notify master inbox: %w", err)
 	}
-	if _, err := DeliverControlNudge(rc.RunDir, "session-added:"+sName, "session-added:"+sName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudge); err != nil {
+	if _, err := DeliverControlNudge(rc.RunDir, "session-added:"+sName, "session-added:"+sName, rc.TmuxSession+":master", rc.Config.Master.Engine, sendAgentNudgeDetailed); err != nil {
 		return fmt.Errorf("nudge master: %w", err)
 	}
 	if err := RefreshRunGuidance(rc.ProjectRoot, rc.Name, rc.RunDir); err != nil {

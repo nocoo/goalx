@@ -1399,7 +1399,51 @@ func TestRenderMasterProtocolRoutesSessionDispatchThroughTell(t *testing.T) {
 		"`goalx attach --run demo session-N`",
 		"Treat `status=sent` in `",
 		"as transport success: the input was submitted to the target engine.",
+		"`status=buffered` means the wake text is still sitting in the target input buffer.",
+		"`queued_message_visible=true` means the provider queue accepted the transport.",
 		"Do not take over or reassign immediately just because the session cursor has not advanced yet after a `sent` delivery.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolStatusRecordIsFactsOnly(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:   "ship it",
+		RunName:     "demo",
+		Mode:        goalx.ModeDevelop,
+		StatusPath:  "/tmp/status.json",
+		Master:      goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession: "ar-demo",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, unwanted := range []string{
+		`"recommendation"`,
+		`"acceptance_met"`,
+		`"acceptance_status"`,
+		`"goal_satisfied"`,
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered master protocol should omit judgment field %q:\n%s", unwanted, text)
+		}
+	}
+	for _, want := range []string{
+		`"phase":"working|complete"`,
+		`"required_remaining":0`,
+		`"keep_session":"session-N"`,
+		`"updated_at":"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)

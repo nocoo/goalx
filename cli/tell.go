@@ -17,7 +17,7 @@ func Tell(projectRoot string, args []string) error {
 	if target == "" && message == "" {
 		return nil
 	}
-	resolvedRun, deliveredTarget, err := deliverTell(projectRoot, runName, target, message, urgent, sendAgentNudge)
+	resolvedRun, deliveredTarget, err := deliverTell(projectRoot, runName, target, message, urgent, sendAgentNudgeDetailed)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func parseTellArgs(args []string) (string, string, bool, error) {
 	}
 }
 
-func deliverTell(projectRoot, runName, target, message string, urgent bool, nudge func(target, engine string) error) (string, string, error) {
+func deliverTell(projectRoot, runName, target, message string, urgent bool, nudge TransportDeliverFunc) (string, string, error) {
 	if target == "" && message == "" {
 		return "", "", nil
 	}

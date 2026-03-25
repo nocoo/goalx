@@ -93,14 +93,14 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "observe",
 			Summary: "Read the current run progress and control summary.",
 			Command: fmt.Sprintf("goalx status --run %s", runName),
-			Paths:   []string{ActivityPath(runDir)},
+			Paths:   []string{ActivityPath(runDir), TransportFactsPath(runDir)},
 		},
 		{
 			ID:      "observe",
 			Kind:    "observe",
 			Summary: "Read the live transport capture plus current run facts.",
 			Command: fmt.Sprintf("goalx observe --run %s", runName),
-			Paths:   []string{ActivityPath(runDir)},
+			Paths:   []string{ActivityPath(runDir), TransportFactsPath(runDir)},
 		},
 		{
 			ID:      "context",

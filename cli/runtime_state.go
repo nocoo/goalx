@@ -18,15 +18,14 @@ import (
 // The separate run-scoped status record is master-written and carries any
 // agent-authored progress summary without project-level sharing.
 type RunRuntimeState struct {
-	Version        int    `json:"version"`
-	Run            string `json:"run"`
-	Mode           string `json:"mode,omitempty"`
-	Active         bool   `json:"active"`
-	Phase          string `json:"phase,omitempty"`
-	Recommendation string `json:"recommendation,omitempty"`
-	StartedAt      string `json:"started_at,omitempty"`
-	StoppedAt      string `json:"stopped_at,omitempty"`
-	UpdatedAt      string `json:"updated_at,omitempty"`
+	Version   int    `json:"version"`
+	Run       string `json:"run"`
+	Mode      string `json:"mode,omitempty"`
+	Active    bool   `json:"active"`
+	Phase     string `json:"phase,omitempty"`
+	StartedAt string `json:"started_at,omitempty"`
+	StoppedAt string `json:"stopped_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
 type SessionRuntimeState struct {

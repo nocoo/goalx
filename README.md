@@ -69,9 +69,11 @@ roles:
 Project-level config is for shared project defaults, not just launch-time engine choices. A common use is an optional local validation command:
 ```yaml
 # .goalx/config.yaml — project-specific
-harness:
+local_validation:
   command: "go build ./... && go test ./... && go vet ./..."
 ```
+
+`local_validation` is session-local self-checking before handoff. Run-level verification stays under `acceptance.command` and is only executed by `goalx verify`.
 
 ## Quick Start
 
@@ -176,7 +178,8 @@ Use `goalx init` + `goalx start --config .goalx/goalx.yaml`, direct config edits
 - The durable control plane is centered on run-scoped files such as `control/run-identity.json`, `control/identity-fence.json`, `control/run-state.json`, `control/inbox/master.jsonl`, `control/reminders.json`, and `control/deliveries.json`.
 - GoalX also writes read-only guidance surfaces under `control/`: `activity.json`, `context-index.json`, and `affordances.{json,md}`. These are derived run facts and command surfaces for humans and agents, not a second source of truth.
 - `goalx save` exports immutable provenance too: `run-charter.json` plus `sessions/session-N/identity.json` for every durable worker.
-- User-scoped `registry.json` and `status.json` under `~/.goalx/runs/{projectID}/` are convenience indexes and external progress summaries, not the source of truth.
+- User-scoped `registry.json` under `~/.goalx/runs/{projectID}/` is a convenience index, not the source of truth.
+- The canonical master-written progress record is run-scoped: `~/.goalx/runs/{projectID}/{run}/status.json`.
 - `artifacts.json` is the durable index for saved reports and other research outputs consumed by `result`, `debate`, `implement`, and `explore`.
 - `run-metadata.json` tracks phase lineage, including `phase_kind`, `source_run`, and `parent_run`, so each run can inherit from its own saved input without touching shared project config.
 - GoalX only auto-ignores `.goalx/goalx.yaml`, the advanced/manual scratch config. Shared `.goalx/config.yaml` stays visible to git.

@@ -38,6 +38,7 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
+	identity.LocalValidationCommand = "go test ./..."
 	if identity.SessionName != "session-1" {
 		t.Fatalf("SessionName = %q", identity.SessionName)
 	}
@@ -84,6 +85,9 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	}
 	if reloaded.Target.Files[0] != "main.go" {
 		t.Fatalf("reloaded session identity target = %+v", reloaded.Target)
+	}
+	if reloaded.LocalValidationCommand != "go test ./..." {
+		t.Fatalf("reloaded local validation = %q", reloaded.LocalValidationCommand)
 	}
 }
 

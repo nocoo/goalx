@@ -31,7 +31,7 @@ mode: develop
 objective: ship feature
 target:
   files: ["README.md"]
-harness:
+local_validation:
   command: "test -f DOES-NOT-EXIST"
 acceptance:
   command: "printf 'e2e ok\n'"
@@ -157,7 +157,7 @@ mode: develop
 objective: ship feature
 target:
   files: ["README.md"]
-harness:
+local_validation:
   command: "test -f DOES-NOT-EXIST"
 `)
 	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {

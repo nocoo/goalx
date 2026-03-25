@@ -107,13 +107,13 @@ func TestReviewUsesManifestDeclaredReportInMixedModeRun(t *testing.T) {
 	}
 	cfg.Mode = goalx.ModeDevelop
 	cfg.Target = goalx.TargetConfig{Files: []string{"src/"}}
-	cfg.Harness = goalx.HarnessConfig{Command: "go test ./..."}
+	cfg.LocalValidation = goalx.LocalValidationConfig{Command: "go test ./..."}
 	cfg.Sessions = []goalx.SessionConfig{
 		{
-			Hint:    "investigate",
-			Mode:    goalx.ModeResearch,
-			Target:  &goalx.TargetConfig{Files: []string{"missing.md"}, Readonly: []string{"."}},
-			Harness: &goalx.HarnessConfig{Command: "test -s missing.md"},
+			Hint:            "investigate",
+			Mode:            goalx.ModeResearch,
+			Target:          &goalx.TargetConfig{Files: []string{"missing.md"}, Readonly: []string{"."}},
+			LocalValidation: &goalx.LocalValidationConfig{Command: "test -s missing.md"},
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -185,7 +185,7 @@ func seedReviewResearchRun(t *testing.T, targetFiles []string) (string, string) 
 		t.Fatalf("write run snapshot: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "codex", goalx.TargetConfig{Files: targetFiles}, goalx.HarnessConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "codex", goalx.TargetConfig{Files: targetFiles}, goalx.LocalValidationConfig{})
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
 		t.Fatalf("seed session journal: %v", err)
 	}

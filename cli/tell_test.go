@@ -19,12 +19,18 @@ func TestTellWritesSessionInboxAndNudges(t *testing.T) {
 	runName, runDir := writeLifecycleRunFixture(t, repo)
 
 	orig := sendAgentNudge
+	origDetailed := sendAgentNudgeDetailed
 	defer func() { sendAgentNudge = orig }()
+	defer func() { sendAgentNudgeDetailed = origDetailed }()
 
 	var gotTarget, gotEngine string
 	sendAgentNudge = func(target, engine string) error {
 		gotTarget, gotEngine = target, engine
 		return nil
+	}
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		gotTarget, gotEngine = target, engine
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	out := captureStdout(t, func() {
@@ -76,9 +82,14 @@ func TestTellKeepsDurableSessionMessageWhenImmediateNudgeFails(t *testing.T) {
 	runName, runDir := writeLifecycleRunFixture(t, repo)
 
 	orig := sendAgentNudge
+	origDetailed := sendAgentNudgeDetailed
 	defer func() { sendAgentNudge = orig }()
+	defer func() { sendAgentNudgeDetailed = origDetailed }()
 	sendAgentNudge = func(target, engine string) error {
 		return fmt.Errorf("tmux target missing")
+	}
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		return TransportDeliveryOutcome{}, fmt.Errorf("tmux target missing")
 	}
 
 	out := captureStdout(t, func() {
@@ -130,11 +141,17 @@ func TestTellResolvesExplicitProjectSelectorOutsideProjectRoot(t *testing.T) {
 	writeAndCommit(t, repoB, "other.txt", "other", "other commit")
 
 	orig := sendAgentNudge
+	origDetailed := sendAgentNudgeDetailed
 	defer func() { sendAgentNudge = orig }()
+	defer func() { sendAgentNudgeDetailed = origDetailed }()
 	called := false
 	sendAgentNudge = func(target, engine string) error {
 		called = true
 		return nil
+	}
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		called = true
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	if err := Tell(repoB, []string{"--run", goalx.ProjectID(repoA) + "/" + runName, "master", "decide and execute"}); err != nil {
@@ -169,12 +186,18 @@ func TestTellUrgentWritesUrgentMasterInboxMessage(t *testing.T) {
 	runName, runDir := writeLifecycleRunFixture(t, repo)
 
 	orig := sendAgentNudge
+	origDetailed := sendAgentNudgeDetailed
 	defer func() { sendAgentNudge = orig }()
+	defer func() { sendAgentNudgeDetailed = origDetailed }()
 
 	var gotTarget, gotEngine string
 	sendAgentNudge = func(target, engine string) error {
 		gotTarget, gotEngine = target, engine
 		return nil
+	}
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		gotTarget, gotEngine = target, engine
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	out := captureStdout(t, func() {
@@ -213,12 +236,18 @@ func TestTellHelpDoesNotDeliverAnything(t *testing.T) {
 	runName, runDir := writeLifecycleRunFixture(t, repo)
 
 	orig := sendAgentNudge
+	origDetailed := sendAgentNudgeDetailed
 	defer func() { sendAgentNudge = orig }()
+	defer func() { sendAgentNudgeDetailed = origDetailed }()
 
 	called := false
 	sendAgentNudge = func(target, engine string) error {
 		called = true
 		return nil
+	}
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		called = true
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
 	}
 
 	out := captureStdout(t, func() {
@@ -269,7 +298,7 @@ func TestAckSessionMarksLatestInboxEntryConsumed(t *testing.T) {
 	}
 }
 
-func TestStatusShowsInboxPendingForSession(t *testing.T) {
+func TestStatusShowsSessionQueueFactsWithoutDerivedInboxState(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -293,8 +322,10 @@ func TestStatusShowsInboxPendingForSession(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(out, "inbox-pending") {
-		t.Fatalf("status output missing inbox-pending:\n%s", out)
+	for _, want := range []string{"idle", "unread=1", "cursor=0/1"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
 	}
 }
 

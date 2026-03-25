@@ -116,18 +116,42 @@ func printObserveStatusSection(title, path string) {
 
 func printObserveSessionQueue(runDir, sessionName string) {
 	state := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
+	transport := loadTransportTargetFacts(runDir, sessionName)
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
-	if delivery, ok := latestSessionDelivery(runDir, sessionName); ok {
-		if delivery.AttemptedAt != "" {
-			fmt.Printf(" last_nudge_at=%s", delivery.AttemptedAt)
-		}
-		if delivery.Status != "" {
-			fmt.Printf(" last_delivery=%s", delivery.Status)
-		}
+	if transport.Target != "" {
+		fmt.Print(formatTransportQueueFacts(transport))
 	}
 	fmt.Println()
 	if launch := sessionLaunchFacts(runDir, sessionName); launch != "" {
 		fmt.Printf("Launch: %s\n", launch)
+	}
+	if transport.TransportState != "" || transport.InputContainsWake || transport.QueuedMessageVisible || transport.WorkingVisible {
+		fmt.Printf("Transport: state=%s", transport.TransportState)
+		if transport.InputContainsWake {
+			fmt.Printf(" input_contains_wake=true")
+		}
+		if transport.QueuedMessageVisible {
+			fmt.Printf(" queued_message_visible=true")
+		}
+		if transport.WorkingVisible {
+			fmt.Printf(" working_visible=true")
+		}
+		if transport.LastSubmitMode != "" {
+			fmt.Printf(" submit_mode=%s", transport.LastSubmitMode)
+		}
+		if transport.LastOutputAt != "" {
+			fmt.Printf(" last_output_at=%s", transport.LastOutputAt)
+		}
+		if transport.LastSubmitAttemptAt != "" {
+			fmt.Printf(" submit_at=%s", transport.LastSubmitAttemptAt)
+		}
+		if transport.LastTransportAcceptAt != "" {
+			fmt.Printf(" accepted_at=%s", transport.LastTransportAcceptAt)
+		}
+		if transport.LastTransportError != "" {
+			fmt.Printf(" last_transport_error=%q", transport.LastTransportError)
+		}
+		fmt.Println()
 	}
 }
 

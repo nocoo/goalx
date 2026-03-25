@@ -6,7 +6,7 @@ Historical note: this report analyzed the pre-inbox, pre-charter protocol. Refer
 
 - **Confidence**: HIGH
 - **Evidence**:
-  - `cli/start.go:236-253` populates `ProtocolData` for each subagent with **only individual fields**: Objective, Mode, Target, Harness, Context, Budget, SessionName, JournalPath, GuidancePath, WorktreePath, DiversityHint
+  - `cli/start.go:236-253` populates `ProtocolData` for each subagent with **only individual fields**: Objective, Mode, Target, LocalValidation, Context, Budget, SessionName, JournalPath, GuidancePath, WorktreePath, DiversityHint
   - **Missing from ProtocolData** (not populated for subagents): Sessions list, TmuxSession, ProjectRoot, AcceptancePath, SummaryPath, MasterJournalPath, StatusPath — all zeroed out (`cli/start.go:237-253` vs `cli/start.go:214-231` for master)
   - Master must complete 4-5 initial control-cycle steps before writing first guidance — including scope assessment, dimension/ownership planning, acceptance checklist creation
   - Default sidecar interval: `2 * time.Minute` (`config.go:170`), minimum enforced: 30s (`cli/start.go` normalizeSidecarInterval)
@@ -25,7 +25,7 @@ Historical note: this report analyzed the pre-inbox, pre-charter protocol. Refer
 | Own SessionName (e.g. "session-1") | File ownership assignments |
 | Own JournalPath, GuidancePath, WorktreePath | Acceptance criteria |
 | Target files + readonly files | Master agent's existence/path |
-| Harness (gate command) | TmuxSession name |
+| LocalValidation (gate command) | TmuxSession name |
 | Context (external refs) | ProjectRoot |
 | Budget (max rounds, duration) | Global progress state |
 | DiversityHint (if configured) | |
@@ -200,7 +200,7 @@ Historical note: this report analyzed the pre-inbox, pre-charter protocol. Refer
   - Codex guidance delivery hook (`cli/adapter.go`) triggers on tool stops, not on file change — passive polling
   - Codex's `--full-auto` flag (per memory: `project_autoresearch_design.md`) gives full filesystem access but no inter-agent messaging
   - In hybrid preset runs (research=opus/claude-code, develop=gpt-5.4/codex), Codex develop sessions start modifying files without ownership info — the worst-case conflict scenario
-- **Counter-evidence**: Codex sessions in develop mode receive the full target file list and harness command — they have enough to start working correctly on many objectives. The risk is primarily with multi-session develop runs where file boundaries matter.
+- **Counter-evidence**: Codex sessions in develop mode receive the full target file list and local_validation command — they have enough to start working correctly on many objectives. The risk is primarily with multi-session develop runs where file boundaries matter.
 - **Implication**: The cold-start fix disproportionately benefits Codex subagents in develop mode, which is arguably the highest-stakes scenario (conflicting file edits are destructive, not just wasteful).
 
 ---

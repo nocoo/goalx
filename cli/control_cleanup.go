@@ -50,7 +50,7 @@ func finalizeControlRun(runDir, lifecycle string, opts finalizeControlRunOptions
 	}
 	for i := range reminders.Items {
 		reminders.Items[i].Suppressed = true
-		reminders.Items[i].AckedAt = now
+		reminders.Items[i].ResolvedAt = now
 		reminders.Items[i].CooldownUntil = now
 	}
 	if err := SaveControlReminders(ControlRemindersPath(runDir), reminders); err != nil {
@@ -65,8 +65,8 @@ func finalizeControlRun(runDir, lifecycle string, opts finalizeControlRunOptions
 		if deliveries.Items[i].Status != "sent" {
 			deliveries.Items[i].Status = "cancelled"
 		}
-		if deliveries.Items[i].AckedAt == "" {
-			deliveries.Items[i].AckedAt = now
+		if deliveries.Items[i].Status == "sent" && deliveries.Items[i].AcceptedAt == "" {
+			deliveries.Items[i].AcceptedAt = now
 		}
 	}
 	return SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries)

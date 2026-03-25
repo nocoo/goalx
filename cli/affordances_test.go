@@ -30,6 +30,31 @@ func TestBuildAffordancesIncludesRunScopedCommands(t *testing.T) {
 	}
 }
 
+func TestBuildAffordancesExposeTransportFactsPath(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	found := false
+	for _, item := range doc.Items {
+		if item.ID != "status" && item.ID != "observe" {
+			continue
+		}
+		for _, path := range item.Paths {
+			if path == TransportFactsPath(runDir) {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("transport facts path not exposed in status/observe affordances: %+v", doc.Items)
+	}
+}
+
 func TestRenderAffordancesMarkdownUsesCurrentRunPaths(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 

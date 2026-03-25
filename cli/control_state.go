@@ -30,7 +30,6 @@ type ControlRunState struct {
 	Version            int    `json:"version"`
 	LifecycleState     string `json:"lifecycle_state,omitempty"`
 	Phase              string `json:"phase,omitempty"`
-	Recommendation     string `json:"recommendation,omitempty"`
 	ActiveSessionCount int    `json:"active_session_count,omitempty"`
 	UrgentUnreadTicks  int    `json:"urgent_unread_ticks,omitempty"`
 	UpdatedAt          string `json:"updated_at,omitempty"`
@@ -55,7 +54,7 @@ type ControlReminder struct {
 	Engine        string `json:"engine,omitempty"`
 	CooldownUntil string `json:"cooldown_until,omitempty"`
 	Attempts      int    `json:"attempts,omitempty"`
-	AckedAt       string `json:"acked_at,omitempty"`
+	ResolvedAt    string `json:"resolved_at,omitempty"`
 	Suppressed    bool   `json:"suppressed,omitempty"`
 }
 
@@ -66,15 +65,17 @@ type ControlReminders struct {
 }
 
 type ControlDelivery struct {
-	DeliveryID  string `json:"delivery_id,omitempty"`
-	MessageID   string `json:"message_id,omitempty"`
-	DedupeKey   string `json:"dedupe_key,omitempty"`
-	Target      string `json:"target,omitempty"`
-	Adapter     string `json:"adapter,omitempty"`
-	Status      string `json:"status,omitempty"`
-	LastError   string `json:"last_error,omitempty"`
-	AttemptedAt string `json:"attempted_at,omitempty"`
-	AckedAt     string `json:"acked_at,omitempty"`
+	DeliveryID     string `json:"delivery_id,omitempty"`
+	MessageID      string `json:"message_id,omitempty"`
+	DedupeKey      string `json:"dedupe_key,omitempty"`
+	Target         string `json:"target,omitempty"`
+	Adapter        string `json:"adapter,omitempty"`
+	Status         string `json:"status,omitempty"`
+	SubmitMode     string `json:"submit_mode,omitempty"`
+	TransportState string `json:"transport_state,omitempty"`
+	LastError      string `json:"last_error,omitempty"`
+	AttemptedAt    string `json:"attempted_at,omitempty"`
+	AcceptedAt     string `json:"accepted_at,omitempty"`
 }
 
 type ControlDeliveries struct {
@@ -334,6 +335,27 @@ func LoadControlReminders(path string) (*ControlReminders, error) {
 	}
 	if err := json.Unmarshal(data, state); err != nil {
 		return nil, fmt.Errorf("parse control reminders: %w", err)
+	}
+	type legacyControlReminder struct {
+		ResolvedAt string `json:"resolved_at,omitempty"`
+		AckedAt    string `json:"acked_at,omitempty"`
+	}
+	type legacyControlReminders struct {
+		Items []legacyControlReminder `json:"items"`
+	}
+	legacy := &legacyControlReminders{}
+	if err := json.Unmarshal(data, legacy); err == nil {
+		for i := range state.Items {
+			if i >= len(legacy.Items) {
+				break
+			}
+			if state.Items[i].ResolvedAt == "" {
+				state.Items[i].ResolvedAt = strings.TrimSpace(legacy.Items[i].ResolvedAt)
+			}
+			if state.Items[i].ResolvedAt == "" {
+				state.Items[i].ResolvedAt = strings.TrimSpace(legacy.Items[i].AckedAt)
+			}
+		}
 	}
 	if state.Version == 0 {
 		state.Version = 1

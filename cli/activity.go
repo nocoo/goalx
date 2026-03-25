@@ -39,11 +39,11 @@ type ActivityLifecycle struct {
 }
 
 type ActivityQueue struct {
-	MasterUnread     int    `json:"master_unread,omitempty"`
-	UrgentUnread     bool   `json:"urgent_unread,omitempty"`
-	RemindersDue     int    `json:"reminders_due,omitempty"`
-	DeliveriesFailed int    `json:"deliveries_failed,omitempty"`
-	LastMasterWakeAt string `json:"last_master_wake_at,omitempty"`
+	MasterUnread       int    `json:"master_unread,omitempty"`
+	UrgentUnread       bool   `json:"urgent_unread,omitempty"`
+	RemindersDue       int    `json:"reminders_due,omitempty"`
+	DeliveriesFailed   int    `json:"deliveries_failed,omitempty"`
+	LastMasterSubmitAt string `json:"last_master_submit_at,omitempty"`
 }
 
 type ActivityActor struct {
@@ -59,24 +59,27 @@ type ActivityActor struct {
 }
 
 type ActivitySession struct {
-	Lease              string `json:"lease,omitempty"`
-	PID                int    `json:"pid,omitempty"`
-	PIDAlive           bool   `json:"pid_alive,omitempty"`
-	Transport          string `json:"transport,omitempty"`
-	RenewedAt          string `json:"renewed_at,omitempty"`
-	ExpiresAt          string `json:"expires_at,omitempty"`
-	JournalStaleMinute int    `json:"journal_stale_minutes,omitempty"`
-	DirtyFiles         int    `json:"dirty_files,omitempty"`
-	Insertions         int    `json:"insertions,omitempty"`
-	Deletions          int    `json:"deletions,omitempty"`
-	PanePresent        bool   `json:"pane_present,omitempty"`
-	PaneHash           string `json:"pane_hash,omitempty"`
-	LastOutputChangeAt string `json:"last_output_change_at,omitempty"`
-	InboxLastID        int64  `json:"inbox_last_id,omitempty"`
-	CursorLastSeenID   int64  `json:"cursor_last_seen_id,omitempty"`
-	Unread             int    `json:"unread,omitempty"`
-	LastNudgeAt        string `json:"last_nudge_at,omitempty"`
-	LastDeliveryStatus string `json:"last_delivery_status,omitempty"`
+	Lease                 string `json:"lease,omitempty"`
+	PID                   int    `json:"pid,omitempty"`
+	PIDAlive              bool   `json:"pid_alive,omitempty"`
+	Transport             string `json:"transport,omitempty"`
+	RenewedAt             string `json:"renewed_at,omitempty"`
+	ExpiresAt             string `json:"expires_at,omitempty"`
+	JournalStaleMinute    int    `json:"journal_stale_minutes,omitempty"`
+	DirtyFiles            int    `json:"dirty_files,omitempty"`
+	Insertions            int    `json:"insertions,omitempty"`
+	Deletions             int    `json:"deletions,omitempty"`
+	PanePresent           bool   `json:"pane_present,omitempty"`
+	PaneHash              string `json:"pane_hash,omitempty"`
+	LastOutputChangeAt    string `json:"last_output_change_at,omitempty"`
+	InboxLastID           int64  `json:"inbox_last_id,omitempty"`
+	CursorLastSeenID      int64  `json:"cursor_last_seen_id,omitempty"`
+	Unread                int    `json:"unread,omitempty"`
+	TransportState        string `json:"transport_state,omitempty"`
+	InputContainsWake     bool   `json:"input_contains_wake,omitempty"`
+	QueuedMessageVisible  bool   `json:"queued_message_visible,omitempty"`
+	LastSubmitAttemptAt   string `json:"last_submit_attempt_at,omitempty"`
+	LastTransportAcceptAt string `json:"last_transport_accept_at,omitempty"`
 }
 
 func ActivityPath(runDir string) string {
@@ -143,11 +146,11 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		},
 		Lifecycle: ActivityLifecycle{},
 		Queue: ActivityQueue{
-			MasterUnread:     unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)),
-			UrgentUnread:     hasUrgentUnread(runDir),
-			RemindersDue:     remindersDue,
-			DeliveriesFailed: deliveriesFailed,
-			LastMasterWakeAt: lastDeliveryAttemptAt(runDir, "master-wake"),
+			MasterUnread:       unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)),
+			UrgentUnread:       hasUrgentUnread(runDir),
+			RemindersDue:       remindersDue,
+			DeliveriesFailed:   deliveriesFailed,
+			LastMasterSubmitAt: lastDeliveryAttemptAt(runDir, "master-wake"),
 		},
 		Actors:   map[string]ActivityActor{},
 		Sessions: map[string]ActivitySession{},
@@ -171,6 +174,7 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 
 	liveness, _ := LoadLivenessState(LivenessPath(runDir))
 	worktreeSnapshot, _ := LoadWorktreeSnapshot(WorktreeSnapshotPath(runDir))
+	transportFacts, _ := LoadTransportFacts(TransportFactsPath(runDir))
 	if worktreeSnapshot != nil {
 		snapshot.Root = worktreeSnapshot.Root
 	}
@@ -212,9 +216,12 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		session.InboxLastID = inboxState.LastID
 		session.CursorLastSeenID = inboxState.LastSeenID
 		session.Unread = inboxState.Unread
-		if delivery, ok := latestSessionDelivery(runDir, name); ok {
-			session.LastNudgeAt = delivery.AttemptedAt
-			session.LastDeliveryStatus = delivery.Status
+		if transport := latestSessionTransportFacts(transportFacts, name); transport.TransportState != "" || transport.InputContainsWake || transport.QueuedMessageVisible || transport.LastSubmitAttemptAt != "" || transport.LastTransportAcceptAt != "" {
+			session.TransportState = transport.TransportState
+			session.InputContainsWake = transport.InputContainsWake
+			session.QueuedMessageVisible = transport.QueuedMessageVisible
+			session.LastSubmitAttemptAt = transport.LastSubmitAttemptAt
+			session.LastTransportAcceptAt = transport.LastTransportAcceptAt
 		}
 		paneHash, panePresent := capturePaneHash(tmuxSession, name)
 		session.PanePresent = panePresent

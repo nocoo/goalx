@@ -17,7 +17,7 @@ func TestImplementUsesSharedMasterConfigInsteadOfSavedRun(t *testing.T) {
 preset: codex
 target:
   files: [cli/]
-harness:
+local_validation:
   command: go test ./...
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
@@ -31,7 +31,7 @@ harness:
 preset: claude-h
 target:
   files: [cli/]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -59,7 +59,7 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte("target:\n  files: [cli/]\nharness:\n  command: go test ./...\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte("target:\n  files: [cli/]\nlocal_validation:\n  command: go test ./...\n"), 0o644); err != nil {
 		t.Fatalf("write base config: %v", err)
 	}
 	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
@@ -158,7 +158,7 @@ func TestImplementAppliesNextConfigPresetToResolvedSavedRun(t *testing.T) {
 preset: codex
 target:
   files: [cli/]
-harness:
+local_validation:
   command: go test ./...
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{

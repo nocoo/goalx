@@ -42,7 +42,7 @@ func TestExploreUsesSharedConfigAndPreservesSharedContext(t *testing.T) {
 preset: codex
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
@@ -56,7 +56,7 @@ harness:
 preset: claude
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 context:
   files:

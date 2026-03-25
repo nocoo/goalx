@@ -201,10 +201,26 @@ func TestBuildActivitySnapshotIncludesSessionQueueFacts(t *testing.T) {
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
 		Version: 1,
 		Items: []ControlDelivery{
-			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "sent", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z"},
+			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "sent", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z", AcceptedAt: "2026-03-25T00:00:00Z"},
 		},
 	}); err != nil {
 		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version: 1,
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				Target:                "session-1",
+				Window:                "session-1",
+				Engine:                "claude-code",
+				TransportState:        "sent",
+				QueuedMessageVisible:  true,
+				LastSubmitAttemptAt:   "2026-03-25T00:00:00Z",
+				LastTransportAcceptAt: "2026-03-25T00:00:00Z",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
 	}
 
 	snapshot, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
@@ -216,7 +232,10 @@ func TestBuildActivitySnapshotIncludesSessionQueueFacts(t *testing.T) {
 	if session.InboxLastID != 1 || session.CursorLastSeenID != 0 || session.Unread != 1 {
 		t.Fatalf("unexpected session queue facts: %+v", session)
 	}
-	if session.LastNudgeAt != "2026-03-25T00:00:00Z" || session.LastDeliveryStatus != "sent" {
-		t.Fatalf("unexpected session delivery facts: %+v", session)
+	if session.TransportState != "sent" || !session.QueuedMessageVisible {
+		t.Fatalf("unexpected session transport facts: %+v", session)
+	}
+	if session.LastSubmitAttemptAt != "2026-03-25T00:00:00Z" || session.LastTransportAcceptAt != "2026-03-25T00:00:00Z" {
+		t.Fatalf("unexpected session transport timestamps: %+v", session)
 	}
 }

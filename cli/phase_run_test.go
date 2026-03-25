@@ -6,7 +6,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestBuildPhaseResolveRequestLeavesTargetAndHarnessUnsetWhenUnconfigured(t *testing.T) {
+func TestBuildPhaseResolveRequestLeavesTargetAndLocalValidationUnsetWhenUnconfigured(t *testing.T) {
 	source := &savedPhaseSource{
 		Run:      "research-a",
 		Mode:     goalx.ModeResearch,
@@ -20,8 +20,7 @@ func TestBuildPhaseResolveRequestLeavesTargetAndHarnessUnsetWhenUnconfigured(t *
 	if req.TargetOverride != nil {
 		t.Fatalf("TargetOverride = %#v, want nil", req.TargetOverride)
 	}
-	if req.HarnessOverride != nil {
-		t.Fatalf("HarnessOverride = %#v, want nil", req.HarnessOverride)
+	if req.LocalValidationOverride != nil {
+		t.Fatalf("LocalValidationOverride = %#v, want nil", req.LocalValidationOverride)
 	}
 }
-

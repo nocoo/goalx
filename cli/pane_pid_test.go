@@ -31,9 +31,9 @@ func TestStartPersistsMasterPanePID(t *testing.T) {
 		Roles: goalx.RoleDefaultsConfig{
 			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
-		Target:  goalx.TargetConfig{Files: []string{"README.md"}},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
-		Master:  goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -86,7 +86,7 @@ sessions:
     mode: develop
 target:
   files: ["."]
-harness:
+local_validation:
   command: "go test ./..."
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))

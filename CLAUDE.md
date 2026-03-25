@@ -23,7 +23,7 @@ GoalX is a **protocol scaffolding infrastructure**. The framework provides three
 - Derives completion mode, goal satisfaction, or result classification from raw data
 - Labels evidence provenance (e.g. "preexisting" vs "run_change")
 - Blocks agent exit via hooks encoding policy (inbox sync hooks for transport reliability are acceptable)
-- Auto-maps mode to execution parameters (target, harness, role)
+- Auto-maps mode to execution parameters (target, local_validation, role)
 - Silently normalizes, truncates, or deduplicates agent-written data
 - Encodes governance policy in charter struct fields (completion standard, approval gates, exploration doctrine belong in master template as semantic guidance, not in Go structs)
 

@@ -189,7 +189,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Required items start as `open` and move to `claimed` when you believe they are ready for closeout review.
 - Optional improvements belong in the Improvement backlog: they matter, but they never replace unfinished required work.
 - `waived` only counts when the user explicitly approved removing that item from the current goal.
-- `{{.AcceptanceStatePath}}` is machine-readable. Treat `default_command` as the run's original acceptance command and `effective_command` as the current command. If you change it, update `change_kind`, `change_reason`, and `goal_version` explicitly. `narrowed` requires `user_approved:true`.
+- `{{.AcceptanceStatePath}}` is machine-readable. Treat `default_command` as the run's original acceptance command and `effective_command` as the current command. If you change the effective command, record the reason in journals or coordination and keep `goal_version` current.
 
 ### Control Loop
 
@@ -202,6 +202,9 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Process every inbox entry with `id > last_seen_id`, then update `{{.MasterCursorPath}}` after you have handled it.
 - Treat `status=sent` in `{{.ControlDeliveriesPath}}` as transport success: the input was submitted to the target engine.
 - `status=sent` is not the same as cursor advancement. It means "submitted", not "durably consumed".
+- `status=buffered` means the wake text is still sitting in the target input buffer. That is not transport acceptance yet.
+- `queued_message_visible=true` means the provider queue accepted the transport. Treat that as `sent`, even if the cursor has not advanced yet.
+- `last_transport_accept_at` is the transport-accept timestamp. Use it when deciding whether a session still deserves grace.
 - Do not take over or reassign immediately just because the session cursor has not advanced yet after a `sent` delivery.
 - Judge session trouble from longer-lived facts such as stale journals, unhealthy leases, repeated failed deliveries, or prolonged lack of progress after a prior `sent`.
 - Tell messages are urgent. If a user tell arrives, respond in the current control cycle.
@@ -293,6 +296,6 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 `{{.StatusPath}}` is master-written. The framework does not populate it. Write it as JSON whenever run state materially changes:
 ```json
-{"phase":"working|complete","recommendation":"...","acceptance_met":true,"acceptance_status":"passed","goal_satisfied":true,"required_remaining":0,"code_changed":false,"keep_session":"session-N"}
+{"phase":"working|complete","required_remaining":0,"open_required_ids":["req-1"],"active_sessions":["session-N"],"keep_session":"session-N","last_verified_at":"2026-03-26T00:00:00Z","updated_at":"2026-03-26T00:00:00Z"}
 ```
-Set `keep_session` when a develop-mode session should be merged before stopping. Do not set `acceptance_met:true` until `goalx verify --run {{.RunName}}` has passed and you have confirmed `required_remaining` is `0`.
+Set `keep_session` when a develop-mode session should be merged before stopping. Keep this file factual: progress coverage, active ownership, and latest verification timestamps belong here; verdicts belong in journals, proof, and summary.

@@ -252,11 +252,11 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"develop","active":true,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"develop","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
-	statusBefore := []byte(`{"run":"verify-run","phase":"working","recommendation":"keep going"}`)
+	statusBefore := []byte(`{"run":"verify-run","phase":"working","required_remaining":1}`)
 	if err := os.MkdirAll(filepath.Dir(RunStatusPath(runDir)), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
@@ -306,11 +306,11 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"readonly-run","mode":"develop","objective":"read only","active":true,"phase":"working","recommendation":"keep going","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"readonly-run","mode":"develop","objective":"read only","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
-	statusBefore := []byte(`{"run":"readonly-run","phase":"working","recommendation":"keep going","active":true}`)
+	statusBefore := []byte(`{"run":"readonly-run","phase":"working","required_remaining":2,"active_sessions":["session-1"]}`)
 	if err := os.MkdirAll(filepath.Dir(RunStatusPath(runDir)), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}

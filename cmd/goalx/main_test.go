@@ -124,8 +124,8 @@ func TestMainInitWritesPreviewManualDraftOnEmptyProject(t *testing.T) {
 	if len(cfg.Target.Files) != 0 {
 		t.Fatalf("target.files = %#v, want unset target", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "" {
-		t.Fatalf("harness.command = %q, want unset harness", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "" {
+		t.Fatalf("local_validation.command = %q, want unset local_validation", cfg.LocalValidation.Command)
 	}
 }
 
@@ -144,7 +144,7 @@ func TestMainDebateWriteConfigReResolvesFromSharedConfig(t *testing.T) {
 	projectCfg := `
 target:
   files: ["src/"]
-harness:
+local_validation:
   command: "go test ./..."
 master:
   engine: claude-code
@@ -164,8 +164,8 @@ master:
 			Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 			Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
-		Target:  goalx.TargetConfig{Files: []string{"report.md"}},
-		Harness: goalx.HarnessConfig{Command: "printf old\n"},
+		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "printf old\n"},
 	}, map[string]string{
 		"summary.md": "# research summary\n",
 	})
@@ -191,8 +191,8 @@ master:
 	if len(cfg.Target.Files) != 1 || cfg.Target.Files[0] != "src/" {
 		t.Fatalf("target.files = %#v, want shared config target", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "go test ./..." {
-		t.Fatalf("harness.command = %q, want shared config harness", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "go test ./..." {
+		t.Fatalf("local_validation.command = %q, want shared config local validation", cfg.LocalValidation.Command)
 	}
 }
 

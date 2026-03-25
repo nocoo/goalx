@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -82,16 +83,23 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 	}
 	shouldExpire := true
 	exitReason := "completed"
+	var watcher *TmuxControlWatcher
 	appendAuditLog(runDir, "sidecar started pid=%d runID=%s epoch=%d", os.Getpid(), runID, epoch)
 	defer func() {
 		appendAuditLog(runDir, "sidecar exiting reason=%s", exitReason)
+	}()
+	defer func() {
+		if watcher != nil {
+			_ = watcher.Close()
+		}
 	}()
 	reportError := func(err error) error {
 		appendAuditLog(runDir, "sidecar error: %v", err)
 		exitReason = err.Error()
 		return err
 	}
-	if err := runSidecarTick(projectRoot, runName, runDir, runID, epoch, interval, os.Getpid()); err != nil {
+	watcher = ensureSidecarTransportWatcher(projectRoot, runName, runDir, watcher)
+	if err := runSidecarTickWithWatcher(projectRoot, runName, runDir, runID, epoch, interval, os.Getpid(), watcher); err != nil {
 		if errors.Is(err, errSidecarStale) {
 			shouldExpire = false
 			exitReason = errSidecarStale.Error()
@@ -117,7 +125,8 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 			exitReason = ctx.Err().Error()
 			return nil
 		case <-ticker.C:
-			if err := runSidecarTick(projectRoot, runName, runDir, runID, epoch, interval, os.Getpid()); err != nil {
+			watcher = ensureSidecarTransportWatcher(projectRoot, runName, runDir, watcher)
+			if err := runSidecarTickWithWatcher(projectRoot, runName, runDir, runID, epoch, interval, os.Getpid(), watcher); err != nil {
 				if errors.Is(err, errSidecarStale) {
 					shouldExpire = false
 					exitReason = errSidecarStale.Error()
@@ -134,6 +143,10 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 }
 
 func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, interval time.Duration, pid int) error {
+	return runSidecarTickWithWatcher(projectRoot, runName, runDir, runID, epoch, interval, pid, nil)
+}
+
+func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch int, interval time.Duration, pid int, watcher *TmuxControlWatcher) error {
 	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -191,6 +204,11 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 			return err
 		}
 	}
+	if watcher != nil && watcher.Alive() {
+		if err := watcher.writeSnapshot(); err != nil {
+			appendAuditLog(runDir, "transport watcher pre-queue snapshot warning: %v", err)
+		}
+	}
 	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
 	if err != nil {
 		return err
@@ -230,13 +248,43 @@ func runSidecarTick(projectRoot, runName, runDir, runID string, epoch int, inter
 	if err := queueMasterWakeReminder(runDir, tmuxSession, cfg.Master.Engine); err != nil {
 		return err
 	}
-	if err := DeliverDueControlReminders(runDir, cfg.Master.Engine, interval, sendAgentNudge); err != nil {
+	if err := DeliverDueControlReminders(runDir, cfg.Master.Engine, interval, sendAgentNudgeDetailed); err != nil {
 		return err
+	}
+	if watcher != nil && watcher.Alive() {
+		if err := watcher.writeSnapshot(); err != nil {
+			appendAuditLog(runDir, "transport watcher snapshot warning: %v", err)
+		}
+	} else if facts, err := BuildTransportFacts(runDir, tmuxSession, cfg.Master.Engine); err == nil {
+		if err := SaveTransportFacts(runDir, facts); err != nil {
+			return err
+		}
 	}
 	if err := RefreshRunGuidance(projectRoot, runName, runDir); err != nil {
 		appendAuditLog(runDir, "guidance refresh warning: %v", err)
 	}
 	return nil
+}
+
+func ensureSidecarTransportWatcher(projectRoot, runName, runDir string, watcher *TmuxControlWatcher) *TmuxControlWatcher {
+	if watcher != nil && watcher.Alive() {
+		return watcher
+	}
+	tmuxSession := goalx.TmuxSessionName(projectRoot, runName)
+	if !SessionExists(tmuxSession) {
+		return nil
+	}
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		appendAuditLog(runDir, "transport watcher start warning: %v", err)
+		return nil
+	}
+	next, err := startTmuxControlWatcher(runDir, tmuxSession, cfg.Master.Engine)
+	if err != nil {
+		appendAuditLog(runDir, "transport watcher start warning: %v", err)
+		return nil
+	}
+	return next
 }
 
 func queueRefreshContextReminder(runDir, tmuxSession, engine string) error {
@@ -253,6 +301,7 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 		return err
 	}
 	now := time.Now().UTC()
+	transportFacts, _ := LoadTransportFacts(TransportFactsPath(runDir))
 	for _, idx := range indexes {
 		sessionName := SessionName(idx)
 		inboxState := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
@@ -263,8 +312,14 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 			}
 			continue
 		}
-		if delivery, ok := latestSessionInboxDelivery(runDir, sessionName); ok && delivery.Status == "sent" && deliveryWithin(delivery, interval, now) {
+		transport := latestSessionTransportFacts(transportFacts, sessionName)
+		if transportAcceptedRecently(transport, interval, now) {
 			continue
+		}
+		if !transportNeedsRepair(transport) {
+			if delivery, ok := latestSessionInboxDelivery(runDir, sessionName); ok && deliveryAcceptedWithin(delivery, interval, now) {
+				continue
+			}
 		}
 		windowName, err := resolveWindowName(runName, sessionName)
 		if err != nil {
@@ -279,6 +334,22 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 		}
 	}
 	return nil
+}
+
+func transportNeedsRepair(facts TransportTargetFacts) bool {
+	return facts.TransportState == "buffered" || facts.InputContainsWake
+}
+
+func transportAcceptedRecently(facts TransportTargetFacts, window time.Duration, now time.Time) bool {
+	if strings.TrimSpace(facts.TransportState) != "sent" {
+		return false
+	}
+	for _, ts := range []string{facts.LastTransportAcceptAt, facts.LastSubmitAttemptAt, facts.LastSampleAt} {
+		if deliveryTimestampWithin(ts, window, now) {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultLaunchRunSidecar(projectRoot, runName string, interval time.Duration) error {

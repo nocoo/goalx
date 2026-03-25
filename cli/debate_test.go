@@ -19,7 +19,7 @@ func TestDebateUsesSharedMasterConfigInsteadOfSavedRun(t *testing.T) {
 preset: codex
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
@@ -33,7 +33,7 @@ harness:
 preset: claude
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -62,7 +62,7 @@ func TestDebateAppliesNextConfigPresetToResolvedSavedRun(t *testing.T) {
 preset: codex
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{

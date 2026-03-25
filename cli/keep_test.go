@@ -113,11 +113,11 @@ func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 	}
 
 	cfg := goalx.Config{
-		Name:      runName,
-		Mode:      goalx.ModeDevelop,
-		Objective: "keep demo",
-		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
+		Name:            runName,
+		Mode:            goalx.ModeDevelop,
+		Objective:       "keep demo",
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 	}
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {

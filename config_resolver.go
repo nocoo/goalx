@@ -57,10 +57,13 @@ func resolveConfigWithOptions(layers *ConfigLayers, req ResolveRequest, detect f
 		cfg.Sessions = nil
 	}
 	applyResolveTargetOverride(&cfg, req.TargetOverride)
-	applyResolveHarnessOverride(&cfg, req.HarnessOverride)
+	applyResolveLocalValidationOverride(&cfg, req.LocalValidationOverride)
 
 	if cfg.Preset == "" {
 		cfg.Preset = detect()
+	}
+	if cfg.Preset != "" && !hasPresetSelection(&cfg, cfg.Preset) {
+		return nil, fmt.Errorf("unknown preset %q", cfg.Preset)
 	}
 
 	applyPreset(&cfg)
@@ -135,14 +138,14 @@ func applyResolveTargetOverride(cfg *Config, override *TargetConfig) {
 	}
 }
 
-func applyResolveHarnessOverride(cfg *Config, override *HarnessConfig) {
+func applyResolveLocalValidationOverride(cfg *Config, override *LocalValidationConfig) {
 	if cfg == nil || override == nil {
 		return
 	}
 	if override.Command != "" {
-		cfg.Harness.Command = override.Command
+		cfg.LocalValidation.Command = override.Command
 	}
 	if override.Timeout > 0 {
-		cfg.Harness.Timeout = override.Timeout
+		cfg.LocalValidation.Timeout = override.Timeout
 	}
 }

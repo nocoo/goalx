@@ -22,7 +22,7 @@ type serveApp struct {
 	cfg           goalx.ServeConfig
 	sessionExists func(string) bool
 	runAction     func(projectRoot, action string, req serveActionRequest) (string, error)
-	sendNudge     func(target, engine string) error
+	sendNudge     TransportDeliverFunc
 }
 
 type serveProject struct {
@@ -102,7 +102,7 @@ func newServeApp(cfg goalx.ServeConfig) *serveApp {
 	app := &serveApp{
 		cfg:           cfg,
 		sessionExists: SessionExists,
-		sendNudge:     SendAgentNudge,
+		sendNudge:     SendAgentNudgeDetailed,
 	}
 	app.runAction = app.runServeAction
 	return app

@@ -17,7 +17,7 @@ func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
-	projectCfg := []byte("target:\n  files: [\"README.md\"]\nharness:\n  command: \"test -f README.md\"\n")
+	projectCfg := []byte("target:\n  files: [\"README.md\"]\nlocal_validation:\n  command: \"test -f README.md\"\n")
 	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), projectCfg, 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
@@ -33,12 +33,12 @@ func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
 	if len(cfg.Target.Files) != 1 || cfg.Target.Files[0] != "README.md" {
 		t.Fatalf("target.files = %#v, want [README.md]", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "test -f README.md" {
-		t.Fatalf("harness.command = %q, want %q", cfg.Harness.Command, "test -f README.md")
+	if cfg.LocalValidation.Command != "test -f README.md" {
+		t.Fatalf("local_validation.command = %q, want %q", cfg.LocalValidation.Command, "test -f README.md")
 	}
 }
 
-func TestInitDevelopLeavesHarnessAndTargetUnsetWithoutProjectConfig(t *testing.T) {
+func TestInitDevelopLeavesLocalValidationAndTargetUnsetWithoutProjectConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -58,8 +58,8 @@ func TestInitDevelopLeavesHarnessAndTargetUnsetWithoutProjectConfig(t *testing.T
 	if len(cfg.Target.Files) != 0 {
 		t.Fatalf("target.files = %#v, want empty", cfg.Target.Files)
 	}
-	if cfg.Harness.Command != "" {
-		t.Fatalf("harness.command = %q, want empty", cfg.Harness.Command)
+	if cfg.LocalValidation.Command != "" {
+		t.Fatalf("local_validation.command = %q, want empty", cfg.LocalValidation.Command)
 	}
 }
 
@@ -89,12 +89,12 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	}
 }
 
-func TestInitDoesNotHardcodeResearchHarnessToReportDotMD(t *testing.T) {
+func TestInitDoesNotHardcodeResearchLocalValidationToReportDotMD(t *testing.T) {
 	data, err := os.ReadFile("init.go")
 	if err != nil {
 		t.Fatalf("read init.go: %v", err)
 	}
 	if strings.Contains(string(data), `test -s report.md && echo 'ok'`) {
-		t.Fatalf("init.go still hardcodes the research harness to report.md")
+		t.Fatalf("init.go still hardcodes the research local validation to report.md")
 	}
 }

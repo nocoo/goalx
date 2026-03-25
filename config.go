@@ -23,23 +23,23 @@ const (
 
 // Config is the merged configuration for a single run.
 type Config struct {
-	Name        string             `yaml:"name"`
-	Mode        Mode               `yaml:"mode"`
-	Objective   string             `yaml:"objective"`
-	Description string             `yaml:"description,omitempty"`
-	Preset      string             `yaml:"preset,omitempty"`
-	Preferences PreferencesConfig  `yaml:"preferences,omitempty"`
-	Roles       RoleDefaultsConfig `yaml:"roles,omitempty"`
-	Routing     RoutingTableConfig `yaml:"routing,omitempty"`
-	Parallel    int                `yaml:"parallel,omitempty"`
-	Sessions    []SessionConfig    `yaml:"sessions,omitempty"`
-	Target      TargetConfig       `yaml:"target"`
-	Harness     HarnessConfig      `yaml:"harness,omitempty"`
-	Acceptance  AcceptanceConfig   `yaml:"acceptance,omitempty"`
-	Context     ContextConfig      `yaml:"context,omitempty"`
-	Budget      BudgetConfig       `yaml:"budget,omitempty"`
-	Master      MasterConfig       `yaml:"master,omitempty"`
-	Serve       ServeConfig        `yaml:"serve,omitempty"`
+	Name            string                `yaml:"name"`
+	Mode            Mode                  `yaml:"mode"`
+	Objective       string                `yaml:"objective"`
+	Description     string                `yaml:"description,omitempty"`
+	Preset          string                `yaml:"preset,omitempty"`
+	Preferences     PreferencesConfig     `yaml:"preferences,omitempty"`
+	Roles           RoleDefaultsConfig    `yaml:"roles,omitempty"`
+	Routing         RoutingTableConfig    `yaml:"routing,omitempty"`
+	Parallel        int                   `yaml:"parallel,omitempty"`
+	Sessions        []SessionConfig       `yaml:"sessions,omitempty"`
+	Target          TargetConfig          `yaml:"target"`
+	LocalValidation LocalValidationConfig `yaml:"local_validation,omitempty"`
+	Acceptance      AcceptanceConfig      `yaml:"acceptance,omitempty"`
+	Context         ContextConfig         `yaml:"context,omitempty"`
+	Budget          BudgetConfig          `yaml:"budget,omitempty"`
+	Master          MasterConfig          `yaml:"master,omitempty"`
+	Serve           ServeConfig           `yaml:"serve,omitempty"`
 
 	presetCatalog    map[string]PresetConfig
 	dimensionCatalog map[string]string
@@ -50,7 +50,7 @@ type TargetConfig struct {
 	Readonly []string `yaml:"readonly,omitempty"`
 }
 
-type HarnessConfig struct {
+type LocalValidationConfig struct {
 	Command string        `yaml:"command"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 }
@@ -85,16 +85,16 @@ type ServeConfig struct {
 }
 
 type SessionConfig struct {
-	Hint         string         `yaml:"hint,omitempty"`
-	Engine       string         `yaml:"engine,omitempty"`
-	Model        string         `yaml:"model,omitempty"`
-	Effort       EffortLevel    `yaml:"effort,omitempty"`
-	Mode         Mode           `yaml:"mode,omitempty"`
-	RouteRole    string         `yaml:"route_role,omitempty"`
-	RouteProfile string         `yaml:"route_profile,omitempty"`
-	Dimensions   []string       `yaml:"dimensions,omitempty"`
-	Target       *TargetConfig  `yaml:"target,omitempty"`
-	Harness      *HarnessConfig `yaml:"harness,omitempty"`
+	Hint            string                 `yaml:"hint,omitempty"`
+	Engine          string                 `yaml:"engine,omitempty"`
+	Model           string                 `yaml:"model,omitempty"`
+	Effort          EffortLevel            `yaml:"effort,omitempty"`
+	Mode            Mode                   `yaml:"mode,omitempty"`
+	RouteRole       string                 `yaml:"route_role,omitempty"`
+	RouteProfile    string                 `yaml:"route_profile,omitempty"`
+	Dimensions      []string               `yaml:"dimensions,omitempty"`
+	Target          *TargetConfig          `yaml:"target,omitempty"`
+	LocalValidation *LocalValidationConfig `yaml:"local_validation,omitempty"`
 }
 
 type PreferencesConfig struct {
@@ -420,6 +420,14 @@ func DetectPresetFromEnvironment() string {
 	}
 }
 
+func hasPresetSelection(cfg *Config, preset string) bool {
+	if strings.TrimSpace(preset) == "" {
+		return false
+	}
+	_, ok := presetCatalogFor(cfg)[preset]
+	return ok
+}
+
 func commandExists(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
@@ -430,10 +438,7 @@ func applyPreset(cfg *Config) {
 	catalog := presetCatalogFor(cfg)
 	preset, ok := catalog[cfg.Preset]
 	if !ok {
-		preset, ok = catalog["codex"]
-		if !ok {
-			preset = Presets["codex"]
-		}
+		return
 	}
 
 	// Master
@@ -476,6 +481,9 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	}
 	if cfg.Name == "" {
 		return fmt.Errorf("name is required (use --name or let goalx init generate one)")
+	}
+	if cfg.Preset != "" && !hasPresetSelection(cfg, cfg.Preset) {
+		return fmt.Errorf("unknown preset %q", cfg.Preset)
 	}
 
 	for _, f := range cfg.Target.Files {
@@ -803,16 +811,16 @@ func EffectiveSessionConfig(cfg *Config, idx int) SessionConfig {
 	}
 	out.Target = &target
 
-	harness := cfg.Harness
-	if out.Harness != nil {
-		if out.Harness.Command != "" {
-			harness.Command = out.Harness.Command
+	localValidation := cfg.LocalValidation
+	if out.LocalValidation != nil {
+		if out.LocalValidation.Command != "" {
+			localValidation.Command = out.LocalValidation.Command
 		}
-		if out.Harness.Timeout > 0 {
-			harness.Timeout = out.Harness.Timeout
+		if out.LocalValidation.Timeout > 0 {
+			localValidation.Timeout = out.LocalValidation.Timeout
 		}
 	}
-	out.Harness = &harness
+	out.LocalValidation = &localValidation
 
 	return out
 }
@@ -843,6 +851,14 @@ func ResolveAcceptanceCommand(cfg *Config) string {
 		return ""
 	}
 	return strings.TrimSpace(cfg.Acceptance.Command)
+}
+
+// ResolveLocalValidationCommand returns the explicit local validation command.
+func ResolveLocalValidationCommand(cfg *Config) string {
+	if cfg == nil {
+		return ""
+	}
+	return strings.TrimSpace(cfg.LocalValidation.Command)
 }
 
 // ProjectID returns a slug from the project root path.
@@ -934,11 +950,11 @@ func mergeConfig(base, overlay *Config) {
 	if len(overlay.Target.Readonly) > 0 {
 		base.Target.Readonly = overlay.Target.Readonly
 	}
-	if overlay.Harness.Command != "" {
-		base.Harness.Command = overlay.Harness.Command
+	if overlay.LocalValidation.Command != "" {
+		base.LocalValidation.Command = overlay.LocalValidation.Command
 	}
-	if overlay.Harness.Timeout > 0 {
-		base.Harness.Timeout = overlay.Harness.Timeout
+	if overlay.LocalValidation.Timeout > 0 {
+		base.LocalValidation.Timeout = overlay.LocalValidation.Timeout
 	}
 	if overlay.Acceptance.Command != "" {
 		base.Acceptance.Command = overlay.Acceptance.Command

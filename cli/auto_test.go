@@ -113,7 +113,7 @@ func TestAutoBuildLaunchConfigMatchesResolverDefaults(t *testing.T) {
 name: shared
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -232,10 +232,6 @@ func TestValidateNextConfigNormalizesExtendedFields(t *testing.T) {
 		Context:       []string{" docs/plan.md ", " ", "README.md"},
 		MasterEngine:  " codex ",
 		MasterModel:   " fast ",
-		Sessions: []sessionConfigJSON{
-			{Hint: " alpha ", Engine: " codex ", Model: " fast "},
-			{Hint: " beta ", Engine: " unknown ", Model: " fast "},
-		},
 	})
 	if got == nil {
 		t.Fatal("validateNextConfig returned nil")
@@ -252,15 +248,6 @@ func TestValidateNextConfigNormalizesExtendedFields(t *testing.T) {
 	if got.MasterEngine != "codex" || got.MasterModel != "fast" {
 		t.Fatalf("master engine/model = %q/%q, want codex/fast", got.MasterEngine, got.MasterModel)
 	}
-	if len(got.Sessions) != 2 {
-		t.Fatalf("sessions = %#v, want 2 entries", got.Sessions)
-	}
-	if got.Sessions[0].Hint != "alpha" || got.Sessions[0].Engine != "codex" || got.Sessions[0].Model != "fast" {
-		t.Fatalf("sessions[0] = %#v, want trimmed codex/fast entry", got.Sessions[0])
-	}
-	if got.Sessions[1].Hint != "beta" || got.Sessions[1].Engine != "" || got.Sessions[1].Model != "" {
-		t.Fatalf("sessions[1] = %#v, want invalid engine/model cleared", got.Sessions[1])
-	}
 }
 
 func TestValidateNextConfigRejectsInvalidExtendedFields(t *testing.T) {
@@ -273,10 +260,6 @@ func TestValidateNextConfigRejectsInvalidExtendedFields(t *testing.T) {
 		MaxIterations: 42,
 		MasterEngine:  "unknown",
 		MasterModel:   "fast",
-		Sessions: []sessionConfigJSON{
-			{Hint: "x", Engine: "codex", Model: "gpt-5.2"},
-			{Hint: "y", Model: "fast"},
-		},
 	})
 	if got == nil {
 		t.Fatal("validateNextConfig returned nil")
@@ -289,15 +272,6 @@ func TestValidateNextConfigRejectsInvalidExtendedFields(t *testing.T) {
 	}
 	if got.MasterEngine != "" || got.MasterModel != "" {
 		t.Fatalf("master engine/model = %q/%q, want empty", got.MasterEngine, got.MasterModel)
-	}
-	if len(got.Sessions) != 2 {
-		t.Fatalf("sessions = %#v, want 2 entries", got.Sessions)
-	}
-	if got.Sessions[0].Model != "" {
-		t.Fatalf("sessions[0].model = %q, want empty", got.Sessions[0].Model)
-	}
-	if got.Sessions[1].Model != "" {
-		t.Fatalf("sessions[1].model = %q, want empty", got.Sessions[1].Model)
 	}
 }
 
@@ -326,9 +300,6 @@ engines:
 		Model:        "small",
 		MasterEngine: "localai",
 		MasterModel:  "small",
-		Sessions: []sessionConfigJSON{
-			{Hint: "worker", Engine: "localai", Model: "small"},
-		},
 	})
 	if got == nil {
 		t.Fatal("validateNextConfig returned nil")
@@ -338,8 +309,5 @@ engines:
 	}
 	if got.MasterEngine != "localai" || got.MasterModel != "small" {
 		t.Fatalf("master engine/model = %q/%q, want localai/small", got.MasterEngine, got.MasterModel)
-	}
-	if len(got.Sessions) != 1 || got.Sessions[0].Engine != "localai" || got.Sessions[0].Model != "small" {
-		t.Fatalf("sessions = %#v, want localai/small preserved from project engines", got.Sessions)
 	}
 }

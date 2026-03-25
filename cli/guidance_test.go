@@ -118,6 +118,15 @@ case "$1" in
     done
     exit 0
     ;;
+  list-panes)
+    printf '%%0\tmaster\n'
+    i=1
+    for w in ${TMUX_WINDOWS}; do
+      printf '%%%s\t%s\n' "$i" "$w"
+      i=$((i+1))
+    done
+    exit 0
+    ;;
   capture-pane)
     target=""
     while [ $# -gt 0 ]; do

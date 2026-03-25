@@ -45,7 +45,6 @@ func TestIdentityFencePathAndDerivation(t *testing.T) {
 		GoalVersion:      goal.Version,
 		DefaultCommand:   "go test ./...",
 		EffectiveCommand: "go test ./...",
-		ChangeKind: "same",
 	}); err != nil {
 		t.Fatalf("SaveAcceptanceState: %v", err)
 	}
@@ -178,7 +177,6 @@ func TestRefreshIdentityFenceDetectsChangedGoalContent(t *testing.T) {
 		GoalVersion:      goal.Version,
 		DefaultCommand:   "go test ./...",
 		EffectiveCommand: "go test ./...",
-		ChangeKind: "same",
 	}); err != nil {
 		t.Fatalf("SaveAcceptanceState: %v", err)
 	}

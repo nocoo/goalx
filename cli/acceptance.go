@@ -11,9 +11,8 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-// No status or change_kind constants — the framework records raw facts.
-// Interpretation of exit codes, classification of gate changes, and
-// governance policy (e.g. narrowed gates requiring approval) belong
+// No status or governance constants — the framework records raw facts.
+// Interpretation of exit codes and governance policy belong
 // to the master agent, not the framework.
 
 // AcceptanceResult records raw verification output — exit code, timestamp,
@@ -29,9 +28,6 @@ type AcceptanceState struct {
 	GoalVersion      int              `json:"goal_version,omitempty"`
 	DefaultCommand   string           `json:"default_command,omitempty"`
 	EffectiveCommand string           `json:"effective_command,omitempty"`
-	ChangeKind       string           `json:"change_kind,omitempty"`
-	ChangeReason     string           `json:"change_reason,omitempty"`
-	UserApproved     bool             `json:"user_approved,omitempty"`
 	LastResult       AcceptanceResult `json:"last_result,omitempty"`
 	UpdatedAt        string           `json:"updated_at,omitempty"`
 }
@@ -132,6 +128,6 @@ func EnsureAcceptanceState(runDir string, cfg *goalx.Config, goalVersion int) (*
 }
 
 // ValidateAcceptanceStateForVerification and normalizeAcceptanceState were
-// removed: they encoded governance policy (change_kind validation, narrowed
+// removed: they encoded governance policy
 // gate approval) and silently mutated agent-written data. Per facts-not-judgments,
 // the master agent owns all interpretation of acceptance state.

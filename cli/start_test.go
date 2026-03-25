@@ -34,7 +34,7 @@ func TestStartCleansUpOnLaunchFailure(t *testing.T) {
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",
@@ -155,7 +155,7 @@ func TestStartLaunchesOnlyMaster(t *testing.T) {
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",
@@ -345,17 +345,22 @@ esac
 	}
 	stateText := string(stateData)
 	if strings.Contains(stateText, `"default_command"`) {
-		t.Fatalf("acceptance state must not synthesize default_command from harness:\n%s", stateText)
+		t.Fatalf("acceptance state must not synthesize default_command from local_validation:\n%s", stateText)
 	}
 	if strings.Contains(stateText, `"effective_command"`) {
-		t.Fatalf("acceptance state must not synthesize effective_command from harness:\n%s", stateText)
+		t.Fatalf("acceptance state must not synthesize effective_command from local_validation:\n%s", stateText)
 	}
 	if !strings.Contains(stateText, `"goal_version": 1`) {
 		t.Fatalf("acceptance state missing goal_version:\n%s", stateText)
 	}
-	// Framework must not auto-derive status or change_kind
+	// Framework must not auto-derive status or governance fields.
 	if strings.Contains(stateText, `"status"`) {
 		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
+	}
+	for _, unwanted := range []string{`"change_kind"`, `"change_reason"`, `"user_approved"`} {
+		if strings.Contains(stateText, unwanted) {
+			t.Fatalf("acceptance state must not contain governance field %q:\n%s", unwanted, stateText)
+		}
 	}
 }
 
@@ -371,12 +376,12 @@ func TestStartRefreshesActivityAfterMasterLaunch(t *testing.T) {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
 	cfg := goalx.Config{
-		Name:      "guidance-start",
-		Mode:      goalx.ModeDevelop,
-		Objective: "ship it",
-		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
-		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Name:            "guidance-start",
+		Mode:            goalx.ModeDevelop,
+		Objective:       "ship it",
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
 	data, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -528,7 +533,7 @@ esac
 				Develop: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 			},
 			Target: goalx.TargetConfig{Files: []string{"README.md"}},
-			Harness: goalx.HarnessConfig{
+			LocalValidation: goalx.LocalValidationConfig{
 				Command: "test -f README.md",
 			},
 			Master: goalx.MasterConfig{
@@ -574,7 +579,7 @@ func TestStartBuildLaunchConfigMatchesResolverDefaults(t *testing.T) {
 name: shared
 target:
   files: ["."]
-harness:
+local_validation:
   command: go test ./...
 `)
 
@@ -624,7 +629,7 @@ func TestStartPreservesExplicitCodexPreset(t *testing.T) {
 preset: codex
 target:
   files: ["README.md"]
-harness:
+local_validation:
   command: test -f README.md
 `)
 
@@ -701,7 +706,7 @@ func TestStartAddsClaudeMasterInboxHook(t *testing.T) {
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "claude-code",
 			Model:  "opus",
@@ -823,7 +828,7 @@ func TestStartRendersMasterPreferences(t *testing.T) {
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",
@@ -945,7 +950,7 @@ func TestStartLaunchesMasterWithCurrentProcessEnvWithoutSnapshot(t *testing.T) {
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
-		Harness: goalx.HarnessConfig{Command: "test -f README.md"},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",
@@ -1067,11 +1072,11 @@ func TestStartAutoSnapshotsTrackedChangesIntoRunWorktree(t *testing.T) {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
 	cfg := goalx.Config{
-		Name:      "snapshot-demo",
-		Mode:      goalx.ModeDevelop,
-		Objective: "ship feature",
-		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
+		Name:            "snapshot-demo",
+		Mode:            goalx.ModeDevelop,
+		Objective:       "ship feature",
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",
@@ -1180,11 +1185,11 @@ func TestStartCopiesGitignoredFilesToRunWorktree(t *testing.T) {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
 	cfg := goalx.Config{
-		Name:      "mirror-demo",
-		Mode:      goalx.ModeDevelop,
-		Objective: "mirror ignored files",
-		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
-		Harness:   goalx.HarnessConfig{Command: "test -f README.md"},
+		Name:            "mirror-demo",
+		Mode:            goalx.ModeDevelop,
+		Objective:       "mirror ignored files",
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "gpt-5.4",

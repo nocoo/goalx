@@ -50,7 +50,7 @@ gx_post "$GOALX_URL/projects/Y/goalx/auto" \
 ### "Fix X on project Y" / "Implement..."
 ```bash
 gx_post "$GOALX_URL/projects/Y/goalx/develop" \
-  -d '{"objective":"X","parallel":2,"target_files":["src/"],"harness_command":"make test"}' | pj
+  -d '{"objective":"X","parallel":2,"target_files":["src/"],"local_validation_command":"make test"}' | pj
 ```
 
 ### "Use 2 opus + 1 codex" / Custom agent composition
