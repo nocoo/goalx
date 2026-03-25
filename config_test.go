@@ -720,6 +720,63 @@ harness:
 	}
 }
 
+func TestLoadConfigDoesNotMutateSharedCatalogs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	origPresets := clonePresetMap(Presets)
+	origDimensions := cloneStringMap(BuiltinDimensions)
+	t.Cleanup(func() {
+		Presets = origPresets
+		BuiltinDimensions = origDimensions
+	})
+
+	userGoalxDir := filepath.Join(home, ".goalx")
+	if err := os.MkdirAll(userGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir user config dir: %v", err)
+	}
+	userCfg := []byte(strings.TrimSpace(`
+presets:
+  local-research:
+    master: {engine: claude-code, model: opus}
+    research: {engine: claude-code, model: opus}
+dimensions:
+  reliability: "reliability: focus on stable behavior"
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
+		t.Fatalf("write user config: %v", err)
+	}
+
+	projectRoot := t.TempDir()
+	projectGoalxDir := filepath.Join(projectRoot, ".goalx")
+	if err := os.MkdirAll(projectGoalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir project config dir: %v", err)
+	}
+	projectCfg := []byte(strings.TrimSpace(`
+name: demo
+mode: develop
+objective: lock config state
+target:
+  files: [README.md]
+harness:
+  command: go test ./...
+`) + "\n")
+	if err := os.WriteFile(filepath.Join(projectGoalxDir, "goalx.yaml"), projectCfg, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	if _, _, err := LoadConfigWithManualDraft(projectRoot, filepath.Join(projectGoalxDir, "goalx.yaml")); err != nil {
+		t.Fatalf("LoadConfigWithManualDraft: %v", err)
+	}
+
+	if !reflect.DeepEqual(Presets, origPresets) {
+		t.Fatalf("Presets mutated across config load: got %#v, want %#v", Presets, origPresets)
+	}
+	if !reflect.DeepEqual(BuiltinDimensions, origDimensions) {
+		t.Fatalf("BuiltinDimensions mutated across config load: got %#v, want %#v", BuiltinDimensions, origDimensions)
+	}
+}
+
 func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
