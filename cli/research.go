@@ -15,17 +15,9 @@ func Research(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := buildLaunchConfig(projectRoot, opts)
+	resolved, err := resolveLaunchConfig(projectRoot, opts)
 	if err != nil {
 		return err
 	}
-	_, engines, err := loadLaunchEngines(projectRoot)
-	if err != nil {
-		return fmt.Errorf("load base config: %w", err)
-	}
-	return startWithConfig(projectRoot, cfg, engines, nil, opts.NoSnapshot)
-}
-
-func loadLaunchEngines(projectRoot string) (*goalx.Config, map[string]goalx.EngineConfig, error) {
-	return goalx.LoadRawBaseConfig(projectRoot)
+	return startWithConfig(projectRoot, &resolved.Config, resolved.Engines, nil, opts.NoSnapshot)
 }

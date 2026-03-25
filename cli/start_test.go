@@ -335,6 +335,121 @@ esac
 	}
 }
 
+func TestStartBuildLaunchConfigMatchesResolverDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+name: shared
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+
+	pathDir := makeDetectedPresetPath(t)
+	t.Setenv("PATH", pathDir+":"+os.Getenv("PATH"))
+
+	opts, err := parseStartArgs([]string{"ship it"})
+	if err != nil {
+		t.Fatalf("parseStartArgs: %v", err)
+	}
+	resolvedCfg, err := resolveLaunchConfig(projectRoot, opts.launchOptions)
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+
+	layers, err := goalx.LoadConfigLayers(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers: %v", err)
+	}
+	resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
+		Objective: "ship it",
+		Mode:      goalx.ModeDevelop,
+	})
+	if err != nil {
+		t.Fatalf("ResolveConfig: %v", err)
+	}
+	cfg := resolvedCfg.Config
+
+	if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
+		t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != resolved.Config.Roles.Research.Engine || cfg.Roles.Research.Model != resolved.Config.Roles.Research.Model {
+		t.Fatalf("research = %s/%s, want %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model, resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
+	}
+	if cfg.Roles.Develop.Engine != resolved.Config.Roles.Develop.Engine || cfg.Roles.Develop.Model != resolved.Config.Roles.Develop.Model {
+		t.Fatalf("develop = %s/%s, want %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model, resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
+	}
+}
+
+func TestStartPreservesExplicitCodexPreset(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	writeLaunchConfigProjectFile(t, repo, `
+preset: codex
+target:
+  files: ["README.md"]
+harness:
+  command: test -f README.md
+`)
+
+	binDir := makeDetectedPresetPath(t)
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+cmd="$1"
+shift
+case "$cmd" in
+  has-session)
+    exit 1
+    ;;
+  new-session|kill-session|send-keys)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error {
+		return nil
+	}
+
+	if err := Start(repo, []string{"ship it"}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, goalx.Slugify("ship it"))
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if cfg.Preset != "codex" {
+		t.Fatalf("preset = %q, want codex", cfg.Preset)
+	}
+	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
+		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
+		t.Fatalf("research = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	}
+	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "gpt-5.4" {
+		t.Fatalf("develop = %s/%s, want codex/gpt-5.4", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	}
+}
+
 func TestStartAddsClaudeMasterInboxHook(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

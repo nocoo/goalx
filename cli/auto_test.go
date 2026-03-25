@@ -2,8 +2,11 @@ package cli
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
+
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestAutoStartsRunWithoutInjectingMode(t *testing.T) {
@@ -97,6 +100,54 @@ func TestAutoReturnsStartError(t *testing.T) {
 	err := Auto(t.TempDir(), []string{"ship it"})
 	if err == nil || !strings.Contains(err.Error(), "start: boom") {
 		t.Fatalf("Auto error = %v, want start failure", err)
+	}
+}
+
+func TestAutoBuildLaunchConfigMatchesResolverDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+name: shared
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+
+	pathDir := makeDetectedPresetPath(t)
+	t.Setenv("PATH", pathDir+":"+os.Getenv("PATH"))
+
+	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeAuto,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+
+	layers, err := goalx.LoadConfigLayers(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers: %v", err)
+	}
+	resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
+		Objective: "ship it",
+		Mode:      goalx.ModeAuto,
+	})
+	if err != nil {
+		t.Fatalf("ResolveConfig: %v", err)
+	}
+	cfg := resolvedCfg.Config
+
+	if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
+		t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != resolved.Config.Roles.Research.Engine || cfg.Roles.Research.Model != resolved.Config.Roles.Research.Model {
+		t.Fatalf("research = %s/%s, want %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model, resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
+	}
+	if cfg.Roles.Develop.Engine != resolved.Config.Roles.Develop.Engine || cfg.Roles.Develop.Model != resolved.Config.Roles.Develop.Model {
+		t.Fatalf("develop = %s/%s, want %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model, resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
 	}
 }
 

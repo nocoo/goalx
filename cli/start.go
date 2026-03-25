@@ -32,14 +32,12 @@ func Start(projectRoot string, args []string) (err error) {
 				return fmt.Errorf("load manual draft config: %w", err)
 			}
 		} else {
-			cfg, err = buildLaunchConfig(projectRoot, opts.launchOptions)
+			resolved, err := resolveLaunchConfig(projectRoot, opts.launchOptions)
 			if err != nil {
 				return err
 			}
-			_, engines, err = goalx.LoadRawBaseConfig(projectRoot)
-			if err != nil {
-				return fmt.Errorf("load base config: %w", err)
-			}
+			cfg = &resolved.Config
+			engines = resolved.Engines
 		}
 	} else {
 		return fmt.Errorf("goalx start requires either an objective with flags or --config PATH for an explicit manual draft")
@@ -48,18 +46,6 @@ func Start(projectRoot string, args []string) (err error) {
 }
 
 func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, metaPatch *RunMetadata, noSnapshot bool) (err error) {
-	// 1b. Auto-detect preset if none was explicitly configured by user.
-	// If the preset was left empty (no user/project config set it), detect
-	// from installed engines and force-apply the detected preset, overriding
-	// any defaults that applyPreset may have filled with the codex fallback.
-	if cfg.Preset == "" || cfg.Preset == "codex" {
-		detected := goalx.DetectPresetFromEnvironment()
-		if detected != cfg.Preset {
-			cfg.Preset = detected
-			goalx.ForceApplyPreset(cfg)
-		}
-	}
-
 	// 2. Auto-generate name if missing
 	if cfg.Name == "" {
 		cfg.Name = goalx.Slugify(cfg.Objective)

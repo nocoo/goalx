@@ -10,7 +10,7 @@ type ResolvedConfig struct {
 	Dimensions map[string]string
 }
 
-// ResolveConfig applies request overrides to loaded config layers and returns one launchable config.
+// ResolveConfig applies request overrides to loaded config layers and returns one resolved config.
 func ResolveConfig(layers *ConfigLayers, req ResolveRequest) (*ResolvedConfig, error) {
 	return resolveConfigWithDetector(layers, req, DetectPresetFromEnvironment)
 }
@@ -50,10 +50,6 @@ func resolveConfigWithDetector(layers *ConfigLayers, req ResolveRequest, detect 
 
 	if cfg.Parallel < 1 {
 		cfg.Parallel = 1
-	}
-
-	if err := ValidateConfig(&cfg, layers.Engines); err != nil {
-		return nil, err
 	}
 
 	return &ResolvedConfig{

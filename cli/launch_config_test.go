@@ -8,6 +8,28 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
+func writeLaunchConfigProjectFile(t *testing.T, projectRoot, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+}
+
+func makeDetectedPresetPath(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	for _, name := range []string{"claude", "codex"} {
+		path := filepath.Join(binDir, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatalf("write %s shim: %v", name, err)
+		}
+	}
+	return binDir
+}
+
 func TestBuildLaunchConfigPreservesConfiguredParallelWhenFlagOmitted(t *testing.T) {
 	projectRoot := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
@@ -166,5 +188,64 @@ target:
 	}
 	if cfg.Roles.Develop.Effort != goalx.EffortMedium {
 		t.Fatalf("develop effort = %q, want %q", cfg.Roles.Develop.Effort, goalx.EffortMedium)
+	}
+}
+
+func TestBuildLaunchConfigResearchAndDevelopMatchResolverDefaults(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+name: shared
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+
+	pathDir := makeDetectedPresetPath(t)
+	t.Setenv("PATH", pathDir+":"+os.Getenv("PATH"))
+
+	layers, err := goalx.LoadConfigLayers(projectRoot)
+	if err != nil {
+		t.Fatalf("LoadConfigLayers: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		mode goalx.Mode
+	}{
+		{name: "research", mode: goalx.ModeResearch},
+		{name: "develop", mode: goalx.ModeDevelop},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
+				Objective: "ship it",
+				Mode:      tt.mode,
+			})
+			if err != nil {
+				t.Fatalf("resolveLaunchConfig: %v", err)
+			}
+			resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
+				Objective: "ship it",
+				Mode:      tt.mode,
+			})
+			if err != nil {
+				t.Fatalf("ResolveConfig: %v", err)
+			}
+			cfg := resolvedCfg.Config
+			if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
+				t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
+			}
+			if cfg.Roles.Research.Engine != resolved.Config.Roles.Research.Engine || cfg.Roles.Research.Model != resolved.Config.Roles.Research.Model {
+				t.Fatalf("research = %s/%s, want %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model, resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
+			}
+			if cfg.Roles.Develop.Engine != resolved.Config.Roles.Develop.Engine || cfg.Roles.Develop.Model != resolved.Config.Roles.Develop.Model {
+				t.Fatalf("develop = %s/%s, want %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model, resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
+			}
+		})
 	}
 }
