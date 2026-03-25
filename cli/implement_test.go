@@ -8,27 +8,34 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestImplementPreservesSavedMasterConfig(t *testing.T) {
+func TestImplementUsesSharedMasterConfigInsteadOfSavedRun(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
-	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
-		Name:      "research-a",
+	writeProjectConfigFixture(t, projectRoot, `
+preset: codex
+target:
+  files: [cli/]
+harness:
+  command: go test ./...
+`)
+	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
+		Objective: "consensus fixes",
 		Mode:      goalx.ModeResearch,
-		Objective: "audit auth flow",
-		Preset:    "claude",
-		Parallel:  2,
-		Master: goalx.MasterConfig{
-			Engine: "codex",
-			Model:  "gpt-5.4",
-		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
+	writeProjectConfigFixture(t, projectRoot, `
+preset: claude-h
+target:
+  files: [cli/]
+harness:
+  command: go test ./...
+`)
 
-	if err := Implement(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nil); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -36,8 +43,11 @@ func TestImplementPreservesSavedMasterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
-		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
+		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Develop.Engine != "claude-code" || cfg.Roles.Develop.Model != "opus" {
+		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
 	}
 }
 
@@ -139,17 +149,21 @@ func TestImplementResolvesNextConfigDimensionsIntoHints(t *testing.T) {
 	}
 }
 
-func TestImplementAppliesNextConfigPreset(t *testing.T) {
+func TestImplementAppliesNextConfigPresetToResolvedSavedRun(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
-	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
-		Name:      "debate",
-		Mode:      goalx.ModeResearch,
+	writeProjectConfigFixture(t, projectRoot, `
+preset: codex
+target:
+  files: [cli/]
+harness:
+  command: go test ./...
+`)
+	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
 		Objective: "consensus fixes",
-		Preset:    "claude",
-		Parallel:  2,
+		Mode:      goalx.ModeResearch,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",

@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,79 @@ func TestExploreStartCreatesFreshCharterWithPreservedRootLineage(t *testing.T) {
 	}
 
 	assertPhaseRunLineage(t, projectRoot, derivePhaseRunName("research-a", "explore", ""), "explore", "research-a", sourceMeta, sourceCharter)
+}
+
+func TestExploreUsesSharedConfigAndPreservesSharedContext(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	externalContextDir := t.TempDir()
+	externalContextPath := filepath.Join(externalContextDir, "shared-context.md")
+	if err := os.WriteFile(externalContextPath, []byte("# shared context\n"), 0o644); err != nil {
+		t.Fatalf("write external context: %v", err)
+	}
+
+	writeProjectConfigFixture(t, projectRoot, `
+preset: codex
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
+		Objective: "audit auth flow",
+		Mode:      goalx.ModeResearch,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+	writeProjectConfigFixture(t, projectRoot, strings.TrimSpace(`
+preset: claude
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+context:
+  files:
+    - `+externalContextPath+`
+  refs:
+    - ticket-123
+`)+"\n")
+
+	if err := Explore(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
+		t.Fatalf("Explore: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
+		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	}
+	if len(cfg.Context.Refs) != 1 || cfg.Context.Refs[0] != "ticket-123" {
+		t.Fatalf("context.refs = %#v, want ticket-123", cfg.Context.Refs)
+	}
+	foundExternal := false
+	foundSummary := false
+	for _, path := range cfg.Context.Files {
+		if path == externalContextPath {
+			foundExternal = true
+		}
+		if strings.HasSuffix(path, "summary.md") {
+			foundSummary = true
+		}
+	}
+	if !foundExternal {
+		t.Fatalf("context.files = %#v, want external shared context %q", cfg.Context.Files, externalContextPath)
+	}
+	if !foundSummary {
+		t.Fatalf("context.files = %#v, want saved summary artifact", cfg.Context.Files)
+	}
 }
 
 func installPhaseStartFakeTmux(t *testing.T) {

@@ -24,11 +24,11 @@ func Explore(projectRoot string, args []string) error {
 		return fmt.Errorf("no reports found in %s", source.Dir)
 	}
 
-	cfg, engines, err := buildPhaseConfigFromSource(projectRoot, "explore", goalx.ModeResearch, source, opts)
+	cfg, engines, err := resolvePhaseConfig(projectRoot, "explore", goalx.ModeResearch, source, opts)
 	if err != nil {
 		return err
 	}
-	contextFiles, err := mergePhaseContext(source.Context, opts.ContextPaths)
+	contextFiles, err := phaseContextFiles(cfg, source, opts.ContextPaths)
 	if err != nil {
 		return err
 	}
@@ -40,24 +40,8 @@ func Explore(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg.Objective = opts.Objective
-	if cfg.Objective == "" {
-		cfg.Objective = fmt.Sprintf("基于 %s 的已有研究结果，继续扩展探索、验证盲点、寻找更优路径，并产出新的可执行切片。", source.Run)
-	}
 	applySessionHints(cfg, hints)
-	cfg.Context = goalx.ContextConfig{Files: contextFiles}
-	if len(cfg.Target.Files) == 0 {
-		cfg.Target.Files = InferTarget(projectRoot)
-	}
-	if len(cfg.Target.Files) == 0 {
-		cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
-	}
-	if cfg.Harness.Command == "" {
-		cfg.Harness.Command = InferHarness(projectRoot)
-	}
-	if cfg.Harness.Command == "" {
-		cfg.Harness = goalx.HarnessConfig{Command: "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"}
-	}
+	cfg.Context = goalx.ContextConfig{Files: contextFiles, Refs: cfg.Context.Refs}
 
 	if opts.WriteConfig {
 		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — explore based on %s\n", source.Run)); err != nil {

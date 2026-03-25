@@ -27,7 +27,7 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 		return fmt.Errorf("no reports found in %s", source.Dir)
 	}
 
-	cfg, engines, err := buildPhaseConfigFromSource(projectRoot, "debate", goalx.ModeResearch, source, opts)
+	cfg, engines, err := resolvePhaseConfig(projectRoot, "debate", goalx.ModeResearch, source, opts)
 	if err != nil {
 		return err
 	}
@@ -37,29 +37,13 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	if err != nil {
 		return err
 	}
-	contextFiles, err := mergePhaseContext(source.Context, opts.ContextPaths)
+	contextFiles, err := phaseContextFiles(cfg, source, opts.ContextPaths)
 	if err != nil {
 		return err
 	}
 
-	cfg.Objective = opts.Objective
-	if cfg.Objective == "" {
-		cfg.Objective = fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单。", source.Run)
-	}
 	applySessionHints(cfg, hints)
-	cfg.Context = goalx.ContextConfig{Files: contextFiles}
-	if len(cfg.Target.Files) == 0 {
-		cfg.Target.Files = InferTarget(projectRoot)
-	}
-	if len(cfg.Target.Files) == 0 {
-		cfg.Target = goalx.TargetConfig{Files: []string{"TODO: specify directories to modify"}}
-	}
-	if cfg.Harness.Command == "" {
-		cfg.Harness.Command = InferHarness(projectRoot)
-	}
-	if cfg.Harness.Command == "" {
-		cfg.Harness = goalx.HarnessConfig{Command: "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"}
-	}
+	cfg.Context = goalx.ContextConfig{Files: contextFiles, Refs: cfg.Context.Refs}
 
 	if opts.WriteConfig {
 		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — debate round based on %s\n", source.Run)); err != nil {

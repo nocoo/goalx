@@ -15,7 +15,8 @@ import (
 type savedPhaseSource struct {
 	Run          string
 	Dir          string
-	Config       *goalx.Config
+	Mode         goalx.Mode
+	Parallel     int
 	Metadata     *RunMetadata
 	Context      []string
 	SessionNames []string
@@ -38,6 +39,10 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	if err != nil {
 		return nil, fmt.Errorf("load saved run %q: %w", runName, err)
 	}
+	parallel := cfg.Parallel
+	if parallel < len(cfg.Sessions) {
+		parallel = len(cfg.Sessions)
+	}
 	contextFiles, sessionNames, err := CollectSavedResearchContext(runDir)
 	if err != nil {
 		return nil, fmt.Errorf("collect saved run context for %q: %w", runName, err)
@@ -46,7 +51,8 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	return &savedPhaseSource{
 		Run:          runName,
 		Dir:          runDir,
-		Config:       cfg,
+		Mode:         cfg.Mode,
+		Parallel:     parallel,
 		Metadata:     meta,
 		Context:      contextFiles,
 		SessionNames: sessionNames,
@@ -70,8 +76,8 @@ func phaseSourceKind(source *savedPhaseSource) string {
 	if source.Metadata != nil && source.Metadata.PhaseKind != "" {
 		return source.Metadata.PhaseKind
 	}
-	if source.Config != nil && source.Config.Mode != "" {
-		return string(source.Config.Mode)
+	if source.Mode != "" {
+		return string(source.Mode)
 	}
 	return ""
 }
@@ -95,26 +101,33 @@ func phaseRunMetadataPatch(source *savedPhaseSource, phaseKind string) *RunMetad
 	return patch
 }
 
-func buildPhaseConfigFromSource(projectRoot string, phaseKind string, mode goalx.Mode, source *savedPhaseSource, opts phaseOptions) (*goalx.Config, map[string]goalx.EngineConfig, error) {
-	if source == nil || source.Config == nil {
+func resolvePhaseConfig(projectRoot string, phaseKind string, mode goalx.Mode, source *savedPhaseSource, opts phaseOptions) (*goalx.Config, map[string]goalx.EngineConfig, error) {
+	if source == nil {
 		return nil, nil, fmt.Errorf("saved phase source is required")
 	}
-	baseCfg, engines, err := goalx.LoadRawBaseConfig(projectRoot)
+	layers, err := goalx.LoadConfigLayers(projectRoot)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load base config: %w", err)
+		return nil, nil, fmt.Errorf("load config layers: %w", err)
 	}
+	req, err := buildPhaseResolveRequest(projectRoot, phaseKind, mode, source, layers.Config, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolved, err := goalx.ResolveConfig(layers, req)
+	if err != nil {
+		return nil, nil, err
+	}
+	if opts.BudgetSeconds > 0 {
+		resolved.Config.Budget.MaxDuration = time.Duration(opts.BudgetSeconds) * time.Second
+	}
+	return &resolved.Config, resolved.Engines, nil
+}
 
-	cfg := *source.Config
-	cfg.Name = derivePhaseRunName(source.Run, phaseKind, opts.Name)
-	cfg.Mode = mode
-	cfg.Sessions = nil
-	cfg.Context = goalx.ContextConfig{}
-	cfg.Acceptance = goalx.AcceptanceConfig{}
-	if opts.Preset != "" {
-		cfg.Preset = opts.Preset
+func buildPhaseResolveRequest(projectRoot string, phaseKind string, mode goalx.Mode, source *savedPhaseSource, baseCfg goalx.Config, opts phaseOptions) (goalx.ResolveRequest, error) {
+	if source == nil {
+		return goalx.ResolveRequest{}, fmt.Errorf("saved phase source is required")
 	}
-	goalx.ApplyPreset(&cfg)
-	if err := applyLaunchRoleOverrides(&cfg, launchOptions{
+	masterOverride, researchOverride, developOverride, err := launchRoleOverrides(launchOptions{
 		Master:         opts.Master,
 		ResearchRole:   opts.ResearchRole,
 		DevelopRole:    opts.DevelopRole,
@@ -122,25 +135,71 @@ func buildPhaseConfigFromSource(projectRoot string, phaseKind string, mode goalx
 		MasterEffort:   opts.MasterEffort,
 		ResearchEffort: opts.ResearchEffort,
 		DevelopEffort:  opts.DevelopEffort,
-	}); err != nil {
-		return nil, nil, err
+	})
+	if err != nil {
+		return goalx.ResolveRequest{}, err
 	}
-	if opts.Parallel > 0 {
-		cfg.Parallel = opts.Parallel
+	parallel := opts.Parallel
+	if parallel < 1 {
+		parallel = source.Parallel
 	}
-	if cfg.Parallel < 1 {
-		cfg.Parallel = source.Config.Parallel
+	req := goalx.ResolveRequest{
+		Name:             derivePhaseRunName(source.Run, phaseKind, opts.Name),
+		Mode:             mode,
+		Objective:        resolvePhaseObjective(phaseKind, source.Run, opts.Objective),
+		Preset:           opts.Preset,
+		Parallel:         parallel,
+		ClearSessions:    true,
+		MasterOverride:   masterOverride,
+		ResearchOverride: researchOverride,
+		DevelopOverride:  developOverride,
 	}
-	if cfg.Parallel < 1 {
-		cfg.Parallel = 1
+	if len(baseCfg.Target.Files) == 0 {
+		target := InferTarget(projectRoot)
+		if len(target) == 0 {
+			target = []string{"."}
+		}
+		req.TargetOverride = &goalx.TargetConfig{Files: target}
 	}
-	if opts.BudgetSeconds > 0 {
-		cfg.Budget.MaxDuration = time.Duration(opts.BudgetSeconds) * time.Second
+	if baseCfg.Harness.Command == "" {
+		harness := InferHarness(projectRoot)
+		if harness == "" {
+			harness = phaseHarnessFallback()
+		}
+		req.HarnessOverride = &goalx.HarnessConfig{Command: harness}
 	}
-	if cfg.Budget.MaxDuration == 0 {
-		cfg.Budget = baseCfg.Budget
+	return req, nil
+}
+
+func resolvePhaseObjective(phaseKind string, sourceRun string, explicit string) string {
+	if explicit != "" {
+		return explicit
 	}
-	return &cfg, engines, nil
+	switch phaseKind {
+	case "debate":
+		return fmt.Sprintf("基于 %s 的独立调研报告，辩论分歧点并达成共识，输出统一的优先级修复清单。", sourceRun)
+	case "implement":
+		return fmt.Sprintf("实施 %s 的共识修复清单。严格按照 context 中的文档执行，不做额外改动。", sourceRun)
+	case "explore":
+		return fmt.Sprintf("基于 %s 的已有研究结果，继续扩展探索、验证盲点、寻找更优路径，并产出新的可执行切片。", sourceRun)
+	default:
+		return sourceRun
+	}
+}
+
+func phaseHarnessFallback() string {
+	return "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"
+}
+
+func phaseContextFiles(cfg *goalx.Config, source *savedPhaseSource, extra []string) ([]string, error) {
+	base := make([]string, 0)
+	if cfg != nil {
+		base = append(base, cfg.Context.Files...)
+	}
+	if source != nil {
+		base = append(base, source.Context...)
+	}
+	return mergePhaseContext(base, extra)
 }
 
 func mergePhaseContext(base []string, extra []string) ([]string, error) {

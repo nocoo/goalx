@@ -32,6 +32,18 @@ func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.C
 	}
 }
 
+func writeResolvedSavedRunFixture(t *testing.T, projectRoot, runName string, opts launchOptions, files map[string]string) goalx.Config {
+	t.Helper()
+
+	opts.Name = runName
+	resolved, err := resolveLaunchConfig(projectRoot, opts)
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	writeSavedRunFixture(t, projectRoot, runName, resolved.Config, files)
+	return resolved.Config
+}
+
 func writeRootConfigFixture(t *testing.T, projectRoot string, cfg goalx.Config) {
 	t.Helper()
 

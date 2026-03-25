@@ -25,26 +25,11 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		return fmt.Errorf("no reports/summary found in %s", source.Dir)
 	}
 
-	cfg, engines, err := buildPhaseConfigFromSource(projectRoot, "implement", goalx.ModeDevelop, source, opts)
+	cfg, engines, err := resolvePhaseConfig(projectRoot, "implement", goalx.ModeDevelop, source, opts)
 	if err != nil {
 		return err
 	}
-	baseCfg, _, err := goalx.LoadRawBaseConfig(projectRoot)
-	if err != nil {
-		return fmt.Errorf("load base config: %w", err)
-	}
-	targetFiles := baseCfg.Target.Files
-	if len(targetFiles) == 0 {
-		targetFiles = InferTarget(projectRoot)
-	}
-	harness := baseCfg.Harness.Command
-	if harness == "" {
-		harness = InferHarness(projectRoot)
-	}
-	if harness == "" {
-		harness = "echo 'no harness inferred - configure harness.command in .goalx/config.yaml'"
-	}
-	contextFiles, err := mergePhaseContext(source.Context, opts.ContextPaths)
+	contextFiles, err := phaseContextFiles(cfg, source, opts.ContextPaths)
 	if err != nil {
 		return err
 	}
@@ -57,14 +42,8 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		return err
 	}
 
-	cfg.Objective = opts.Objective
-	if cfg.Objective == "" {
-		cfg.Objective = fmt.Sprintf("实施 %s 的共识修复清单。严格按照 context 中的文档执行，不做额外改动。", source.Run)
-	}
 	applySessionHints(cfg, hints)
-	cfg.Context = goalx.ContextConfig{Files: contextFiles}
-	cfg.Target = goalx.TargetConfig{Files: targetFiles}
-	cfg.Harness = goalx.HarnessConfig{Command: harness}
+	cfg.Context = goalx.ContextConfig{Files: contextFiles, Refs: cfg.Context.Refs}
 
 	if opts.WriteConfig {
 		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf("# goalx manual draft — implement fixes from %s\n", source.Run)); err != nil {

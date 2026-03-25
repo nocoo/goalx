@@ -10,25 +10,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestDebatePreservesSavedMasterConfig(t *testing.T) {
+func TestDebateUsesSharedMasterConfigInsteadOfSavedRun(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
-	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
-		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+	writeProjectConfigFixture(t, projectRoot, `
+preset: codex
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
 		Objective: "audit auth flow",
-		Preset:    "claude",
-		Parallel:  2,
-		Master: goalx.MasterConfig{
-			Engine: "codex",
-			Model:  "gpt-5.4",
-		},
+		Mode:      goalx.ModeResearch,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
+	writeProjectConfigFixture(t, projectRoot, `
+preset: claude
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
 
 	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
@@ -38,8 +45,50 @@ func TestDebatePreservesSavedMasterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
-		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
+		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	}
+}
+
+func TestDebateAppliesNextConfigPresetToResolvedSavedRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeProjectConfigFixture(t, projectRoot, `
+preset: codex
+target:
+  files: ["."]
+harness:
+  command: go test ./...
+`)
+	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
+		Objective: "audit auth flow",
+		Mode:      goalx.ModeResearch,
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, &nextConfigJSON{Preset: "claude"}); err != nil {
+		t.Fatalf("Debate: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if cfg.Preset != "claude" {
+		t.Fatalf("preset = %q, want claude", cfg.Preset)
+	}
+	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
+		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
+	}
+	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
 	}
 }
 
@@ -104,7 +153,7 @@ func TestDebateInheritsSavedParallelWithoutOverride(t *testing.T) {
 		Name:      "research-a",
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
-		Preset:    "claude",
+		Preset:    "codex",
 		Parallel:  5,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
@@ -124,7 +173,7 @@ func TestDebateInheritsSavedParallelWithoutOverride(t *testing.T) {
 	}
 }
 
-func TestDebateAppliesNextConfigPreset(t *testing.T) {
+func TestDebateInheritsSavedSessionFanoutWithoutParallel(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -134,13 +183,13 @@ func TestDebateAppliesNextConfigPreset(t *testing.T) {
 		Mode:      goalx.ModeResearch,
 		Objective: "audit auth flow",
 		Preset:    "codex",
-		Parallel:  2,
+		Sessions:  make([]goalx.SessionConfig, 4),
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, &nextConfigJSON{Preset: "claude"}); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -148,11 +197,11 @@ func TestDebateAppliesNextConfigPreset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Preset != "claude" {
-		t.Fatalf("preset = %q, want claude", cfg.Preset)
+	if cfg.Parallel != 4 {
+		t.Fatalf("parallel = %d, want 4", cfg.Parallel)
 	}
-	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
-		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if len(cfg.Sessions) != 4 {
+		t.Fatalf("sessions = %#v, want 4 inherited fan-out sessions", cfg.Sessions)
 	}
 }
 
