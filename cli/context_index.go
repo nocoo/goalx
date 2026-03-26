@@ -219,12 +219,13 @@ func contextRunIdentity(charter *RunCharter) ContextRunIdentity {
 }
 
 func providerFactsForEngine(target, engine string) []ProviderFact {
+	capability := providerCapabilityDescriptor(engine)
 	switch strings.TrimSpace(engine) {
 	case "claude-code":
 		return []ProviderFact{
-			{Target: target, Engine: engine, Fact: "GoalX canonical provider runtime is tmux + interactive TUI."},
-			{Target: target, Engine: engine, Fact: "Interactive Claude sessions can use installed skills, plugins, and MCP servers from the native TUI."},
-			{Target: target, Engine: engine, Fact: "Claude root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions."},
+			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
+			{Target: target, Engine: engine, Fact: capability.nativeFact("Claude")},
+			{Target: target, Engine: engine, Fact: capability.limitFact("Claude")},
 			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local PermissionRequest hook so unattended Claude MCP permission dialogs can be auto-allowed."},
 			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local Elicitation hook so unattended Claude MCP user-input or browser-auth requests are cancelled instead of hanging forever."},
 			{Target: target, Engine: engine, Fact: "If a Claude permission or elicitation dialog still surfaces, GoalX writes an urgent master-inbox fact through a Notification hook so the run can recover."},
@@ -233,8 +234,8 @@ func providerFactsForEngine(target, engine string) []ProviderFact {
 		}
 	case "codex":
 		return []ProviderFact{
-			{Target: target, Engine: engine, Fact: "GoalX canonical provider runtime is tmux + interactive TUI."},
-			{Target: target, Engine: engine, Fact: "Interactive Codex sessions can use installed skills and configured MCP servers from the native TUI."},
+			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
+			{Target: target, Engine: engine, Fact: capability.nativeFact("Codex")},
 			{Target: target, Engine: engine, Fact: "Configured MCP servers are usable without an extra GoalX approval layer in this environment."},
 			{Target: target, Engine: engine, Fact: "Native subagents require explicit invocation."},
 		}
@@ -258,4 +259,63 @@ func dedupeProviderFacts(facts []ProviderFact) []ProviderFact {
 		out = append(out, fact)
 	}
 	return out
+}
+
+type providerCapabilityDescriptorState struct {
+	native string
+	limit  string
+}
+
+func providerCapabilityDescriptor(engine string) providerCapabilityDescriptorState {
+	switch strings.TrimSpace(engine) {
+	case "claude-code":
+		return providerCapabilityDescriptorState{
+			native: "skills,plugins,mcp",
+			limit:  "claude_root_no_bypass",
+		}
+	case "codex":
+		return providerCapabilityDescriptorState{
+			native: "skills,mcp",
+		}
+	default:
+		return providerCapabilityDescriptorState{}
+	}
+}
+
+func (d providerCapabilityDescriptorState) summary() string {
+	parts := []string{"provider_capability=tui"}
+	if strings.TrimSpace(d.native) != "" {
+		parts = append(parts, "provider_native="+d.native)
+	}
+	if strings.TrimSpace(d.limit) != "" {
+		parts = append(parts, "provider_limit="+d.limit)
+	}
+	if len(parts) == 1 && strings.TrimSpace(d.native) == "" && strings.TrimSpace(d.limit) == "" {
+		return ""
+	}
+	return strings.Join(parts, " ")
+}
+
+func (d providerCapabilityDescriptorState) runtimeFact() string {
+	return "GoalX canonical provider runtime is tmux + interactive TUI."
+}
+
+func (d providerCapabilityDescriptorState) nativeFact(provider string) string {
+	switch strings.TrimSpace(d.native) {
+	case "skills,plugins,mcp":
+		return "Interactive " + provider + " sessions can use installed skills, plugins, and MCP servers from the native TUI."
+	case "skills,mcp":
+		return "Interactive " + provider + " sessions can use installed skills and configured MCP servers from the native TUI."
+	default:
+		return ""
+	}
+}
+
+func (d providerCapabilityDescriptorState) limitFact(provider string) string {
+	switch strings.TrimSpace(d.limit) {
+	case "claude_root_no_bypass":
+		return provider + " root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions."
+	default:
+		return ""
+	}
 }

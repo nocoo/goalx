@@ -295,28 +295,15 @@ func sessionLaunchFacts(runDir, sessionName string) string {
 	return strings.Join(parts, " ")
 }
 
-func providerCapabilitySummaryForEngine(engine string) string {
-	parts := []string{"provider_capability=tui"}
-	switch strings.TrimSpace(engine) {
-	case "claude-code":
-		parts = append(parts, "provider_native=skills,plugins,mcp", "provider_limit=claude_root_no_bypass")
-	case "codex":
-		parts = append(parts, "provider_native=skills,mcp")
-	default:
-		return ""
-	}
-	return strings.Join(parts, " ")
-}
-
 func targetProviderCapabilitySummary(runDir, target, masterEngine string) string {
 	if strings.TrimSpace(target) == "master" {
-		return providerCapabilitySummaryForEngine(masterEngine)
+		return providerCapabilityDescriptor(masterEngine).summary()
 	}
 	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, target))
 	if err != nil || identity == nil {
 		return ""
 	}
-	return providerCapabilitySummaryForEngine(identity.Engine)
+	return providerCapabilityDescriptor(identity.Engine).summary()
 }
 
 func transportTargetFactsSummary(runDir, target string) string {
