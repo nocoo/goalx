@@ -113,7 +113,7 @@ func TestSendAgentNudgeCodexStagesPayloadAndSubmitSeparately(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("sendAgentKeys calls = %d, want 2", len(calls))
 	}
-	if calls[0].target != "gx-demo:master" || calls[0].keys != masterWakeMessage || calls[0].submit != "" {
+	if calls[0].target != "gx-demo:master" || calls[0].keys != transportWakeToken || calls[0].submit != "" {
 		t.Fatalf("first codex send = %+v, want wake payload without submit", calls[0])
 	}
 	if calls[1].target != "gx-demo:master" || calls[1].keys != "" || calls[1].submit != "Enter" {
@@ -141,7 +141,7 @@ func TestSendAgentNudgeCodexRepairsBufferedWakeWithEnterOnly(t *testing.T) {
 		return nil
 	}
 	captureAgentPane = func(target string) (string, error) {
-		return "› goalx-wake\n  gpt-5.4 xhigh", nil
+		return "› [[GOALX_WAKE_CHECK_INBOX]]\n  gpt-5.4 xhigh", nil
 	}
 
 	outcome, err := SendAgentNudgeDetailed("gx-demo:session-2", "codex")
@@ -171,7 +171,7 @@ func TestSendAgentNudgeClaudeTreatsQueuedWakeAsAccepted(t *testing.T) {
 		return nil
 	}
 	captureAgentPane = func(target string) (string, error) {
-		return "❯ goalx-wake\nPress up to edit queued messages", nil
+		return "❯ [[GOALX_WAKE_CHECK_INBOX]]\nPress up to edit queued messages", nil
 	}
 
 	outcome, err := SendAgentNudgeDetailed("gx-demo:session-2", "claude-code")
@@ -216,7 +216,7 @@ func TestSendAgentNudgeNonCodexUsesExplicitWakePayload(t *testing.T) {
 			if gotTarget != "gx-demo:master" {
 				t.Fatalf("target = %q, want gx-demo:master", gotTarget)
 			}
-			if gotKeys != masterWakeMessage || gotSubmit != "Enter" {
+			if gotKeys != transportWakeToken || gotSubmit != "Enter" {
 				t.Fatalf("SendAgentNudge used keys=%q submit=%q, want explicit wake payload + Enter", gotKeys, gotSubmit)
 			}
 		})

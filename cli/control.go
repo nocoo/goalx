@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const masterWakeMessage = "goalx-wake"
+const transportWakeToken = "[[GOALX_WAKE_CHECK_INBOX]]"
 
 type MasterInboxMessage struct {
 	ID        int64  `json:"id"`
@@ -328,7 +328,7 @@ func SendAgentNudgeDetailed(target, engine string) (TransportDeliveryOutcome, er
 				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
 			}, nil
 		}
-		if err := sendAgentKeys(target, masterWakeMessage, ""); err != nil {
+		if err := sendAgentKeys(target, transportWakeToken, ""); err != nil {
 			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter"}, err
 		}
 		time.Sleep(150 * time.Millisecond)
@@ -368,7 +368,7 @@ func SendAgentNudgeDetailed(target, engine string) (TransportDeliveryOutcome, er
 			}, nil
 		}
 	}
-	if err := sendAgentKeys(target, masterWakeMessage, "Enter"); err != nil {
+	if err := sendAgentKeys(target, transportWakeToken, "Enter"); err != nil {
 		return TransportDeliveryOutcome{SubmitMode: "payload_enter"}, err
 	}
 	time.Sleep(150 * time.Millisecond)

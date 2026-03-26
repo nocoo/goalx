@@ -24,6 +24,7 @@ type AffordanceItem struct {
 	Kind    string   `json:"kind,omitempty"`
 	Summary string   `json:"summary,omitempty"`
 	Command string   `json:"command,omitempty"`
+	Facts   []string `json:"facts,omitempty"`
 	Paths   []string `json:"paths,omitempty"`
 }
 
@@ -155,6 +156,15 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		},
 	}
 	if index != nil {
+		if facts := providerFactsForTarget(index.ProviderFacts, normalizedTarget); len(facts) > 0 {
+			doc.Items = append(doc.Items, AffordanceItem{
+				ID:      "provider-facts",
+				Kind:    "fact",
+				Summary: providerFactsSummary(normalizedTarget, facts),
+				Facts:   renderProviderFactLines(normalizedTarget, facts),
+				Paths:   []string{ContextIndexPath(runDir)},
+			})
+		}
 		doc.Items = append(doc.Items, AffordanceItem{
 			ID:      "paths",
 			Kind:    "path",
@@ -190,6 +200,12 @@ func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
 		}
 		if item.Command != "" {
 			b.WriteString("```bash\n" + item.Command + "\n```\n\n")
+		}
+		for _, fact := range item.Facts {
+			b.WriteString("- " + fact + "\n")
+		}
+		if len(item.Facts) > 0 {
+			b.WriteString("\n")
 		}
 		for _, path := range item.Paths {
 			b.WriteString("- `" + path + "`\n")
@@ -260,4 +276,53 @@ func buildAttachCommand(runName, target string) string {
 		args = append(args, "session-N")
 	}
 	return strings.Join(args, " ")
+}
+
+func providerFactsForTarget(facts []ProviderFact, target string) []ProviderFact {
+	if len(facts) == 0 {
+		return nil
+	}
+	if strings.TrimSpace(target) == "" {
+		return facts
+	}
+	filtered := make([]ProviderFact, 0, len(facts))
+	for _, fact := range facts {
+		if fact.Target == target {
+			filtered = append(filtered, fact)
+		}
+	}
+	return filtered
+}
+
+func providerFactsSummary(target string, facts []ProviderFact) string {
+	if len(facts) == 0 {
+		return ""
+	}
+	if strings.TrimSpace(target) == "" {
+		return "Provider-scoped execution facts for this run."
+	}
+	engine := facts[0].Engine
+	if strings.TrimSpace(engine) == "" {
+		return fmt.Sprintf("Provider-scoped execution facts for `%s`.", target)
+	}
+	return fmt.Sprintf("Provider-scoped execution facts for `%s` (`%s`).", target, engine)
+}
+
+func renderProviderFactLines(target string, facts []ProviderFact) []string {
+	lines := make([]string, 0, len(facts))
+	for _, fact := range facts {
+		line := fact.Fact
+		if strings.TrimSpace(target) == "" {
+			prefix := fact.Target
+			if strings.TrimSpace(prefix) == "" {
+				prefix = "run"
+			}
+			if fact.Engine != "" {
+				prefix += " (" + fact.Engine + ")"
+			}
+			line = prefix + ": " + line
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }

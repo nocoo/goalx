@@ -17,7 +17,7 @@ func TestBuildTransportFactsMarksCodexBufferedWake(t *testing.T) {
 	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("› goalx-wake\n  gpt-5.4 xhigh\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("› [[GOALX_WAKE_CHECK_INBOX]]\n  gpt-5.4 xhigh\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -53,7 +53,7 @@ func TestBuildTransportFactsMarksClaudeQueuedWakeAsSent(t *testing.T) {
 	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("❯ goalx-wake\nPress up to edit queued messages\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("❯ [[GOALX_WAKE_CHECK_INBOX]]\nPress up to edit queued messages\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -85,7 +85,7 @@ func TestBuildTransportFactsMarksCodexQueuedWakeAsSent(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
-	if err := os.WriteFile(masterCapture, []byte("• Working (24s)\n• Messages to be submitted after next tool call\n  ↳ goalx-wake\n"), 0o644); err != nil {
+	if err := os.WriteFile(masterCapture, []byte("• Working (24s)\n• Messages to be submitted after next tool call\n  ↳ [[GOALX_WAKE_CHECK_INBOX]]\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)

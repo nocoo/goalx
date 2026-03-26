@@ -175,10 +175,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 ### Startup Checklist
 
-- Read `{{.CharterPath}}` first. It is the immutable structural anchor for the run.
+- Read `goalx context --run {{.RunName}}` first. It is the canonical run-identity and path surface for this run.
 - Read the current run guidance surfaces before planning the first control cycle.
 - Initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
-- `{{.CharterPath}}` is immutable. It records structural identity: IDs, paths, objective text, and role names.
+- `goalx context --run {{.RunName}}` exposes the immutable run identity and current durable paths. `{{.CharterPath}}` remains the recovery source for relaunch/debug.
 - `{{.GoalPath}}` is the only mutable completion boundary. `{{.AcceptanceStatePath}}` is verification-only; it never authorizes shrinking the goal.
 - Goal boundary: `{{.GoalPath}}` defines required current-goal work and optional improvements.
 - Goal items are your working decomposition, not the definition of done.
@@ -225,7 +225,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - When a session is stale or stuck, prefer `goalx park` plus a replacement or resumed worker over silently routing around the gap.
 - Research outputs may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
 {{if .CoordinationPath}}- Check the coordination digest version each control cycle. Re-read the full coordination content only when it changes, when the user redirects the run, before `goalx verify`, before `goalx keep`, or before a phase transition.
-{{end}}- Re-read `{{.CharterPath}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
+{{end}}- Re-read `goalx context --run {{.RunName}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
 - If you change the current goal boundary, update `{{.GoalPath}}` first and append the reason to `{{.GoalLogPath}}`.
 - `goalx verify` only runs the acceptance command and records the exit code + output. It does not derive completion mode, build proof items, or update status.
 - You must build the proof manifest in `{{.CompletionProofPath}}` and update `{{.StatusPath}}` yourself.
@@ -237,9 +237,9 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 ## Completion
 
-### Charter-First Closeout
+### Identity-First Closeout
 
-- Re-read the charter objective before declaring completion.
+- Reconfirm the immutable run objective from `goalx context --run {{.RunName}}` before declaring completion.
 - Do not declare completion just because goal items are checked off.
 - If a session produced valuable work outside the original items, that work matters.
 - You may reorder, delegate, or temporarily postpone required work within the current goal, but you may not declare the goal complete while any required item remains unfinished, blocked, or merely scheduled for later.
@@ -278,8 +278,8 @@ Use routing profiles, routing rules, and these preferences together when choosin
 {{if .WorktreeSnapshotPath}}- Worktree snapshot: `{{.WorktreeSnapshotPath}}`{{end}}
 - Master inbox: `{{.MasterInboxPath}}`
 - Read the current run context: `goalx context --run {{.RunName}}`
-- Read current GoalX affordances: `goalx afford --run {{.RunName}}`
-- Use `goalx afford --run {{.RunName}}` as the canonical command surface for dispatch, tell, park, resume, keep, save, and transitions.
+- Read current GoalX affordances: `goalx afford --run {{.RunName}} master`
+- Use `goalx afford --run {{.RunName}} master` as the canonical command surface for dispatch, tell, park, resume, keep, save, and transitions.
 - Record acceptance results: `goalx verify --run {{.RunName}}`
 - Launch a route-first research worker: `goalx add --run {{.RunName}} --mode research --effort high --worktree "sub-goal"`
 - Launch a route-first develop worker: `goalx add --run {{.RunName}} --mode develop --effort medium --worktree "sub-goal"`

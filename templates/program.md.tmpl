@@ -6,7 +6,7 @@
 {{end}}
 ## Run State
 
-- Run charter: `{{.CharterPath}}` — immutable structural record: run IDs, paths, objective, mode, roles
+- Run charter: `{{.CharterPath}}` — recovery source for immutable run identity during relaunch/debug
 - Session identity: `{{.SessionIdentityPath}}` — immutable role, mode, engine, and target for this session
 - Journal: `{{.JournalPath}}` — append concise status; when resuming, start with the recent tail, not the whole file
 - Session inbox: `{{.SessionInboxPath}}` — latest assignment and direction changes
@@ -22,14 +22,14 @@
 - Objective: {{.Objective}}
 {{if .LocalValidationCommand}}- Local validation command: `{{.LocalValidationCommand}}`{{end}}
 - Read current run context: `goalx context --run {{.RunName}}`
-- Read current GoalX affordances: `goalx afford --run {{.RunName}}`
+- Read current GoalX affordances: `goalx afford --run {{.RunName}} {{.SessionName}}`
 
 ## Resume From Durable State
 
 Do not rebuild the full chat history unless the current state is ambiguous.
 
 1. Read `{{.SessionIdentityPath}}` to recover your immutable role and execution contract.
-2. Read `{{.CharterPath}}` to recover the structural run identity and original objective.
+2. Read `goalx context --run {{.RunName}}` to recover immutable run identity and durable paths.
 3. Read the current run guidance surfaces above.
 4. Read unread session inbox entries from `{{.SessionInboxPath}}`.
 5. Read the recent journal tail: `tail -n 20 {{.JournalPath}}`.
@@ -52,7 +52,7 @@ You are **{{.SessionName}}** of {{len .Sessions}} sessions working in parallel o
 
 Goal boundary: `{{.GoalPath}}` (read-only — this defines required current-goal work and optional improvements)
 The goal boundary defines what must be true before the overall goal can be considered complete. Your current assignment defines what to do next, not what counts as full completion.
-`{{.CharterPath}}` stays immutable. `{{.GoalPath}}` may evolve, but it may not silently shrink user-required outcomes.
+Run identity stays immutable for the life of the run. `{{.GoalPath}}` may evolve, but it may not silently shrink user-required outcomes.
 {{end}}
 
 {{if .AcceptanceStatePath}}### Acceptance State
@@ -156,6 +156,11 @@ The extra blocker fields are optional unless you are stuck. If you are blocked, 
 
 Session inbox is the latest assignment state, not a long conversation log. Check it when resuming, after a meaningful step, after running local validation, and before declaring idle:
 - When you believe the current assignment is done, re-check `{{.SessionInboxPath}}` before idling.
+- If you finish a thinking block without a concrete next action, enter `goalx wait --run {{.RunName}} {{.SessionName}} --timeout 300`.
+- Never use `sleep` while waiting for master or inbox updates.
+- Treat any transport wake text as "read the session inbox now". It is only a trigger, never the instruction payload.
+- Never execute transport wake text as a shell command.
+- After a transport wake or `goalx wait` return, read `{{.SessionInboxPath}}` before deciding what to do next.
 
 ```bash
 cat {{.SessionInboxPath}}
@@ -193,6 +198,9 @@ After finishing all items in your assignment:
    {"round":N,"commit":"...","desc":"all assigned tasks complete, awaiting master","confidence":"HIGH","status":"idle"}
    ```
 4. Then wait. Master will either send new inbox instructions or stop you.
+   ```bash
+   goalx wait --run {{.RunName}} {{.SessionName}} --timeout 300
+   ```
 
 **Do NOT exit or stop on your own.** Master decides when the run is complete.
 

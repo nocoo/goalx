@@ -237,7 +237,7 @@ func targetQueuedMessageVisible(engine string, lines []string) bool {
 func targetWakeBuffered(lines []string) bool {
 	for _, line := range trailingPromptLines(lines, 3) {
 		trimmed := strings.TrimSpace(line)
-		if (strings.HasPrefix(trimmed, "❯") || strings.HasPrefix(trimmed, "›")) && strings.Contains(trimmed, masterWakeMessage) {
+		if (strings.HasPrefix(trimmed, "❯") || strings.HasPrefix(trimmed, "›")) && strings.Contains(trimmed, transportWakeToken) {
 			return true
 		}
 	}

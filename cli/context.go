@@ -92,6 +92,39 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Activity", index.ActivityPath)
 	writeContextLine("Context index", index.ContextIndexPath)
 	writeContextLine("Affordances", index.AffordancesMarkdown)
+	if identity := index.RunIdentity; identity.RunID != "" || identity.Objective != "" {
+		b.WriteString("\n## Run Identity\n\n")
+		writeContextLine("Objective", identity.Objective)
+		writeContextLine("Run ID", identity.RunID)
+		writeContextLine("Root run ID", identity.RootRunID)
+		writeContextLine("Charter ID", identity.CharterID)
+		writeContextLine("Mode", identity.Mode)
+		writeContextLine("Phase kind", identity.PhaseKind)
+		if identity.RoleContracts.Master != nil {
+			writeContextLine("Master role", identity.RoleContracts.Master.Mandate)
+		}
+		if identity.RoleContracts.ResearchSubagent != nil {
+			writeContextLine("Research role", identity.RoleContracts.ResearchSubagent.Mandate)
+		}
+		if identity.RoleContracts.DevelopSubagent != nil {
+			writeContextLine("Develop role", identity.RoleContracts.DevelopSubagent.Mandate)
+		}
+	}
+	if len(index.ProviderFacts) > 0 {
+		b.WriteString("\n## Provider Facts\n\n")
+		for _, fact := range index.ProviderFacts {
+			target := fact.Target
+			if strings.TrimSpace(target) == "" {
+				target = "run"
+			}
+			label := target
+			if fact.Engine != "" {
+				label += " (" + fact.Engine + ")"
+			}
+			b.WriteString(fmt.Sprintf("- %s: %s\n", label, fact.Fact))
+		}
+		b.WriteString("\n")
+	}
 	b.WriteString("\n## Master\n\n")
 	writeContextLine("Engine", index.Master.Engine)
 	writeContextLine("Model", index.Master.Model)

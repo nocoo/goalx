@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -33,6 +34,37 @@ func TestBuildContextIndexIncludesRunAnchors(t *testing.T) {
 	}
 	if index.Master.Engine != "codex" || index.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %+v, want codex/gpt-5.4", index.Master)
+	}
+}
+
+func TestBuildContextIndexIncludesImmutableRunIdentity(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	charter, err := LoadRunCharter(RunCharterPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunCharter: %v", err)
+	}
+	if index.RunIdentity.RunID != meta.RunID {
+		t.Fatalf("run identity run_id = %q, want %q", index.RunIdentity.RunID, meta.RunID)
+	}
+	if index.RunIdentity.RootRunID != meta.RootRunID {
+		t.Fatalf("run identity root_run_id = %q, want %q", index.RunIdentity.RootRunID, meta.RootRunID)
+	}
+	if index.RunIdentity.Objective != cfg.Objective {
+		t.Fatalf("run identity objective = %q, want %q", index.RunIdentity.Objective, cfg.Objective)
+	}
+	if index.RunIdentity.Mode != string(cfg.Mode) {
+		t.Fatalf("run identity mode = %q, want %q", index.RunIdentity.Mode, cfg.Mode)
+	}
+	if index.RunIdentity.RoleContracts.Master == nil || index.RunIdentity.RoleContracts.Master.Kind != "master" {
+		t.Fatalf("run identity master role contract = %+v, want master contract", index.RunIdentity.RoleContracts.Master)
+	}
+	if charter != nil && index.RunIdentity.CharterID != charter.CharterID {
+		t.Fatalf("run identity charter_id = %q, want %q", index.RunIdentity.CharterID, charter.CharterID)
 	}
 }
 
@@ -115,5 +147,17 @@ func TestContextIndexExcludesRawEnvSnapshot(t *testing.T) {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("context index should not expose %q:\n%s", unwanted, text)
 		}
+	}
+}
+
+func TestBuildContextIndexFailsWithoutRunCharter(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := os.Remove(RunCharterPath(runDir)); err != nil {
+		t.Fatalf("remove run charter: %v", err)
+	}
+
+	_, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err == nil || !strings.Contains(err.Error(), "run charter missing") {
+		t.Fatalf("BuildContextIndex error = %v, want missing charter error", err)
 	}
 }

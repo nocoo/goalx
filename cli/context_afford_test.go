@@ -37,6 +37,8 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 
 	for _, want := range []string{
 		"# GoalX Context",
+		"## Run Identity",
+		"Objective:",
 		"Run dir:",
 		"Context index:",
 		"session-1",
@@ -61,6 +63,7 @@ func TestAffordCommandPrintsMarkdownAffordances(t *testing.T) {
 		"# GoalX Affordances",
 		"goalx context --run " + cfg.Name,
 		"goalx afford --run " + cfg.Name + " master",
+		"## provider-facts",
 		"## tell",
 	} {
 		if !strings.Contains(out, want) {
@@ -92,7 +95,44 @@ func TestContextCommandJsonPrintsMachineReadableIndex(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(out, `"context_index_path"`) || !strings.Contains(out, `"run_name": "guidance-run"`) {
+	if !strings.Contains(out, `"context_index_path"`) || !strings.Contains(out, `"run_name": "guidance-run"`) || !strings.Contains(out, `"run_identity"`) {
 		t.Fatalf("context json output missing expected keys:\n%s", out)
+	}
+}
+
+func TestAffordCommandPrintsProviderFactsForClaudeSession(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	sessionName := "session-1"
+	if err := EnsureSessionControl(runDir, sessionName); err != nil {
+		t.Fatalf("EnsureSessionControl: %v", err)
+	}
+	identity := &SessionIdentity{
+		Version:         1,
+		SessionName:     sessionName,
+		RoleKind:        "research",
+		Mode:            string(goalx.ModeResearch),
+		Engine:          "claude-code",
+		Model:           "opus",
+		OriginCharterID: meta.CharterID,
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, sessionName), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Afford(repo, []string{"--run", cfg.Name, sessionName}); err != nil {
+			t.Fatalf("Afford: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"## provider-facts",
+		"claude-code",
+		"MCP approvals",
+		"Write/Edit requires prior read",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("afford output missing %q:\n%s", want, out)
+		}
 	}
 }

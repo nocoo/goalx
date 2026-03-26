@@ -11,32 +11,44 @@ import (
 )
 
 type ContextIndex struct {
-	Version             int              `json:"version"`
-	CheckedAt           string           `json:"checked_at,omitempty"`
-	ProjectRoot         string           `json:"project_root,omitempty"`
-	RunDir              string           `json:"run_dir,omitempty"`
-	RunName             string           `json:"run_name,omitempty"`
-	RunWorktree         string           `json:"run_worktree,omitempty"`
-	ReportsDir          string           `json:"reports_dir,omitempty"`
-	CharterPath         string           `json:"charter_path,omitempty"`
-	GoalPath            string           `json:"goal_path,omitempty"`
-	AcceptanceStatePath string           `json:"acceptance_state_path,omitempty"`
-	CompletionProofPath string           `json:"completion_proof_path,omitempty"`
-	CoordinationPath    string           `json:"coordination_path,omitempty"`
-	SummaryPath         string           `json:"summary_path,omitempty"`
-	ControlDir          string           `json:"control_dir,omitempty"`
-	ActivityPath        string           `json:"activity_path,omitempty"`
-	TransportFactsPath  string           `json:"transport_facts_path,omitempty"`
-	AffordancesJSONPath string           `json:"affordances_json_path,omitempty"`
-	AffordancesMarkdown string           `json:"affordances_markdown_path,omitempty"`
-	ContextIndexPath    string           `json:"context_index_path,omitempty"`
-	DimensionsPath      string           `json:"dimensions_path,omitempty"`
-	Master              ContextMaster    `json:"master"`
-	Sessions            []ContextSession `json:"sessions,omitempty"`
-	ClaudeCodeAvailable bool             `json:"claude_code_available,omitempty"`
-	CodexAvailable      bool             `json:"codex_available,omitempty"`
-	GitAvailable        bool             `json:"git_available,omitempty"`
-	TmuxAvailable       bool             `json:"tmux_available,omitempty"`
+	Version             int                `json:"version"`
+	CheckedAt           string             `json:"checked_at,omitempty"`
+	ProjectRoot         string             `json:"project_root,omitempty"`
+	RunDir              string             `json:"run_dir,omitempty"`
+	RunName             string             `json:"run_name,omitempty"`
+	RunWorktree         string             `json:"run_worktree,omitempty"`
+	RunIdentity         ContextRunIdentity `json:"run_identity"`
+	ReportsDir          string             `json:"reports_dir,omitempty"`
+	CharterPath         string             `json:"charter_path,omitempty"`
+	GoalPath            string             `json:"goal_path,omitempty"`
+	AcceptanceStatePath string             `json:"acceptance_state_path,omitempty"`
+	CompletionProofPath string             `json:"completion_proof_path,omitempty"`
+	CoordinationPath    string             `json:"coordination_path,omitempty"`
+	SummaryPath         string             `json:"summary_path,omitempty"`
+	ControlDir          string             `json:"control_dir,omitempty"`
+	ActivityPath        string             `json:"activity_path,omitempty"`
+	TransportFactsPath  string             `json:"transport_facts_path,omitempty"`
+	AffordancesJSONPath string             `json:"affordances_json_path,omitempty"`
+	AffordancesMarkdown string             `json:"affordances_markdown_path,omitempty"`
+	ContextIndexPath    string             `json:"context_index_path,omitempty"`
+	DimensionsPath      string             `json:"dimensions_path,omitempty"`
+	Master              ContextMaster      `json:"master"`
+	Sessions            []ContextSession   `json:"sessions,omitempty"`
+	ProviderFacts       []ProviderFact     `json:"provider_facts,omitempty"`
+	ClaudeCodeAvailable bool               `json:"claude_code_available,omitempty"`
+	CodexAvailable      bool               `json:"codex_available,omitempty"`
+	GitAvailable        bool               `json:"git_available,omitempty"`
+	TmuxAvailable       bool               `json:"tmux_available,omitempty"`
+}
+
+type ContextRunIdentity struct {
+	CharterID     string                  `json:"charter_id,omitempty"`
+	RunID         string                  `json:"run_id,omitempty"`
+	RootRunID     string                  `json:"root_run_id,omitempty"`
+	Objective     string                  `json:"objective,omitempty"`
+	Mode          string                  `json:"mode,omitempty"`
+	PhaseKind     string                  `json:"phase_kind,omitempty"`
+	RoleContracts RunCharterRoleContracts `json:"role_contracts,omitempty"`
 }
 
 type ContextMaster struct {
@@ -53,6 +65,12 @@ type ContextSession struct {
 	JournalPath  string `json:"journal_path,omitempty"`
 	InboxPath    string `json:"inbox_path,omitempty"`
 	CursorPath   string `json:"cursor_path,omitempty"`
+}
+
+type ProviderFact struct {
+	Target string `json:"target,omitempty"`
+	Engine string `json:"engine,omitempty"`
+	Fact   string `json:"fact,omitempty"`
 }
 
 func ContextIndexPath(runDir string) string {
@@ -99,6 +117,10 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 	if err != nil {
 		return nil, err
 	}
+	charter, err := RequireRunCharter(runDir)
+	if err != nil {
+		return nil, err
+	}
 	index := &ContextIndex{
 		Version:             1,
 		CheckedAt:           time.Now().UTC().Format(time.RFC3339),
@@ -106,6 +128,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		RunDir:              runDir,
 		RunName:             runName,
 		RunWorktree:         RunWorktreePath(runDir),
+		RunIdentity:         contextRunIdentity(charter),
 		ReportsDir:          ReportsDir(runDir),
 		CharterPath:         RunCharterPath(runDir),
 		GoalPath:            GoalPath(runDir),
@@ -130,6 +153,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		GitAvailable:        toolAvailable("git"),
 		TmuxAvailable:       toolAvailable("tmux"),
 	}
+	index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine("master", cfg.Master.Engine)...)
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
 		return nil, err
@@ -146,6 +170,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		}
 		if identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, name)); err == nil && identity != nil {
 			session.Mode = identity.Mode
+			index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine(name, identity.Engine)...)
 		}
 		if session.Mode == "" {
 			if sessionsState, err := EnsureSessionsRuntimeState(runDir); err == nil {
@@ -157,6 +182,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		index.Sessions = append(index.Sessions, session)
 	}
 	sort.Slice(index.Sessions, func(i, j int) bool { return index.Sessions[i].Name < index.Sessions[j].Name })
+	index.ProviderFacts = dedupeProviderFacts(index.ProviderFacts)
 	return index, nil
 }
 
@@ -175,4 +201,53 @@ func resolvedSessionContextWorktree(runDir, runName, sessionName string) string 
 func toolAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
+}
+
+func contextRunIdentity(charter *RunCharter) ContextRunIdentity {
+	if charter == nil {
+		return ContextRunIdentity{}
+	}
+	return ContextRunIdentity{
+		CharterID:     charter.CharterID,
+		RunID:         charter.RunID,
+		RootRunID:     charter.RootRunID,
+		Objective:     charter.Objective,
+		Mode:          charter.Mode,
+		PhaseKind:     charter.PhaseKind,
+		RoleContracts: charter.RoleContracts,
+	}
+}
+
+func providerFactsForEngine(target, engine string) []ProviderFact {
+	switch strings.TrimSpace(engine) {
+	case "claude-code":
+		return []ProviderFact{
+			{Target: target, Engine: engine, Fact: "MCP approvals can remain target-scoped; unattended worktree sessions may block on confirmation."},
+			{Target: target, Engine: engine, Fact: "Write/Edit requires prior read of the target file."},
+			{Target: target, Engine: engine, Fact: "Direct large-file edits can fail when the provider read window is exceeded."},
+		}
+	case "codex":
+		return []ProviderFact{
+			{Target: target, Engine: engine, Fact: "Native subagents require explicit invocation."},
+		}
+	default:
+		return nil
+	}
+}
+
+func dedupeProviderFacts(facts []ProviderFact) []ProviderFact {
+	if len(facts) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]ProviderFact, 0, len(facts))
+	for _, fact := range facts {
+		key := fact.Target + "\x00" + fact.Engine + "\x00" + fact.Fact
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, fact)
+	}
+	return out
 }

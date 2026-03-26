@@ -139,3 +139,45 @@ func TestBuildAffordancesIncludesSessionTellAndAttachCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildAffordancesIncludesProviderFactsForClaudeTargets(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	sessionName := "session-1"
+	if err := EnsureSessionControl(runDir, sessionName); err != nil {
+		t.Fatalf("EnsureSessionControl: %v", err)
+	}
+	identity := &SessionIdentity{
+		Version:         1,
+		SessionName:     sessionName,
+		RoleKind:        "research",
+		Mode:            "research",
+		Engine:          "claude-code",
+		Model:           "opus",
+		OriginCharterID: meta.CharterID,
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, sessionName), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, sessionName)
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	found := false
+	for _, item := range doc.Items {
+		if item.ID != "provider-facts" {
+			continue
+		}
+		found = strings.Contains(item.Summary, "claude-code")
+		for _, path := range item.Paths {
+			if path == ContextIndexPath(runDir) {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("provider facts affordance missing for claude target: %+v", doc.Items)
+	}
+}

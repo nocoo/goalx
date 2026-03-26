@@ -43,10 +43,13 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Objective: ship it",
 		"Local validation command: `go test ./...`",
 		"`goalx context --run demo`",
-		"`goalx afford --run demo`",
+		"`goalx afford --run demo session-1`",
+		"`goalx wait --run demo session-1 --timeout 300`",
 		"## Resume From Durable State",
 		"Do not rebuild the full chat history",
 		"Read the current run guidance surfaces above",
+		"Treat any transport wake text as",
+		"Never execute transport wake text as a shell command.",
 		"Read the recent journal tail",
 		"Read unread session inbox entries",
 		"Inspect the current worktree state",
@@ -58,6 +61,9 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	}
 	if strings.Contains(text, "reconstruct context") {
 		t.Fatalf("rendered protocol should not emphasize reconstructing full context:\n%s", text)
+	}
+	if strings.Contains(text, "Read `"+RunCharterPath(runDir)+"` to recover the structural run identity") {
+		t.Fatalf("rendered protocol should recover run identity through goalx context, not by reading charter first:\n%s", text)
 	}
 }
 
@@ -481,7 +487,7 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 		"goal-log.jsonl",
 		"goalx verify --run demo",
 		"goalx add --run demo",
-		"goalx afford --run demo",
+		"goalx afford --run demo master",
 		"canonical command surface",
 		"orchestrator",
 		"check evidence density, clear evidence, and actionability of findings",
@@ -1081,7 +1087,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"goalx add --run demo --mode research --effort high",
 		"goalx add --run demo --mode develop --effort medium",
 		"goalx add --run demo --mode research --engine ENGINE --model MODEL --effort LEVEL",
-		"goalx afford --run demo",
+		"goalx afford --run demo master",
 		"canonical command surface",
 		"temporary research session",
 		"Research-mode sessions produce evidence and reports, not mergeable code changes.",
@@ -1248,7 +1254,7 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 		"Read the inbox every control cycle before making decisions.",
 		"If you finish a thinking block without a concrete next action, immediately enter `goalx wait --run demo master --timeout 300`.",
 		"If a session is stale for 15+ minutes while its lease is healthy, park it and replace it.",
-		"Re-read the charter objective before declaring completion.",
+		"Reconfirm the immutable run objective from `goalx context --run demo` before declaring completion.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -1364,7 +1370,7 @@ func TestRenderMasterProtocolReferencesGoalxContextAndAfford(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"`goalx context --run demo`",
-		"`goalx afford --run demo`",
+		"`goalx afford --run demo master`",
 		"`/tmp/control/context-index.json`",
 		"`/tmp/control/activity.json`",
 		"`/tmp/control/affordances.md`",
@@ -1372,6 +1378,32 @@ func TestRenderMasterProtocolReferencesGoalxContextAndAfford(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestRenderMasterProtocolUsesContextInsteadOfCharterForStartup(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective: "ship it",
+		RunName:   "demo",
+		Mode:      goalx.ModeDevelop,
+		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	if strings.Contains(text, "Read `"+RunCharterPath(runDir)+"` first.") {
+		t.Fatalf("rendered master protocol should use goalx context as startup identity surface:\n%s", text)
+	}
+	if !strings.Contains(text, "`goalx context --run demo`") {
+		t.Fatalf("rendered master protocol missing goalx context startup surface:\n%s", text)
 	}
 }
 
