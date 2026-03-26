@@ -24,8 +24,8 @@ func TestNextDefaultsToAutoFirst(t *testing.T) {
 			t.Fatalf("Next: %v", err)
 		}
 	})
-	if !strings.Contains(out, "goalx auto \"your objective\"") {
-		t.Fatalf("next output missing auto-first quickstart:\n%s", out)
+	if !strings.Contains(out, "goalx run \"your objective\"") {
+		t.Fatalf("next output missing run-first quickstart:\n%s", out)
 	}
 	if strings.Contains(out, "goalx init") || strings.Contains(out, "goalx start") {
 		t.Fatalf("next output still promotes init/start:\n%s", out)
@@ -149,9 +149,9 @@ func TestNextSuggestsExplicitPhaseFromSavedResearchRun(t *testing.T) {
 		}
 	})
 	for _, want := range []string{
-		"goalx debate --from research-a",
-		"goalx implement --from research-a",
-		"goalx explore --from research-a",
+		"goalx run --from research-a --intent debate",
+		"goalx run --from research-a --intent implement",
+		"goalx run --from research-a --intent explore",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("next output missing %q:\n%s", want, out)
@@ -180,7 +180,7 @@ func TestNextFallsBackToLegacySavedRuns(t *testing.T) {
 			t.Fatalf("Next: %v", err)
 		}
 	})
-	if !strings.Contains(out, "goalx debate --from research-a") {
+	if !strings.Contains(out, "goalx run --from research-a --intent debate") {
 		t.Fatalf("next output missing legacy saved run guidance:\n%s", out)
 	}
 }

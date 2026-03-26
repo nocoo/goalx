@@ -828,6 +828,9 @@ esac
 	if controlState.LifecycleState == "completed" {
 		t.Fatalf("lifecycle_state = %q, want run kept active for unread master inbox", controlState.LifecycleState)
 	}
+	if _, err := os.Stat(filepath.Join(ControlDir(runDir), "handoffs", "master.json")); !os.IsNotExist(err) {
+		t.Fatalf("sidecar relaunch should not create legacy handoff file, stat err = %v", err)
+	}
 
 	logData, err := os.ReadFile(logPath)
 	if err != nil {

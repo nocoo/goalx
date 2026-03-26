@@ -261,7 +261,7 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 		DimensionsCatalog:      cfg.DimensionCatalog(),
 		TmuxSession:            tmuxSess,
 		ProjectRoot:            runWT,
-		SummaryPath:            filepath.Join(runDir, "summary.md"),
+		SummaryPath:            SummaryPath(runDir),
 		CharterPath:            RunCharterPath(runDir),
 		GoalPath:               goalPath,
 		GoalLogPath:            goalLogPath,

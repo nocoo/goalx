@@ -77,6 +77,7 @@ acceptance:
 		`"default_command": "printf 'e2e ok\n'"`,
 		`"effective_command": "printf 'e2e ok\n'"`,
 		`"goal_version": 1`,
+		`"command": "printf 'e2e ok\n'"`,
 		`"exit_code": 0`,
 	} {
 		if !strings.Contains(stateText, want) {
@@ -279,8 +280,13 @@ acceptance:
 		t.Fatalf("read acceptance state: %v", err)
 	}
 	stateText := string(stateData)
-	if !strings.Contains(stateText, `"exit_code": 0`) {
-		t.Fatalf("acceptance state missing exit_code 0:\n%s", stateText)
+	for _, want := range []string{
+		`"command": "printf 'e2e ok\n'"`,
+		`"exit_code": 0`,
+	} {
+		if !strings.Contains(stateText, want) {
+			t.Fatalf("acceptance state missing %q:\n%s", want, stateText)
+		}
 	}
 	if strings.Contains(stateText, `"status"`) {
 		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)

@@ -286,9 +286,21 @@ func CollectSavedResearchContext(runDir string) ([]string, []string, error) {
 		seen[path] = true
 	}
 
-	summaryPath := filepath.Join(runDir, "summary.md")
+	summaryPath := SummaryPath(runDir)
 	if info, err := os.Stat(summaryPath); err == nil && !info.IsDir() && info.Size() > 0 {
 		addPath(summaryPath)
+	}
+	if entries, err := os.ReadDir(ReportsDir(runDir)); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			path := filepath.Join(ReportsDir(runDir), entry.Name())
+			addPath(path)
+			if strings.HasSuffix(entry.Name(), "-report.md") {
+				sessionNames = append(sessionNames, strings.TrimSuffix(entry.Name(), "-report.md"))
+			}
+		}
 	}
 	if manifest != nil {
 		for _, session := range manifest.Sessions {

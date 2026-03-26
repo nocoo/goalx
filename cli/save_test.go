@@ -442,6 +442,48 @@ func TestSavePrefersRunReportsDirOverWorktreeFallback(t *testing.T) {
 	}
 }
 
+func TestSaveCopiesRunScopedReportsDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runName := "demo"
+	runDir := goalx.RunDir(projectRoot, runName)
+	if err := os.MkdirAll(ReportsDir(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir reports dir: %v", err)
+	}
+
+	cfg := goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeResearch,
+		Objective: "inspect",
+		Target:    goalx.TargetConfig{Files: []string{"notes.md"}},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
+	if err := os.WriteFile(filepath.Join(ReportsDir(runDir), "repo-summary.md"), []byte("repo report\n"), 0o644); err != nil {
+		t.Fatalf("write run-scoped report: %v", err)
+	}
+
+	if err := Save(projectRoot, []string{"--run", runName}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "reports", "repo-summary.md"))
+	if err != nil {
+		t.Fatalf("read saved run-scoped report: %v", err)
+	}
+	if string(got) != "repo report\n" {
+		t.Fatalf("saved run-scoped report = %q, want %q", string(got), "repo report\n")
+	}
+}
+
 func seedSaveRunProvenance(t *testing.T, projectRoot, runDir, runName, objective string) {
 	t.Helper()
 

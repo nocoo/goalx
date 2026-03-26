@@ -59,7 +59,7 @@ Run identity stays immutable for the life of the run. `{{.GoalPath}}` may evolve
 {{if .AcceptanceStatePath}}### Acceptance State
 
 Machine-readable acceptance state: `{{.AcceptanceStatePath}}` (read-only — verification-only; it does not define scope)
-{{if .CompletionProofPath}}Canonical completion proof manifest: `{{.CompletionProofPath}}` (read-only — inspect this when you need to understand current closeout coverage or proof gaps){{end}}
+{{if .CompletionProofPath}}Agent-owned closeout/evidence surface: `{{.CompletionProofPath}}` (read-only — inspect it when you need to understand current closeout coverage or proof gaps; GoalX does not validate verdict structure there){{end}}
 {{if .AcceptanceNotesPath}}Optional acceptance notes: `{{.AcceptanceNotesPath}}`{{end}}
 {{end}}
 {{end}}

@@ -17,6 +17,7 @@ var launchEnvDenylist = map[string]struct{}{
 	"PS1":                  {},
 	"PWD":                  {},
 	"SHLVL":                {},
+	"TERM":                 {},
 	"TERM_PROGRAM":         {},
 	"TERM_PROGRAM_VERSION": {},
 	"TMUX":                 {},
@@ -69,6 +70,14 @@ func buildEngineExecCommand(engineCmd, prompt string) string {
 
 func buildLaunchEnvPrefix(env map[string]string) string {
 	parts := []string{"env"}
+	denyKeys := make([]string, 0, len(launchEnvDenylist))
+	for key := range launchEnvDenylist {
+		denyKeys = append(denyKeys, key)
+	}
+	sort.Strings(denyKeys)
+	for _, key := range denyKeys {
+		parts = append(parts, "-u", key)
+	}
 	keys := make([]string, 0, len(env))
 	for key := range env {
 		keys = append(keys, key)

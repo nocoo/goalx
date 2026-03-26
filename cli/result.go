@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	goalx "github.com/vonbai/goalx"
@@ -17,8 +18,15 @@ type selectionJSON struct {
 	Branch string `json:"branch"`
 }
 
-// Result prints the saved result for a run. Research runs print summary.md,
-// develop runs print the kept session plus branch history and diff stat.
+type resultRun struct {
+	Name   string
+	Dir    string
+	Config *goalx.Config
+	Saved  bool
+}
+
+// Result prints the canonical run-level result surface when present, then falls
+// back to supporting reports or kept-branch metadata for older runs.
 func Result(projectRoot string, args []string) error {
 	if printUsageIfHelp(args, "usage: goalx result [NAME] [--full]") {
 		return nil
@@ -44,45 +52,21 @@ func Result(projectRoot string, args []string) error {
 		return fmt.Errorf("usage: goalx result [NAME] [--full]")
 	}
 
-	location, err := ResolveSavedRunLocation(projectRoot, runName)
+	target, err := resolveResultRun(projectRoot, runName)
 	if err != nil {
-		var multipleErr MultipleSavedRunsError
-		switch {
-		case errors.Is(err, os.ErrNotExist):
-			if strings.TrimSpace(runName) != "" {
-				return fmt.Errorf("saved run %q not found", runName)
-			}
-			return fmt.Errorf("no saved runs found")
-		case errors.As(err, &multipleErr):
-			return fmt.Errorf("%s (specify NAME)", multipleErr.Error())
-		}
 		return err
 	}
-	runDir := location.Dir
 
-	cfg, err := LoadSavedRunSpec(runDir)
-	if err != nil {
-		return fmt.Errorf("load saved config: %w", err)
-	}
-
-	if cfg.Mode == goalx.ModeResearch {
-		data, err := os.ReadFile(filepath.Join(runDir, "summary.md"))
-		if err != nil {
-			reportData, reportErr := loadSavedResearchFallback(runDir)
-			if reportErr != nil {
-				return fmt.Errorf("read summary: %w", err)
-			}
-			data = reportData
-		}
+	if data, err := loadResultSurface(target.Dir); err == nil {
 		if full {
 			fmt.Print(string(data))
 			return nil
 		}
-		printResearchResult(data)
+		printRunResult(data)
 		return nil
 	}
 
-	selection, err := loadResultSelection(projectRoot, runDir, cfg.Name)
+	selection, err := loadResultSelection(projectRoot, target.Dir, target.Config.Name)
 	if err != nil {
 		return err
 	}
@@ -102,13 +86,63 @@ func Result(projectRoot string, args []string) error {
 	return nil
 }
 
-func loadSavedResearchFallback(runDir string) ([]byte, error) {
-	contextFiles, _, err := CollectSavedResearchContext(runDir)
-	if err != nil {
+func resolveResultRun(projectRoot, runName string) (*resultRun, error) {
+	location, err := ResolveSavedRunLocation(projectRoot, runName)
+	if err == nil {
+		cfg, loadErr := LoadSavedRunSpec(location.Dir)
+		if loadErr != nil {
+			return nil, fmt.Errorf("load saved config: %w", loadErr)
+		}
+		return &resultRun{
+			Name:   cfg.Name,
+			Dir:    location.Dir,
+			Config: cfg,
+			Saved:  true,
+		}, nil
+	}
+
+	var multipleErr MultipleSavedRunsError
+	switch {
+	case errors.As(err, &multipleErr):
+		return nil, fmt.Errorf("%s (specify NAME)", multipleErr.Error())
+	case !errors.Is(err, os.ErrNotExist):
 		return nil, err
 	}
+
+	rc, activeErr := ResolveRun(projectRoot, runName)
+	if activeErr == nil {
+		return &resultRun{
+			Name:   rc.Name,
+			Dir:    rc.RunDir,
+			Config: rc.Config,
+			Saved:  false,
+		}, nil
+	}
+
+	if strings.TrimSpace(runName) != "" {
+		return nil, fmt.Errorf("saved run %q not found", runName)
+	}
+	return nil, fmt.Errorf("no saved runs found")
+}
+
+func loadResultSurface(runDir string) ([]byte, error) {
+	data, err := os.ReadFile(SummaryPath(runDir))
+	if err == nil && len(data) > 0 {
+		return data, nil
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read summary: %w", err)
+	}
+	return loadResultFallback(runDir)
+}
+
+func loadResultFallback(runDir string) ([]byte, error) {
+	contextFiles, _, err := CollectSavedResearchContext(runDir)
+	if err != nil {
+		contextFiles = nil
+	}
 	for _, path := range contextFiles {
-		if filepath.Base(path) == "summary.md" {
+		if path == SummaryPath(runDir) || filepath.Base(path) == "summary.md" {
 			continue
 		}
 		data, err := os.ReadFile(path)
@@ -116,7 +150,38 @@ func loadSavedResearchFallback(runDir string) ([]byte, error) {
 			return data, nil
 		}
 	}
+	reportFiles, err := loadRunScopedReportFiles(runDir)
+	if err == nil {
+		for _, data := range reportFiles {
+			if len(data) > 0 {
+				return data, nil
+			}
+		}
+	}
 	return nil, fmt.Errorf("no saved research report found in %s", runDir)
+}
+
+func loadRunScopedReportFiles(runDir string) ([][]byte, error) {
+	entries, err := os.ReadDir(ReportsDir(runDir))
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+	out := make([][]byte, 0, len(names))
+	for _, name := range names {
+		data, err := os.ReadFile(filepath.Join(ReportsDir(runDir), name))
+		if err == nil && len(data) > 0 {
+			out = append(out, data)
+		}
+	}
+	return out, nil
 }
 
 func parseSections(data []byte) map[string]string {
@@ -146,15 +211,15 @@ func parseSections(data []byte) map[string]string {
 	return sections
 }
 
-func printResearchResult(data []byte) {
-	fmt.Println("=== Research Result ===")
-	fmt.Print(renderResearchSummary(data))
+func printRunResult(data []byte) {
+	fmt.Println("=== Result ===")
+	fmt.Print(renderResultSummary(data))
 	fmt.Println()
 	fmt.Println()
 	fmt.Println("Full report: goalx result --full")
 }
 
-func renderResearchSummary(data []byte) string {
+func renderResultSummary(data []byte) string {
 	sections := parseSections(data)
 	var parts []string
 

@@ -10,62 +10,56 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestAutoStartsRunWithoutInjectingMode(t *testing.T) {
-	oldStart := autoStart
+func TestAutoRoutesThroughRunEntrypointWithoutInjectingMode(t *testing.T) {
+	oldRun := runEntrypoint
 	defer func() {
-		autoStart = oldStart
+		runEntrypoint = oldRun
 	}()
 
-	startCalls := 0
-	autoStart = func(_ string, args []string) error {
-		startCalls++
-		want := []string{"ship it"}
+	runCalls := 0
+	runEntrypoint = func(_ string, args []string, nc *nextConfigJSON) error {
+		runCalls++
+		if nc != nil {
+			t.Fatalf("next config = %#v, want nil", nc)
+		}
+		want := []string{"--intent", runIntentDeliver, "ship it"}
 		if len(args) != len(want) {
-			t.Fatalf("start args = %v, want %v", args, want)
+			t.Fatalf("run args = %v, want %v", args, want)
 		}
 		for i := range want {
 			if args[i] != want[i] {
-				t.Fatalf("start args = %v, want %v", args, want)
+				t.Fatalf("run args = %v, want %v", args, want)
 			}
 		}
 		return nil
 	}
 
-	out := captureStdout(t, func() {
-		if err := Auto(t.TempDir(), []string{"ship it"}); err != nil {
-			t.Fatalf("Auto: %v", err)
-		}
-	})
-
-	if startCalls != 1 {
-		t.Fatalf("start calls = %d, want 1", startCalls)
+	if err := Auto(t.TempDir(), []string{"ship it"}); err != nil {
+		t.Fatalf("Auto: %v", err)
 	}
-	for _, want := range []string{
-		"Run started.",
-		"goalx status",
-		"goalx observe",
-		"goalx attach",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("auto output missing %q:\n%s", want, out)
-		}
+
+	if runCalls != 1 {
+		t.Fatalf("run calls = %d, want 1", runCalls)
 	}
 }
 
 func TestAutoPreservesExplicitMode(t *testing.T) {
-	oldStart := autoStart
+	oldRun := runEntrypoint
 	defer func() {
-		autoStart = oldStart
+		runEntrypoint = oldRun
 	}()
 
-	autoStart = func(_ string, args []string) error {
-		want := []string{"ship it", "--develop"}
+	runEntrypoint = func(_ string, args []string, nc *nextConfigJSON) error {
+		if nc != nil {
+			t.Fatalf("next config = %#v, want nil", nc)
+		}
+		want := []string{"--intent", runIntentDeliver, "ship it", "--develop"}
 		if len(args) != len(want) {
-			t.Fatalf("start args = %v, want %v", args, want)
+			t.Fatalf("run args = %v, want %v", args, want)
 		}
 		for i := range want {
 			if args[i] != want[i] {
-				t.Fatalf("start args = %v, want %v", args, want)
+				t.Fatalf("run args = %v, want %v", args, want)
 			}
 		}
 		return nil
@@ -76,31 +70,17 @@ func TestAutoPreservesExplicitMode(t *testing.T) {
 	}
 }
 
-func TestAutoReturnsInitError(t *testing.T) {
-	oldStart := autoStart
+func TestAutoReturnsRunError(t *testing.T) {
+	oldRun := runEntrypoint
 	defer func() {
-		autoStart = oldStart
+		runEntrypoint = oldRun
 	}()
 
-	autoStart = func(string, []string) error { return errors.New("boom") }
+	runEntrypoint = func(string, []string, *nextConfigJSON) error { return errors.New("boom") }
 
 	err := Auto(t.TempDir(), []string{"ship it"})
-	if err == nil || !strings.Contains(err.Error(), "start: boom") {
-		t.Fatalf("Auto error = %v, want start failure", err)
-	}
-}
-
-func TestAutoReturnsStartError(t *testing.T) {
-	oldStart := autoStart
-	defer func() {
-		autoStart = oldStart
-	}()
-
-	autoStart = func(string, []string) error { return errors.New("boom") }
-
-	err := Auto(t.TempDir(), []string{"ship it"})
-	if err == nil || !strings.Contains(err.Error(), "start: boom") {
-		t.Fatalf("Auto error = %v, want start failure", err)
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("Auto error = %v, want run failure", err)
 	}
 }
 
@@ -153,14 +133,14 @@ local_validation:
 }
 
 func TestAutoHelpPrintsUsage(t *testing.T) {
-	oldStart := autoStart
+	oldRun := runEntrypoint
 	defer func() {
-		autoStart = oldStart
+		runEntrypoint = oldRun
 	}()
 
-	startCalls := 0
-	autoStart = func(string, []string) error {
-		startCalls++
+	runCalls := 0
+	runEntrypoint = func(string, []string, *nextConfigJSON) error {
+		runCalls++
 		return nil
 	}
 
@@ -170,8 +150,8 @@ func TestAutoHelpPrintsUsage(t *testing.T) {
 		}
 	})
 
-	if startCalls != 0 {
-		t.Fatalf("start calls = %d, want 0", startCalls)
+	if runCalls != 0 {
+		t.Fatalf("run calls = %d, want 0", runCalls)
 	}
 	if !strings.Contains(out, "usage: goalx auto") {
 		t.Fatalf("auto help missing usage:\n%s", out)

@@ -135,7 +135,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		AcceptanceStatePath: AcceptanceStatePath(runDir),
 		CompletionProofPath: CompletionStatePath(runDir),
 		CoordinationPath:    CoordinationPath(runDir),
-		SummaryPath:         filepath.Join(runDir, "summary.md"),
+		SummaryPath:         SummaryPath(runDir),
 		ControlDir:          ControlDir(runDir),
 		ActivityPath:        ActivityPath(runDir),
 		TransportFactsPath:  TransportFactsPath(runDir),

@@ -14,11 +14,11 @@ import (
 const usage = `goalx — autonomous research CLI
 
 Usage:
+  goalx run     "objective" [flags]   Primary goal entrypoint; defaults to deliver semantics
+  goalx run     --from RUN --intent debate|implement|explore [flags] Continue an existing run with an explicit next-step intent
   goalx init    "objective" [flags]   Generate an explicit manual draft config from an objective
   goalx start   --config PATH         Create run + tmux + launch the master from an explicit manual draft
   goalx start   "objective" [flags]   Create and start a run directly from CLI flags
-  goalx research "objective" [flags]  Start a research run directly from CLI flags
-  goalx develop  "objective" [flags]  Start a develop run directly from CLI flags
   goalx list                          List all runs (active / completed / archived)
   goalx status  [--run RUN] [session] Show current run progress and control summary
   goalx context [--run RUN] [--json]    Show the run context index
@@ -35,9 +35,6 @@ Usage:
   goalx archive [--run RUN] <session> Git tag + preserve
   goalx save    [--run RUN]           Save run artifacts to user-scoped durable storage
   goalx verify  [--run RUN]           Run the effective acceptance command and record exit code + output
-  goalx debate  --from RUN [flags]     Start a debate run from a saved run
-  goalx implement --from RUN [flags]   Start a develop run from a saved run
-  goalx explore --from RUN [flags]     Start a follow-up research run from a saved run
   goalx drop    [--run RUN]           Cleanup branch + worktree
   goalx report  [--run RUN]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
@@ -47,7 +44,6 @@ Usage:
   goalx ack-session [--run RUN] <session>      Acknowledge latest processed session inbox entry
   goalx wait    [--run RUN] [target] [--timeout DURATION] Block on unread inbox entries or timeout
   goalx observe [RUN]                  Capture live output from all tmux windows
-  goalx auto    "objective" [flags]   Init and start one master-led run, then exit
   goalx serve                         Start the GoalX HTTP control server
   goalx next                           Show next pipeline step
 
@@ -55,7 +51,8 @@ Notes:
   RUN selectors are local-first. Bare NAME stays in the current project; use project-id/run or run_id for cross-project targeting.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   Use --master, --research-role, and --develop-role for role-specific engine/model defaults.
-  goalx auto remains the default path; debate/implement/explore require --from RUN unless you choose --write-config.
+  Use goalx run --intent research or --intent develop when you want a non-default launch hint.
+  goalx run --intent debate|implement|explore requires --from RUN unless you choose --write-config.
   .goalx/config.yaml is the shared project config; .goalx/goalx.yaml is an explicit manual draft only.
 
 Run 'goalx <command> --help' for details.`
@@ -63,7 +60,7 @@ Run 'goalx <command> --help' for details.`
 var (
 	errInterrupted       = errors.New("interrupted by signal")
 	mainStart            = cli.Start
-	mainAuto             = cli.Auto
+	mainRun              = func(projectRoot string, args []string) error { return cli.Run(projectRoot, args, nil) }
 	mainStop             = cli.Stop
 	mainWait             = cli.Wait
 	mainSidecar          = cli.Sidecar
@@ -113,14 +110,13 @@ func runCommand(cwd, cmd string, args []string) error {
 	cwd = cli.CanonicalProjectRoot(cwd)
 
 	switch cmd {
+	case "run":
+		if runNeedsSignalCleanup(args) {
+			return runWithSignalCleanup(cwd, func() error { return mainRun(cwd, args) })
+		}
+		return mainRun(cwd, args)
 	case "start":
 		return runWithSignalCleanup(cwd, func() error { return mainStart(cwd, args) })
-	case "auto":
-		return runWithSignalCleanup(cwd, func() error { return mainAuto(cwd, args) })
-	case "research":
-		return runWithSignalCleanup(cwd, func() error { return cli.Research(cwd, args) })
-	case "develop":
-		return runWithSignalCleanup(cwd, func() error { return cli.Develop(cwd, args) })
 	case "init":
 		return cli.Init(cwd, args)
 	case "list":
@@ -163,12 +159,6 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Report(cwd, args)
 	case "result":
 		return cli.Result(cwd, args)
-	case "debate":
-		return cli.Debate(cwd, args, nil)
-	case "implement":
-		return cli.Implement(cwd, args, nil)
-	case "explore":
-		return cli.Explore(cwd, args)
 	case "add":
 		return cli.Add(cwd, args)
 	case "dimension":
@@ -193,6 +183,28 @@ func runCommand(cwd, cmd string, args []string) error {
 		return mainLeaseLoop(cwd, args)
 	default:
 		return errUnknownCommand
+	}
+}
+
+func runNeedsSignalCleanup(args []string) bool {
+	intent := "deliver"
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--intent":
+			if i+1 < len(args) {
+				intent = args[i+1]
+				i++
+			}
+		case "--from":
+			return false
+		}
+	}
+
+	switch intent {
+	case "debate", "implement", "explore":
+		return false
+	default:
+		return true
 	}
 }
 

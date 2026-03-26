@@ -2,8 +2,6 @@ package cli
 
 import (
 	"fmt"
-
-	goalx "github.com/vonbai/goalx"
 )
 
 func Research(projectRoot string, args []string) error {
@@ -11,9 +9,5 @@ func Research(projectRoot string, args []string) error {
 		fmt.Println(launchUsage("research"))
 		return nil
 	}
-	opts, err := parseLaunchOptions(args, goalx.ModeResearch, false)
-	if err != nil {
-		return err
-	}
-	return startResolvedLaunch(projectRoot, opts)
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentResearch), nil)
 }

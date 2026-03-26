@@ -12,17 +12,25 @@ func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
 		fmt.Println(phaseUsage("implement"))
 		return nil
 	}
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentImplement), nc)
+}
+
+func runImplement(projectRoot string, args []string, nc *nextConfigJSON) error {
 	opts, err := parsePhaseOptions("implement", args)
 	if err != nil {
 		return err
 	}
-	return runPhaseAction(projectRoot, phaseActionSpec{
+	return runPhaseAction(projectRoot, implementPhaseSpec(), opts, nc)
+}
+
+func implementPhaseSpec() phaseActionSpec {
+	return phaseActionSpec{
 		Kind:         "implement",
 		Mode:         goalx.ModeDevelop,
 		NoContextErr: "no reports/summary found in %s",
 		DraftHeader:  "# goalx manual draft — implement fixes from %s\n",
 		DefaultHints: implementPhaseHints,
-	}, opts, nc)
+	}
 }
 
 func implementPhaseHints(*savedPhaseSource) []string {

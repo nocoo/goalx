@@ -40,6 +40,7 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 		"## Run Identity",
 		"Objective:",
 		"Run dir:",
+		"Closeout/evidence surface:",
 		"Context index:",
 		"## Provider Facts",
 		"GoalX canonical provider runtime is tmux + interactive TUI.",

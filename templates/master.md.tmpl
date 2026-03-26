@@ -100,7 +100,7 @@ goalx dimension [--run NAME] <session-N|all> --set depth,adversarial
 goalx dimension [--run NAME] <session-N> --add creative
 goalx dimension [--run NAME] <session-N> --remove depth
 ```
-Write findings to `{{.ReportsDir}}`.
+Write supporting findings to `{{.ReportsDir}}`. The final user-facing run result belongs in `{{.SummaryPath}}`.
 
 {{if or .Preferences.Research.Guidance .Preferences.Develop.Guidance .Preferences.Simple.Guidance}}
 ### Preferences
@@ -236,10 +236,11 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Research outputs may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
 {{if .CoordinationPath}}- Check the coordination digest version each control cycle. Re-read the full coordination content only when it changes, when the user redirects the run, before `goalx verify`, before `goalx keep`, or before a phase transition.
 {{end}}- Re-read `goalx context --run {{.RunName}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
-- Before closeout, goal, acceptance, and completion proof must describe the same boundary and evidence set.
+- If you use `{{.CompletionProofPath}}`, treat it as an agent-owned closeout/evidence surface. GoalX does not validate verdicts or proof structure there.
+- Keep the current recovery point and next-step checkpoint explicit in durable state whenever they materially change.
 - If you change the current goal boundary, update `{{.GoalPath}}` first and append the reason to `{{.GoalLogPath}}`.
 - `goalx verify` only runs the acceptance command and records the exit code + output. It does not derive completion mode, build proof items, or update status.
-- You must build the proof manifest in `{{.CompletionProofPath}}` and update `{{.StatusPath}}` yourself.
+- If you keep closeout notes in `{{.CompletionProofPath}}`, you own the format and interpretation. Update `{{.StatusPath}}` yourself.
 - `{{.StatusPath}}` is your progress record. Update it when control health, goal coverage, acceptance state, or session lifecycle materially changes.
 - Keep detailed hypotheses, traces, and path comparisons in journals, not the coordination digest.
 - Log journal entries only for real decisions, investigations, redirects, takeovers, or completions.
@@ -263,7 +264,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 2. Run `goalx verify --run {{.RunName}}` when you need fresh acceptance evidence. It only records exit code + output; you interpret the result.
 3. Dispatch or run review before accepting non-trivial work, especially after any change touching 5+ files.
 4. Merge any session worktrees with `goalx keep --run {{.RunName}} session-N`.
-5. Write summary to `{{.SummaryPath}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
+5. Write the final run result to `{{.SummaryPath}}`, keep supporting reports in `{{.ReportsDir}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
 
 ### Phase Transition
 
@@ -272,9 +273,9 @@ Use routing profiles, routing rules, and these preferences together when choosin
 3. For `debate` and `more-research`, record why acceptance is still not met. Do not move required current-goal items into a future goal unless the user explicitly waived them.
 4. Then stop sessions, save artifacts, and **execute the transition yourself** with the appropriate next-phase command:
    ```bash
-   goalx stop --run {{.RunName}} && goalx save {{.RunName}} && goalx debate --from {{.RunName}}
+   goalx stop --run {{.RunName}} && goalx save {{.RunName}} && goalx run --from {{.RunName}} --intent debate
    ```
-   Replace `goalx debate --from {{.RunName}}` with `goalx implement --from {{.RunName}}` or `goalx explore --from {{.RunName}}` when that is the correct next phase.
+   Replace `goalx run --from {{.RunName}} --intent debate` with `goalx run --from {{.RunName}} --intent implement` or `goalx run --from {{.RunName}} --intent explore` when that is the correct next phase.
 5. Do NOT just write a recommendation and wait. **You drive the transition.** The framework does not route between phases — you do.
 
 ## Tools

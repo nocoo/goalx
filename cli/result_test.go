@@ -100,6 +100,52 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 	}
 }
 
+func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
+	projectRoot := initGitRepo(t)
+	writeAndCommit(t, projectRoot, "README.md", "base\n", "base commit")
+
+	headBranch := currentBranchName(t, projectRoot)
+	branch := "goalx/dev-run/1"
+	runGit(t, projectRoot, "checkout", "-b", branch)
+	writeAndCommit(t, projectRoot, "README.md", "base\nupdated\n", "feat: update readme")
+	runGit(t, projectRoot, "checkout", headBranch)
+
+	runDir := writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
+		Name: "dev-run",
+		Mode: goalx.ModeDevelop,
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+	}, map[string]string{
+		"summary.md": "# Final Result\n\nship it\n",
+	})
+
+	selection := map[string]string{
+		"kept":   "session-1",
+		"branch": branch,
+	}
+	data, err := json.Marshal(selection)
+	if err != nil {
+		t.Fatalf("marshal selection: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "selection.json"), data, 0o644); err != nil {
+		t.Fatalf("write selection.json: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"dev-run"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "ship it") {
+		t.Fatalf("result output missing final summary:\n%s", out)
+	}
+	if strings.Contains(out, "feat: update readme") {
+		t.Fatalf("result output should prefer summary surface over branch summary:\n%s", out)
+	}
+}
+
 func TestResultPrintsSmartResearchSummaryByDefault(t *testing.T) {
 	projectRoot := t.TempDir()
 
@@ -140,7 +186,7 @@ hidden details
 	})
 
 	for _, want := range []string{
-		"=== Research Result ===",
+		"=== Result ===",
 		"Recommendation: implement",
 		"- finding 1",
 		"... (1 more lines)",
@@ -230,6 +276,62 @@ func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
 
 	if !strings.Contains(out, "# report only") {
 		t.Fatalf("result output missing manifest-backed report:\n%s", out)
+	}
+}
+
+func TestResultFallsBackToActiveResearchReportWhenSavedRunMissing(t *testing.T) {
+	projectRoot := t.TempDir()
+	cfg := &goalx.Config{
+		Name:      "active-run",
+		Mode:      goalx.ModeResearch,
+		Objective: "inspect repo",
+		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
+	}
+	runDir := writeRunSpecFixture(t, projectRoot, cfg)
+	reportPath := filepath.Join(ReportsDir(runDir), "repo-summary.md")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("mkdir reports dir: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("# active report\n\nlive data\n"), 0o644); err != nil {
+		t.Fatalf("write active report: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"active-run"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "# active report") {
+		t.Fatalf("result output missing active run report:\n%s", out)
+	}
+}
+
+func TestResultFallsBackToActiveReportBeforeDevelopSelectionExists(t *testing.T) {
+	projectRoot := t.TempDir()
+	cfg := &goalx.Config{
+		Name:      "active-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "inspect repo",
+		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
+	}
+	runDir := writeRunSpecFixture(t, projectRoot, cfg)
+	reportPath := filepath.Join(ReportsDir(runDir), "repo-summary.md")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("mkdir reports dir: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("# current report\n\nlive data\n"), 0o644); err != nil {
+		t.Fatalf("write current report: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Result(projectRoot, []string{"active-run"}); err != nil {
+			t.Fatalf("Result: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "# current report") {
+		t.Fatalf("result output missing active report fallback:\n%s", out)
 	}
 }
 

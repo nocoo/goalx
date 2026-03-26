@@ -19,6 +19,7 @@ import (
 // and path to captured output. No derived status or verdict.
 type AcceptanceResult struct {
 	CheckedAt    string `json:"checked_at,omitempty"`
+	Command      string `json:"command,omitempty"`
 	ExitCode     *int   `json:"exit_code,omitempty"`
 	EvidencePath string `json:"evidence_path,omitempty"`
 }

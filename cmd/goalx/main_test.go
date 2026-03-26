@@ -170,7 +170,7 @@ master:
 		"summary.md": "# research summary\n",
 	})
 
-	out := runGoalx(t, binPath, home, projectRoot, "debate", "--from", "research-a", "--write-config", "--preset", "codex", "--name", "debate-a")
+	out := runGoalx(t, binPath, home, projectRoot, "run", "--from", "research-a", "--intent", "debate", "--write-config", "--preset", "codex", "--name", "debate-a")
 	if !strings.Contains(out, "Generated manual draft") {
 		t.Fatalf("debate output missing generated message:\n%s", out)
 	}
@@ -234,6 +234,41 @@ func TestRunCommandStopsActiveRunOnSignal(t *testing.T) {
 	}
 	if stopCalls != 1 {
 		t.Fatalf("stop calls = %d, want 1", stopCalls)
+	}
+}
+
+func TestRunCommandDispatchesRun(t *testing.T) {
+	oldRun := mainRun
+	defer func() { mainRun = oldRun }()
+
+	called := false
+	mainRun = func(_ string, args []string) error {
+		called = true
+		want := []string{"ship it", "--intent", "research"}
+		if len(args) != len(want) {
+			t.Fatalf("args = %v, want %v", args, want)
+		}
+		for i := range want {
+			if args[i] != want[i] {
+				t.Fatalf("args = %v, want %v", args, want)
+			}
+		}
+		return nil
+	}
+
+	if err := runCommand(t.TempDir(), "run", []string{"ship it", "--intent", "research"}); err != nil {
+		t.Fatalf("runCommand run: %v", err)
+	}
+	if !called {
+		t.Fatal("run command was not dispatched")
+	}
+}
+
+func TestRunCommandRejectsLegacyTopLevelAliases(t *testing.T) {
+	for _, legacy := range []string{"auto", "research", "develop", "debate", "implement", "explore"} {
+		if err := runCommand(t.TempDir(), legacy, []string{"demo"}); !errors.Is(err, errUnknownCommand) {
+			t.Fatalf("runCommand %s error = %v, want errUnknownCommand", legacy, err)
+		}
 	}
 }
 
@@ -383,5 +418,31 @@ func TestUsageDocumentsExplicitCrossProjectSelectors(t *testing.T) {
 func TestUsageDocumentsDimensionCommand(t *testing.T) {
 	if !strings.Contains(usage, "goalx dimension") {
 		t.Fatalf("usage missing dimension command:\n%s", usage)
+	}
+}
+
+func TestUsageDocumentsRunCommand(t *testing.T) {
+	if !strings.Contains(usage, "goalx run") {
+		t.Fatalf("usage missing run command:\n%s", usage)
+	}
+	if !strings.Contains(usage, "Primary goal entrypoint") {
+		t.Fatalf("usage missing run contract:\n%s", usage)
+	}
+}
+
+func TestUsageOmitsLegacyLaunchAliases(t *testing.T) {
+	for _, unwanted := range []string{
+		"goalx auto",
+		"goalx research",
+		"goalx develop",
+		"goalx debate",
+		"goalx implement",
+		"goalx explore",
+		"Temporary alias",
+		"legacy launch/phase commands remain temporary aliases",
+	} {
+		if strings.Contains(usage, unwanted) {
+			t.Fatalf("usage should omit legacy launch alias %q:\n%s", unwanted, usage)
+		}
 	}
 }

@@ -1,17 +1,17 @@
 # GoalX
 
 ```bash
-goalx auto "audit the authentication system and fix every vulnerability"
+goalx run "the authentication system is secure and all vulnerabilities are fixed"
 # go to sleep
 # wake up to results
 ```
 
-You give a goal. GoalX launches a master agent that decomposes it, spins up parallel workers across AI engines, challenges findings, rescues stuck sessions, and synthesizes everything into a final result. You come back to a research report or a passing test suite — depending on what the goal needed.
+You describe where you want to end up. GoalX launches a master agent that figures out how to get there — decomposes the goal, spins up parallel workers across AI engines, challenges findings, rescues stuck sessions, and synthesizes everything into a final result. You come back to a research report or a passing test suite — depending on what the goal needed.
 
 ## What Actually Happens
 
 ```
-$ goalx auto "find and fix all N+1 query issues in the API layer"
+$ goalx run "the API layer has no N+1 query issues and performs within acceptable limits"
 
 GoalX ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -34,7 +34,7 @@ GoalX ━━━━━━━━━━━━━━━━━━━━━━━━�
 Behind the scenes:
 
 ```
-                        goalx auto "goal"
+                        goalx run "goal"
                               │
                     ┌─────────┴─────────┐
                     │     Master        │  opus — decomposes goal,
@@ -81,7 +81,7 @@ Zero config needed — GoalX detects your engines and picks the best preset:
 
 ```bash
 # The default. Master decides everything.
-goalx auto "goal"
+goalx run "goal"
 
 # Watch it work
 goalx observe
@@ -95,21 +95,21 @@ goalx keep
 
 That's the entire workflow for most goals. Everything below is optional control.
 
-## Phase Runs
+## Intent Overrides
 
-When you know what kind of work you want:
+When you want to bias the launch without reintroducing multiple entrypoints:
 
 ```bash
-goalx research "map all API endpoints and their auth requirements" --effort high
-goalx develop "implement rate limiting on all public endpoints" --effort medium
+goalx run "all API endpoints and their auth requirements are documented" --intent research --effort high
+goalx run "all public endpoints are rate-limited and protected" --intent develop --effort medium
 ```
 
-Chain phases from saved results:
+Continue an existing run with an explicit next-step intent:
 
 ```bash
-goalx debate --from auth-audit          # challenge research findings
-goalx implement --from auth-audit       # build fixes from research
-goalx explore --from auth-audit         # dig deeper into one area
+goalx run --from auth-audit --intent debate     # challenge findings
+goalx run --from auth-audit --intent implement  # build from prior results
+goalx run --from auth-audit --intent explore    # dig deeper into one area
 ```
 
 ## Runtime Control
@@ -132,8 +132,8 @@ goalx resume session-3
 ## Effort Levels
 
 ```bash
-goalx research "goal" --effort high     # deep reasoning
-goalx develop "goal" --effort minimal   # fast cheap pass
+goalx run "goal" --intent research --effort high
+goalx run "goal" --intent develop --effort minimal
 ```
 
 | Level | When to Use |
@@ -149,7 +149,7 @@ goalx develop "goal" --effort minimal   # fast cheap pass
 Dimensions shape how agents approach the objective:
 
 ```bash
-goalx auto "audit security" --dimension adversarial,evidence
+goalx run "audit security" --dimension adversarial,evidence
 goalx dimension session-2 --add creative    # change live
 ```
 
@@ -210,12 +210,9 @@ local_validation:
 | Command | What It Does |
 |---------|-------------|
 | **Start** | |
-| `goalx auto` | One master-led run. The default path. |
-| `goalx research` | Direct research run with role defaults |
-| `goalx develop` | Direct develop run with role defaults |
-| `goalx debate --from RUN` | Challenge findings from a saved run |
-| `goalx implement --from RUN` | Build from a saved run's research |
-| `goalx explore --from RUN` | Dig deeper from a saved run |
+| `goalx run` | Primary goal entrypoint. Master decides the path. |
+| `goalx run --intent research|develop` | Bias the initial launch without changing the single-entrypoint model |
+| `goalx run --from RUN --intent debate|implement|explore` | Continue an existing run with an explicit next-step intent |
 | **Observe** | |
 | `goalx observe` | Live transport capture + control summary |
 | `goalx status` | Progress, lease health, inbox, reminders |
@@ -265,7 +262,7 @@ goalx/
 └── cmd/goalx/main.go     # Entry point
 ```
 
-**Master** reads the immutable `run-charter.json`, maintains `goal.json` as the mutable completion boundary, dispatches parallel work, rescues stuck sessions, and builds `proof/completion.json`.
+**Master** reads the immutable `run-charter.json`, maintains `goal.json` as the mutable completion boundary, dispatches parallel work, rescues stuck sessions, and writes the final result to `summary.md`. If the master keeps closeout notes in `proof/completion.json`, it owns the format — the framework does not validate it.
 
 **Subagent** resumes from durable identity + charter, executes hypothesis-driven research or structured TDD, and communicates via journal + inbox.
 
@@ -280,8 +277,9 @@ Every run gets its own git worktree. Sessions can optionally get sub-worktrees f
 ├── run-charter.json               # immutable doctrine
 ├── state/                         # mutable run + session state
 ├── control/                       # inbox, dimensions, guidance
-├── proof/                         # completion evidence
-└── reports/                       # research outputs
+├── summary.md                     # canonical run result
+├── reports/                       # supporting research outputs
+└── proof/                         # agent-owned closeout evidence
 ```
 
 ## HTTP API
@@ -292,7 +290,7 @@ goalx serve    # starts on configured bind address
 
 Full REST API for remote management. Bearer token auth + IP binding. See [deploy/](deploy/) for systemd unit and config.
 
-Key endpoints: `POST /projects/:name/goalx/auto`, `/observe`, `/status`, `/tell`, `/keep`, `/stop`. Same action names as the CLI.
+Key endpoints: `POST /projects/:name/goalx/auto`, `/observe`, `/status`, `/tell`, `/keep`, `/stop`. The HTTP API still exposes the existing GoalX action names.
 
 ## OpenClaw Integration
 

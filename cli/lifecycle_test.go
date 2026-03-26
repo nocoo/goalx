@@ -43,6 +43,9 @@ func TestParkMarksSessionParkedAndStopsWindow(t *testing.T) {
 	if sess.BlockedBy != "postgres lock timeout" {
 		t.Fatalf("session blocked_by = %q, want postgres lock timeout", sess.BlockedBy)
 	}
+	if _, err := os.Stat(filepath.Join(ControlDir(runDir), "handoffs", "session-1.json")); !os.IsNotExist(err) {
+		t.Fatalf("park should not create legacy handoff file, stat err = %v", err)
+	}
 
 	logData, err := os.ReadFile(logPath)
 	if err != nil {
@@ -165,6 +168,14 @@ func TestResumeRelaunchesParkedSessionAndMarksActive(t *testing.T) {
 	}
 	if strings.Contains(logText, "send-keys -t "+wantSession+":session-1") {
 		t.Fatalf("resume should launch directly, not via send-keys:\n%s", logText)
+	}
+
+	inboxData, err := os.ReadFile(ControlInboxPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("read session inbox: %v", err)
+	}
+	if strings.Contains(string(inboxData), `"type":"handoff"`) {
+		t.Fatalf("resume should not queue legacy handoff message:\n%s", string(inboxData))
 	}
 }
 
@@ -497,6 +508,9 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	}
 	if got := coord.Sessions["session-2"].Scope; got != "db race triage" {
 		t.Fatalf("session-2 scope = %q, want db race triage", got)
+	}
+	if _, err := os.Stat(filepath.Join(ControlDir(runDir), "handoffs", "session-2.json")); !os.IsNotExist(err) {
+		t.Fatalf("replace should not create legacy handoff file, stat err = %v", err)
 	}
 
 	logData, err := os.ReadFile(logPath)

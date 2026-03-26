@@ -202,7 +202,7 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 		if state, err := loadDerivedRunState(projectRoot, goalx.RunDir(projectRoot, reg.FocusedRun)); err == nil && state != nil && (state.Status == "active" || state.Status == "degraded") {
 			return reg.FocusedRun, nil
 		}
-		if _, ok := reg.ActiveRuns[reg.FocusedRun]; ok {
+		if _, err := resolveLocalRun(projectRoot, reg.FocusedRun); err == nil {
 			return reg.FocusedRun, nil
 		}
 	}
@@ -222,10 +222,6 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 			return "", fmt.Errorf("multiple active runs: %s (specify --run)", strings.Join(openNames, ", "))
 		}
 	}
-	if len(reg.ActiveRuns) > 1 {
-		return "", fmt.Errorf("multiple active runs: %s (specify --run)", strings.Join(sortedRunNames(reg.ActiveRuns), ", "))
-	}
-
 	runsDir := ProjectDataDir(projectRoot)
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {

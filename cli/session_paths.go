@@ -27,6 +27,11 @@ func ReportsDir(runDir string) string {
 	return filepath.Join(runDir, "reports")
 }
 
+// SummaryPath returns the canonical run-level result surface.
+func SummaryPath(runDir string) string {
+	return filepath.Join(runDir, "summary.md")
+}
+
 // WorktreePath returns the worktree directory for a session.
 func WorktreePath(runDir, cfgName string, num int) string {
 	return filepath.Join(runDir, "worktrees", cfgName+"-"+strconv.Itoa(num))

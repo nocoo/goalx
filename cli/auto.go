@@ -1,36 +1,13 @@
 package cli
 
-import (
-	"fmt"
+import "fmt"
 
-	goalx "github.com/vonbai/goalx"
-)
-
-var (
-	autoStart = startAuto
-)
-
-// Auto initializes a run, starts the master, and exits.
-// The master continues orchestrating in tmux.
 func Auto(projectRoot string, args []string) error {
 	if wantsHelp(args) {
 		fmt.Println(launchUsage("auto"))
 		return nil
 	}
-
-	if err := autoStart(projectRoot, args); err != nil {
-		return fmt.Errorf("start: %w", err)
-	}
-	printAutoStarted()
-	return nil
-}
-
-func startAuto(projectRoot string, args []string) error {
-	opts, err := parseLaunchOptions(args, goalx.ModeAuto, true)
-	if err != nil {
-		return err
-	}
-	return autoWithOptions(projectRoot, opts)
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentDeliver), nil)
 }
 
 func autoWithOptions(projectRoot string, opts launchOptions) error {

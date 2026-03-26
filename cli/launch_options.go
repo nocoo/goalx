@@ -89,7 +89,7 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 		Mode: defaultMode,
 	}
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return opts, fmt.Errorf("usage: goalx <start|auto|research|develop> \"objective\" [flags]")
+		return opts, fmt.Errorf("usage: goalx <run|start|init> \"objective\" [flags]")
 	}
 
 	opts.Objective = args[0]

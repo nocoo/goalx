@@ -54,10 +54,13 @@ func Save(projectRoot string, args []string) error {
 		return fmt.Errorf("resolve run artifacts: %w", err)
 	}
 
-	// Copy summary
-	summaryPath := filepath.Join(rc.RunDir, "summary.md")
-	if err := copyFileIfExists(summaryPath, filepath.Join(saveDir, "summary.md")); err != nil {
+	// Copy canonical run result surface and supporting reports.
+	summaryPath := SummaryPath(rc.RunDir)
+	if err := copyFileIfExists(summaryPath, SummaryPath(saveDir)); err != nil {
 		return fmt.Errorf("copy summary: %w", err)
+	}
+	if err := copyReportsDirIfExists(rc.RunDir, saveDir); err != nil {
+		return fmt.Errorf("copy reports dir: %w", err)
 	}
 
 	// Copy immutable run spec + runtime state.
@@ -275,4 +278,25 @@ func copyFileIfExists(src, dst string) error {
 
 	_, err = io.Copy(out, in)
 	return err
+}
+
+func copyReportsDirIfExists(srcRunDir, dstRunDir string) error {
+	entries, err := os.ReadDir(ReportsDir(srcRunDir))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		src := filepath.Join(ReportsDir(srcRunDir), entry.Name())
+		dst := filepath.Join(ReportsDir(dstRunDir), entry.Name())
+		if err := copyFileIfExists(src, dst); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -14,17 +14,25 @@ func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
 		fmt.Println(phaseUsage("debate"))
 		return nil
 	}
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentDebate), nc)
+}
+
+func runDebate(projectRoot string, args []string, nc *nextConfigJSON) error {
 	opts, err := parsePhaseOptions("debate", args)
 	if err != nil {
 		return err
 	}
-	return runPhaseAction(projectRoot, phaseActionSpec{
+	return runPhaseAction(projectRoot, debatePhaseSpec(), opts, nc)
+}
+
+func debatePhaseSpec() phaseActionSpec {
+	return phaseActionSpec{
 		Kind:         "debate",
 		Mode:         goalx.ModeResearch,
 		NoContextErr: "no reports found in %s",
 		DraftHeader:  "# goalx manual draft — debate round based on %s\n",
 		DefaultHints: debatePhaseHints,
-	}, opts, nc)
+	}
 }
 
 func debatePhaseHints(source *savedPhaseSource) []string {

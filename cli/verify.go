@@ -82,6 +82,7 @@ func Verify(projectRoot string, args []string) error {
 	}
 	state.LastResult = AcceptanceResult{
 		CheckedAt:    now,
+		Command:      command,
 		ExitCode:     &exitCode,
 		EvidencePath: evidencePath,
 	}

@@ -15,12 +15,12 @@ goalx start --config .goalx/goalx.yaml
 Do not choose this path by default. Prefer:
 
 ```bash
-goalx auto "goal"
-goalx research "goal" --effort high
-goalx develop "goal" --effort medium
-goalx debate --from RUN
-goalx implement --from RUN
-goalx explore --from RUN
+goalx run "goal"
+goalx run "goal" --intent research --effort high
+goalx run "goal" --intent develop --effort medium
+goalx run --from RUN --intent debate
+goalx run --from RUN --intent implement
+goalx run --from RUN --intent explore
 ```
 
 Shared config now uses top-level `preset`, `master`, `roles`, `routing`, and `preferences` fields. A minimal manual draft looks like:
@@ -58,7 +58,6 @@ preferences:
 - If names collide across projects, use `--run <project-id>/<run>`
 - Active runs, new saved runs, focus, and status are user-scoped under `~/.goalx/runs/{projectID}/...`
 - `.goalx/config.yaml` is the shared project-scoped config file
-- Canonical closeout proof lives at `~/.goalx/runs/{projectID}/{run}/proof/completion.json`
 - `run-charter.json` and `sessions/session-N/identity.json` are required live-run provenance. Missing files mean the run is broken, not that GoalX should fall back.
 
 ## Manual Intervention
@@ -71,11 +70,11 @@ Prefer durable GoalX commands over direct transport input:
 - `goalx add --run NAME --mode research --effort high "question"` to add a routed research session
 - `goalx add --run NAME --mode develop --route-profile PROFILE "task"` to force a specific routing profile
 - `goalx add --run NAME --mode research --engine ENGINE --model MODEL --effort LEVEL "task"` only when you intentionally want to bypass routing
-- `goalx research "goal" --effort high` to start a direct research run with research-role defaults plus explicit reasoning depth
-- `goalx develop "goal" --effort medium` to start a direct develop run with develop-role defaults plus explicit reasoning depth
-- `goalx debate --from RUN` to start a debate phase from a saved research run
-- `goalx implement --from RUN` to start an implementation phase from a saved run
-- `goalx explore --from RUN` to start a follow-up research phase from a saved run
+- `goalx run "goal" --intent research --effort high` to start a direct research run with explicit reasoning depth
+- `goalx run "goal" --intent develop --effort medium` to start a direct develop run with explicit reasoning depth
+- `goalx run --from RUN --intent debate` to start a debate phase from a saved research run
+- `goalx run --from RUN --intent implement` to start an implementation phase from a saved run
+- `goalx run --from RUN --intent explore` to start a follow-up research phase from a saved run
 - `--master engine/model`, `--research-role engine/model`, and `--develop-role engine/model` to override role defaults
 - `--effort LEVEL`, `--master-effort LEVEL`, `--research-effort LEVEL`, and `--develop-effort LEVEL` to control provider-aware reasoning depth
 - `--dimension depth,adversarial` to seed launch-time viewpoints for a new run or phase

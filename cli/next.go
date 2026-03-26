@@ -120,17 +120,17 @@ func Next(projectRoot string, args []string) error {
 
 	if latestDebate != "" {
 		fmt.Printf("Debate completed: %s\n", latestDebate)
-		fmt.Printf("  → goalx implement --from %s\n", latestDebate)
-		fmt.Printf("  → goalx explore --from %s    # extend debate findings if needed\n", latestDebate)
+		fmt.Printf("  → goalx run --from %s --intent implement\n", latestDebate)
+		fmt.Printf("  → goalx run --from %s --intent explore    # extend debate findings if needed\n", latestDebate)
 		return nil
 	}
 
 	if latestResearch != "" {
 		fmt.Printf("Research completed: %s\n", latestResearch)
-		fmt.Printf("  → goalx debate --from %s\n", latestResearch)
-		fmt.Printf("  → goalx implement --from %s\n", latestResearch)
+		fmt.Printf("  → goalx run --from %s --intent debate\n", latestResearch)
+		fmt.Printf("  → goalx run --from %s --intent implement\n", latestResearch)
 		fmt.Println()
-		fmt.Printf("  Or continue exploration:\n  → goalx explore --from %s\n", latestResearch)
+		fmt.Printf("  Or continue exploration:\n  → goalx run --from %s --intent explore\n", latestResearch)
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func Next(projectRoot string, args []string) error {
 		if latestAny != "" {
 			fmt.Printf("  → goalx result %s\n", latestAny)
 		}
-		fmt.Println("  → goalx auto \"...\"  # start a new autonomous run")
+		fmt.Println("  → goalx run \"...\"  # start a new autonomous run")
 		return nil
 	}
 
@@ -148,7 +148,7 @@ func Next(projectRoot string, args []string) error {
 	fmt.Println("No runs or saved results found.")
 	fmt.Println()
 	fmt.Println("Quickstart:")
-	fmt.Println("  goalx auto \"your objective\"")
+	fmt.Println("  goalx run \"your objective\"")
 	return nil
 }
 
