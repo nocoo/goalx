@@ -35,12 +35,14 @@ func Observe(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	refreshDisplayFacts(rc)
 
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
 	printStatusControlSummary(rc)
 
 	printObserveStatusSection("### Run runtime state", RunRuntimeStatePath(rc.RunDir))
 	printObserveStatusSection("### Run status record", RunStatusPath(rc.RunDir))
+	printRunAdvisories(rc)
 
 	if !SessionExists(rc.TmuxSession) {
 		fmt.Println("### transport")

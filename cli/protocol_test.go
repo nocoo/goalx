@@ -1008,6 +1008,8 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 		"`/tmp/goal.json` required items are the canonical current-goal obligations and definition of done.",
 		"Do not use required goal items as implementation tasks or temporary decomposition.",
 		"Keep execution decomposition in coordination, inbox, journals, and session briefs instead of rewriting goal items.",
+		"Move an item to `claimed` only when decisive evidence says the goal outcome itself is satisfied and ready for closeout review.",
+		"Missing user credentials, external approval, or real-world publish access does not justify claiming a required item as end-to-end verified.",
 		"If a session produced valuable work outside the original items, that work matters.",
 		"If a session shows no journal output for 15+ minutes while its lease is healthy",
 		"Research runs usually close out through reports and goal updates; develop runs usually close out through reviewed code, verification evidence, and `goalx keep`.",
@@ -1146,6 +1148,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Sessions without dedicated worktrees share the run worktree.",
 		"Use `goalx add --worktree` for parallel isolation.",
 		"Explicit `--engine/--model` bypasses routing.",
+		"Run `git status --short` before you say \"ready for commit\" or \"ready for closeout\".",
+		"closeout is not complete until `/tmp/summary.md` and `/tmp/proof/completion.json` exist",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
@@ -1273,6 +1277,11 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		"This run was launched with explicit `evolve` intent.",
 		"Trial record: `/tmp/evolution.jsonl`",
 		"Append a JSON line to `/tmp/evolution.jsonl` for every material trial",
+		"`required_remaining == 0` only means the current required baseline is covered.",
+		"Do not enter review or idle just because required items are covered.",
+		"Before you enter review or idle in `evolve`, do one of the following in durable state:",
+		"record a factual blocker that is truly outside your current permissions, credentials, or reachable environment",
+		"record a diminishing-returns decision that cites recent trial evidence and the remaining upside",
 		"`goalx add --run demo --worktree --base-branch session-N`",
 		"Stop the iteration loop when budget is exhausted",
 		"the user redirects or stops the run",

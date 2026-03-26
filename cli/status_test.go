@@ -268,6 +268,17 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 
 func TestStatusShowsSessionTransportFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("❯ [[GOALX_WAKE_CHECK_INBOX]]\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
 
 	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "build_fast", "", goalx.TargetConfig{})
 	if err != nil {
@@ -284,18 +295,6 @@ func TestStatusShowsSessionTransportFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
-	if err := SaveTransportFacts(runDir, &TransportFacts{
-		Version: 1,
-		Targets: map[string]TransportTargetFacts{
-			"session-1": {
-				TransportState:    "buffered",
-				InputContainsWake: true,
-			},
-		},
-	}); err != nil {
-		t.Fatalf("SaveTransportFacts: %v", err)
-	}
-
 	out := captureStdout(t, func() {
 		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
 			t.Fatalf("Status: %v", err)
@@ -319,6 +318,17 @@ func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	if err := SaveRunSpec(runDir, cfg); err != nil {
 		t.Fatalf("SaveRunSpec: %v", err)
 	}
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("queued messages\nNeeds your permission\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("❯ [[GOALX_WAKE_CHECK_INBOX]]\nPlease authenticate in browser\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
 
 	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "build_fast", "", goalx.TargetConfig{})
 	if err != nil {
@@ -338,16 +348,16 @@ func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 		Version: 1,
 		Targets: map[string]TransportTargetFacts{
 			"master": {
-				TransportState:        "sent",
-				ProviderDialogVisible: true,
-				ProviderDialogKind:    "permission_prompt",
-				ProviderDialogHint:    "Needs your permission",
-			},
-			"session-1": {
 				TransportState:        "buffered",
 				ProviderDialogVisible: true,
-				ProviderDialogKind:    "auth_prompt",
-				ProviderDialogHint:    "Please authenticate in browser",
+				ProviderDialogKind:    "stale_dialog",
+				ProviderDialogHint:    "stale dialog",
+			},
+			"session-1": {
+				TransportState:        "sent",
+				ProviderDialogVisible: true,
+				ProviderDialogKind:    "stale_dialog",
+				ProviderDialogHint:    "stale dialog",
 			},
 		},
 	}); err != nil {
@@ -478,6 +488,17 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 	runName, runDir := writeLifecycleRunFixture(t, repo)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("Messages to be submitted after next tool call\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
 
 	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte(`{"round":2,"desc":"awaiting master","status":"idle"}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write session journal: %v", err)
@@ -500,9 +521,9 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 				Target:                "session-1",
 				Window:                "session-1",
 				Engine:                "codex",
-				TransportState:        "sent",
-				LastSubmitAttemptAt:   "2026-03-25T00:00:00Z",
-				LastTransportAcceptAt: "2026-03-25T00:00:01Z",
+				TransportState:        "buffered",
+				LastSubmitAttemptAt:   "1999-01-01T00:00:00Z",
+				LastTransportAcceptAt: "1999-01-01T00:00:01Z",
 			},
 		},
 	}); err != nil {
@@ -522,6 +543,42 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 		"submit_at=2026-03-25T00:00:00Z",
 		"transport=sent",
 		"accepted_at=2026-03-25T00:00:01Z",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestStatusWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"review","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+	if err := os.WriteFile(EvolutionLogPath(runDir), []byte("{\"trial\":1}\n"), 0o644); err != nil {
+		t.Fatalf("write evolution log: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"### advisories",
+		"Potential evolve stall:",
+		"phase=review",
+		"active_sessions=0",
+		"evolution_entries=1",
+		"summary_exists=false",
+		"completion_proof_exists=false",
+		"Closeout artifacts missing:",
+		"required_remaining=0",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)

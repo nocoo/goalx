@@ -52,7 +52,7 @@ func TestObserveShowsSessionQueueFacts(t *testing.T) {
 	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("Messages to be submitted after next tool call\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -77,9 +77,9 @@ func TestObserveShowsSessionQueueFacts(t *testing.T) {
 				Target:                "session-1",
 				Window:                "session-1",
 				Engine:                "codex",
-				TransportState:        "sent",
-				LastSubmitAttemptAt:   "2026-03-25T00:00:00Z",
-				LastTransportAcceptAt: "2026-03-25T00:00:01Z",
+				TransportState:        "buffered",
+				LastSubmitAttemptAt:   "1999-01-01T00:00:00Z",
+				LastTransportAcceptAt: "1999-01-01T00:00:01Z",
 			},
 		},
 	}); err != nil {
@@ -113,7 +113,7 @@ func TestObserveShowsSessionLaunchFacts(t *testing.T) {
 	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("queued messages\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -159,7 +159,7 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("queued messages\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -180,16 +180,29 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
+	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
+		Version: 1,
+		Items: []ControlDelivery{
+			{
+				DeliveryID:     "del-1",
+				DedupeKey:      "session-wake:session-1",
+				Status:         "sent",
+				Target:         "gx-demo:session-1",
+				AttemptedAt:    "2026-03-25T00:00:01Z",
+				AcceptedAt:     "2026-03-25T00:00:02Z",
+				SubmitMode:     "payload_enter",
+				TransportState: "sent",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
 	if err := SaveTransportFacts(runDir, &TransportFacts{
 		Version: 1,
 		Targets: map[string]TransportTargetFacts{
 			"session-1": {
-				TransportState:        "sent",
-				QueuedMessageVisible:  true,
-				LastSubmitMode:        "payload_enter",
-				LastOutputAt:          "2026-03-25T00:00:00Z",
-				LastSubmitAttemptAt:   "2026-03-25T00:00:01Z",
-				LastTransportAcceptAt: "2026-03-25T00:00:02Z",
+				TransportState: "buffered",
+				LastSubmitMode: "stale_mode",
 			},
 		},
 	}); err != nil {
@@ -206,7 +219,6 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 		"Transport: state=sent",
 		"queued_message_visible=true",
 		"submit_mode=payload_enter",
-		"last_output_at=2026-03-25T00:00:00Z",
 		"submit_at=2026-03-25T00:00:01Z",
 		"accepted_at=2026-03-25T00:00:02Z",
 	} {
@@ -226,10 +238,10 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
 	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
-	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+	if err := os.WriteFile(masterCapture, []byte("queued messages\nNeeds your permission\n"), 0o644); err != nil {
 		t.Fatalf("write master capture: %v", err)
 	}
-	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+	if err := os.WriteFile(sessionCapture, []byte("❯ [[GOALX_WAKE_CHECK_INBOX]]\nPlease authenticate in browser\n"), 0o644); err != nil {
 		t.Fatalf("write session capture: %v", err)
 	}
 	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
@@ -254,16 +266,16 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 		Version: 1,
 		Targets: map[string]TransportTargetFacts{
 			"master": {
-				TransportState:        "sent",
-				ProviderDialogVisible: true,
-				ProviderDialogKind:    "permission_prompt",
-				ProviderDialogHint:    "Needs your permission",
-			},
-			"session-1": {
 				TransportState:        "buffered",
 				ProviderDialogVisible: true,
-				ProviderDialogKind:    "auth_prompt",
-				ProviderDialogHint:    "Please authenticate in browser",
+				ProviderDialogKind:    "stale_dialog",
+				ProviderDialogHint:    "stale dialog",
+			},
+			"session-1": {
+				TransportState:        "sent",
+				ProviderDialogVisible: true,
+				ProviderDialogKind:    "stale_dialog",
+				ProviderDialogHint:    "stale dialog",
 			},
 		},
 	}); err != nil {
@@ -289,6 +301,42 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 		"Queue: unread=0 cursor=0/0 transport=buffered dialog=auth_prompt",
 		`dialog_hint="Please authenticate in browser"`,
 		"provider_dialog_visible=true provider_dialog_kind=auth_prompt",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestObserveWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"review","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+	if err := os.WriteFile(EvolutionLogPath(runDir), []byte("{\"trial\":1}\n"), 0o644); err != nil {
+		t.Fatalf("write evolution log: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"### advisories",
+		"Potential evolve stall:",
+		"phase=review",
+		"active_sessions=0",
+		"evolution_entries=1",
+		"summary_exists=false",
+		"completion_proof_exists=false",
+		"Closeout artifacts missing:",
+		"required_remaining=0",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)

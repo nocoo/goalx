@@ -26,9 +26,11 @@ func Status(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	refreshDisplayFacts(rc)
 
 	fmt.Printf("Run: %s\n", rc.Name)
 	printStatusControlSummary(rc)
+	printRunAdvisories(rc)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "SESSION\tLAST_ROUND\tSTATUS\tLEASE\tSUMMARY")

@@ -398,18 +398,15 @@ func applyLatestDeliveryFacts(runDir, logicalTarget string, facts *TransportTarg
 	facts.LastSubmitAttemptAt = delivery.AttemptedAt
 	facts.LastSubmitMode = delivery.SubmitMode
 	facts.LastTransportError = delivery.LastError
+	if delivery.AcceptedAt != "" && (strings.TrimSpace(delivery.TransportState) == "sent" || strings.TrimSpace(delivery.Status) == "sent") {
+		facts.LastTransportAcceptAt = delivery.AcceptedAt
+	}
 	if transportState := strings.TrimSpace(delivery.TransportState); transportState != "" {
 		if facts.TransportState == "" {
 			facts.TransportState = transportState
 		}
-		if transportState == "sent" && delivery.AcceptedAt != "" {
-			facts.LastTransportAcceptAt = delivery.AcceptedAt
-		}
 	}
 	if facts.TransportState == "" && strings.TrimSpace(delivery.Status) != "" && delivery.Status != "pending" {
 		facts.TransportState = delivery.Status
-		if delivery.Status == "sent" && delivery.AcceptedAt != "" {
-			facts.LastTransportAcceptAt = delivery.AcceptedAt
-		}
 	}
 }
