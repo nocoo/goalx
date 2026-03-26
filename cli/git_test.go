@@ -60,8 +60,15 @@ func TestMergeWorktreeRejectsDirtyTree(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected MergeWorktree to reject dirty worktree")
 	}
-	if !strings.Contains(err.Error(), "source root has uncommitted changes") {
-		t.Fatalf("MergeWorktree error = %v, want source root message", err)
+	for _, want := range []string{
+		"merge target",
+		repo,
+		"dirty.txt",
+		"commit or stash changes before merge",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("MergeWorktree error = %v, want substring %q", err, want)
+		}
 	}
 }
 

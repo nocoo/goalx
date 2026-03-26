@@ -67,6 +67,7 @@ func MergeWorktree(targetDir, branch string) error {
 	if err != nil {
 		return fmt.Errorf("git status: %w: %s", err, statusOut)
 	}
+	dirtyPaths := make([]string, 0)
 	for _, line := range strings.Split(string(statusOut), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -76,7 +77,10 @@ func MergeWorktree(targetDir, branch string) error {
 		if isAllowedLocalConfigPath(path) {
 			continue
 		}
-		return fmt.Errorf("source root has uncommitted changes; commit or stash changes before merge")
+		dirtyPaths = append(dirtyPaths, path)
+	}
+	if len(dirtyPaths) > 0 {
+		return fmt.Errorf("merge target %s has uncommitted changes (%s); commit or stash changes before merge", targetDir, summarizeDirtyPaths(dirtyPaths))
 	}
 
 	// Pre-check for conflicts using merge-tree
@@ -112,6 +116,17 @@ func MergeWorktree(targetDir, branch string) error {
 		}
 	}
 	return nil
+}
+
+func summarizeDirtyPaths(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	const limit = 5
+	if len(paths) <= limit {
+		return strings.Join(paths, ", ")
+	}
+	return fmt.Sprintf("%s, +%d more", strings.Join(paths[:limit], ", "), len(paths)-limit)
 }
 
 func min(a, b int) int {

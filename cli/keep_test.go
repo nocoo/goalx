@@ -101,6 +101,46 @@ func TestKeepMergesSessionBranchIntoRunWorktree(t *testing.T) {
 	}
 }
 
+func TestKeepReportsDirtyRunWorktreePath(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	runName := "keep-run"
+	runDir := writeKeepRunFixture(t, repo, runName)
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", runName)
+	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+
+	sessionWT := WorktreePath(runDir, runName, 1)
+	sessionBranch := fmt.Sprintf("goalx/%s/1", runName)
+	if err := CreateWorktree(runWT, sessionWT, sessionBranch); err != nil {
+		t.Fatalf("CreateWorktree session root: %v", err)
+	}
+	writeAndCommit(t, sessionWT, "feature.txt", "session change\n", "session change")
+	if err := os.WriteFile(filepath.Join(runWT, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {
+		t.Fatalf("write dirty file: %v", err)
+	}
+
+	err := Keep(repo, []string{"--run", runName, "session-1"})
+	if err == nil {
+		t.Fatal("expected Keep to reject dirty run worktree")
+	}
+	for _, want := range []string{
+		"merge target",
+		runWT,
+		"dirty.txt",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Keep error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 	t.Helper()
 
