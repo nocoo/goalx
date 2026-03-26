@@ -314,6 +314,11 @@ func TestStatusShowsSessionTransportFacts(t *testing.T) {
 
 func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Master.Engine = "claude-code"
+	cfg.Master.Model = "opus"
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
 
 	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "build_fast", "", goalx.TargetConfig{})
 	if err != nil {
@@ -356,6 +361,10 @@ func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	})
 
 	for _, want := range []string{
+		"provider_capability=tui",
+		"provider_native=skills,plugins,mcp",
+		"provider_limit=claude_root_no_bypass",
+		"provider_native=skills,mcp",
 		"dialog=permission_prompt",
 		`dialog_hint="Needs your permission"`,
 		"dialog=auth_prompt",

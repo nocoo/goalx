@@ -134,6 +134,13 @@ func Status(projectRoot string, args []string) error {
 				summary += " | " + launch
 			}
 		}
+		if capability := targetProviderCapabilitySummary(rc.RunDir, sName, rc.Config.Master.Engine); capability != "" {
+			if summary == "no entries" {
+				summary = capability
+			} else {
+				summary += " | " + capability
+			}
+		}
 		if transport := transportTargetFactsSummary(rc.RunDir, sName); transport != "" {
 			if summary == "no entries" {
 				summary = transport
@@ -153,6 +160,13 @@ func Status(projectRoot string, args []string) error {
 			masterSummary = transport
 		} else {
 			masterSummary += " | " + transport
+		}
+	}
+	if capability := targetProviderCapabilitySummary(rc.RunDir, "master", rc.Config.Master.Engine); capability != "" {
+		if masterSummary == "no entries" {
+			masterSummary = capability
+		} else {
+			masterSummary += " | " + capability
 		}
 	}
 	fmt.Fprintf(w, "master\t-\t-\t%s\t%s\n", actorLeaseSummary(rc.RunDir, "master", "missing"), masterSummary)
@@ -279,6 +293,30 @@ func sessionLaunchFacts(runDir, sessionName string) string {
 		parts = append(parts, "route="+identity.RouteProfile)
 	}
 	return strings.Join(parts, " ")
+}
+
+func providerCapabilitySummaryForEngine(engine string) string {
+	parts := []string{"provider_capability=tui"}
+	switch strings.TrimSpace(engine) {
+	case "claude-code":
+		parts = append(parts, "provider_native=skills,plugins,mcp", "provider_limit=claude_root_no_bypass")
+	case "codex":
+		parts = append(parts, "provider_native=skills,mcp")
+	default:
+		return ""
+	}
+	return strings.Join(parts, " ")
+}
+
+func targetProviderCapabilitySummary(runDir, target, masterEngine string) string {
+	if strings.TrimSpace(target) == "master" {
+		return providerCapabilitySummaryForEngine(masterEngine)
+	}
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, target))
+	if err != nil || identity == nil {
+		return ""
+	}
+	return providerCapabilitySummaryForEngine(identity.Engine)
 }
 
 func transportTargetFactsSummary(runDir, target string) string {

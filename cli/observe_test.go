@@ -218,6 +218,11 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 
 func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Master.Engine = "claude-code"
+	cfg.Master.Model = "opus"
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
 
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
 	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
@@ -273,10 +278,14 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 
 	for _, want := range []string{
 		"### master",
+		"provider_capability=tui",
+		"provider_native=skills,plugins,mcp",
+		"provider_limit=claude_root_no_bypass",
 		"Queue: unread=0 cursor=0/0 transport=sent dialog=permission_prompt",
 		`dialog_hint="Needs your permission"`,
 		"provider_dialog_visible=true provider_dialog_kind=permission_prompt",
 		"### session-1",
+		"provider_native=skills,mcp",
 		"Queue: unread=0 cursor=0/0 transport=buffered dialog=auth_prompt",
 		`dialog_hint="Please authenticate in browser"`,
 		"provider_dialog_visible=true provider_dialog_kind=auth_prompt",

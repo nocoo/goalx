@@ -64,7 +64,7 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	fmt.Println("### master")
-	printObserveMasterQueue(rc.RunDir)
+	printObserveMasterQueue(rc.RunDir, rc.Config.Master.Engine)
 	printPaneCapture(rc.TmuxSession, "master")
 	fmt.Println()
 
@@ -76,7 +76,7 @@ func Observe(projectRoot string, args []string) error {
 	for _, num := range sessionIndexes {
 		windowName := sessionWindowName(rc.Config.Name, num)
 		fmt.Printf("### %s\n", SessionName(num))
-		printObserveSessionQueue(rc.RunDir, SessionName(num))
+		printObserveSessionQueue(rc.RunDir, SessionName(num), rc.Config.Master.Engine)
 		printPaneCapture(rc.TmuxSession, windowName)
 		fmt.Println()
 	}
@@ -115,12 +115,15 @@ func printObserveStatusSection(title, path string) {
 	fmt.Println()
 }
 
-func printObserveSessionQueue(runDir, sessionName string) {
+func printObserveSessionQueue(runDir, sessionName, masterEngine string) {
 	state := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
 	transport := loadTransportTargetFacts(runDir, sessionName)
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
 	if hasTransportFacts(transport) {
 		fmt.Print(formatTransportQueueFacts(transport))
+	}
+	if capability := targetProviderCapabilitySummary(runDir, sessionName, masterEngine); capability != "" {
+		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
 	if launch := sessionLaunchFacts(runDir, sessionName); launch != "" {
@@ -129,12 +132,15 @@ func printObserveSessionQueue(runDir, sessionName string) {
 	printObserveTransportFacts(transport)
 }
 
-func printObserveMasterQueue(runDir string) {
+func printObserveMasterQueue(runDir, masterEngine string) {
 	state := readControlInboxState(MasterInboxPath(runDir), MasterCursorPath(runDir))
 	transport := loadTransportTargetFacts(runDir, "master")
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
 	if hasTransportFacts(transport) {
 		fmt.Print(formatTransportQueueFacts(transport))
+	}
+	if capability := targetProviderCapabilitySummary(runDir, "master", masterEngine); capability != "" {
+		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
 	printObserveTransportFacts(transport)
