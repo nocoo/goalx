@@ -129,6 +129,8 @@ func TestAffordCommandPrintsProviderFactsForClaudeSession(t *testing.T) {
 		"## provider-facts",
 		"claude-code",
 		"project-local PermissionRequest hook",
+		"project-local Elicitation hook",
+		"urgent master-inbox fact",
 		"Installed personal/project/plugin skills",
 		"Write/Edit requires prior read",
 	} {

@@ -21,6 +21,9 @@ var claudeContext7Tools = []string{
 }
 
 const claudeMCPPermissionHookMatcher = "mcp__.*"
+const claudeMCPElicitationHookMatcher = ".*"
+const claudePermissionNotificationMatcher = "permission_prompt"
+const claudeElicitationNotificationMatcher = "elicitation_dialog"
 
 // EnsureEngineTrusted pre-accepts workspace trust for interactive engines so
 // freshly created worktrees can start unattended.
@@ -159,10 +162,27 @@ func ensureClaudeProjectLocalHooks(path string) error {
 
 	hooks := coerceObject(doc["hooks"])
 	permissionCommand := shellQuote(goalxBin) + " claude-hook permission-request"
+	elicitationCommand := shellQuote(goalxBin) + " claude-hook elicitation"
+	notificationCommand := shellQuote(goalxBin) + " claude-hook notification"
 	hooks["PermissionRequest"] = appendClaudeHookEntry(
 		coerceArray(hooks["PermissionRequest"]),
 		claudeMCPPermissionHookMatcher,
 		permissionCommand,
+	)
+	hooks["Elicitation"] = appendClaudeHookEntry(
+		coerceArray(hooks["Elicitation"]),
+		claudeMCPElicitationHookMatcher,
+		elicitationCommand,
+	)
+	hooks["Notification"] = appendClaudeHookEntry(
+		coerceArray(hooks["Notification"]),
+		claudePermissionNotificationMatcher,
+		notificationCommand,
+	)
+	hooks["Notification"] = appendClaudeHookEntry(
+		coerceArray(hooks["Notification"]),
+		claudeElicitationNotificationMatcher,
+		notificationCommand,
 	)
 	doc["hooks"] = hooks
 

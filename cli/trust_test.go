@@ -162,6 +162,45 @@ func TestEnsureEngineTrustedClaudeWritesLocalMCPPermissionHook(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("permission hook count = %d, want 1; settings = %#v", count, hooks["PermissionRequest"])
 	}
+	elicitationHooks := hooks["Elicitation"].([]any)
+	count = 0
+	for _, entry := range elicitationHooks {
+		entryObj := entry.(map[string]any)
+		if entryObj["matcher"] != ".*" {
+			continue
+		}
+		for _, hook := range entryObj["hooks"].([]any) {
+			hookObj := hook.(map[string]any)
+			if hookObj["type"] == "command" && strings.Contains(hookObj["command"].(string), "claude-hook elicitation") {
+				count++
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("elicitation hook count = %d, want 1; settings = %#v", count, hooks["Elicitation"])
+	}
+	notificationHooks := hooks["Notification"].([]any)
+	permissionVisible := 0
+	elicitationVisible := 0
+	for _, entry := range notificationHooks {
+		entryObj := entry.(map[string]any)
+		matcher, _ := entryObj["matcher"].(string)
+		for _, hook := range entryObj["hooks"].([]any) {
+			hookObj := hook.(map[string]any)
+			if hookObj["type"] != "command" || !strings.Contains(hookObj["command"].(string), "claude-hook notification") {
+				continue
+			}
+			switch matcher {
+			case "permission_prompt":
+				permissionVisible++
+			case "elicitation_dialog":
+				elicitationVisible++
+			}
+		}
+	}
+	if permissionVisible != 1 || elicitationVisible != 1 {
+		t.Fatalf("notification hooks = %#v, want permission_prompt and elicitation_dialog backstops once each", notificationHooks)
+	}
 }
 
 func TestClaudePermissionRequestHookOutputPrefersLocalSettingsSuggestion(t *testing.T) {

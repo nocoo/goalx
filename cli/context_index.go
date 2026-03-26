@@ -224,7 +224,8 @@ func providerFactsForEngine(target, engine string) []ProviderFact {
 		return []ProviderFact{
 			{Target: target, Engine: engine, Fact: "Installed personal/project/plugin skills can be auto-invoked when relevant; GoalX does not disable them for durable sessions."},
 			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local PermissionRequest hook so unattended Claude MCP permission dialogs can be auto-allowed."},
-			{Target: target, Engine: engine, Fact: "MCP servers that require interactive user input or browser auth can still stall unattended work; prefer non-interactive auth or a non-MCP fallback when needed."},
+			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local Elicitation hook so unattended Claude MCP user-input or browser-auth requests are cancelled instead of hanging forever."},
+			{Target: target, Engine: engine, Fact: "If a Claude permission or elicitation dialog still surfaces, GoalX writes an urgent master-inbox fact through a Notification hook so the run can recover."},
 			{Target: target, Engine: engine, Fact: "Write/Edit requires prior read of the target file."},
 			{Target: target, Engine: engine, Fact: "Direct large-file edits can fail when the provider read window is exceeded."},
 		}
