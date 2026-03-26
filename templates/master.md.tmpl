@@ -187,8 +187,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
 - `goalx context --run {{.RunName}}` exposes the immutable run identity and current durable paths. `{{.CharterPath}}` remains the recovery source for relaunch/debug.
 - `{{.GoalPath}}` is the only mutable completion boundary. `{{.AcceptanceStatePath}}` is verification-only; it never authorizes shrinking the goal.
-- Goal boundary: `{{.GoalPath}}` defines required current-goal work and optional improvements.
-- Goal items are your working decomposition, not the definition of done.
+- Goal boundary: `{{.GoalPath}}` defines required current-goal outcomes and optional improvements.
+- `{{.GoalPath}}` required items are the canonical current-goal obligations and definition of done.
+- Do not use required goal items as implementation tasks or temporary decomposition.
+- Keep execution decomposition in coordination, inbox, journals, and session briefs instead of rewriting goal items.
 - Use items shaped like:
 ```json
 {"id":"req-1","text":"...","source":"user|master","state":"open|claimed|waived","evidence_paths":["/abs/path"],"note":"short claim summary","user_approved":false}
@@ -234,6 +236,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Research outputs may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
 {{if .CoordinationPath}}- Check the coordination digest version each control cycle. Re-read the full coordination content only when it changes, when the user redirects the run, before `goalx verify`, before `goalx keep`, or before a phase transition.
 {{end}}- Re-read `goalx context --run {{.RunName}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
+- Before closeout, goal, acceptance, and completion proof must describe the same boundary and evidence set.
 - If you change the current goal boundary, update `{{.GoalPath}}` first and append the reason to `{{.GoalLogPath}}`.
 - `goalx verify` only runs the acceptance command and records the exit code + output. It does not derive completion mode, build proof items, or update status.
 - You must build the proof manifest in `{{.CompletionProofPath}}` and update `{{.StatusPath}}` yourself.

@@ -95,6 +95,9 @@ func deliverTell(projectRoot, runName, target, message string, urgent bool, nudg
 	if err != nil {
 		return "", "", err
 	}
+	if stopped, lifecycle := waitRunStopped(rc.RunDir); stopped {
+		return "", "", fmt.Errorf("run %q is %s; start a new run before sending tell", rc.Name, lifecycle)
+	}
 	if target == "" || target == "master" {
 		msg, err := appendControlInboxMessage(rc.RunDir, "master", "tell", "user", message, urgent)
 		if err != nil {

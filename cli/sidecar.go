@@ -173,6 +173,12 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		return err
 	}
 	if runState != nil && runState.Phase == "complete" && !SessionExists(tmuxSession) {
+		if unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)) > 0 {
+			if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
+				return err
+			}
+			return nil
+		}
 		if err := finalizeCompletedRunFromSidecar(projectRoot, runName, runDir); err != nil {
 			return err
 		}

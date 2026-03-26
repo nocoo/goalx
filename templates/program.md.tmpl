@@ -50,8 +50,9 @@ You are **{{.SessionName}}** of {{len .Sessions}} sessions working in parallel o
 
 {{if .GoalPath}}### Goal Boundary
 
-Goal boundary: `{{.GoalPath}}` (read-only — this defines required current-goal work and optional improvements)
+Goal boundary: `{{.GoalPath}}` (read-only — this defines required current-goal outcomes and optional improvements)
 The goal boundary defines what must be true before the overall goal can be considered complete. Your current assignment defines what to do next, not what counts as full completion.
+Required goal items are the canonical current-goal obligations for the overall run. Your assignment is the decomposition; the goal boundary is not.
 Run identity stays immutable for the life of the run. `{{.GoalPath}}` may evolve, but it may not silently shrink user-required outcomes.
 {{end}}
 

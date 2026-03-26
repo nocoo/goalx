@@ -44,6 +44,12 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 	workdir := RunWorktreePath(runDir)
 	launchCmd := buildMasterLaunchCommand(goalxBin, cfg.Name, runDir, meta.RunID, meta.Epoch, masterLeaseTTL, engineCmd, prompt)
 
+	if !SessionExists(tmuxSession) {
+		if err := NewSessionWithCommand(tmuxSession, "master", workdir, launchCmd); err != nil {
+			return fmt.Errorf("create master session: %w", err)
+		}
+		return nil
+	}
 	_ = KillWindow(tmuxSession, "master")
 	if err := NewWindowWithCommand(tmuxSession, "master", workdir, launchCmd); err != nil {
 		return fmt.Errorf("create master window: %w", err)

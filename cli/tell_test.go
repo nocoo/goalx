@@ -227,6 +227,32 @@ func TestTellUrgentWritesUrgentMasterInboxMessage(t *testing.T) {
 	}
 }
 
+func TestTellRejectsCompletedRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "completed"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+
+	err := Tell(repo, []string{"--run", runName, "master", "reopen and fix verification"})
+	if err == nil || !strings.Contains(err.Error(), `run "`+runName+`" is completed`) {
+		t.Fatalf("Tell error = %v, want completed-run rejection", err)
+	}
+
+	data, readErr := os.ReadFile(MasterInboxPath(runDir))
+	if readErr != nil {
+		t.Fatalf("read master inbox: %v", readErr)
+	}
+	if strings.TrimSpace(string(data)) != "" {
+		t.Fatalf("master inbox = %q, want empty", string(data))
+	}
+}
+
 func TestTellHelpDoesNotDeliverAnything(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

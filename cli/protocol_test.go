@@ -18,6 +18,8 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		Target:                 goalx.TargetConfig{Files: []string{"main.go"}},
+		GoalPath:               "/tmp/goal.json",
+		AcceptanceStatePath:    "/tmp/acceptance.json",
 		LocalValidationCommand: "go test ./...",
 		SessionName:            "session-1",
 		JournalPath:            "/tmp/journal.jsonl",
@@ -456,6 +458,8 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 		"Goal boundary: `/tmp/goal.json`",
 		"The goal boundary defines what must be true before the overall goal can be considered complete.",
 		"Your current assignment defines what to do next, not what counts as full completion.",
+		"Required goal items are the canonical current-goal obligations for the overall run.",
+		"Your assignment is the decomposition; the goal boundary is not.",
 		"one coherent capability slice at a time",
 	} {
 		if !strings.Contains(text, want) {
@@ -973,6 +977,7 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 		TmuxSession:    "ar-demo",
 		SummaryPath:    "/tmp/summary.md",
 		StatusPath:     "/tmp/status.json",
+		GoalPath:       "/tmp/goal.json",
 		ReportsDir:     "/tmp/run/reports",
 		DimensionsPath: "/tmp/control/dimensions.json",
 		Routing: goalx.RoutingTableConfig{
@@ -1000,7 +1005,9 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Goal items are your working decomposition, not the definition of done.",
+		"`/tmp/goal.json` required items are the canonical current-goal obligations and definition of done.",
+		"Do not use required goal items as implementation tasks or temporary decomposition.",
+		"Keep execution decomposition in coordination, inbox, journals, and session briefs instead of rewriting goal items.",
 		"If a session produced valuable work outside the original items, that work matters.",
 		"If a session shows no journal output for 15+ minutes while its lease is healthy",
 		"Research runs usually close out through reports and goal updates; develop runs usually close out through reviewed code, verification evidence, and `goalx keep`.",
@@ -1022,6 +1029,9 @@ func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance
 	}
 	if strings.Contains(text, "--strategy") {
 		t.Fatalf("rendered master protocol should omit legacy strategy guidance:\n%s", text)
+	}
+	if strings.Contains(text, "Goal items are your working decomposition, not the definition of done.") {
+		t.Fatalf("rendered master protocol should not describe goal items as decomposition:\n%s", text)
 	}
 }
 
@@ -1113,6 +1123,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"You may reorder, delegate, or temporarily postpone required work within the current goal",
 		"you may not declare the goal complete while any required item remains unfinished, blocked, or merely scheduled for later",
 		"If any required item is uncovered, that is a scheduling bug.",
+		"Before closeout, goal, acceptance, and completion proof must describe the same boundary and evidence set.",
 		"If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.",
 		"Treat configured `parallel` as initial fan-out guidance, not a permanent ceiling;",
 		"waiting_external",

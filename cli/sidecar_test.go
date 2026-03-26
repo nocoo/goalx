@@ -757,6 +757,94 @@ func TestSidecarFinalizesCompletedRunWhenMasterSessionIsGone(t *testing.T) {
 	}
 }
 
+func TestSidecarKeepsCompletedRunAliveWhenUnreadMasterInboxExists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+
+	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState: %v", err)
+	}
+	runState.Active = true
+	runState.Phase = "complete"
+	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if _, err := appendControlInboxMessage(runDir, "master", "tell", "user", "reopen and fix verification", false); err != nil {
+		t.Fatalf("appendControlInboxMessage: %v", err)
+	}
+
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	logPath := filepath.Join(fakeBin, "tmux.log")
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+echo "$@" >> "$TMUX_LOG"
+case "$1" in
+  has-session)
+    exit 1
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("TMUX_LOG", logPath)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, runName, runDir, meta.RunID, meta.Epoch, 50*time.Millisecond, 4242); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if controlState.LifecycleState == "completed" {
+		t.Fatalf("lifecycle_state = %q, want run kept active for unread master inbox", controlState.LifecycleState)
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	logText := string(logData)
+	wantSession := goalx.TmuxSessionName(repo, runName)
+	for _, want := range []string{
+		"new-session -d -s " + wantSession + " -n master -c " + RunWorktreePath(runDir),
+		filepath.Join(runDir, "master.md"),
+	} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("tmux log missing %q:\n%s", want, logText)
+		}
+	}
+}
+
 func TestRunSidecarTickQueuesSessionWakeForUnreadSessionInbox(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
