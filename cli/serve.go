@@ -68,7 +68,6 @@ type serveActionRequest struct {
 	MasterEffort   goalx.EffortLevel `json:"master_effort"`
 	ResearchEffort goalx.EffortLevel `json:"research_effort"`
 	DevelopEffort  goalx.EffortLevel `json:"develop_effort"`
-	BudgetSeconds  int               `json:"budget_seconds"`
 	WriteConfig    bool              `json:"write_config"`
 	ConfigScope    string            `json:"config_scope"`
 }
@@ -546,7 +545,6 @@ func phaseOptionsFromServeRequest(req serveActionRequest) (phaseOptions, error) 
 		ResearchEffort: req.ResearchEffort,
 		DevelopEffort:  req.DevelopEffort,
 		Preset:         req.Preset,
-		BudgetSeconds:  req.BudgetSeconds,
 		WriteConfig:    req.WriteConfig,
 	}, nil
 }

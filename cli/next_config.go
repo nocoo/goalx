@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -19,7 +18,6 @@ type nextConfigJSON struct {
 	Effort        goalx.EffortLevel `json:"effort,omitempty"`
 	Preset        string            `json:"preset,omitempty"`
 	Dimensions    []string          `json:"dimensions,omitempty"`
-	BudgetSeconds int               `json:"budget_seconds,omitempty"`
 	Objective     string            `json:"objective,omitempty"`
 	Mode          string            `json:"mode,omitempty"`
 	MaxIterations int               `json:"max_iterations,omitempty"`
@@ -70,10 +68,6 @@ func validateNextConfig(projectRoot string, nc *nextConfigJSON) *nextConfigJSON 
 		fmt.Fprintf(os.Stderr, "warning: capping next_config.parallel=%d to %d\n", validated.Parallel, maxNextConfigParallel)
 		validated.Parallel = maxNextConfigParallel
 	}
-	if validated.BudgetSeconds < 0 {
-		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.budget_seconds=%d (must be >= 0)\n", validated.BudgetSeconds)
-		validated.BudgetSeconds = 0
-	}
 	if validated.MaxIterations < 0 || validated.MaxIterations > maxNextConfigIterations {
 		fmt.Fprintf(os.Stderr, "warning: ignoring next_config.max_iterations=%d (must be 1-%d or 0)\n", validated.MaxIterations, maxNextConfigIterations)
 		validated.MaxIterations = 0
@@ -120,13 +114,6 @@ func nextConfigParallel(fallback int, nc *nextConfigJSON) int {
 func nextConfigObjective(fallback string, nc *nextConfigJSON) string {
 	if nc != nil && nc.Objective != "" {
 		return nc.Objective
-	}
-	return fallback
-}
-
-func nextConfigBudget(fallback time.Duration, nc *nextConfigJSON) time.Duration {
-	if nc != nil && nc.BudgetSeconds > 0 {
-		return time.Duration(nc.BudgetSeconds) * time.Second
 	}
 	return fallback
 }

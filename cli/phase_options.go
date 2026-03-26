@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -25,12 +26,13 @@ type phaseOptions struct {
 	ResearchEffort goalx.EffortLevel
 	DevelopEffort  goalx.EffortLevel
 	Preset         string
-	BudgetSeconds  int
+	BudgetSet      bool
+	Budget         time.Duration
 	WriteConfig    bool
 }
 
 func phaseUsage(command string) string {
-	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget-seconds N] [--write-config]
+	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--write-config]
 
 notes:
   --from RUN is required and must reference a saved run.
@@ -158,16 +160,17 @@ func parsePhaseOptions(command string, args []string) (phaseOptions, error) {
 			}
 			i++
 			opts.Preset = args[i]
-		case "--budget-seconds":
+		case "--budget":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --budget-seconds")
+				return opts, fmt.Errorf("missing value for --budget")
 			}
 			i++
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n < 0 {
-				return opts, fmt.Errorf("invalid --budget-seconds value %q", args[i])
+			budget, err := parseBudgetOverride(args[i])
+			if err != nil {
+				return opts, err
 			}
-			opts.BudgetSeconds = n
+			opts.BudgetSet = true
+			opts.Budget = budget
 		case "--write-config":
 			opts.WriteConfig = true
 		case "--engine", "--model":
@@ -194,9 +197,6 @@ func mergeNextConfigIntoPhaseOptions(opts phaseOptions, nc *nextConfigJSON, phas
 	}
 	if opts.Preset == "" && nc.Preset != "" {
 		opts.Preset = nc.Preset
-	}
-	if opts.BudgetSeconds == 0 && nc.BudgetSeconds > 0 {
-		opts.BudgetSeconds = nc.BudgetSeconds
 	}
 	if len(opts.ContextPaths) == 0 && len(nc.Context) > 0 {
 		opts.ContextPaths = append([]string(nil), nc.Context...)

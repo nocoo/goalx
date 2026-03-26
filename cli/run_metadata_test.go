@@ -57,6 +57,7 @@ func TestSaveRunMetadataPreservesCharterFields(t *testing.T) {
 		RootRunID:       "run_root",
 		Epoch:           3,
 		BaseRevision:    "base",
+		Intent:          "evolve",
 		PhaseKind:       "research",
 		SnapshotCommit:  "abc1234",
 		CharterID:       "charter_abc",
@@ -81,6 +82,9 @@ func TestSaveRunMetadataPreservesCharterFields(t *testing.T) {
 	}
 	if reloaded.SnapshotCommit != meta.SnapshotCommit {
 		t.Fatalf("SnapshotCommit = %q, want %q", reloaded.SnapshotCommit, meta.SnapshotCommit)
+	}
+	if reloaded.Intent != meta.Intent {
+		t.Fatalf("Intent = %q, want %q", reloaded.Intent, meta.Intent)
 	}
 }
 

@@ -18,6 +18,7 @@ Do not choose this path by default. Prefer:
 goalx run "goal"
 goalx run "goal" --intent research --effort high
 goalx run "goal" --intent develop --effort medium
+goalx run "goal" --intent evolve --budget 8h
 goalx run --from RUN --intent debate
 goalx run --from RUN --intent implement
 goalx run --from RUN --intent explore
@@ -49,6 +50,47 @@ routing:
 preferences:
   research:
     guidance: "Use high-effort Codex by default; escalate depth work to opus."
+```
+
+## Budget
+
+Budget is a user-level time constraint set at `goalx run`. The master sees it as a time fact and manages accordingly. The framework does not enforce it.
+
+```bash
+goalx run "goal" --budget 4h                      # 4-hour budget for any intent
+goalx run "goal" --intent evolve                   # evolve defaults to 8h
+goalx run "goal" --intent evolve --budget 24h      # override evolve default
+goalx run "goal" --intent evolve --budget 0s       # explicit no limit
+```
+
+Budget can also be set in config.yaml:
+
+```yaml
+budget:
+  max_duration: 12h
+```
+
+Resolution order: `--budget` CLI flag > config.yaml `budget.max_duration` > intent default (0 for bounded intents, 8h for evolve).
+
+## Base-Branch Forking
+
+Fork a new session's worktree from an existing session's branch:
+
+```bash
+goalx add --run NAME --mode develop --base-branch session-1 --worktree "alternative approach"
+```
+
+The source session must have its own worktree (created with `--worktree`). If session-1 shares the run root worktree, the command fails fast with an error.
+
+This is useful for:
+- Trying an alternative approach starting from where a previous session left off
+- Evolve-intent runs where the master wants to fork parallel improvements from the current best result
+- Any situation where you want tree-shaped exploration instead of linear iteration
+
+You can also pass a raw branch name instead of a session selector:
+
+```bash
+goalx add --run NAME --mode develop --base-branch goalx/my-run/1 --worktree "fork from branch"
 ```
 
 ## Manual Run Targeting

@@ -262,6 +262,122 @@ local_validation:
 	}
 }
 
+func TestAddWorktreeUsesSessionBaseBranch(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+parallel: 1
+sessions:
+  - hint: first
+    mode: develop
+target:
+  files: ["."]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+runName+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	session1WT := WorktreePath(runDir, runName, 1)
+	if err := CreateWorktree(runWT, session1WT, "goalx/"+runName+"/1"); err != nil {
+		t.Fatalf("CreateWorktree session-1: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(session1WT, "feature.txt"), []byte("from session 1\n"), 0o644); err != nil {
+		t.Fatalf("write feature.txt: %v", err)
+	}
+	runGit(t, session1WT, "add", "feature.txt")
+	runGit(t, session1WT, "commit", "-m", "session branch change")
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:         "session-1",
+		State:        "active",
+		Mode:         string(goalx.ModeDevelop),
+		Branch:       "goalx/" + runName + "/1",
+		WorktreePath: session1WT,
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	if err := Add(repo, []string{"follow up slice", "--mode", "develop", "--worktree", "--base-branch", "session-1", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(WorktreePath(runDir, runName, 2), "feature.txt"))
+	if err != nil {
+		t.Fatalf("read session-2 feature.txt: %v", err)
+	}
+	if string(data) != "from session 1\n" {
+		t.Fatalf("session-2 feature.txt = %q, want session-1 branch contents", string(data))
+	}
+}
+
+func TestAddWorktreeBaseBranchFailsForSharedSession(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+parallel: 1
+sessions:
+  - hint: first
+    mode: develop
+target:
+  files: ["."]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+runName+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-1",
+		State: "active",
+		Mode:  string(goalx.ModeDevelop),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	err := Add(repo, []string{"follow up slice", "--mode", "develop", "--worktree", "--base-branch", "session-1", "--run", runName})
+	if err == nil || !strings.Contains(err.Error(), "has no dedicated branch") {
+		t.Fatalf("Add error = %v, want dedicated branch error", err)
+	}
+}
+
 func TestAddRendersAcceptanceContractAndTeamContext(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -35,6 +35,16 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 	if err != nil {
 		return fmt.Errorf("load run metadata: %w", err)
 	}
+	if err := ensureEvolutionSurface(runDir, meta); err != nil {
+		return fmt.Errorf("init evolution surface: %w", err)
+	}
+	masterData, err := buildMasterProtocolData(projectRoot, runDir, tmuxSession, cfg, engines, engineCmd, meta)
+	if err != nil {
+		return fmt.Errorf("build master protocol data: %w", err)
+	}
+	if err := RenderMasterProtocol(masterData, runDir); err != nil {
+		return fmt.Errorf("render master protocol: %w", err)
+	}
 	goalxBin, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve goalx executable: %w", err)

@@ -31,6 +31,16 @@ func TestServeHandlerRequiresBearerToken(t *testing.T) {
 	}
 }
 
+func TestServeActionRequestRemovesBudgetSecondsSchema(t *testing.T) {
+	data, err := json.Marshal(serveActionRequest{})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(data), "budget_seconds") {
+		t.Fatalf("serve action request should not expose budget_seconds schema:\n%s", string(data))
+	}
+}
+
 func TestServeHandlerListsProjectsAndRuns(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

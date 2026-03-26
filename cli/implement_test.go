@@ -78,10 +78,9 @@ func TestImplementAppliesNextConfigOverrides(t *testing.T) {
 		Engine:        "codex",
 		Model:         "fast",
 		Dimensions:    []string{"depth", "adversarial", "evidence", "perfectionist"},
-		BudgetSeconds: 1200,
 		Objective:     "custom implement objective",
 	}
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--budget", "20m", "--write-config"}, nc); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 

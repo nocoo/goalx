@@ -26,6 +26,7 @@ type RunMetadata struct {
 	Epoch           int    `json:"epoch,omitempty"`
 	BaseRevision    string `json:"base_revision,omitempty"`
 	SnapshotCommit  string `json:"snapshot_commit,omitempty"`
+	Intent          string `json:"intent,omitempty"`
 	PhaseKind       string `json:"phase_kind,omitempty"`
 	SourceRun       string `json:"source_run,omitempty"`
 	SourcePhase     string `json:"source_phase,omitempty"`

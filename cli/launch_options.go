@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -26,6 +27,9 @@ type launchOptions struct {
 	DevelopEffort  goalx.EffortLevel
 	Subs           []string
 	Preset         string
+	Intent         string
+	BudgetSet      bool
+	Budget         time.Duration
 	NoSnapshot     bool
 }
 
@@ -50,7 +54,7 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
        goalx start --config PATH
 
 advanced/manual path:
@@ -60,21 +64,21 @@ notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
  role defaults are separate: --master, --research-role, --develop-role.`
 	case "init":
-		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
 
 notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
  role defaults are separate: --master, --research-role, --develop-role.`
 	case "auto":
-		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx auto "objective" [--research|--develop] [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
 
 notes:
   master decides mode unless you pass --research or --develop.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
  role defaults are separate: --master, --research-role, --develop-role.`
 	case "research", "develop":
-		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--sub ENGINE/MODEL[:N]]
+		return fmt.Sprintf(`usage: goalx %s "objective" [--parallel N] [--name NAME] [--preset NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
 
 notes:
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
@@ -215,6 +219,17 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 			}
 			i++
 			opts.Preset = args[i]
+		case "--budget":
+			if i+1 >= len(args) {
+				return opts, fmt.Errorf("missing value for --budget")
+			}
+			i++
+			budget, err := parseBudgetOverride(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.BudgetSet = true
+			opts.Budget = budget
 		case "--no-snapshot":
 			opts.NoSnapshot = true
 		case "--engine", "--model":
@@ -224,6 +239,21 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 		}
 	}
 	return opts, nil
+}
+
+func parseBudgetOverride(raw string) (time.Duration, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0, fmt.Errorf("invalid --budget value %q", raw)
+	}
+	if value == "0" {
+		return 0, nil
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration < 0 {
+		return 0, fmt.Errorf("invalid --budget value %q", raw)
+	}
+	return duration, nil
 }
 
 func splitListFlag(raw string) []string {

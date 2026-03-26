@@ -102,6 +102,7 @@ When you want to bias the launch without reintroducing multiple entrypoints:
 ```bash
 goalx run "all API endpoints and their auth requirements are documented" --intent research --effort high
 goalx run "all public endpoints are rate-limited and protected" --intent develop --effort medium
+goalx run "this project is production-ready" --intent evolve --budget 8h
 ```
 
 Continue an existing run with an explicit next-step intent:
@@ -111,6 +112,18 @@ goalx run --from auth-audit --intent debate     # challenge findings
 goalx run --from auth-audit --intent implement  # build from prior results
 goalx run --from auth-audit --intent explore    # dig deeper into one area
 ```
+
+## Budget
+
+Budget is a user-level time constraint. The master sees it as a fact and manages its time accordingly. The framework does not enforce it.
+
+```bash
+goalx run "goal" --budget 4h                    # bounded run with 4h budget
+goalx run "goal" --intent evolve                # evolve defaults to 8h
+goalx run "goal" --intent evolve --budget 0s    # explicit no limit
+```
+
+Non-evolve intents default to no budget — the master stops when the goal is met. Evolve defaults to 8h because open-ended runs need a safety boundary.
 
 ## Runtime Control
 
@@ -211,8 +224,9 @@ local_validation:
 |---------|-------------|
 | **Start** | |
 | `goalx run` | Primary goal entrypoint. Master decides the path. |
-| `goalx run --intent research|develop` | Bias the initial launch without changing the single-entrypoint model |
-| `goalx run --from RUN --intent debate|implement|explore` | Continue an existing run with an explicit next-step intent |
+| `goalx run --intent research\|develop` | Bias the initial launch without changing the single-entrypoint model |
+| `goalx run --intent evolve --budget 8h` | Open-ended iterative improvement until budget or user stop |
+| `goalx run --from RUN --intent debate\|implement\|explore` | Continue an existing run with an explicit next-step intent |
 | **Observe** | |
 | `goalx observe` | Live transport capture + control summary |
 | `goalx status` | Progress, lease health, inbox, reminders |
@@ -279,6 +293,7 @@ Every run gets its own git worktree. Sessions can optionally get sub-worktrees f
 ├── control/                       # inbox, dimensions, guidance
 ├── summary.md                     # canonical run result
 ├── reports/                       # supporting research outputs
+├── evolution.jsonl                # trial record (evolve intent only)
 └── proof/                         # agent-owned closeout evidence
 ```
 
@@ -290,7 +305,7 @@ goalx serve    # starts on configured bind address
 
 Full REST API for remote management. Bearer token auth + IP binding. See [deploy/](deploy/) for systemd unit and config.
 
-Key endpoints: `POST /projects/:name/goalx/auto`, `/observe`, `/status`, `/tell`, `/keep`, `/stop`. The HTTP API still exposes the existing GoalX action names.
+Key endpoints: `POST /projects/:name/goalx/run`, `/observe`, `/status`, `/tell`, `/keep`, `/stop`. Same action names as the CLI.
 
 ## OpenClaw Integration
 

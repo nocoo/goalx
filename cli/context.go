@@ -98,6 +98,7 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Run ID", identity.RunID)
 		writeContextLine("Root run ID", identity.RootRunID)
 		writeContextLine("Charter ID", identity.CharterID)
+		writeContextLine("Intent", identity.Intent)
 		writeContextLine("Mode", identity.Mode)
 		writeContextLine("Phase kind", identity.PhaseKind)
 		if identity.RoleContracts.Master != nil {

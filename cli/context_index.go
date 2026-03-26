@@ -46,6 +46,7 @@ type ContextRunIdentity struct {
 	RunID         string                  `json:"run_id,omitempty"`
 	RootRunID     string                  `json:"root_run_id,omitempty"`
 	Objective     string                  `json:"objective,omitempty"`
+	Intent        string                  `json:"intent,omitempty"`
 	Mode          string                  `json:"mode,omitempty"`
 	PhaseKind     string                  `json:"phase_kind,omitempty"`
 	RoleContracts RunCharterRoleContracts `json:"role_contracts,omitempty"`
@@ -121,6 +122,10 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 	if err != nil {
 		return nil, err
 	}
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	index := &ContextIndex{
 		Version:             1,
 		CheckedAt:           time.Now().UTC().Format(time.RFC3339),
@@ -128,7 +133,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		RunDir:              runDir,
 		RunName:             runName,
 		RunWorktree:         RunWorktreePath(runDir),
-		RunIdentity:         contextRunIdentity(charter),
+		RunIdentity:         contextRunIdentity(charter, meta),
 		ReportsDir:          ReportsDir(runDir),
 		CharterPath:         RunCharterPath(runDir),
 		GoalPath:            GoalPath(runDir),
@@ -203,11 +208,11 @@ func toolAvailable(name string) bool {
 	return err == nil
 }
 
-func contextRunIdentity(charter *RunCharter) ContextRunIdentity {
+func contextRunIdentity(charter *RunCharter, meta *RunMetadata) ContextRunIdentity {
 	if charter == nil {
 		return ContextRunIdentity{}
 	}
-	return ContextRunIdentity{
+	identity := ContextRunIdentity{
 		CharterID:     charter.CharterID,
 		RunID:         charter.RunID,
 		RootRunID:     charter.RootRunID,
@@ -216,6 +221,10 @@ func contextRunIdentity(charter *RunCharter) ContextRunIdentity {
 		PhaseKind:     charter.PhaseKind,
 		RoleContracts: charter.RoleContracts,
 	}
+	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
+		identity.Intent = strings.TrimSpace(meta.Intent)
+	}
+	return identity
 }
 
 func providerFactsForEngine(target, engine string) []ProviderFact {

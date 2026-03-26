@@ -39,6 +39,10 @@ func TestBuildContextIndexIncludesRunAnchors(t *testing.T) {
 
 func TestBuildContextIndexIncludesImmutableRunIdentity(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
 
 	index, err := BuildContextIndex(repo, cfg.Name, runDir)
 	if err != nil {
@@ -60,11 +64,17 @@ func TestBuildContextIndexIncludesImmutableRunIdentity(t *testing.T) {
 	if index.RunIdentity.Mode != string(cfg.Mode) {
 		t.Fatalf("run identity mode = %q, want %q", index.RunIdentity.Mode, cfg.Mode)
 	}
+	if index.RunIdentity.Intent != runIntentEvolve {
+		t.Fatalf("run identity intent = %q, want %q", index.RunIdentity.Intent, runIntentEvolve)
+	}
 	if index.RunIdentity.RoleContracts.Master == nil || index.RunIdentity.RoleContracts.Master.Kind != "master" {
 		t.Fatalf("run identity master role contract = %+v, want master contract", index.RunIdentity.RoleContracts.Master)
 	}
 	if charter != nil && index.RunIdentity.CharterID != charter.CharterID {
 		t.Fatalf("run identity charter_id = %q, want %q", index.RunIdentity.CharterID, charter.CharterID)
+	}
+	if !strings.Contains(renderContextIndex(index), "Intent: `evolve`") {
+		t.Fatalf("rendered context missing intent:\n%s", renderContextIndex(index))
 	}
 }
 

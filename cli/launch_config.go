@@ -32,7 +32,7 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 		}
 		resolved.Config.Context = goalx.ContextConfig{Files: contextFiles}
 	}
-	resolved.Config.Budget = goalx.BudgetConfig{MaxDuration: 6 * time.Hour}
+	applyLaunchBudgetOverride(&resolved.Config, opts)
 	return &resolved.Config, nil
 }
 
@@ -60,8 +60,21 @@ func resolveLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Resolve
 		}
 		resolved.Config.Context = goalx.ContextConfig{Files: contextFiles}
 	}
-	resolved.Config.Budget = goalx.BudgetConfig{MaxDuration: 6 * time.Hour}
+	applyLaunchBudgetOverride(&resolved.Config, opts)
 	return resolved, nil
+}
+
+func applyLaunchBudgetOverride(cfg *goalx.Config, opts launchOptions) {
+	if cfg == nil {
+		return
+	}
+	if opts.BudgetSet {
+		cfg.Budget.MaxDuration = opts.Budget
+		return
+	}
+	if opts.Intent == runIntentEvolve && cfg.Budget.MaxDuration <= 0 {
+		cfg.Budget.MaxDuration = 8 * time.Hour
+	}
 }
 
 func buildLaunchResolveRequest(projectRoot string, baseCfg goalx.Config, opts launchOptions) (goalx.ResolveRequest, error) {

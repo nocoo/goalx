@@ -1237,6 +1237,53 @@ func TestRenderMasterProtocolIncludesOptimizationDoctrine(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "ship it",
+		RunName:             "demo",
+		Mode:                goalx.ModeAuto,
+		Intent:              runIntentEvolve,
+		CurrentTime:         "2026-03-27T08:00:00Z",
+		RunStartedAt:        "2026-03-27T06:00:00Z",
+		EvolutionLogPath:    "/tmp/evolution.jsonl",
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalPath:            "/tmp/goal.json",
+		StatusPath:          "/tmp/status.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		EngineCommand:       "codex --model gpt-5.4",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Current time (UTC): 2026-03-27T08:00:00Z",
+		"Run started at (UTC): 2026-03-27T06:00:00Z",
+		"Intent: evolve",
+		"This run was launched with explicit `evolve` intent.",
+		"Trial record: `/tmp/evolution.jsonl`",
+		"Append a JSON line to `/tmp/evolution.jsonl` for every material trial",
+		"`goalx add --run demo --worktree --base-branch session-N`",
+		"Stop the iteration loop when budget is exhausted",
+		"the user redirects or stops the run",
+		"recent trials show diminishing returns",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{

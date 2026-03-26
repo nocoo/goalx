@@ -24,3 +24,30 @@ func TestBuildPhaseResolveRequestLeavesTargetAndLocalValidationUnsetWhenUnconfig
 		t.Fatalf("LocalValidationOverride = %#v, want nil", req.LocalValidationOverride)
 	}
 }
+
+func TestResolvePhaseConfigLeavesBudgetUnlimitedByDefault(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	writeProjectConfigFixture(t, projectRoot, `
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	source := &savedPhaseSource{
+		Run:      "research-a",
+		Mode:     goalx.ModeResearch,
+		Parallel: 1,
+	}
+
+	cfg, _, err := resolvePhaseConfig(projectRoot, "debate", goalx.ModeResearch, source, phaseOptions{})
+	if err != nil {
+		t.Fatalf("resolvePhaseConfig: %v", err)
+	}
+	if cfg.Budget.MaxDuration != 0 {
+		t.Fatalf("budget = %v, want unlimited (0)", cfg.Budget.MaxDuration)
+	}
+}

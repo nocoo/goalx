@@ -113,10 +113,9 @@ func TestDebateAppliesNextConfigOverrides(t *testing.T) {
 		Engine:        "codex",
 		Model:         "fast",
 		Dimensions:    []string{"depth", "adversarial", "evidence"},
-		BudgetSeconds: 900,
 		Objective:     "custom debate objective",
 	}
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nc); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--budget", "15m", "--write-config"}, nc); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 

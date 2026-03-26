@@ -2,6 +2,7 @@ package cli
 
 import (
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -20,7 +21,7 @@ func TestParsePhaseOptions(t *testing.T) {
 		"--dimension", "depth,adversarial",
 		"--effort", "minimal",
 		"--context", "README.md,docs/arch.md",
-		"--budget-seconds", "900",
+		"--budget", "15m",
 		"--write-config",
 	})
 	if err != nil {
@@ -56,8 +57,11 @@ func TestParsePhaseOptions(t *testing.T) {
 	if len(opts.Dimensions) != 2 || opts.Dimensions[0] != "depth" || opts.Dimensions[1] != "adversarial" {
 		t.Fatalf("dimensions = %#v, want [depth adversarial]", opts.Dimensions)
 	}
-	if opts.BudgetSeconds != 900 {
-		t.Fatalf("budget-seconds = %d", opts.BudgetSeconds)
+	if !opts.BudgetSet {
+		t.Fatal("BudgetSet = false, want true")
+	}
+	if opts.Budget != 15*time.Minute {
+		t.Fatalf("budget = %v, want 15m", opts.Budget)
 	}
 	if !opts.WriteConfig {
 		t.Fatal("write-config = false, want true")

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	goalx "github.com/vonbai/goalx"
 	"gopkg.in/yaml.v3"
@@ -91,7 +90,7 @@ func phaseSourceKind(source *savedPhaseSource) string {
 }
 
 func phaseRunMetadataPatch(source *savedPhaseSource, phaseKind string) *RunMetadata {
-	patch := &RunMetadata{PhaseKind: phaseKind}
+	patch := &RunMetadata{Intent: phaseKind, PhaseKind: phaseKind}
 	if source == nil {
 		return patch
 	}
@@ -165,8 +164,8 @@ func resolvePhaseConfig(projectRoot string, phaseKind string, mode goalx.Mode, s
 	if err != nil {
 		return nil, nil, err
 	}
-	if opts.BudgetSeconds > 0 {
-		resolved.Config.Budget.MaxDuration = time.Duration(opts.BudgetSeconds) * time.Second
+	if opts.BudgetSet {
+		resolved.Config.Budget.MaxDuration = opts.Budget
 	}
 	return &resolved.Config, resolved.Engines, nil
 }

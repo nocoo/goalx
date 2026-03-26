@@ -36,6 +36,27 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 
 - Run: {{.RunName}}
 - Master: {{.Master.Engine}}/{{.Master.Model}}
+{{if .CurrentTime}}- Current time (UTC): {{.CurrentTime}}
+{{end}}{{if .RunStartedAt}}- Run started at (UTC): {{.RunStartedAt}}
+{{end}}{{if .Intent}}- Intent: {{.Intent}}
+{{end}}
+
+{{if eq .Intent "evolve"}}
+### Evolve Intent
+
+- This run was launched with explicit `evolve` intent.
+- Trial record: `{{.EvolutionLogPath}}`
+- Re-read `{{.EvolutionLogPath}}` before planning the next iteration or recovering from relaunch.
+- Append a JSON line to `{{.EvolutionLogPath}}` for every material trial: hypothesis, path/branch, decisive evidence, outcome, and next step.
+- Run an explicit iteration loop: choose the highest-value next trial, execute it, review evidence, record the result, then continue, pivot, or consolidate.
+- Bias toward producing meaningful code or system improvements, not stopping at diagnosis alone.
+- When exploring divergent paths, use isolated worktrees and explicit base branches instead of mutating one branch blindly.
+- Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
+- Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..." --mode develop` when a trial should fork from an existing session result.
+- Keep the current best path visible in durable state, and record why weaker trials were rejected.
+- Stop the iteration loop when budget is exhausted, the user redirects or stops the run, or recent trials show diminishing returns relative to cost, risk, and remaining upside.
+- Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned trials.
+{{end}}
 
 ## Resources
 

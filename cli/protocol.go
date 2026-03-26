@@ -16,6 +16,10 @@ type ProtocolData struct {
 	RunName                string
 	Objective              string
 	Description            string
+	Intent                 string
+	CurrentTime            string
+	RunStartedAt           string
+	EvolutionLogPath       string
 	Mode                   goalx.Mode
 	Engine                 string
 	SessionCapabilities    ProviderCapabilities
@@ -124,6 +128,9 @@ func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 	}
 	if data.GoalLogPath == "" && data.GoalPath != "" {
 		data.GoalLogPath = filepath.Join(filepath.Dir(data.GoalPath), "goal-log.jsonl")
+	}
+	if data.EvolutionLogPath == "" && runDir != "" && data.Intent == runIntentEvolve {
+		data.EvolutionLogPath = EvolutionLogPath(runDir)
 	}
 	if data.CharterPath == "" && runDir != "" {
 		data.CharterPath = RunCharterPath(runDir)

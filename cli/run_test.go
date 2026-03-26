@@ -70,6 +70,42 @@ func TestRunIntentResearchUsesResearchLaunchMode(t *testing.T) {
 	}
 }
 
+func TestRunIntentEvolveUsesAutoLaunchMode(t *testing.T) {
+	oldAuto := runAutoWithOptions
+	defer func() { runAutoWithOptions = oldAuto }()
+
+	calls := 0
+	runAutoWithOptions = func(projectRoot string, opts launchOptions) error {
+		calls++
+		if projectRoot == "" {
+			t.Fatal("projectRoot should not be empty")
+		}
+		if opts.Objective != "ship auth" {
+			t.Fatalf("objective = %q, want ship auth", opts.Objective)
+		}
+		if opts.Mode != goalx.ModeAuto {
+			t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeAuto)
+		}
+		if opts.Intent != runIntentEvolve {
+			t.Fatalf("intent = %q, want %q", opts.Intent, runIntentEvolve)
+		}
+		return nil
+	}
+
+	out := captureStdout(t, func() {
+		if err := Run(t.TempDir(), []string{"ship auth", "--intent", "evolve"}, nil); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+	})
+
+	if calls != 1 {
+		t.Fatalf("auto calls = %d, want 1", calls)
+	}
+	if !strings.Contains(out, "Run started.") {
+		t.Fatalf("run output missing start summary:\n%s", out)
+	}
+}
+
 func TestRunIntentDebateUsesPhasePath(t *testing.T) {
 	oldDebate := runDebateWithNextConfig
 	defer func() { runDebateWithNextConfig = oldDebate }()

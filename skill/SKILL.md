@@ -1,6 +1,6 @@
 ---
 name: goalx
-description: Use when the user wants GoalX to autonomously pursue a goal in the current project, observe or redirect a running GoalX run, or continue a completed run into its next phase. Also use when the user mentions goalx commands, run management, autonomous research, multi-agent orchestration, or wants to start/monitor/redirect any goal-driven work — even if they don't say "goalx" explicitly.
+description: Use when the user wants GoalX to autonomously pursue a goal in the current project, observe or redirect a running GoalX run, or continue a completed run into its next phase. Also use when the user mentions goalx commands, run management, autonomous research, multi-agent orchestration, or wants to start/monitor/redirect any goal-driven work — even if they don't say "goalx" explicitly. Trigger on evolve/iterate/improve-over-time requests too.
 ---
 
 # GoalX
@@ -69,9 +69,24 @@ goalx run "goal" --intent research                 # produce findings, not code
 goalx run --from RUN --intent debate               # challenge prior findings
 goalx run --from RUN --intent implement            # build from prior research
 goalx run --from RUN --intent explore              # extend prior findings
+goalx run "goal" --intent evolve --budget 8h       # open-ended iterative improvement
 ```
 
 Intent is a hint to the master about what kind of outcome the user expects. It does not change the runtime architecture.
+
+**Evolve** is for open-ended improvement — the master iteratively finds and executes the highest-value improvements until the budget runs out or the user says stop. It keeps a trial record (`evolution.jsonl`) so context survives relaunches.
+
+## Budget
+
+Budget is a user-level time constraint set at run creation. The master sees it as a fact and respects it. The framework does not enforce it — agents manage their own time.
+
+```bash
+goalx run "goal" --budget 4h                # 4-hour time budget
+goalx run "goal" --intent evolve            # evolve defaults to 8h if no --budget
+goalx run "goal" --intent evolve --budget 0s  # explicit no limit
+```
+
+Non-evolve intents default to no budget (master stops when the goal is met). Evolve defaults to 8h because open-ended runs need a safety boundary.
 
 ## How to Think About GoalX
 
@@ -132,10 +147,13 @@ goalx save                    # export to durable storage
 
 ```bash
 goalx add --run NAME --mode develop --worktree "task"   # add an isolated worker
+goalx add --run NAME --mode develop --base-branch session-1 --worktree "alt approach"  # fork from session-1's branch
 goalx park --run NAME session-3                          # pause, keep worktree
 goalx resume --run NAME session-3                        # restart parked
 goalx keep --run NAME session-1                          # merge session branch
 ```
+
+`--base-branch` forks the new worktree from an existing session's branch instead of from main. This is useful when you want to try an alternative approach starting from where another session left off. The source session must have its own worktree.
 
 ## Multi-Run Projects
 

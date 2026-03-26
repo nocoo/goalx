@@ -2,6 +2,7 @@ package cli
 
 import (
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -128,6 +129,32 @@ func TestParseLaunchOptionsSupportsRepeatedDimensionsAndRoutingFlags(t *testing.
 	}
 	if opts.RouteProfile != "build_balanced" {
 		t.Fatalf("route profile = %q, want build_balanced", opts.RouteProfile)
+	}
+}
+
+func TestParseLaunchOptionsSupportsBudgetOverride(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "15m"}, goalx.ModeResearch, true)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if !opts.BudgetSet {
+		t.Fatal("BudgetSet = false, want true")
+	}
+	if opts.Budget != 15*time.Minute {
+		t.Fatalf("budget = %v, want 15m", opts.Budget)
+	}
+}
+
+func TestParseLaunchOptionsSupportsExplicitZeroBudgetOverride(t *testing.T) {
+	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "0"}, goalx.ModeResearch, true)
+	if err != nil {
+		t.Fatalf("parseLaunchOptions: %v", err)
+	}
+	if !opts.BudgetSet {
+		t.Fatal("BudgetSet = false, want true")
+	}
+	if opts.Budget != 0 {
+		t.Fatalf("budget = %v, want 0", opts.Budget)
 	}
 }
 

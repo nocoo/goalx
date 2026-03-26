@@ -311,9 +311,6 @@ var BuiltinDefaults = Config{
 	Master: MasterConfig{
 		CheckInterval: 2 * time.Minute,
 	},
-	Budget: BudgetConfig{
-		MaxDuration: 8 * time.Hour,
-	},
 }
 
 func ParseEffortLevel(raw string) (EffortLevel, error) {

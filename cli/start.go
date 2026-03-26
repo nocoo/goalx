@@ -48,7 +48,7 @@ func startWithOptions(projectRoot string, opts startOptions) error {
 		engines = resolved.Engines
 	}
 
-	return startWithConfig(projectRoot, cfg, engines, nil, opts.NoSnapshot)
+	return startWithConfig(projectRoot, cfg, engines, launchRunMetadataPatch(opts.launchOptions), opts.NoSnapshot)
 }
 
 func startResolvedLaunch(projectRoot string, opts launchOptions) error {
@@ -56,7 +56,7 @@ func startResolvedLaunch(projectRoot string, opts launchOptions) error {
 	if err != nil {
 		return err
 	}
-	return startWithConfig(projectRoot, &resolved.Config, resolved.Engines, nil, opts.NoSnapshot)
+	return startWithConfig(projectRoot, &resolved.Config, resolved.Engines, launchRunMetadataPatch(opts), opts.NoSnapshot)
 }
 
 func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, metaPatch *RunMetadata, noSnapshot bool) (err error) {
@@ -181,10 +181,6 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	masterCmd := masterSpec.Command
 	masterProtocolPath := filepath.Join(runDir, "master.md")
 	masterPrompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, masterProtocolPath)
-	goalPath := GoalPath(runDir)
-	goalLogPath := GoalLogPath(runDir)
-	acceptanceStatePath := AcceptanceStatePath(runDir)
-	statusPath := RunStatusPath(runDir)
 
 	if err := EnsureEngineTrusted(cfg.Master.Engine, runWT); err != nil {
 		return fmt.Errorf("trust bootstrap master: %w", err)
@@ -225,6 +221,9 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		return fmt.Errorf("write run metadata: %w", err)
 	}
+	if err := ensureEvolutionSurface(runDir, meta); err != nil {
+		return fmt.Errorf("init evolution surface: %w", err)
+	}
 	if _, err := EnsureArtifactsManifest(runDir); err != nil {
 		return fmt.Errorf("init artifacts manifest: %w", err)
 	}
@@ -246,47 +245,9 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	}
 
 	// 11. Render protocols
-	masterData := ProtocolData{
-		RunName:                cfg.Name,
-		Objective:              cfg.Objective,
-		Description:            cfg.Description,
-		Mode:                   cfg.Mode,
-		Engines:                engines,
-		Master:                 cfg.Master,
-		Budget:                 cfg.Budget,
-		Target:                 cfg.Target,
-		Context:                cfg.Context,
-		Preferences:            cfg.Preferences,
-		Routing:                cfg.Routing,
-		DimensionsCatalog:      cfg.DimensionCatalog(),
-		TmuxSession:            tmuxSess,
-		ProjectRoot:            runWT,
-		SummaryPath:            SummaryPath(runDir),
-		CharterPath:            RunCharterPath(runDir),
-		GoalPath:               goalPath,
-		GoalLogPath:            goalLogPath,
-		IdentityFencePath:      IdentityFencePath(runDir),
-		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(runDir)),
-		AcceptanceStatePath:    acceptanceStatePath,
-		CompletionProofPath:    CompletionStatePath(runDir),
-		RunStatePath:           RunRuntimeStatePath(runDir),
-		SessionsStatePath:      SessionsRuntimeStatePath(runDir),
-		ProjectRegistryPath:    ProjectRegistryPath(projectRoot),
-		RunMetadataPath:        RunMetadataPath(runDir),
-		CoordinationPath:       CoordinationPath(runDir),
-		MasterInboxPath:        MasterInboxPath(runDir),
-		MasterCursorPath:       MasterCursorPath(runDir),
-		ControlRunIdentityPath: ControlRunIdentityPath(runDir),
-		ControlRunStatePath:    ControlRunStatePath(runDir),
-		MasterLeasePath:        ControlLeasePath(runDir, "master"),
-		SidecarLeasePath:       ControlLeasePath(runDir, "sidecar"),
-		LivenessPath:           LivenessPath(runDir),
-		WorktreeSnapshotPath:   WorktreeSnapshotPath(runDir),
-		ControlRemindersPath:   ControlRemindersPath(runDir),
-		ControlDeliveriesPath:  ControlDeliveriesPath(runDir),
-		MasterJournalPath:      filepath.Join(runDir, "master.jsonl"),
-		StatusPath:             statusPath,
-		EngineCommand:          masterCmd,
+	masterData, err := buildMasterProtocolData(projectRoot, runDir, tmuxSess, cfg, engines, masterCmd, meta)
+	if err != nil {
+		return fmt.Errorf("build master protocol data: %w", err)
 	}
 	if err := RenderMasterProtocol(masterData, runDir); err != nil {
 		return fmt.Errorf("render master protocol: %w", err)
@@ -384,6 +345,9 @@ func applyRunMetadataPatch(meta *RunMetadata, patch *RunMetadata) {
 	if patch.RootRunID != "" {
 		meta.RootRunID = patch.RootRunID
 	}
+	if patch.Intent != "" {
+		meta.Intent = patch.Intent
+	}
 	if patch.PhaseKind != "" {
 		meta.PhaseKind = patch.PhaseKind
 	}
@@ -396,4 +360,89 @@ func applyRunMetadataPatch(meta *RunMetadata, patch *RunMetadata) {
 	if patch.ParentRun != "" {
 		meta.ParentRun = patch.ParentRun
 	}
+}
+
+func launchRunMetadataPatch(opts launchOptions) *RunMetadata {
+	if strings.TrimSpace(opts.Intent) == "" {
+		return nil
+	}
+	return &RunMetadata{Intent: strings.TrimSpace(opts.Intent)}
+}
+
+func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, masterCmd string, meta *RunMetadata) (ProtocolData, error) {
+	if cfg == nil {
+		return ProtocolData{}, fmt.Errorf("run config is nil")
+	}
+	dimensionsCatalog := cfg.DimensionCatalog()
+	sessionDataList, err := buildSessionDataList(runDir, cfg, engines, dimensionsCatalog)
+	if err != nil {
+		return ProtocolData{}, err
+	}
+	intent := ""
+	runStartedAt := ""
+	if meta != nil {
+		intent = meta.Intent
+		runStartedAt = meta.StartedAt
+	}
+	return ProtocolData{
+		RunName:                cfg.Name,
+		Objective:              cfg.Objective,
+		Description:            cfg.Description,
+		Intent:                 intent,
+		CurrentTime:            time.Now().UTC().Format(time.RFC3339),
+		RunStartedAt:           runStartedAt,
+		EvolutionLogPath:       evolutionLogPathForIntent(runDir, intent),
+		Mode:                   cfg.Mode,
+		Engines:                engines,
+		Sessions:               sessionDataList,
+		Master:                 cfg.Master,
+		Budget:                 cfg.Budget,
+		Target:                 cfg.Target,
+		Context:                cfg.Context,
+		Preferences:            cfg.Preferences,
+		Routing:                cfg.Routing,
+		DimensionsCatalog:      dimensionsCatalog,
+		TmuxSession:            tmuxSession,
+		ProjectRoot:            RunWorktreePath(runDir),
+		SummaryPath:            SummaryPath(runDir),
+		CharterPath:            RunCharterPath(runDir),
+		GoalPath:               GoalPath(runDir),
+		GoalLogPath:            GoalLogPath(runDir),
+		IdentityFencePath:      IdentityFencePath(runDir),
+		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(runDir)),
+		AcceptanceStatePath:    AcceptanceStatePath(runDir),
+		CompletionProofPath:    CompletionStatePath(runDir),
+		RunStatePath:           RunRuntimeStatePath(runDir),
+		SessionsStatePath:      SessionsRuntimeStatePath(runDir),
+		ProjectRegistryPath:    ProjectRegistryPath(projectRoot),
+		RunMetadataPath:        RunMetadataPath(runDir),
+		CoordinationPath:       CoordinationPath(runDir),
+		MasterInboxPath:        MasterInboxPath(runDir),
+		MasterCursorPath:       MasterCursorPath(runDir),
+		ControlRunIdentityPath: ControlRunIdentityPath(runDir),
+		ControlRunStatePath:    ControlRunStatePath(runDir),
+		MasterLeasePath:        ControlLeasePath(runDir, "master"),
+		SidecarLeasePath:       ControlLeasePath(runDir, "sidecar"),
+		LivenessPath:           LivenessPath(runDir),
+		WorktreeSnapshotPath:   WorktreeSnapshotPath(runDir),
+		ControlRemindersPath:   ControlRemindersPath(runDir),
+		ControlDeliveriesPath:  ControlDeliveriesPath(runDir),
+		MasterJournalPath:      filepath.Join(runDir, "master.jsonl"),
+		StatusPath:             RunStatusPath(runDir),
+		EngineCommand:          masterCmd,
+	}, nil
+}
+
+func ensureEvolutionSurface(runDir string, meta *RunMetadata) error {
+	if meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
+		return nil
+	}
+	return ensureEmptyFile(EvolutionLogPath(runDir))
+}
+
+func evolutionLogPathForIntent(runDir, intent string) string {
+	if strings.TrimSpace(intent) != runIntentEvolve {
+		return ""
+	}
+	return EvolutionLogPath(runDir)
 }

@@ -9,6 +9,7 @@ import (
 
 const (
 	runIntentDeliver   = "deliver"
+	runIntentEvolve    = "evolve"
 	runIntentResearch  = "research"
 	runIntentDevelop   = "develop"
 	runIntentDebate    = "debate"
@@ -43,10 +44,13 @@ func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
 
 	switch req.Intent {
 	case runIntentDeliver:
+		fallthrough
+	case runIntentEvolve:
 		opts, err := parseLaunchOptions(req.Args, goalx.ModeAuto, true)
 		if err != nil {
 			return err
 		}
+		opts.Intent = req.Intent
 		if err := runAutoWithOptions(projectRoot, opts); err != nil {
 			return fmt.Errorf("start: %w", err)
 		}
@@ -57,12 +61,14 @@ func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
 		if err != nil {
 			return err
 		}
+		opts.Intent = req.Intent
 		return runLaunchWithOptions(projectRoot, opts)
 	case runIntentDevelop:
 		opts, err := parseLaunchOptions(req.Args, goalx.ModeDevelop, false)
 		if err != nil {
 			return err
 		}
+		opts.Intent = req.Intent
 		return runLaunchWithOptions(projectRoot, opts)
 	case runIntentDebate:
 		return runDebateWithNextConfig(projectRoot, req.Args, nc)
@@ -76,7 +82,7 @@ func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
 }
 
 func runUsage() string {
-	return `usage: goalx run "objective" [--intent deliver|research] [flags]
+	return `usage: goalx run "objective" [--intent deliver|evolve|research|develop] [flags]
        goalx run --from RUN --intent debate [flags]
 
 notes:
@@ -116,7 +122,7 @@ func normalizeRunIntent(raw string) (string, error) {
 	switch strings.TrimSpace(raw) {
 	case "", "auto", runIntentDeliver:
 		return runIntentDeliver, nil
-	case runIntentResearch, runIntentDevelop, runIntentDebate, runIntentImplement, runIntentExplore:
+	case runIntentEvolve, runIntentResearch, runIntentDevelop, runIntentDebate, runIntentImplement, runIntentExplore:
 		return strings.TrimSpace(raw), nil
 	default:
 		return "", fmt.Errorf("unknown --intent %q", raw)

@@ -10,7 +10,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree]`
+const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree] [--base-branch BRANCH|session-N]`
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
@@ -35,6 +35,7 @@ func Add(projectRoot string, args []string) (err error) {
 	var flagRouteRole, flagRouteProfile string
 	var flagDimensions []string
 	useWorktree := false
+	baseBranchSelector := ""
 	var hintParts []string
 	for i := 0; i < len(rest); i++ {
 		switch rest[i] {
@@ -93,6 +94,12 @@ func Add(projectRoot string, args []string) (err error) {
 			flagRouteProfile = rest[i]
 		case "--worktree":
 			useWorktree = true
+		case "--base-branch":
+			if i+1 >= len(rest) {
+				return fmt.Errorf("missing value for --base-branch")
+			}
+			i++
+			baseBranchSelector = strings.TrimSpace(rest[i])
 		default:
 			if strings.HasPrefix(rest[i], "-") {
 				return fmt.Errorf("unknown flag %q", rest[i])
@@ -105,6 +112,9 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if explicitEngine != explicitModel {
 		return fmt.Errorf("--engine and --model must be provided together")
+	}
+	if baseBranchSelector != "" && !useWorktree {
+		return fmt.Errorf("--base-branch requires --worktree")
 	}
 	switch strings.TrimSpace(flagRouteRole) {
 	case "research":
@@ -274,7 +284,15 @@ func Add(projectRoot string, args []string) (err error) {
 	if useWorktree {
 		wtPath = WorktreePath(rc.RunDir, rc.Config.Name, newNum)
 		branch = fmt.Sprintf("goalx/%s/%d", rc.Config.Name, newNum)
-		if err := CreateWorktree(runWT, wtPath, branch); err != nil {
+		baseBranch := ""
+		if baseBranchSelector != "" {
+			resolvedBaseBranch, err := resolveAddBaseBranchSelector(rc.RunDir, rc.Config.Name, baseBranchSelector)
+			if err != nil {
+				return err
+			}
+			baseBranch = resolvedBaseBranch
+		}
+		if err := CreateWorktree(runWT, wtPath, branch, baseBranch); err != nil {
 			return fmt.Errorf("create worktree: %w", err)
 		}
 		if err := CopyGitignoredFiles(runWT, wtPath); err != nil {
@@ -468,4 +486,23 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 		})
 	}
 	return list, nil
+}
+
+func resolveAddBaseBranchSelector(runDir, runName, selector string) (string, error) {
+	selector = strings.TrimSpace(selector)
+	if selector == "" {
+		return "", fmt.Errorf("base branch selector is required")
+	}
+	if _, err := parseSessionIndex(selector); err == nil {
+		sessionState, err := EnsureSessionsRuntimeState(runDir)
+		if err != nil {
+			return "", fmt.Errorf("load session runtime state: %w", err)
+		}
+		branch := resolvedSessionBranch(runDir, runName, selector, sessionState)
+		if branch == "" {
+			return "", fmt.Errorf("session %q has no dedicated branch", selector)
+		}
+		return branch, nil
+	}
+	return selector, nil
 }

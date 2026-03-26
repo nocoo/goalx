@@ -50,3 +50,66 @@ func TestRelaunchMasterIgnoresLegacyHandoffFile(t *testing.T) {
 		}
 	}
 }
+
+func TestRelaunchMasterRerendersProtocolWithFreshFacts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	installFakeTmux(t, "master")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := os.WriteFile(JournalPath(runDir, "session-2"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-2 journal: %v", err)
+	}
+	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", "", cfg.Target)
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	identity.LocalValidationCommand = goalx.ResolveLocalValidationCommand(cfg)
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-2"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-2",
+		State: "active",
+		Mode:  string(goalx.ModeDevelop),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	if err := relaunchMaster(repo, runDir, goalx.TmuxSessionName(repo, runName), cfg); err != nil {
+		t.Fatalf("relaunchMaster: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read master.md: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Current time (UTC):",
+		"Run started at (UTC):",
+		"Intent: evolve",
+		"This run was launched with explicit `evolve` intent.",
+		"evolution.jsonl",
+		"session-2",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("master.md missing %q:\n%s", want, text)
+		}
+	}
+}

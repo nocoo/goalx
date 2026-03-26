@@ -227,6 +227,74 @@ func TestBuildLaunchConfigPreviewLeavesTargetAndLocalValidationUnsetWhenUnconfig
 	}
 }
 
+func TestResolveLaunchConfigPreservesConfiguredBudgetWhenFlagOmitted(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+budget:
+  max_duration: 45m
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeDevelop,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	if resolved.Config.Budget.MaxDuration != 45*time.Minute {
+		t.Fatalf("budget = %v, want 45m", resolved.Config.Budget.MaxDuration)
+	}
+}
+
+func TestResolveLaunchConfigLeavesBudgetUnlimitedByDefaultForNonEvolve(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeDevelop,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	if resolved.Config.Budget.MaxDuration != 0 {
+		t.Fatalf("budget = %v, want unlimited (0)", resolved.Config.Budget.MaxDuration)
+	}
+}
+
+func TestResolveLaunchConfigHonorsExplicitZeroBudgetForEvolveIntent(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective:  "ship it",
+		Mode:       goalx.ModeAuto,
+		Intent:     runIntentEvolve,
+		BudgetSet:  true,
+		Budget:     0,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	if resolved.Config.Budget.MaxDuration != 0 {
+		t.Fatalf("budget = %v, want 0", resolved.Config.Budget.MaxDuration)
+	}
+}
+
 func TestBuildLaunchConfigResearchAndDevelopMatchResolverDefaults(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
