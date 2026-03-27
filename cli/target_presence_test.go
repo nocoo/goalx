@@ -146,6 +146,57 @@ func TestBuildTargetPresenceFactsReportsMissingSidecarLease(t *testing.T) {
 	}
 }
 
+func TestBuildTargetPresenceFactsUsesSessionWidePaneEnumeration(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeTargetPresenceFixture(t)
+	if err := RenewControlLease(runDir, "sidecar", meta.RunID, meta.Epoch, time.Minute, "process", os.Getpid()); err != nil {
+		t.Fatalf("RenewControlLease sidecar: %v", err)
+	}
+
+	sessionName := goalx.TmuxSessionName(repo, cfg.Name)
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+case "$1" in
+  has-session)
+    exit 0
+    ;;
+  list-windows)
+    printf 'master\nsession-1\n'
+    exit 0
+    ;;
+  list-panes)
+    if [ "$2" = "-a" ]; then
+      printf '%s\t%%0\tmaster\n%s\t%%1\tsession-1\n' "$TMUX_SESSION_NAME" "$TMUX_SESSION_NAME"
+      exit 0
+    fi
+    printf '%%1\tsession-1\n'
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("TMUX_SESSION_NAME", sessionName)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	facts, err := BuildTargetPresenceFacts(runDir, sessionName)
+	if err != nil {
+		t.Fatalf("BuildTargetPresenceFacts: %v", err)
+	}
+	for _, target := range []string{"master", "session-1"} {
+		if got := facts[target].State; got != TargetPresencePresent {
+			t.Fatalf("%s state = %q, want %q", target, got, TargetPresencePresent)
+		}
+	}
+}
+
 func TestRefreshActivityFactsPersistsMasterWindowMissingExplicitly(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

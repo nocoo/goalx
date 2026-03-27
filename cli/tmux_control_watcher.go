@@ -215,7 +215,7 @@ func defaultLaunchTmuxControlClient(session string) (*exec.Cmd, io.WriteCloser, 
 }
 
 func defaultListTmuxSessionPanes(session string) ([]tmuxPaneRef, error) {
-	out, err := exec.Command("tmux", "list-panes", "-t", session, "-F", "#{pane_id}\t#{window_name}").Output()
+	out, err := exec.Command("tmux", "list-panes", "-a", "-F", "#{session_name}\t#{pane_id}\t#{window_name}").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -224,10 +224,21 @@ func defaultListTmuxSessionPanes(session string) ([]tmuxPaneRef, error) {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "\t", 2)
-		ref := tmuxPaneRef{PaneID: strings.TrimSpace(parts[0])}
-		if len(parts) == 2 {
+		parts := strings.SplitN(line, "\t", 3)
+		ref := tmuxPaneRef{}
+		switch len(parts) {
+		case 3:
+			if strings.TrimSpace(parts[0]) != session {
+				continue
+			}
+			ref.PaneID = strings.TrimSpace(parts[1])
+			ref.WindowName = strings.TrimSpace(parts[2])
+		case 2:
+			// Test fixtures may still emit pane/window pairs without a session column.
+			ref.PaneID = strings.TrimSpace(parts[0])
 			ref.WindowName = strings.TrimSpace(parts[1])
+		default:
+			continue
 		}
 		panes = append(panes, ref)
 	}
