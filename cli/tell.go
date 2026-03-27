@@ -104,8 +104,10 @@ func deliverTell(projectRoot, runName, target, message string, urgent bool, nudg
 			return "", "", err
 		}
 		if nudge != nil {
-			dedupeKey := fmt.Sprintf("master-inbox:%d", msg.ID)
-			_, _ = DeliverControlNudge(rc.RunDir, dedupeKey, dedupeKey, rc.TmuxSession+":master", rc.Config.Master.Engine, nudge)
+			if facts, factsErr := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); factsErr == nil && targetPresenceAvailableForTransport(facts) {
+				dedupeKey := fmt.Sprintf("master-inbox:%d", msg.ID)
+				_, _ = DeliverControlNudge(rc.RunDir, dedupeKey, dedupeKey, rc.TmuxSession+":master", rc.Config.Master.Engine, nudge)
+			}
 		}
 		return rc.Name, "master", nil
 	}
@@ -134,8 +136,10 @@ func deliverTell(projectRoot, runName, target, message string, urgent bool, nudg
 		return "", "", fmt.Errorf("load %s identity: %w", target, err)
 	}
 	if nudge != nil {
-		messageID := fmt.Sprintf("session-inbox:%s:%d", target, msg.ID)
-		_, _ = DeliverControlNudge(rc.RunDir, messageID, messageID, rc.TmuxSession+":"+windowName, identity.Engine, nudge)
+		if facts, factsErr := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, target); factsErr == nil && targetPresenceAvailableForTransport(facts) {
+			messageID := fmt.Sprintf("session-inbox:%s:%d", target, msg.ID)
+			_, _ = DeliverControlNudge(rc.RunDir, messageID, messageID, rc.TmuxSession+":"+windowName, identity.Engine, nudge)
+		}
 	}
 	return rc.Name, target, nil
 }

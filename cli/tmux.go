@@ -115,16 +115,28 @@ func KillWindow(session, window string) error {
 
 // WindowExists returns true if a tmux window with the given name exists.
 func WindowExists(session, window string) bool {
-	out, err := exec.Command("tmux", "list-windows", "-t", session, "-F", "#{window_name}").Output()
+	windows, err := tmuxWindowsByName(session)
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if strings.TrimSpace(line) == window {
-			return true
-		}
+	_, ok := windows[window]
+	return ok
+}
+
+func tmuxWindowsByName(session string) (map[string]struct{}, error) {
+	out, err := exec.Command("tmux", "list-windows", "-t", session, "-F", "#{window_name}").Output()
+	if err != nil {
+		return nil, err
 	}
-	return false
+	windows := make(map[string]struct{})
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		windows[name] = struct{}{}
+	}
+	return windows, nil
 }
 
 // CapturePaneOutput captures the visible content of a tmux pane.

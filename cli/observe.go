@@ -52,6 +52,10 @@ func Observe(projectRoot string, args []string) error {
 		fmt.Println()
 
 		fmt.Println("### master")
+		printObserveMasterQueue(rc.RunDir, rc.Config.Master.Engine)
+		if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+			fmt.Println(label)
+		}
 		printJournalExcerpt(filepath.Join(rc.RunDir, "master.jsonl"))
 		fmt.Println()
 
@@ -61,6 +65,10 @@ func Observe(projectRoot string, args []string) error {
 		}
 		for _, num := range sessionIndexes {
 			fmt.Printf("### %s\n", SessionName(num))
+			printObserveSessionQueue(rc.RunDir, SessionName(num), rc.Config.Master.Engine)
+			if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
+				fmt.Println(label)
+			}
 			printJournalExcerpt(JournalPath(rc.RunDir, SessionName(num)))
 			fmt.Println()
 		}
@@ -69,7 +77,11 @@ func Observe(projectRoot string, args []string) error {
 
 	fmt.Println("### master")
 	printObserveMasterQueue(rc.RunDir, rc.Config.Master.Engine)
-	printPaneCapture(rc.TmuxSession, "master")
+	if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+		fmt.Println(label)
+	} else {
+		printPaneCapture(rc.TmuxSession, "master")
+	}
 	fmt.Println()
 
 	// Sessions
@@ -81,7 +93,11 @@ func Observe(projectRoot string, args []string) error {
 		windowName := sessionWindowName(rc.Config.Name, num)
 		fmt.Printf("### %s\n", SessionName(num))
 		printObserveSessionQueue(rc.RunDir, SessionName(num), rc.Config.Master.Engine)
-		printPaneCapture(rc.TmuxSession, windowName)
+		if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
+			fmt.Println(label)
+		} else {
+			printPaneCapture(rc.TmuxSession, windowName)
+		}
 		fmt.Println()
 	}
 

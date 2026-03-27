@@ -210,6 +210,14 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 			return err
 		}
 	}
+	presence, err := BuildTargetPresenceFacts(runDir, tmuxSession)
+	if err != nil {
+		return err
+	}
+	presence, err = reconcileTargetPresenceRecovery(projectRoot, runDir, runName, tmuxSession, cfg, runState, presence)
+	if err != nil {
+		return err
+	}
 	if watcher != nil && watcher.Alive() {
 		controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
 		if err != nil {
@@ -218,7 +226,7 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, watcher, controlState); err != nil {
 			appendAuditLog(runDir, "transport watcher pre-queue snapshot warning: %v", err)
 		}
-		if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg); err != nil {
+		if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg, presence); err != nil {
 			return err
 		}
 		if err := queueUnreadSessionWakeReminders(runDir, tmuxSession, runName, interval); err != nil {
@@ -257,7 +265,7 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, nil, controlState); err != nil {
 		return err
 	}
-	if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg); err != nil {
+	if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg, presence); err != nil {
 		return err
 	}
 	if err := queueUnreadSessionWakeReminders(runDir, tmuxSession, runName, interval); err != nil {
@@ -446,7 +454,7 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 	return nil
 }
 
-func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goalx.Config) error {
+func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goalx.Config, presence map[string]TargetPresenceFacts) error {
 	type urgentTarget struct {
 		name   string
 		tmux   string
@@ -486,6 +494,11 @@ func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goa
 			}
 			continue
 		}
+		if presence != nil {
+			if targetFacts, ok := presence[target.name]; ok && targetPresenceMissing(targetFacts) {
+				continue
+			}
+		}
 		facts := loadTransportTargetFacts(runDir, target.name)
 		switch normalizeTUITransportState(facts.TransportState) {
 		case TUIStateProviderDialog:
@@ -509,6 +522,74 @@ func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goa
 		}
 	}
 	return nil
+}
+
+func reconcileTargetPresenceRecovery(projectRoot, runDir, runName, tmuxSession string, cfg *goalx.Config, runState *RunRuntimeState, presence map[string]TargetPresenceFacts) (map[string]TargetPresenceFacts, error) {
+	if runState == nil || !runState.Active || strings.TrimSpace(runState.Phase) == "complete" {
+		return presence, nil
+	}
+	if presence == nil {
+		return nil, fmt.Errorf("target presence is nil")
+	}
+	for _, facts := range presence {
+		if err := recordTargetPresenceObservation(runDir, facts); err != nil {
+			return nil, err
+		}
+	}
+	masterFacts := presence["master"]
+	if masterFacts.SessionExists && targetPresenceMissing(masterFacts) {
+		recovery := loadTransportRecoveryTarget(runDir, "master")
+		if recovery.CurrentMissingLastRelaunchAt == "" || recovery.CurrentMissingLastRelaunchResult != "success" {
+			if err := recordMissingTargetRelaunchAttempt(runDir, "master", masterFacts.State); err != nil {
+				return nil, err
+			}
+			if err := relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession, cfg); err != nil {
+				if recordErr := recordMissingTargetRelaunchResult(runDir, "master", masterFacts.State, "failure", err); recordErr != nil {
+					return nil, recordErr
+				}
+				return nil, err
+			}
+			if err := recordMissingTargetRelaunchResult(runDir, "master", masterFacts.State, "success", nil); err != nil {
+				return nil, err
+			}
+		}
+	}
+	masterFacts = presence["master"]
+	masterAvailable := targetPresenceAvailableForTransport(masterFacts)
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, idx := range indexes {
+		sessionName := SessionName(idx)
+		sessionFacts, ok := presence[sessionName]
+		if !ok {
+			continue
+		}
+		if !targetPresenceMissing(sessionFacts) {
+			continue
+		}
+		if err := recordTargetPresenceObservation(runDir, sessionFacts); err != nil {
+			return nil, err
+		}
+		if !masterAvailable {
+			continue
+		}
+		recovery := loadTransportRecoveryTarget(runDir, sessionName)
+		if recovery.CurrentMissingState == sessionFacts.State && recovery.CurrentMissingLastAlertAt != "" {
+			continue
+		}
+		reason := fmt.Sprintf("target missing: %s state=%s first_seen=%s", sessionName, sessionFacts.State, blankAsUnknown(recovery.CurrentMissingFirstSeenAt))
+		appendAuditLog(runDir, "target_missing_alert target=%s cause=%s first_seen=%s", sessionName, sessionFacts.State, blankAsUnknown(recovery.CurrentMissingFirstSeenAt))
+		body := fmt.Sprintf("Target missing in active GoalX run; target=%s state=%s first_seen=%s action=do_not_respawn_worker", sessionName, sessionFacts.State, blankAsUnknown(recovery.CurrentMissingFirstSeenAt))
+		if _, err := appendControlInboxMessage(runDir, "master", "target-missing", "goalx sidecar", body, true); err != nil {
+			return nil, err
+		}
+		if err := recordMissingTargetAlert(runDir, sessionName, sessionFacts.State, reason); err != nil {
+			return nil, err
+		}
+	}
+	return presence, nil
 }
 
 func transportNeedsRepair(facts TransportTargetFacts) bool {

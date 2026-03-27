@@ -227,6 +227,50 @@ func TestDropKillsPersistedPaneProcessTreesWhenTmuxSessionMissing(t *testing.T) 
 	waitForProcessExit(t, childPID)
 }
 
+func TestRelaunchMissingMasterWindowAuditsAndSkipsKill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, _ := writeTargetPresenceFixture(t)
+	logPath := installFakePresenceTmux(t, true, "session-1", "%1\\tsession-1\\n")
+
+	if err := relaunchMissingMasterWindow(repo, runDir, goalx.TmuxSessionName(repo, cfg.Name), cfg); err != nil {
+		t.Fatalf("relaunchMissingMasterWindow: %v", err)
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	logText := string(logData)
+	wantSession := goalx.TmuxSessionName(repo, cfg.Name)
+	for _, want := range []string{
+		"new-window -t " + wantSession + " -n master -c " + RunWorktreePath(runDir),
+		filepath.Join(runDir, "master.md"),
+	} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("tmux log missing %q:\n%s", want, logText)
+		}
+	}
+	if strings.Contains(logText, "kill-window") {
+		t.Fatalf("missing-master relaunch should not kill window:\n%s", logText)
+	}
+
+	auditData, err := os.ReadFile(filepath.Join(runDir, "sidecar.log"))
+	if err != nil {
+		t.Fatalf("read sidecar audit log: %v", err)
+	}
+	auditText := string(auditData)
+	for _, want := range []string{
+		"target_relaunch_attempt target=master cause=window_missing",
+		"target_relaunch_result target=master result=success cause=window_missing",
+	} {
+		if !strings.Contains(auditText, want) {
+			t.Fatalf("sidecar audit log missing %q:\n%s", want, auditText)
+		}
+	}
+}
+
 func TestScanLivenessReportsJournalStaleMinutes(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -394,6 +438,56 @@ esac
 		t.Setenv("TMUX_EXPECT_DEAD_PID", "")
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func installFakePresenceTmux(t *testing.T, hasSession bool, windows string, panes string) string {
+	t.Helper()
+
+	fakeBin := t.TempDir()
+	logPath := filepath.Join(fakeBin, "tmux.log")
+	script := `#!/bin/sh
+echo "$@" >> "$TMUX_LOG"
+case "$1" in
+  has-session)
+    if [ "${TMUX_HAS_SESSION:-0}" = "1" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  list-windows)
+    if [ -n "${TMUX_WINDOWS:-}" ]; then
+      printf '%s\n' $TMUX_WINDOWS
+    fi
+    exit 0
+    ;;
+  list-panes)
+    if [ -n "${TMUX_PANES:-}" ]; then
+      printf '%b' "$TMUX_PANES"
+    fi
+    exit 0
+    ;;
+  capture-pane|new-window|kill-window|send-keys)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	hasSessionValue := "0"
+	if hasSession {
+		hasSessionValue = "1"
+	}
+	t.Setenv("TMUX_LOG", logPath)
+	t.Setenv("TMUX_HAS_SESSION", hasSessionValue)
+	t.Setenv("TMUX_WINDOWS", windows)
+	t.Setenv("TMUX_PANES", panes)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return logPath
 }
 
 func writePersistedPanePID(t *testing.T, runDir, holder string, pid int) {

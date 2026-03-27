@@ -127,7 +127,13 @@ func TestRunSidecarTickDeliversDueMasterWakeReminder(t *testing.T) {
 
 	fakeBin := t.TempDir()
 	tmuxPath := filepath.Join(fakeBin, "tmux")
-	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 0; fi\nexit 0\n"), 0o755); err != nil {
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"has-session\" ]; then exit 0; fi\n" +
+		"if [ \"$1\" = \"list-windows\" ]; then printf '%s\n' master; exit 0; fi\n" +
+		"if [ \"$1\" = \"list-panes\" ]; then printf '%%0\tmaster\n'; exit 0; fi\n" +
+		"if [ \"$1\" = \"capture-pane\" ]; then exit 0; fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake tmux: %v", err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -227,6 +233,163 @@ func TestRunSidecarTickQueuesRefreshContextWhenIdentityFenceChanges(t *testing.T
 	}
 	if !found {
 		t.Fatalf("expected refresh-context reminder after identity fence change: %+v", reminders.Items)
+	}
+}
+
+func TestRunSidecarTickRelaunchesMissingMasterWindowOnActiveRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+
+	fakeBin := t.TempDir()
+	logPath := filepath.Join(fakeBin, "tmux.log")
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := "#!/bin/sh\n" +
+		"echo \"$@\" >> \"$TMUX_LOG\"\n" +
+		"if [ \"$1\" = \"has-session\" ]; then exit 0; fi\n" +
+		"if [ \"$1\" = \"list-windows\" ]; then printf '%s\n' session-1; exit 0; fi\n" +
+		"if [ \"$1\" = \"list-panes\" ]; then printf '%%1\tsession-1\n'; exit 0; fi\n" +
+		"if [ \"$1\" = \"capture-pane\" ]; then exit 0; fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("TMUX_LOG", logPath)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	logText := string(logData)
+	wantSession := goalx.TmuxSessionName(repo, cfg.Name)
+	for _, want := range []string{
+		"new-window -t " + wantSession + " -n master -c " + RunWorktreePath(runDir),
+	} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("tmux log missing %q:\n%s", want, logText)
+		}
+	}
+	if strings.Contains(logText, "kill-window") {
+		t.Fatalf("missing-master relaunch should not kill window:\n%s", logText)
+	}
+
+	auditData, err := os.ReadFile(filepath.Join(runDir, "sidecar.log"))
+	if err != nil {
+		t.Fatalf("read sidecar audit log: %v", err)
+	}
+	auditText := string(auditData)
+	for _, want := range []string{
+		"target_relaunch_attempt target=master cause=window_missing",
+		"target_relaunch_result target=master result=success cause=window_missing",
+	} {
+		if !strings.Contains(auditText, want) {
+			t.Fatalf("sidecar audit log missing %q:\n%s", want, auditText)
+		}
+	}
+}
+
+func TestRunSidecarTickAlertsMasterOnceWhenSessionWindowMissing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"has-session\" ]; then exit 0; fi\n" +
+		"if [ \"$1\" = \"list-windows\" ]; then printf '%s\n' master; exit 0; fi\n" +
+		"if [ \"$1\" = \"list-panes\" ]; then printf '%%0\tmaster\n'; exit 0; fi\n" +
+		"if [ \"$1\" = \"capture-pane\" ]; then printf 'prompt\n'; exit 0; fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	for i := 0; i < 2; i++ {
+		if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+			t.Fatalf("runSidecarTick #%d: %v", i+1, err)
+		}
+	}
+
+	inbox, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inbox), `"type":"target-missing"`); got != 1 {
+		t.Fatalf("target-missing alerts = %d, want 1:\n%s", got, string(inbox))
+	}
+	if _, err := os.Stat(SessionIdentityPath(runDir, "session-2")); !os.IsNotExist(err) {
+		t.Fatalf("unexpected replacement worker created, stat err = %v", err)
+	}
+
+	recoveryData, err := os.ReadFile(TransportRecoveryPath(runDir))
+	if err != nil {
+		t.Fatalf("read transport recovery: %v", err)
+	}
+	recoveryText := string(recoveryData)
+	for _, want := range []string{
+		"session-1",
+		"window_missing",
+		"current_missing_first_seen_at",
+		"current_missing_last_alert_at",
+	} {
+		if !strings.Contains(recoveryText, want) {
+			t.Fatalf("transport recovery missing %q:\n%s", want, recoveryText)
+		}
 	}
 }
 
@@ -848,6 +1011,63 @@ esac
 	}
 }
 
+func TestRunSidecarTickAlertsMissingSessionWindowOnceWithoutRespawn(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeTargetPresenceFixture(t)
+	logPath := installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 50*time.Millisecond, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick first: %v", err)
+	}
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 50*time.Millisecond, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick second: %v", err)
+	}
+
+	recovery, err := LoadTransportRecovery(TransportRecoveryPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadTransportRecovery: %v", err)
+	}
+	sessionRecovery := recovery.Targets["session-1"]
+	if sessionRecovery.CurrentMissingState != TargetPresenceWindowMissing {
+		t.Fatalf("session recovery state = %q, want %q", sessionRecovery.CurrentMissingState, TargetPresenceWindowMissing)
+	}
+	if sessionRecovery.CurrentMissingFirstSeenAt == "" || sessionRecovery.CurrentMissingLastAlertAt == "" {
+		t.Fatalf("session recovery timestamps missing: %+v", sessionRecovery)
+	}
+	if !strings.Contains(sessionRecovery.CurrentMissingLastAlertReason, "session-1") {
+		t.Fatalf("session alert reason missing target name: %+v", sessionRecovery)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), `"type":"target-missing"`); got != 1 {
+		t.Fatalf("master inbox target-missing count = %d, want 1\n%s", got, string(inboxData))
+	}
+	if !strings.Contains(string(inboxData), "do_not_respawn_worker") {
+		t.Fatalf("master inbox missing no-respawn guidance:\n%s", string(inboxData))
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	if strings.Contains(string(logData), "new-window -t "+goalx.TmuxSessionName(repo, cfg.Name)+" -n session-1") {
+		t.Fatalf("missing session should not respawn worker:\n%s", string(logData))
+	}
+
+	auditData, err := os.ReadFile(filepath.Join(runDir, "sidecar.log"))
+	if err != nil {
+		t.Fatalf("read sidecar audit log: %v", err)
+	}
+	if strings.Count(string(auditData), "target_missing_alert target=session-1 cause=window_missing") != 1 {
+		t.Fatalf("missing session alert should be recorded once:\n%s", string(auditData))
+	}
+}
+
 func TestRunSidecarTickQueuesSessionWakeForUnreadSessionInbox(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -881,6 +1101,7 @@ func TestRunSidecarTickQueuesSessionWakeForUnreadSessionInbox(t *testing.T) {
 	script := "#!/bin/sh\n" +
 		"if [ \"$1\" = \"has-session\" ]; then exit 0; fi\n" +
 		"if [ \"$1\" = \"list-windows\" ]; then printf '%s\n' master session-1; exit 0; fi\n" +
+		"if [ \"$1\" = \"list-panes\" ]; then printf '%%0\tmaster\n%%1\tsession-1\n'; exit 0; fi\n" +
 		"if [ \"$1\" = \"capture-pane\" ]; then exit 0; fi\n" +
 		"exit 0\n"
 	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {

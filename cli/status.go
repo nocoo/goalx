@@ -217,6 +217,9 @@ func printStatusControlSummary(rc *RunContext) {
 		}
 	}
 	fmt.Printf("Control: run_id=%s epoch=%s charter=%s run_status=%s unread_inbox=%d master_lease=%s sidecar_lease=%s reminders_due=%d deliveries_failed=%d\n", runID, epoch, charter, runStatus, unread, masterLease, sidecarLease, remindersDue, deliveriesFailed)
+	if missing := targetLossSummary(rc); missing != "" {
+		fmt.Printf("Targets: %s\n", missing)
+	}
 	if activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir)); err == nil && activity != nil {
 		if budget := formatBudgetSummary(activity.Budget); budget != "" {
 			fmt.Printf("Budget: %s\n", budget)
@@ -229,6 +232,28 @@ func printStatusControlSummary(rc *RunContext) {
 		fmt.Printf("Memory: %s\n", memory)
 	}
 	fmt.Println()
+}
+
+func targetLossSummary(rc *RunContext) string {
+	if rc == nil {
+		return ""
+	}
+	parts := make([]string, 0, 4)
+	if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+		parts = append(parts, label)
+	}
+	if indexes, err := existingSessionIndexes(rc.RunDir); err == nil {
+		for _, idx := range indexes {
+			name := SessionName(idx)
+			if label := transportMissingLabel(name, loadTransportTargetFacts(rc.RunDir, name)); label != "" {
+				parts = append(parts, label)
+			}
+		}
+	}
+	if sidecar, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "sidecar"); err == nil && targetPresenceMissing(sidecar) {
+		parts = append(parts, "sidecar missing ("+sidecar.State+")")
+	}
+	return strings.Join(parts, " | ")
 }
 
 func splitNonEmptyLines(s string) []string {

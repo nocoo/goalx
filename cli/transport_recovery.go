@@ -16,13 +16,22 @@ type TransportRecoveryState struct {
 }
 
 type TransportRecoveryTarget struct {
-	Target                    string `json:"target,omitempty"`
-	LastWakeSubmitAt          string `json:"last_wake_submit_at,omitempty"`
-	LastEnterRepairAt         string `json:"last_enter_repair_at,omitempty"`
-	LastInterruptEscalationAt string `json:"last_interrupt_escalation_at,omitempty"`
-	LastInterruptReason       string `json:"last_interrupt_reason,omitempty"`
-	LastInterruptResultingState string `json:"last_interrupt_resulting_state,omitempty"`
-	UrgentEscalationAttempts  int    `json:"urgent_escalation_attempts,omitempty"`
+	Target                           string `json:"target,omitempty"`
+	LastWakeSubmitAt                 string `json:"last_wake_submit_at,omitempty"`
+	LastEnterRepairAt                string `json:"last_enter_repair_at,omitempty"`
+	LastInterruptEscalationAt        string `json:"last_interrupt_escalation_at,omitempty"`
+	LastInterruptReason              string `json:"last_interrupt_reason,omitempty"`
+	LastInterruptResultingState      string `json:"last_interrupt_resulting_state,omitempty"`
+	UrgentEscalationAttempts         int    `json:"urgent_escalation_attempts,omitempty"`
+	CurrentMissingState              string `json:"current_missing_state,omitempty"`
+	CurrentMissingFirstSeenAt        string `json:"current_missing_first_seen_at,omitempty"`
+	CurrentMissingLastSeenAt         string `json:"current_missing_last_seen_at,omitempty"`
+	CurrentMissingLastAlertAt        string `json:"current_missing_last_alert_at,omitempty"`
+	CurrentMissingLastAlertReason    string `json:"current_missing_last_alert_reason,omitempty"`
+	CurrentMissingLastRelaunchAt     string `json:"current_missing_last_relaunch_at,omitempty"`
+	CurrentMissingLastRelaunchResult string `json:"current_missing_last_relaunch_result,omitempty"`
+	CurrentMissingLastRelaunchError  string `json:"current_missing_last_relaunch_error,omitempty"`
+	CurrentMissingRelaunchAttempts   int    `json:"current_missing_relaunch_attempts,omitempty"`
 }
 
 func TransportRecoveryPath(runDir string) string {
@@ -135,4 +144,98 @@ func resetUrgentEscalationAttempts(runDir, target string) error {
 	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
 		entry.UrgentEscalationAttempts = 0
 	})
+}
+
+func recordTargetPresenceObservation(runDir string, facts TargetPresenceFacts) error {
+	target := strings.TrimSpace(facts.Target)
+	if target == "" {
+		return nil
+	}
+	now := presenceObservationTime(facts)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		if targetPresenceMissing(facts) {
+			state := strings.TrimSpace(facts.State)
+			if entry.CurrentMissingState != state {
+				entry.CurrentMissingState = state
+				entry.CurrentMissingFirstSeenAt = now
+				entry.CurrentMissingLastAlertAt = ""
+				entry.CurrentMissingLastAlertReason = ""
+				entry.CurrentMissingLastRelaunchAt = ""
+				entry.CurrentMissingLastRelaunchResult = ""
+				entry.CurrentMissingLastRelaunchError = ""
+				entry.CurrentMissingRelaunchAttempts = 0
+			}
+			entry.CurrentMissingLastSeenAt = now
+			return
+		}
+		entry.CurrentMissingState = ""
+		entry.CurrentMissingFirstSeenAt = ""
+		entry.CurrentMissingLastSeenAt = ""
+		entry.CurrentMissingLastAlertAt = ""
+		entry.CurrentMissingLastAlertReason = ""
+		entry.CurrentMissingLastRelaunchAt = ""
+		entry.CurrentMissingLastRelaunchResult = ""
+		entry.CurrentMissingLastRelaunchError = ""
+		entry.CurrentMissingRelaunchAttempts = 0
+	})
+}
+
+func recordMissingTargetAlert(runDir, target, missingState, reason string) error {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		if entry.CurrentMissingState == "" {
+			entry.CurrentMissingState = strings.TrimSpace(missingState)
+		}
+		entry.CurrentMissingLastSeenAt = now
+		entry.CurrentMissingLastAlertAt = now
+		entry.CurrentMissingLastAlertReason = strings.TrimSpace(reason)
+	})
+}
+
+func recordMissingTargetRelaunchAttempt(runDir, target, missingState string) error {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		if entry.CurrentMissingState == "" {
+			entry.CurrentMissingState = strings.TrimSpace(missingState)
+		}
+		entry.CurrentMissingLastSeenAt = now
+		entry.CurrentMissingLastRelaunchAt = now
+		entry.CurrentMissingRelaunchAttempts++
+	})
+}
+
+func recordMissingTargetRelaunchResult(runDir, target, missingState, result string, relaunchErr error) error {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		if entry.CurrentMissingState == "" {
+			entry.CurrentMissingState = strings.TrimSpace(missingState)
+		}
+		entry.CurrentMissingLastSeenAt = now
+		entry.CurrentMissingLastRelaunchAt = now
+		entry.CurrentMissingLastRelaunchResult = strings.TrimSpace(result)
+		if relaunchErr != nil {
+			entry.CurrentMissingLastRelaunchError = relaunchErr.Error()
+		} else {
+			entry.CurrentMissingLastRelaunchError = ""
+		}
+	})
+}
+
+func presenceObservationTime(facts TargetPresenceFacts) string {
+	if ts := strings.TrimSpace(facts.CheckedAt); ts != "" {
+		return ts
+	}
+	return time.Now().UTC().Format(time.RFC3339)
 }

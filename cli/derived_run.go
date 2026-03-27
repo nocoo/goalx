@@ -46,6 +46,7 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 		HasLease:       controlLeaseActive(runDir, "sidecar") || controlLeaseActive(runDir, "master"),
 		HasTmuxSession: SessionExists(goalx.TmuxSessionName(projectRoot, name)),
 	}
+	tmuxSession := goalx.TmuxSessionName(projectRoot, name)
 	state.RunID, state.Epoch, state.Charter, state.Objective = deriveRunIdentitySurface(runDir, cfg.Objective)
 
 	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
@@ -68,9 +69,30 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 
 	switch state.LifecycleState {
 	case "active":
-		if state.HasLease {
+		presence, err := BuildTargetPresenceFacts(runDir, tmuxSession)
+		if err != nil {
+			return nil, err
+		}
+		sessionMissing := false
+		for target, facts := range presence {
+			if !strings.HasPrefix(target, "session-") {
+				continue
+			}
+			if targetPresenceMissing(facts) {
+				sessionMissing = true
+				break
+			}
+		}
+		switch {
+		case targetPresenceMissing(presence["master"]):
+			state.Status = "stranded"
+		case targetPresenceMissing(presence["sidecar"]):
+			state.Status = "stranded"
+		case sessionMissing:
+			state.Status = "degraded"
+		case state.HasLease:
 			state.Status = "active"
-		} else {
+		default:
 			state.Status = "degraded"
 		}
 	case "completed":
@@ -175,6 +197,15 @@ func controlLeaseActive(runDir, holder string) bool {
 	return expiresAt.After(time.Now().UTC())
 }
 
+func derivedRunStatusOpen(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "active", "degraded", "stranded":
+		return true
+	default:
+		return false
+	}
+}
+
 func findSingleRunnableRun(projectRoot string) (*RunContext, error) {
 	states, err := listDerivedRunStates(projectRoot)
 	if err != nil {
@@ -182,7 +213,7 @@ func findSingleRunnableRun(projectRoot string) (*RunContext, error) {
 	}
 	runnable := make([]string, 0)
 	for _, state := range states {
-		if state.Status == "active" || state.Status == "degraded" {
+		if derivedRunStatusOpen(state.Status) {
 			runnable = append(runnable, state.Name)
 		}
 	}

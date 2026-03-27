@@ -29,23 +29,25 @@ func Pulse(projectRoot string, args []string) error {
 }
 
 func queueMasterWakeReminder(runDir, tmuxSession, engine string) error {
-	if !SessionExists(tmuxSession) {
+	facts, err := LoadTargetPresenceFact(runDir, tmuxSession, "master")
+	if err != nil {
+		return err
+	}
+	if !targetPresenceAvailableForTransport(facts) {
 		return nil
 	}
-	_, err := QueueControlReminderWithEngine(runDir, "master-wake", "control-cycle", tmuxSession+":master", engine)
+	_, err = QueueControlReminderWithEngine(runDir, "master-wake", "control-cycle", tmuxSession+":master", engine)
 	return err
 }
 
 func queueSessionWakeReminder(runDir, tmuxSession, sessionName, windowName, engine string) error {
-	if !SessionExists(tmuxSession) {
+	facts, err := LoadTargetPresenceFact(runDir, tmuxSession, sessionName)
+	if err != nil {
+		return err
+	}
+	if !targetPresenceAvailableForTransport(facts) || strings.TrimSpace(windowName) == "" {
 		return nil
 	}
-	if strings.TrimSpace(windowName) == "" {
-		return nil
-	}
-	if !WindowExists(tmuxSession, windowName) {
-		return nil
-	}
-	_, err := QueueControlReminderWithEngine(runDir, "session-wake:"+sessionName, "session-inbox-unread", tmuxSession+":"+windowName, engine)
+	_, err = QueueControlReminderWithEngine(runDir, "session-wake:"+sessionName, "session-inbox-unread", tmuxSession+":"+windowName, engine)
 	return err
 }

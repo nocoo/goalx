@@ -25,7 +25,7 @@ func Next(projectRoot string, args []string) error {
 	}
 	focusedRun := ""
 	if reg != nil && reg.FocusedRun != "" {
-		if state, ok := stateByName[reg.FocusedRun]; ok && (state.Status == "active" || state.Status == "degraded") {
+		if state, ok := stateByName[reg.FocusedRun]; ok && derivedRunStatusOpen(state.Status) {
 			focusedRun = reg.FocusedRun
 		} else if len(states) == 0 {
 			focusedRun = reg.FocusedRun
@@ -161,7 +161,7 @@ func findRunnableRuns(reg *ProjectRegistry, projectRoot string) ([]string, []str
 			switch state.Status {
 			case "active":
 				active = append(active, state.Name)
-			case "degraded":
+			case "degraded", "stranded":
 				degraded = append(degraded, state.Name)
 			}
 		}

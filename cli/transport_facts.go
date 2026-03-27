@@ -89,14 +89,17 @@ func buildTransportFacts(runDir, tmuxSession, masterEngine string, paneOutputAt 
 		CheckedAt: time.Now().UTC().Format(time.RFC3339),
 		Targets:   map[string]TransportTargetFacts{},
 	}
-	panesByWindow, err := tmuxPanesByWindow(tmuxSession)
+	presence, err := BuildTargetPresenceFacts(runDir, tmuxSession)
 	if err != nil {
 		return nil, err
 	}
-	if pane, ok := panesByWindow["master"]; ok {
-		masterFacts := inspectTransportTarget(tmuxSession+":master", "master", "master", masterEngine)
-		masterFacts.PaneID = pane.PaneID
-		masterFacts.LastOutputAt = formatPaneOutputAt(paneOutputAt, pane.PaneID)
+	if masterPresence, ok := presence["master"]; ok {
+		masterFacts := transportFactsFromPresence(masterPresence, masterEngine, paneOutputAt)
+		if masterPresence.State == TargetPresencePresent {
+			masterFacts = inspectTransportTarget(tmuxSession+":master", "master", "master", masterEngine)
+			masterFacts.PaneID = masterPresence.PaneID
+			masterFacts.LastOutputAt = formatPaneOutputAt(paneOutputAt, masterPresence.PaneID)
+		}
 		applyLatestDeliveryFacts(runDir, "master", &masterFacts)
 		facts.Targets["master"] = masterFacts
 	}
@@ -113,23 +116,17 @@ func buildTransportFacts(runDir, tmuxSession, masterEngine string, paneOutputAt 
 		if identity == nil {
 			continue
 		}
-		window := name
-		pane, ok := panesByWindow[window]
+		targetPresence, ok := presence[name]
 		if !ok {
-			targetFacts := TransportTargetFacts{
-				Target:       name,
-				Window:       window,
-				Engine:       identity.Engine,
-				LastSampleAt: facts.CheckedAt,
-			}
-			applyLatestDeliveryFacts(runDir, name, &targetFacts)
-			facts.Targets[name] = targetFacts
 			continue
 		}
-		target := tmuxSession + ":" + window
-		targetFacts := inspectTransportTarget(target, name, window, identity.Engine)
-		targetFacts.PaneID = pane.PaneID
-		targetFacts.LastOutputAt = formatPaneOutputAt(paneOutputAt, pane.PaneID)
+		targetFacts := transportFactsFromPresence(targetPresence, identity.Engine, paneOutputAt)
+		if targetPresence.State == TargetPresencePresent {
+			target := tmuxSession + ":" + targetPresence.Window
+			targetFacts = inspectTransportTarget(target, name, targetPresence.Window, identity.Engine)
+			targetFacts.PaneID = targetPresence.PaneID
+			targetFacts.LastOutputAt = formatPaneOutputAt(paneOutputAt, targetPresence.PaneID)
+		}
 		applyLatestDeliveryFacts(runDir, name, &targetFacts)
 		facts.Targets[name] = targetFacts
 	}
@@ -137,6 +134,21 @@ func buildTransportFacts(runDir, tmuxSession, masterEngine string, paneOutputAt 
 		facts.Targets = nil
 	}
 	return facts, nil
+}
+
+func transportFactsFromPresence(presence TargetPresenceFacts, engine string, paneOutputAt map[string]time.Time) TransportTargetFacts {
+	facts := TransportTargetFacts{
+		Target:       presence.Target,
+		Window:       presence.Window,
+		PaneID:       presence.PaneID,
+		Engine:       strings.TrimSpace(engine),
+		LastSampleAt: presence.CheckedAt,
+		LastOutputAt: formatPaneOutputAt(paneOutputAt, presence.PaneID),
+	}
+	if presence.State != "" && presence.State != TargetPresencePresent {
+		facts.TransportState = presence.State
+	}
+	return facts
 }
 
 func inspectTransportTarget(target, logicalTarget, window, engine string) TransportTargetFacts {
@@ -408,6 +420,19 @@ func loadTransportTargetFacts(runDir, target string) TransportTargetFacts {
 		return TransportTargetFacts{}
 	}
 	return facts.Targets[target]
+}
+
+func transportMissingLabel(target string, facts TransportTargetFacts) string {
+	switch strings.TrimSpace(facts.TransportState) {
+	case TargetPresenceSessionMissing:
+		return target + " session missing"
+	case TargetPresenceWindowMissing:
+		return target + " window missing"
+	case TargetPresencePaneMissing:
+		return target + " pane missing"
+	default:
+		return ""
+	}
 }
 
 func latestSessionTransportFacts(all *TransportFacts, sessionName string) TransportTargetFacts {

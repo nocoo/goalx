@@ -14,16 +14,17 @@ import (
 )
 
 type ActivitySnapshot struct {
-	Version   int                        `json:"version"`
-	CheckedAt string                     `json:"checked_at,omitempty"`
-	Run       ActivityRunInfo            `json:"run"`
-	Lifecycle ActivityLifecycle          `json:"lifecycle"`
-	Queue     ActivityQueue              `json:"queue"`
-	Budget    ActivityBudget             `json:"budget,omitempty"`
-	Coverage  RequiredCoverage           `json:"coverage,omitempty"`
-	Root      WorktreeDiffStat           `json:"root"`
-	Actors    map[string]ActivityActor   `json:"actors,omitempty"`
-	Sessions  map[string]ActivitySession `json:"sessions,omitempty"`
+	Version   int                            `json:"version"`
+	CheckedAt string                         `json:"checked_at,omitempty"`
+	Run       ActivityRunInfo                `json:"run"`
+	Lifecycle ActivityLifecycle              `json:"lifecycle"`
+	Queue     ActivityQueue                  `json:"queue"`
+	Budget    ActivityBudget                 `json:"budget,omitempty"`
+	Coverage  RequiredCoverage               `json:"coverage,omitempty"`
+	Root      WorktreeDiffStat               `json:"root"`
+	Targets   map[string]TargetPresenceFacts `json:"targets,omitempty"`
+	Actors    map[string]ActivityActor       `json:"actors,omitempty"`
+	Sessions  map[string]ActivitySession     `json:"sessions,omitempty"`
 }
 
 type ActivityRunInfo struct {
@@ -186,6 +187,11 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		return nil, err
 	}
 	snapshot.Coverage = coverage
+	targets, err := BuildTargetPresenceFacts(runDir, tmuxSession)
+	if err != nil {
+		return nil, err
+	}
+	snapshot.Targets = targets
 	snapshot.Actors["master"] = buildActivityActor(runDir, "master", tmuxSession, "master", previousActor(previous, "master"), snapshot.CheckedAt)
 	snapshot.Actors["sidecar"] = buildActivityActor(runDir, "sidecar", tmuxSession, "", previousActor(previous, "sidecar"), snapshot.CheckedAt)
 

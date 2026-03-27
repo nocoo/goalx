@@ -117,8 +117,14 @@ func TestNextUsesDerivedActiveRunWithoutRegistry(t *testing.T) {
 	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
 	}
-	if err := RenewControlLease(runDir, "sidecar", "run_alpha", 1, time.Minute, "process", 4242); err != nil {
+	if err := RenewControlLease(runDir, "sidecar", "run_alpha", 1, time.Minute, "process", os.Getpid()); err != nil {
 		t.Fatalf("RenewControlLease: %v", err)
+	}
+	installFakeTmux(t, "master")
+	origList := listTmuxSessionPanes
+	defer func() { listTmuxSessionPanes = origList }()
+	listTmuxSessionPanes = func(session string) ([]tmuxPaneRef, error) {
+		return []tmuxPaneRef{{PaneID: "%0", WindowName: "master"}}, nil
 	}
 
 	out := captureStdout(t, func() {

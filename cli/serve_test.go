@@ -76,9 +76,10 @@ func TestServeHandlerListsProjectsAndRuns(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
 	}
-	if err := RenewControlLease(goalx.RunDir(workspaceB, "serve-rollout"), "sidecar", "run_demo", 1, time.Minute, "process", 4242); err != nil {
+	if err := RenewControlLease(goalx.RunDir(workspaceB, "serve-rollout"), "sidecar", "run_demo", 1, time.Minute, "process", os.Getpid()); err != nil {
 		t.Fatalf("RenewControlLease: %v", err)
 	}
+	installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
 	metaA, err := LoadRunMetadata(RunMetadataPath(runDirA))
 	if err != nil {
 		t.Fatalf("LoadRunMetadata auth-audit: %v", err)
@@ -522,6 +523,7 @@ func TestServeHandlerTellWritesSessionInboxAndNudgesSession(t *testing.T) {
 		t.Fatalf("seed session journal: %v", err)
 	}
 	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "", "", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+	installFakePresenceTmux(t, true, "master session-1", "%0\\tmaster\\n%1\\tsession-1\\n")
 
 	var gotTarget, gotEngine string
 	app := newServeApp(goalx.ServeConfig{
@@ -574,6 +576,7 @@ func TestServeHandlerTellWritesMasterInboxAndUsesControlNudge(t *testing.T) {
 	if err := EnsureMasterControl(runDir); err != nil {
 		t.Fatalf("EnsureMasterControl: %v", err)
 	}
+	installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
 
 	var gotTarget, gotEngine string
 	app := newServeApp(goalx.ServeConfig{

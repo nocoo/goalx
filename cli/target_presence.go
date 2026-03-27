@@ -1,0 +1,140 @@
+package cli
+
+import (
+	"strings"
+	"time"
+)
+
+const (
+	TargetPresencePresent        = "present"
+	TargetPresenceUnknown        = "unknown"
+	TargetPresenceSessionMissing = "session_missing"
+	TargetPresenceWindowMissing  = "window_missing"
+	TargetPresencePaneMissing    = "pane_missing"
+	TargetPresenceLeaseExpired   = "lease_expired"
+	TargetPresenceProcessMissing = "process_missing"
+)
+
+type TargetPresenceFacts struct {
+	Target          string `json:"target,omitempty"`
+	Kind            string `json:"kind,omitempty"`
+	Window          string `json:"window,omitempty"`
+	SessionExpected bool   `json:"session_expected,omitempty"`
+	SessionExists   bool   `json:"session_exists,omitempty"`
+	WindowExpected  bool   `json:"window_expected,omitempty"`
+	WindowExists    bool   `json:"window_exists,omitempty"`
+	PaneID          string `json:"pane_id,omitempty"`
+	PaneExists      bool   `json:"pane_exists,omitempty"`
+	LeasePresent    bool   `json:"lease_present,omitempty"`
+	LeaseHealthy    bool   `json:"lease_healthy,omitempty"`
+	ProcessPID      int    `json:"process_pid,omitempty"`
+	ProcessPIDAlive bool   `json:"process_pid_alive,omitempty"`
+	State           string `json:"state,omitempty"`
+	CheckedAt       string `json:"checked_at,omitempty"`
+}
+
+func BuildTargetPresenceFacts(runDir, tmuxSession string) (map[string]TargetPresenceFacts, error) {
+	checkedAt := time.Now().UTC().Format(time.RFC3339)
+	sessionExists := SessionExists(tmuxSession)
+	windowsByName := map[string]struct{}{}
+	if sessionExists {
+		windowsByName, _ = tmuxWindowsByName(tmuxSession)
+	}
+	panesByWindow, err := tmuxPanesByWindow(tmuxSession)
+	if err != nil {
+		return nil, err
+	}
+
+	targets := map[string]TargetPresenceFacts{
+		"master": buildTmuxTargetPresence("master", "master", "master", checkedAt, sessionExists, windowsByName, panesByWindow),
+	}
+
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, idx := range indexes {
+		name := SessionName(idx)
+		targets[name] = buildTmuxTargetPresence(name, "session", name, checkedAt, sessionExists, windowsByName, panesByWindow)
+	}
+	targets["sidecar"] = buildLeaseTargetPresence(runDir, "sidecar", checkedAt)
+	return targets, nil
+}
+
+func LoadTargetPresenceFact(runDir, tmuxSession, target string) (TargetPresenceFacts, error) {
+	targets, err := BuildTargetPresenceFacts(runDir, tmuxSession)
+	if err != nil {
+		return TargetPresenceFacts{}, err
+	}
+	return targets[target], nil
+}
+
+func targetPresenceAvailableForTransport(facts TargetPresenceFacts) bool {
+	state := strings.TrimSpace(facts.State)
+	return state == "" || state == TargetPresencePresent || state == TargetPresenceUnknown
+}
+
+func targetPresenceMissing(facts TargetPresenceFacts) bool {
+	state := strings.TrimSpace(facts.State)
+	return state != "" && state != TargetPresencePresent && state != TargetPresenceUnknown
+}
+
+func buildTmuxTargetPresence(target, kind, window, checkedAt string, sessionExists bool, windowsByName map[string]struct{}, panesByWindow map[string]tmuxPaneRef) TargetPresenceFacts {
+	facts := TargetPresenceFacts{
+		Target:          target,
+		Kind:            kind,
+		Window:          window,
+		SessionExpected: true,
+		SessionExists:   sessionExists,
+		WindowExpected:  true,
+		CheckedAt:       checkedAt,
+	}
+	if !sessionExists {
+		facts.State = TargetPresenceSessionMissing
+		return facts
+	}
+	if len(windowsByName) == 0 && len(panesByWindow) == 0 {
+		facts.State = TargetPresenceUnknown
+		return facts
+	}
+	if _, ok := windowsByName[window]; !ok {
+		facts.State = TargetPresenceWindowMissing
+		return facts
+	}
+	facts.WindowExists = true
+	pane, ok := panesByWindow[window]
+	if !ok {
+		facts.State = TargetPresencePaneMissing
+		return facts
+	}
+	facts.PaneExists = true
+	facts.PaneID = strings.TrimSpace(pane.PaneID)
+	facts.State = TargetPresencePresent
+	return facts
+}
+
+func buildLeaseTargetPresence(runDir, target, checkedAt string) TargetPresenceFacts {
+	facts := TargetPresenceFacts{
+		Target:    target,
+		Kind:      target,
+		CheckedAt: checkedAt,
+	}
+	lease, err := LoadControlLease(ControlLeasePath(runDir, target))
+	if err != nil || lease == nil {
+		facts.State = TargetPresenceLeaseExpired
+		return facts
+	}
+	facts.LeasePresent = true
+	facts.ProcessPID = lease.PID
+	facts.ProcessPIDAlive = processAlive(lease.PID)
+	facts.LeaseHealthy = controlLeaseHealthyAt(lease, time.Now().UTC())
+	switch {
+	case !facts.LeaseHealthy:
+		facts.State = TargetPresenceLeaseExpired
+	case lease.PID > 0 && !facts.ProcessPIDAlive:
+		facts.State = TargetPresenceProcessMissing
+	default:
+		facts.State = TargetPresencePresent
+	}
+	return facts
+}

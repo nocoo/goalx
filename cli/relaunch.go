@@ -66,3 +66,65 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 	}
 	return nil
 }
+
+func relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("run config is nil")
+	}
+	masterPresence, err := LoadTargetPresenceFact(runDir, tmuxSession, "master")
+	if err != nil {
+		return fmt.Errorf("load master target presence: %w", err)
+	}
+	appendAuditLog(runDir, "target_relaunch_attempt target=master cause=%s session_exists=%t window_exists=%t", blankAsUnknown(masterPresence.State), masterPresence.SessionExists, masterPresence.WindowExists)
+	if !masterPresence.SessionExists {
+		err := fmt.Errorf("tmux session missing for master relaunch")
+		appendAuditLog(runDir, "target_relaunch_result target=master result=failure cause=%s err=%v", blankAsUnknown(masterPresence.State), err)
+		return err
+	}
+
+	engines, err := loadEngineCatalog(projectRoot)
+	if err != nil {
+		return fmt.Errorf("load config for engine resolution: %w", err)
+	}
+	spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: cfg.Master.Engine,
+		Model:  cfg.Master.Model,
+		Effort: cfg.Master.Effort,
+	})
+	if err != nil {
+		return fmt.Errorf("resolve engine: %w", err)
+	}
+	engineCmd := spec.Command
+	protocolPath := filepath.Join(runDir, "master.md")
+	prompt := goalx.ResolvePrompt(engines, cfg.Master.Engine, protocolPath)
+
+	meta, err := EnsureRunMetadata(runDir, projectRoot, cfg.Objective)
+	if err != nil {
+		return fmt.Errorf("load run metadata: %w", err)
+	}
+	if err := ensureEvolutionSurface(runDir, meta); err != nil {
+		return fmt.Errorf("init evolution surface: %w", err)
+	}
+	masterData, err := buildMasterProtocolData(projectRoot, runDir, tmuxSession, cfg, engines, engineCmd, meta)
+	if err != nil {
+		return fmt.Errorf("build master protocol data: %w", err)
+	}
+	if err := RenderMasterProtocol(masterData, runDir); err != nil {
+		return fmt.Errorf("render master protocol: %w", err)
+	}
+	goalxBin, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve goalx executable: %w", err)
+	}
+	checkSec, _ := normalizeSidecarInterval(cfg.Master.CheckInterval)
+	masterLeaseTTL := time.Duration(checkSec) * time.Second * 2
+	workdir := RunWorktreePath(runDir)
+	launchCmd := buildMasterLaunchCommand(goalxBin, cfg.Name, runDir, meta.RunID, meta.Epoch, masterLeaseTTL, engineCmd, prompt)
+
+	if err := NewWindowWithCommand(tmuxSession, "master", workdir, launchCmd); err != nil {
+		appendAuditLog(runDir, "target_relaunch_result target=master result=failure cause=%s err=%v", blankAsUnknown(masterPresence.State), err)
+		return fmt.Errorf("create master window: %w", err)
+	}
+	appendAuditLog(runDir, "target_relaunch_result target=master result=success cause=%s", blankAsUnknown(masterPresence.State))
+	return nil
+}

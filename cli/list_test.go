@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 	if err := SaveControlRunState(ControlRunStatePath(activeRun), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState active: %v", err)
 	}
-	if err := RenewControlLease(activeRun, "sidecar", "run_alpha", 1, time.Minute, "process", 4242); err != nil {
+	if err := RenewControlLease(activeRun, "sidecar", "run_alpha", 1, time.Minute, "process", os.Getpid()); err != nil {
 		t.Fatalf("RenewControlLease active: %v", err)
 	}
 
@@ -35,6 +36,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 	if err := SaveControlRunState(ControlRunStatePath(degradedRun), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState degraded: %v", err)
 	}
+	installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
 
 	out := captureStdout(t, func() {
 		if err := List(repo, nil); err != nil {
@@ -50,7 +52,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 		"alpha",
 		"active",
 		"beta",
-		"degraded",
+		"stranded",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("list output missing %q:\n%s", want, out)

@@ -17,6 +17,7 @@ func TestTellWritesSessionInboxAndNudges(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 	runName, runDir := writeLifecycleRunFixture(t, repo)
+	installFakePresenceTmux(t, true, "master session-1", "%0\\tmaster\\n%1\\tsession-1\\n")
 
 	orig := sendAgentNudge
 	origDetailed := sendAgentNudgeDetailed
@@ -80,6 +81,7 @@ func TestTellKeepsDurableSessionMessageWhenImmediateNudgeFails(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 	runName, runDir := writeLifecycleRunFixture(t, repo)
+	installFakePresenceTmux(t, true, "master session-1", "%0\\tmaster\\n%1\\tsession-1\\n")
 
 	orig := sendAgentNudge
 	origDetailed := sendAgentNudgeDetailed
@@ -136,6 +138,7 @@ func TestTellResolvesExplicitProjectSelectorOutsideProjectRoot(t *testing.T) {
 	if err := RegisterActiveRun(repoA, cfg); err != nil {
 		t.Fatalf("RegisterActiveRun: %v", err)
 	}
+	installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
 
 	repoB := initNamedGitRepo(t, "project-b")
 	writeAndCommit(t, repoB, "other.txt", "other", "other commit")
@@ -184,6 +187,7 @@ func TestTellUrgentWritesUrgentMasterInboxMessage(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")
 	runName, runDir := writeLifecycleRunFixture(t, repo)
+	installFakePresenceTmux(t, true, "master session-1", "%0\\tmaster\\n%1\\tsession-1\\n")
 
 	orig := sendAgentNudge
 	origDetailed := sendAgentNudgeDetailed

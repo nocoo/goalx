@@ -199,7 +199,7 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 		return "", err
 	}
 	if reg.FocusedRun != "" {
-		if state, err := loadDerivedRunState(projectRoot, goalx.RunDir(projectRoot, reg.FocusedRun)); err == nil && state != nil && (state.Status == "active" || state.Status == "degraded") {
+		if state, err := loadDerivedRunState(projectRoot, goalx.RunDir(projectRoot, reg.FocusedRun)); err == nil && state != nil && derivedRunStatusOpen(state.Status) {
 			return reg.FocusedRun, nil
 		}
 		if _, err := resolveLocalRun(projectRoot, reg.FocusedRun); err == nil {
@@ -209,7 +209,7 @@ func ResolveDefaultRunName(projectRoot string) (string, error) {
 	if states, err := listDerivedRunStates(projectRoot); err == nil {
 		openNames := make([]string, 0)
 		for _, state := range states {
-			if state.Status == "active" || state.Status == "degraded" {
+			if derivedRunStatusOpen(state.Status) {
 				openNames = append(openNames, state.Name)
 			}
 		}
