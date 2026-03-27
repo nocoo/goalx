@@ -407,6 +407,50 @@ func TestLLMExtractionAutoDetectsClaudeWhenCodexUnavailable(t *testing.T) {
 	}
 }
 
+func TestLLMExtractionSkipsWhenConfigDisablesIt(t *testing.T) {
+	repo, runDir, _, _ := writeGuidanceRunFixture(t)
+	writeProjectConfigFixture(t, repo, `
+memory:
+  llm_extract: off
+`)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := AppendMemorySeed(runDir, MemorySeed{
+		Kind:      "verify_result",
+		Run:       "run-1",
+		Selectors: map[string]string{"project_id": goalx.ProjectID(repo), "service": "postgres"},
+		Message:   "acceptance command recorded exit_code=1",
+		Evidence:  []MemoryEvidence{{Kind: "summary", Path: SummaryPath(runDir)}},
+		CreatedAt: "2026-03-27T18:30:00Z",
+	}); err != nil {
+		t.Fatalf("AppendMemorySeed: %v", err)
+	}
+
+	origRunner := runMemoryLLMExtract
+	origExists := memoryLLMCommandExists
+	defer func() {
+		runMemoryLLMExtract = origRunner
+		memoryLLMCommandExists = origExists
+	}()
+	memoryLLMCommandExists = func(name string) bool { return name == "codex" }
+	runMemoryLLMExtract = func(req memoryLLMExtractRequest) (memoryLLMExtractResponse, error) {
+		t.Fatalf("runMemoryLLMExtract should not be called when memory.llm_extract=off")
+		return memoryLLMExtractResponse{}, nil
+	}
+
+	proposals, err := ExtractMemoryProposals(runDir)
+	if err != nil {
+		t.Fatalf("ExtractMemoryProposals: %v", err)
+	}
+	if len(proposals) != 0 {
+		t.Fatalf("proposals = %+v, want no llm proposals when disabled", proposals)
+	}
+}
+
 func TestSaveAppendsExtractedMemoryProposals(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

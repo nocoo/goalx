@@ -39,6 +39,7 @@ type Config struct {
 	Context         ContextConfig         `yaml:"context,omitempty"`
 	Budget          BudgetConfig          `yaml:"budget,omitempty"`
 	Master          MasterConfig          `yaml:"master,omitempty"`
+	Memory          MemoryConfig          `yaml:"memory,omitempty"`
 	Serve           ServeConfig           `yaml:"serve,omitempty"`
 
 	presetCatalog    map[string]PresetConfig
@@ -75,6 +76,10 @@ type MasterConfig struct {
 	Model         string        `yaml:"model,omitempty"`
 	Effort        EffortLevel   `yaml:"effort,omitempty"`
 	CheckInterval time.Duration `yaml:"check_interval,omitempty"`
+}
+
+type MemoryConfig struct {
+	LLMExtract string `yaml:"llm_extract,omitempty"`
 }
 
 type ServeConfig struct {
@@ -481,6 +486,9 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	}
 	if cfg.Preset != "" && !hasPresetSelection(cfg, cfg.Preset) {
 		return fmt.Errorf("unknown preset %q", cfg.Preset)
+	}
+	if err := validateMemoryConfig(cfg.Memory); err != nil {
+		return err
 	}
 
 	for _, f := range cfg.Target.Files {
@@ -980,6 +988,9 @@ func mergeConfig(base, overlay *Config) {
 	if overlay.Master.CheckInterval > 0 {
 		base.Master.CheckInterval = overlay.Master.CheckInterval
 	}
+	if overlay.Memory.LLMExtract != "" {
+		base.Memory.LLMExtract = overlay.Memory.LLMExtract
+	}
 	if overlay.Serve.Bind != "" {
 		base.Serve.Bind = overlay.Serve.Bind
 	}
@@ -1021,6 +1032,15 @@ func mergeServeConfig(base, overlay *ServeConfig) {
 func mergePreferencePolicy(base *PreferencePolicy, overlay PreferencePolicy) {
 	if overlay.Guidance != "" {
 		base.Guidance = overlay.Guidance
+	}
+}
+
+func validateMemoryConfig(cfg MemoryConfig) error {
+	switch strings.TrimSpace(cfg.LLMExtract) {
+	case "", "off":
+		return nil
+	default:
+		return fmt.Errorf("memory.llm_extract must be \"off\" when set, got %q", cfg.LLMExtract)
 	}
 }
 

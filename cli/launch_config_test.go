@@ -250,6 +250,55 @@ local_validation:
 	}
 }
 
+func TestResolveLaunchConfigPreservesMemoryLLMExtractOff(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+memory:
+  llm_extract: off
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeDevelop,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
+	}
+	if resolved.Config.Memory.LLMExtract != "off" {
+		t.Fatalf("memory.llm_extract = %q, want off", resolved.Config.Memory.LLMExtract)
+	}
+	if err := goalx.ValidateConfig(&resolved.Config, resolved.Engines); err != nil {
+		t.Fatalf("ValidateConfig: %v", err)
+	}
+}
+
+func TestResolveLaunchConfigRejectsUnknownMemoryLLMExtractMode(t *testing.T) {
+	projectRoot := t.TempDir()
+	writeLaunchConfigProjectFile(t, projectRoot, `
+memory:
+  llm_extract: auto
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+`)
+
+	_, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeDevelop,
+	})
+	if err == nil {
+		t.Fatal("resolveLaunchConfig accepted unknown memory.llm_extract mode")
+	}
+	if got := err.Error(); got != `memory.llm_extract must be "off" when set, got "auto"` {
+		t.Fatalf("error = %q, want strict memory.llm_extract validation", got)
+	}
+}
+
 func TestResolveLaunchConfigLeavesBudgetUnlimitedByDefaultForNonEvolve(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeLaunchConfigProjectFile(t, projectRoot, `
@@ -281,11 +330,11 @@ local_validation:
 `)
 
 	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
-		Objective:  "ship it",
-		Mode:       goalx.ModeAuto,
-		Intent:     runIntentEvolve,
-		BudgetSet:  true,
-		Budget:     0,
+		Objective: "ship it",
+		Mode:      goalx.ModeAuto,
+		Intent:    runIntentEvolve,
+		BudgetSet: true,
+		Budget:    0,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)

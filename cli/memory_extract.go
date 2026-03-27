@@ -225,11 +225,14 @@ func extractLLMMemoryProposals(runDir string, seeds []MemorySeed) ([]MemoryPropo
 	if meta == nil || strings.TrimSpace(meta.ProjectRoot) == "" {
 		return nil, nil
 	}
-	engines, err := loadEngineCatalog(meta.ProjectRoot)
+	layers, err := goalx.LoadConfigLayers(meta.ProjectRoot)
 	if err != nil {
 		return nil, err
 	}
-	target, ok := selectMemoryLLMExtractTarget(engines)
+	if strings.TrimSpace(layers.Config.Memory.LLMExtract) == "off" {
+		return nil, nil
+	}
+	target, ok := selectMemoryLLMExtractTarget(layers.Engines)
 	if !ok {
 		return nil, nil
 	}
