@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestExtractMemoryProposalsFromGroundedSeeds(t *testing.T) {
@@ -160,6 +162,191 @@ func TestAppendMemoryProposalsUsesDailyShardAndDedupes(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 1 {
 		t.Fatalf("proposal shard lines = %d, want 1: %s", len(lines), string(data))
+	}
+}
+
+func TestLLMExtractionBoundsProposalCount(t *testing.T) {
+	repo, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\nscheduler first\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(ReportsDir(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir reports: %v", err)
+	}
+	reportPath := filepath.Join(ReportsDir(runDir), "ops.md")
+	if err := os.WriteFile(reportPath, []byte("run db checks inside scheduler first\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := AppendMemorySeed(runDir, MemorySeed{
+		Kind:      "verify_result",
+		Run:       "run-1",
+		Selectors: map[string]string{"project_id": goalx.ProjectID(repo), "service": "postgres"},
+		Message:   "acceptance command recorded exit_code=1",
+		Evidence: []MemoryEvidence{
+			{Kind: "summary", Path: SummaryPath(runDir)},
+			{Kind: "report", Path: reportPath},
+		},
+		CreatedAt: "2026-03-27T18:00:00Z",
+	}); err != nil {
+		t.Fatalf("AppendMemorySeed: %v", err)
+	}
+
+	origRunner := runMemoryLLMExtract
+	origExists := memoryLLMCommandExists
+	defer func() {
+		runMemoryLLMExtract = origRunner
+		memoryLLMCommandExists = origExists
+	}()
+	memoryLLMCommandExists = func(name string) bool { return name == "codex" }
+	runMemoryLLMExtract = func(req memoryLLMExtractRequest) (memoryLLMExtractResponse, error) {
+		if req.Target.Engine != "codex" || req.Target.Model != "fast" {
+			t.Fatalf("target = %+v, want codex/fast", req.Target)
+		}
+		if req.Selectors["project_id"] != goalx.ProjectID(repo) {
+			t.Fatalf("selectors = %+v, want project selector", req.Selectors)
+		}
+		return memoryLLMExtractResponse{
+			Proposals: []memoryLLMExtractItem{
+				{Kind: MemoryKindProcedure, Statement: "run db checks inside scheduler first", EvidencePaths: []string{SummaryPath(runDir)}},
+				{Kind: MemoryKindPitfall, Statement: "direct host db checks often fail", EvidencePaths: []string{reportPath}},
+				{Kind: MemoryKindProcedure, Statement: "extra proposal should be bounded away", EvidencePaths: []string{reportPath}},
+			},
+		}, nil
+	}
+
+	proposals, err := ExtractMemoryProposals(runDir)
+	if err != nil {
+		t.Fatalf("ExtractMemoryProposals: %v", err)
+	}
+	if len(proposals) != 2 {
+		t.Fatalf("proposal len = %d, want bounded 2", len(proposals))
+	}
+	for _, proposal := range proposals {
+		if proposal.Kind != MemoryKindProcedure && proposal.Kind != MemoryKindPitfall {
+			t.Fatalf("unexpected proposal kind: %+v", proposal)
+		}
+		if len(proposal.Evidence) == 0 {
+			t.Fatalf("proposal missing evidence: %+v", proposal)
+		}
+		if proposal.Selectors["project_id"] != goalx.ProjectID(repo) {
+			t.Fatalf("proposal selectors = %+v, want project_id", proposal.Selectors)
+		}
+	}
+}
+
+func TestLLMExtractionRequiresEvidencePaths(t *testing.T) {
+	repo, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := AppendMemorySeed(runDir, MemorySeed{
+		Kind:      "verify_result",
+		Run:       "run-1",
+		Selectors: map[string]string{"project_id": goalx.ProjectID(repo), "service": "postgres"},
+		Message:   "acceptance command recorded exit_code=1",
+		Evidence:  []MemoryEvidence{{Kind: "summary", Path: SummaryPath(runDir)}},
+		CreatedAt: "2026-03-27T18:10:00Z",
+	}); err != nil {
+		t.Fatalf("AppendMemorySeed: %v", err)
+	}
+
+	origRunner := runMemoryLLMExtract
+	origExists := memoryLLMCommandExists
+	defer func() {
+		runMemoryLLMExtract = origRunner
+		memoryLLMCommandExists = origExists
+	}()
+	memoryLLMCommandExists = func(name string) bool { return name == "codex" }
+	runMemoryLLMExtract = func(req memoryLLMExtractRequest) (memoryLLMExtractResponse, error) {
+		return memoryLLMExtractResponse{
+			Proposals: []memoryLLMExtractItem{
+				{Kind: MemoryKindProcedure, Statement: "missing evidence", EvidencePaths: nil},
+				{Kind: MemoryKindPitfall, Statement: "unknown evidence", EvidencePaths: []string{"/tmp/unknown.md"}},
+			},
+		}, nil
+	}
+
+	proposals, err := ExtractMemoryProposals(runDir)
+	if err != nil {
+		t.Fatalf("ExtractMemoryProposals: %v", err)
+	}
+	if len(proposals) != 0 {
+		t.Fatalf("proposals = %+v, want none when llm evidence paths invalid", proposals)
+	}
+}
+
+func TestLLMExtractionDoesNotPromoteDirectly(t *testing.T) {
+	repo, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := AppendMemorySeed(runDir, MemorySeed{
+		Kind:      "verify_result",
+		Run:       "run-1",
+		Selectors: map[string]string{"project_id": goalx.ProjectID(repo), "service": "postgres"},
+		Message:   "acceptance command recorded exit_code=1",
+		Evidence:  []MemoryEvidence{{Kind: "summary", Path: SummaryPath(runDir)}},
+		CreatedAt: "2026-03-27T18:20:00Z",
+	}); err != nil {
+		t.Fatalf("AppendMemorySeed: %v", err)
+	}
+
+	origRunner := runMemoryLLMExtract
+	origExists := memoryLLMCommandExists
+	defer func() {
+		runMemoryLLMExtract = origRunner
+		memoryLLMCommandExists = origExists
+	}()
+	memoryLLMCommandExists = func(name string) bool { return name == "codex" }
+	runMemoryLLMExtract = func(req memoryLLMExtractRequest) (memoryLLMExtractResponse, error) {
+		return memoryLLMExtractResponse{
+			Proposals: []memoryLLMExtractItem{
+				{Kind: MemoryKindProcedure, Statement: "run db checks inside scheduler first", EvidencePaths: []string{SummaryPath(runDir)}},
+			},
+		}, nil
+	}
+
+	now := time.Date(2026, time.March, 27, 18, 20, 0, 0, time.UTC)
+	if err := AppendExtractedMemoryProposals(runDir, now); err != nil {
+		t.Fatalf("AppendExtractedMemoryProposals: %v", err)
+	}
+
+	proposals, err := loadMemoryProposals(MemoryProposalPath(now))
+	if err != nil {
+		t.Fatalf("loadMemoryProposals: %v", err)
+	}
+	if len(proposals) != 1 || proposals[0].Kind != MemoryKindProcedure {
+		t.Fatalf("proposal shard = %+v, want one procedure proposal", proposals)
+	}
+	if entries := loadCanonicalEntriesByKind(t, MemoryKindProcedure); len(entries) != 0 {
+		t.Fatalf("canonical procedures = %+v, want none before promotion", entries)
+	}
+}
+
+func TestLLMExtractionAutoDetectsClaudeWhenCodexUnavailable(t *testing.T) {
+	engines := map[string]goalx.EngineConfig{
+		"claude-code": goalx.BuiltinEngines["claude-code"],
+		"codex":       goalx.BuiltinEngines["codex"],
+	}
+	origExists := memoryLLMCommandExists
+	defer func() { memoryLLMCommandExists = origExists }()
+	memoryLLMCommandExists = func(name string) bool { return name == "claude" }
+
+	target, ok := selectMemoryLLMExtractTarget(engines)
+	if !ok {
+		t.Fatal("selectMemoryLLMExtractTarget returned no target")
+	}
+	if target.Engine != "claude-code" || target.Model != "haiku" {
+		t.Fatalf("target = %+v, want claude-code/haiku", target)
 	}
 }
 
