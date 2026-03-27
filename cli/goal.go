@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,10 +64,17 @@ func LoadGoalState(path string) (*GoalState, error) {
 
 	var state GoalState
 	if len(strings.TrimSpace(string(data))) == 0 {
-		state = *NewGoalState()
-		return &state, nil
+		return nil, fmt.Errorf("parse goal state: goal state is empty")
 	}
-	if err := json.Unmarshal(data, &state); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&state); err != nil {
+		return nil, fmt.Errorf("parse goal state: %w", err)
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return nil, fmt.Errorf("parse goal state: %w", err)
+	}
+	if err := validateGoalStateInput(&state); err != nil {
 		return nil, fmt.Errorf("parse goal state: %w", err)
 	}
 	normalizeGoalState(&state)
@@ -75,6 +84,9 @@ func LoadGoalState(path string) (*GoalState, error) {
 func SaveGoalState(path string, state *GoalState) error {
 	if state == nil {
 		return fmt.Errorf("goal state is nil")
+	}
+	if err := validateGoalStateInput(state); err != nil {
+		return err
 	}
 	normalizeGoalState(state)
 	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -111,9 +123,6 @@ func EnsureGoalState(runDir string) (*GoalState, error) {
 			return nil, err
 		}
 		return state, nil
-	}
-	if err := SaveGoalState(path, state); err != nil {
-		return nil, err
 	}
 	return state, nil
 }
@@ -219,6 +228,52 @@ func normalizeGoalItem(item *GoalItem, defaultSource string) {
 	item.Source = normalizeGoalItemSource(item.Source, defaultSource)
 	item.State = normalizeGoalItemState(item.State)
 	item.EvidencePaths = trimmedGoalEvidencePaths(item.EvidencePaths)
+}
+
+func validateGoalStateInput(state *GoalState) error {
+	if state == nil {
+		return fmt.Errorf("goal state is nil")
+	}
+	for _, item := range state.Required {
+		if err := validateGoalItemInput(item); err != nil {
+			return err
+		}
+	}
+	for _, item := range state.Optional {
+		if err := validateGoalItemInput(item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateGoalItemInput(item GoalItem) error {
+	if source := strings.TrimSpace(item.Source); source != "" {
+		switch source {
+		case goalItemSourceUser, goalItemSourceMaster:
+		default:
+			return fmt.Errorf("invalid goal item source %q", item.Source)
+		}
+	}
+	if state := strings.TrimSpace(item.State); state != "" {
+		switch state {
+		case goalItemStateOpen, goalItemStateClaimed, goalItemStateWaived:
+		default:
+			return fmt.Errorf("invalid goal item state %q", item.State)
+		}
+	}
+	return nil
+}
+
+func ensureJSONEOF(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+	return fmt.Errorf("unexpected trailing JSON content")
 }
 
 func normalizeGoalItemSource(source, defaultSource string) string {

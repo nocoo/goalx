@@ -30,9 +30,12 @@ func Verify(projectRoot string, args []string) error {
 		return err
 	}
 
-	goalState, err := EnsureGoalState(rc.RunDir)
+	goalState, err := LoadGoalState(GoalPath(rc.RunDir))
 	if err != nil {
 		return fmt.Errorf("load goal state: %w", err)
+	}
+	if goalState == nil {
+		return fmt.Errorf("load goal state: goal state is missing")
 	}
 	state, err := EnsureAcceptanceState(rc.RunDir, rc.Config, goalState.Version)
 	if err != nil {

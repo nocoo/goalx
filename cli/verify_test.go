@@ -216,6 +216,62 @@ local_validation:
 	}
 }
 
+func TestVerifyDoesNotRewriteGoalState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+
+	runName := "verify-goal-readonly"
+	runDir := goalx.RunDir(repo, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	snapshot := []byte(`name: verify-goal-readonly
+mode: develop
+objective: ship feature
+acceptance:
+  command: "printf 'e2e ok\n'"
+`)
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	goalBefore := []byte(`{
+  "version": 1,
+  "updated_at": "2026-03-27T00:00:00Z",
+  "required": [
+    {
+      "id": "req-1",
+      "text": "ship feature",
+      "source": "user",
+      "state": "claimed",
+      "evidence_paths": ["/tmp/e2e.txt"]
+    }
+  ],
+  "optional": []
+}`)
+	if err := os.WriteFile(GoalPath(runDir), goalBefore, 0o644); err != nil {
+		t.Fatalf("write goal state: %v", err)
+	}
+	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
+		Version:      1,
+		Objective:    "ship feature",
+		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
+	}); err != nil {
+		t.Fatalf("write run metadata: %v", err)
+	}
+	seedRunCharterForTests(t, runDir, runName, repo)
+
+	if err := Verify(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+
+	assertFileUnchanged(t, GoalPath(runDir), goalBefore)
+}
+
 func TestVerifyRecordsAcceptanceWhenRunChangedCode(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
