@@ -216,6 +216,9 @@ func printStatusControlSummary(rc *RunContext) {
 	}
 	fmt.Printf("Control: run_id=%s epoch=%s charter=%s run_status=%s unread_inbox=%d master_lease=%s sidecar_lease=%s reminders_due=%d deliveries_failed=%d\n", runID, epoch, charter, runStatus, unread, masterLease, sidecarLease, remindersDue, deliveriesFailed)
 	if activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir)); err == nil && activity != nil {
+		if budget := formatBudgetSummary(activity.Budget); budget != "" {
+			fmt.Printf("Budget: %s\n", budget)
+		}
 		if coverage := formatCoverageSummary(activity.Coverage); coverage != "" {
 			fmt.Printf("Coverage: %s\n", coverage)
 		}

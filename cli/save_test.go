@@ -197,6 +197,57 @@ func TestSaveCopiesGoalBoundaryArtifacts(t *testing.T) {
 	}
 }
 
+func TestSaveCopiesDevelopSelectionAndCoordinationState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runName := "demo"
+	runDir := goalx.RunDir(projectRoot, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	cfg := goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
+
+	selection := `{"kept":"session-2","branch":"goalx/demo/2"}`
+	if err := os.WriteFile(filepath.Join(runDir, "selection.json"), []byte(selection), 0o644); err != nil {
+		t.Fatalf("write selection.json: %v", err)
+	}
+	coordination := `{"version":1,"owners":{"req-1":"session-2"}}`
+	if err := os.WriteFile(CoordinationPath(runDir), []byte(coordination), 0o644); err != nil {
+		t.Fatalf("write coordination.json: %v", err)
+	}
+
+	if err := Save(projectRoot, []string{"--run", runName}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "selection.json")); err != nil {
+		t.Fatalf("read saved selection.json: %v", err)
+	} else if string(got) != selection {
+		t.Fatalf("saved selection.json = %q, want %q", string(got), selection)
+	}
+	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "coordination.json")); err != nil {
+		t.Fatalf("read saved coordination.json: %v", err)
+	} else if string(got) != coordination {
+		t.Fatalf("saved coordination.json = %q, want %q", string(got), coordination)
+	}
+}
+
 func TestSaveDoesNotMutateRunStateFromRunStatusRecord(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

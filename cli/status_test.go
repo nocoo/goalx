@@ -311,6 +311,42 @@ func TestStatusShowsSessionTransportFacts(t *testing.T) {
 	}
 }
 
+func TestStatusShowsBudgetFactsAndExhaustionAdvisory(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Budget.MaxDuration = time.Hour
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	startedAt := time.Now().UTC().Add(-90 * time.Minute).Truncate(time.Second)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: startedAt.Format(time.RFC3339),
+		UpdatedAt: startedAt.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Budget: max_duration=1h0m0s",
+		"deadline_at=",
+		"exhausted=true",
+		"Budget exhausted:",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusDoesNotSurfaceAckSessionAsSessionLifecycleState(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	installGuidanceFakeTmux(t, []string{"session-1"})

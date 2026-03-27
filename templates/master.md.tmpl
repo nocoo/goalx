@@ -36,7 +36,7 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 
 - Run: {{.RunName}}
 - Master: {{.Master.Engine}}/{{.Master.Model}}
-{{if .CurrentTime}}- Current time (UTC): {{.CurrentTime}}
+{{if .CurrentTime}}- Current time (UTC): {{.CurrentTime}} (launch snapshot; recompute current UTC time before budget decisions)
 {{end}}{{if .RunStartedAt}}- Run started at (UTC): {{.RunStartedAt}}
 {{end}}{{if .Intent}}- Intent: {{.Intent}}
 {{end}}
@@ -332,7 +332,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Stop current run before restarting if needed: `goalx stop --run {{.RunName}}`
 - Transport wake text is only a trigger. Real instructions live in the control files above.
 - Always use absolute paths. Do NOT use `~`.
-{{if .Budget.MaxDuration}}- Budget: {{.Budget.MaxDuration}}. If exhausted, write progress summary and stop.
+{{if .Budget.MaxDuration}}- Budget: {{.Budget.MaxDuration}}. Re-read `{{.ActivityPath}}` or recompute UTC now before deciding whether it is exhausted. If exhausted, write progress summary and stop.
 {{end}}
 
 ## Status

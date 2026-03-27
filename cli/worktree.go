@@ -170,6 +170,43 @@ func branchCheckedOutInAnyWorktree(projectRoot, branch string) (bool, error) {
 	return false, nil
 }
 
+func gitIsAncestor(projectRoot, ancestor, descendant string) (bool, error) {
+	ancestor = strings.TrimSpace(ancestor)
+	descendant = strings.TrimSpace(descendant)
+	if ancestor == "" || descendant == "" {
+		return false, fmt.Errorf("ancestor and descendant revisions are required")
+	}
+	out, err := exec.Command("git", "-C", projectRoot, "merge-base", "--is-ancestor", ancestor, descendant).CombinedOutput()
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, fmt.Errorf("git merge-base --is-ancestor %s %s: %w: %s", ancestor, descendant, err, out)
+}
+
+func gitTreesEqual(projectRoot, revA, revB string) (bool, error) {
+	treeA, err := gitTreeRevision(projectRoot, revA)
+	if err != nil {
+		return false, err
+	}
+	treeB, err := gitTreeRevision(projectRoot, revB)
+	if err != nil {
+		return false, err
+	}
+	return treeA == treeB, nil
+}
+
+func gitTreeRevision(projectRoot, rev string) (string, error) {
+	out, err := exec.Command("git", "-C", projectRoot, "rev-parse", strings.TrimSpace(rev)+"^{tree}").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse %s^{tree}: %w: %s", rev, err, out)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // TagArchive creates a git tag pointing at the given branch.
 func TagArchive(projectRoot, branch, tag string) error {
 	return exec.Command("git", "-C", projectRoot, "tag", tag, branch).Run()

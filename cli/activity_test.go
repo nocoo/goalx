@@ -244,6 +244,55 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 	}
 }
 
+func TestBuildActivitySnapshotIncludesBudgetFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Budget.MaxDuration = 2 * time.Hour
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+
+	startedAt := time.Now().UTC().Add(-3 * time.Hour).Truncate(time.Second)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: startedAt.Format(time.RFC3339),
+		UpdatedAt: startedAt.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	snapshot, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildActivitySnapshot: %v", err)
+	}
+
+	if snapshot.Budget.MaxDurationSeconds != int64((2*time.Hour)/time.Second) {
+		t.Fatalf("budget max_duration_seconds = %d, want %d", snapshot.Budget.MaxDurationSeconds, int64((2*time.Hour)/time.Second))
+	}
+	if snapshot.Budget.StartedAt != startedAt.Format(time.RFC3339) {
+		t.Fatalf("budget started_at = %q, want %q", snapshot.Budget.StartedAt, startedAt.Format(time.RFC3339))
+	}
+	if !snapshot.Budget.Exhausted {
+		t.Fatalf("budget exhausted = false, want true: %+v", snapshot.Budget)
+	}
+
+	deadlineAt, err := time.Parse(time.RFC3339, snapshot.Budget.DeadlineAt)
+	if err != nil {
+		t.Fatalf("parse deadline_at: %v", err)
+	}
+	if want := startedAt.Add(2 * time.Hour); !deadlineAt.Equal(want) {
+		t.Fatalf("budget deadline_at = %s, want %s", deadlineAt, want)
+	}
+	if snapshot.Budget.ElapsedSeconds < int64((3*time.Hour)/time.Second)-2 {
+		t.Fatalf("budget elapsed_seconds = %d, want about %d", snapshot.Budget.ElapsedSeconds, int64((3*time.Hour)/time.Second))
+	}
+	if snapshot.Budget.RemainingSeconds > -int64((1*time.Hour)/time.Second)+2 {
+		t.Fatalf("budget remaining_seconds = %d, want about -%d", snapshot.Budget.RemainingSeconds, int64((1*time.Hour)/time.Second))
+	}
+}
+
 func TestBuildActivitySnapshotSerializesCoverageUnknownExplicitly(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")

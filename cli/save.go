@@ -83,6 +83,12 @@ func Save(projectRoot string, args []string) error {
 	if err := copyFileIfExists(GoalLogPath(rc.RunDir), filepath.Join(saveDir, "goal-log.jsonl")); err != nil {
 		return fmt.Errorf("copy goal log: %w", err)
 	}
+	if err := copyFileIfExists(filepath.Join(rc.RunDir, "selection.json"), filepath.Join(saveDir, "selection.json")); err != nil {
+		return fmt.Errorf("copy selection state: %w", err)
+	}
+	if err := copyFileIfExists(CoordinationPath(rc.RunDir), filepath.Join(saveDir, "coordination.json")); err != nil {
+		return fmt.Errorf("copy coordination state: %w", err)
+	}
 	runMetadataPath := RunMetadataPath(rc.RunDir)
 	if err := copyFileIfExists(runMetadataPath, filepath.Join(saveDir, "run-metadata.json")); err != nil {
 		return fmt.Errorf("copy run metadata: %w", err)

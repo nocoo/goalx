@@ -46,6 +46,94 @@ func TestKeepMergesRunWorktreeIntoSourceRootWhenNoSessionProvided(t *testing.T) 
 	}
 }
 
+func TestKeepSkipsRootMergeWhenRunTreeAlreadyIntegrated(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	baseRevision := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))
+	runName := "keep-run"
+	runDir := writeKeepRunFixture(t, repo, runName)
+	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
+		Version:      1,
+		ProjectRoot:  repo,
+		RunID:        "run_keep",
+		RootRunID:    "run_keep",
+		Epoch:        1,
+		BaseRevision: baseRevision,
+	}); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", runName)
+	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	writeAndCommit(t, runWT, "README.md", "base\nroot change\n", "root change")
+
+	writeAndCommit(t, repo, "README.md", "base\nroot change\n", "manual integrate")
+	headBefore := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))
+
+	out := captureStdout(t, func() {
+		if err := Keep(repo, []string{"--run", runName}); err != nil {
+			t.Fatalf("Keep: %v", err)
+		}
+	})
+	if !strings.Contains(out, "Run worktree already integrated into source root.") {
+		t.Fatalf("keep output missing already-integrated message:\n%s", out)
+	}
+
+	headAfter := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))
+	if headAfter != headBefore {
+		t.Fatalf("keep should not create a new merge commit when trees already match: before=%s after=%s", headBefore, headAfter)
+	}
+}
+
+func TestKeepRejectsRootMergeWhenTargetHeadLeftRunBaseLineage(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	baseRevision := strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))
+	runName := "keep-run"
+	runDir := writeKeepRunFixture(t, repo, runName)
+	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
+		Version:      1,
+		ProjectRoot:  repo,
+		RunID:        "run_keep",
+		RootRunID:    "run_keep",
+		Epoch:        1,
+		BaseRevision: baseRevision,
+	}); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", runName)
+	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	writeAndCommit(t, runWT, "README.md", "base\nroot change\n", "root change")
+
+	runGit(t, repo, "checkout", "--orphan", "other-root")
+	writeAndCommit(t, repo, "README.md", "other root\n", "other root")
+
+	err := Keep(repo, []string{"--run", runName})
+	if err == nil {
+		t.Fatal("expected Keep to reject merging into a target outside the run base lineage")
+	}
+	for _, want := range []string{"base revision", "does not descend"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Keep error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func TestKeepMergesSessionBranchIntoRunWorktree(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "README.md", "base\n", "base commit")

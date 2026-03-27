@@ -55,16 +55,16 @@ func collectRunAdvisories(rc *RunContext) []string {
 		return nil
 	}
 	status, err := loadDisplayStatusRecord(RunStatusPath(rc.RunDir))
-	if err != nil || status == nil {
-		return nil
-	}
 	summaryExists := fileExists(SummaryPath(rc.RunDir))
 	completionExists := fileExists(CompletionStatePath(rc.RunDir))
 	advisories := make([]string, 0, 2)
-	if status.RequiredRemaining != nil && *status.RequiredRemaining == 0 && (!summaryExists || !completionExists) {
+	if err == nil && status != nil && status.RequiredRemaining != nil && *status.RequiredRemaining == 0 && (!summaryExists || !completionExists) {
 		advisories = append(advisories, fmt.Sprintf("Closeout artifacts missing: required_remaining=0 summary_exists=%t completion_proof_exists=%t", summaryExists, completionExists))
 	}
 	if activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir)); err == nil && activity != nil {
+		if activity.Budget.MaxDurationSeconds > 0 && activity.Budget.Exhausted && activity.Lifecycle.RunActive {
+			advisories = append(advisories, "Budget exhausted: "+formatBudgetSummary(activity.Budget))
+		}
 		coverage := activity.Coverage
 		if coverage.OwnersPresent && (len(coverage.UnmappedOpenIDs) > 0 || len(coverage.OwnerSessionMissingIDs) > 0) {
 			parts := make([]string, 0, 3)
@@ -86,7 +86,7 @@ func collectRunAdvisories(rc *RunContext) []string {
 	if err != nil || meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
 		return advisories
 	}
-	if strings.TrimSpace(status.Phase) != "review" || (summaryExists && completionExists) {
+	if status == nil || strings.TrimSpace(status.Phase) != "review" || (summaryExists && completionExists) {
 		return advisories
 	}
 	evolutionEntries, lastTrialAt := evolutionLogFacts(EvolutionLogPath(rc.RunDir))
@@ -121,6 +121,36 @@ func formatCoverageSummary(coverage RequiredCoverage) string {
 	appendCoverageSummaryPart(&parts, "idle_reusable", coverage.IdleReusableSessions)
 	appendCoverageSummaryPart(&parts, "parked_reusable", coverage.ParkedReusableSessions)
 	return strings.Join(parts, " ")
+}
+
+func formatBudgetSummary(budget ActivityBudget) string {
+	if budget.MaxDurationSeconds <= 0 {
+		return ""
+	}
+	parts := []string{
+		"max_duration=" + formatBudgetDurationSeconds(budget.MaxDurationSeconds),
+	}
+	if budget.StartedAt != "" {
+		parts = append(parts, "started_at="+budget.StartedAt)
+	}
+	if budget.DeadlineAt != "" {
+		parts = append(parts, "deadline_at="+budget.DeadlineAt)
+	}
+	if budget.ElapsedSeconds > 0 {
+		parts = append(parts, "elapsed="+formatBudgetDurationSeconds(budget.ElapsedSeconds))
+	}
+	switch {
+	case budget.RemainingSeconds > 0:
+		parts = append(parts, "remaining="+formatBudgetDurationSeconds(budget.RemainingSeconds))
+	case budget.RemainingSeconds < 0:
+		parts = append(parts, "overrun="+formatBudgetDurationSeconds(-budget.RemainingSeconds))
+	}
+	parts = append(parts, fmt.Sprintf("exhausted=%t", budget.Exhausted))
+	return strings.Join(parts, " ")
+}
+
+func formatBudgetDurationSeconds(seconds int64) string {
+	return (time.Duration(seconds) * time.Second).String()
 }
 
 func appendCoverageSummaryPart(parts *[]string, label string, values []string) {

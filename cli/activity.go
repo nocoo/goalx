@@ -19,6 +19,7 @@ type ActivitySnapshot struct {
 	Run       ActivityRunInfo            `json:"run"`
 	Lifecycle ActivityLifecycle          `json:"lifecycle"`
 	Queue     ActivityQueue              `json:"queue"`
+	Budget    ActivityBudget             `json:"budget,omitempty"`
 	Coverage  RequiredCoverage           `json:"coverage,omitempty"`
 	Root      WorktreeDiffStat           `json:"root"`
 	Actors    map[string]ActivityActor   `json:"actors,omitempty"`
@@ -45,6 +46,15 @@ type ActivityQueue struct {
 	RemindersDue       int    `json:"reminders_due,omitempty"`
 	DeliveriesFailed   int    `json:"deliveries_failed,omitempty"`
 	LastMasterSubmitAt string `json:"last_master_submit_at,omitempty"`
+}
+
+type ActivityBudget struct {
+	MaxDurationSeconds int64  `json:"max_duration_seconds,omitempty"`
+	StartedAt          string `json:"started_at,omitempty"`
+	DeadlineAt         string `json:"deadline_at,omitempty"`
+	ElapsedSeconds     int64  `json:"elapsed_seconds,omitempty"`
+	RemainingSeconds   int64  `json:"remaining_seconds,omitempty"`
+	Exhausted          bool   `json:"exhausted,omitempty"`
 }
 
 type ActivityActor struct {
@@ -170,6 +180,7 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		snapshot.Lifecycle.RuntimePhase = runtimeState.Phase
 		snapshot.Lifecycle.RunActive = runtimeState.Active
 	}
+	snapshot.Budget = buildActivityBudget(cfg, runtimeState, meta, snapshot.CheckedAt)
 	coverage, err := BuildRequiredCoverage(runDir)
 	if err != nil {
 		return nil, err
@@ -239,6 +250,47 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		snapshot.Sessions = nil
 	}
 	return snapshot, nil
+}
+
+func buildActivityBudget(cfg *goalx.Config, runtimeState *RunRuntimeState, meta *RunMetadata, checkedAt string) ActivityBudget {
+	if cfg == nil || cfg.Budget.MaxDuration <= 0 {
+		return ActivityBudget{}
+	}
+
+	budget := ActivityBudget{
+		MaxDurationSeconds: int64(cfg.Budget.MaxDuration / time.Second),
+	}
+	startedAt := ""
+	if runtimeState != nil {
+		startedAt = strings.TrimSpace(runtimeState.StartedAt)
+	}
+	if startedAt == "" && meta != nil {
+		startedAt = strings.TrimSpace(meta.StartedAt)
+	}
+	if startedAt == "" {
+		return budget
+	}
+	budget.StartedAt = startedAt
+
+	startTime, err := time.Parse(time.RFC3339, startedAt)
+	if err != nil {
+		return budget
+	}
+	checkedTime, err := time.Parse(time.RFC3339, checkedAt)
+	if err != nil {
+		checkedTime = time.Now().UTC()
+	}
+	if checkedTime.Before(startTime) {
+		checkedTime = startTime
+	}
+
+	elapsed := checkedTime.Sub(startTime)
+	remaining := cfg.Budget.MaxDuration - elapsed
+	budget.DeadlineAt = startTime.Add(cfg.Budget.MaxDuration).UTC().Format(time.RFC3339)
+	budget.ElapsedSeconds = int64(elapsed / time.Second)
+	budget.RemainingSeconds = int64(remaining / time.Second)
+	budget.Exhausted = elapsed >= cfg.Budget.MaxDuration
+	return budget
 }
 
 func buildActivityActor(runDir, holder, tmuxSession, window string, previous ActivityActor, checkedAt string) ActivityActor {

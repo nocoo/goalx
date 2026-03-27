@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // Keep merges or preserves a specific session from a run.
@@ -25,10 +26,30 @@ func Keep(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	runWT := RunWorktreePath(rc.RunDir)
 
 	if len(rest) == 0 {
+		meta, err := LoadRunMetadata(RunMetadataPath(rc.RunDir))
+		if err != nil {
+			return fmt.Errorf("load run metadata: %w", err)
+		}
+		if meta != nil && strings.TrimSpace(meta.BaseRevision) != "" {
+			ok, err := gitIsAncestor(rc.ProjectRoot, meta.BaseRevision, "HEAD")
+			if err != nil {
+				return fmt.Errorf("check run base revision ancestry: %w", err)
+			}
+			if !ok {
+				return fmt.Errorf("source root HEAD does not descend from run base revision %s; switch back to the run base branch or merge manually", meta.BaseRevision)
+			}
+		}
 		runBranch := fmt.Sprintf("goalx/%s/root", rc.Config.Name)
+		integrated, err := gitTreesEqual(rc.ProjectRoot, "HEAD", runBranch)
+		if err != nil {
+			return fmt.Errorf("compare %s with source root: %w", runBranch, err)
+		}
+		if integrated {
+			fmt.Printf("Run worktree already integrated into source root.\n")
+			return nil
+		}
 		if err := MergeWorktree(rc.ProjectRoot, runBranch); err != nil {
 			return fmt.Errorf("merge %s: %w", runBranch, err)
 		}
@@ -36,6 +57,7 @@ func Keep(projectRoot string, args []string) error {
 		return nil
 	}
 
+	runWT := RunWorktreePath(rc.RunDir)
 	sessionName := rest[0]
 	idx, err := parseSessionIndex(sessionName)
 	if err != nil {
