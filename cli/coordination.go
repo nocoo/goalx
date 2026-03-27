@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	goalx "github.com/vonbai/goalx"
@@ -61,24 +60,17 @@ func LoadCoordinationState(path string) (*CoordinationState, error) {
 }
 
 func SaveCoordinationState(path string, state *CoordinationState) error {
-	if state == nil {
-		return fmt.Errorf("coordination state is nil")
-	}
-	normalizeCoordinationState(state)
-	if state.Version <= 0 {
-		state.Version = 1
+	if err := validateCoordinationState(state); err != nil {
+		return err
 	}
 	if state.UpdatedAt == "" {
 		state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
 	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return writeFileAtomic(path, data, 0o644)
 }
 
 func EnsureCoordinationState(runDir, objective string) (*CoordinationState, error) {
@@ -99,163 +91,18 @@ func EnsureCoordinationState(runDir, objective string) (*CoordinationState, erro
 		}
 		return state, nil
 	}
-	if state.Version <= 0 {
-		state.Version = 1
-	}
-	if state.Owners == nil {
-		state.Owners = map[string]string{}
-	}
-	if state.Sessions == nil {
-		state.Sessions = map[string]CoordinationSession{}
-	}
-	if state.UpdatedAt == "" {
-		state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-	if err := SaveCoordinationState(path, state); err != nil {
-		return nil, err
-	}
 	return state, nil
-}
-
-type coordinationWire struct {
-	Version       int                            `json:"version"`
-	PlanSummary   []string                       `json:"plan_summary,omitempty"`
-	Owners        map[string]string              `json:"owners,omitempty"`
-	Sessions      map[string]CoordinationSession `json:"sessions,omitempty"`
-	Decision      *CoordinationDecision          `json:"decision,omitempty"`
-	Blocked       []string                       `json:"blocked,omitempty"`
-	OpenQuestions []string                       `json:"open_questions,omitempty"`
-	UpdatedAt     string                         `json:"updated_at,omitempty"`
-}
-
-type legacyCoordinationEntry struct {
-	Owner       string   `json:"owner,omitempty"`
-	Session     string   `json:"session,omitempty"`
-	Scope       any      `json:"scope,omitempty"`
-	Status      string   `json:"status,omitempty"`
-	State       string   `json:"state,omitempty"`
-	Reason      string   `json:"reason,omitempty"`
-	Note        string   `json:"note,omitempty"`
-	Worktree    string   `json:"worktree_path,omitempty"`
-	NextActions []string `json:"next_actions,omitempty"`
 }
 
 func parseCoordinationState(data []byte) (*CoordinationState, error) {
-	wire := &coordinationWire{}
-	if err := json.Unmarshal(data, wire); err == nil {
-		state := &CoordinationState{
-			Version:       maxInt(wire.Version, 1),
-			PlanSummary:   wire.PlanSummary,
-			Owners:        mapOrEmpty(wire.Owners),
-			Sessions:      mapSessionsOrEmpty(wire.Sessions),
-			Decision:      wire.Decision,
-			Blocked:       append([]string(nil), wire.Blocked...),
-			OpenQuestions: append([]string(nil), wire.OpenQuestions...),
-			UpdatedAt:     wire.UpdatedAt,
-		}
-		normalizeCoordinationState(state)
-		return state, nil
-	}
-
-	raw := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	var state CoordinationState
+	if err := decodeStrictJSON(data, &state); err != nil {
 		return nil, err
 	}
-	state := &CoordinationState{
-		Version:   1,
-		Owners:    map[string]string{},
-		Sessions:  map[string]CoordinationSession{},
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+	if err := validateCoordinationState(&state); err != nil {
+		return nil, err
 	}
-	_ = json.Unmarshal(raw["version"], &state.Version)
-	_ = json.Unmarshal(raw["updated_at"], &state.UpdatedAt)
-	_ = json.Unmarshal(raw["plan_summary"], &state.PlanSummary)
-	_ = json.Unmarshal(raw["open_questions"], &state.OpenQuestions)
-	_ = json.Unmarshal(raw["decision"], &state.Decision)
-	if state.Version <= 0 {
-		state.Version = 1
-	}
-	normalizeLegacyCoordinationEntries(state, raw["active"], "active", "")
-	normalizeLegacyCoordinationEntries(state, raw["blocked"], "blocked", "")
-	normalizeLegacyCoordinationEntries(state, raw["parked"], "parked", "")
-	normalizeLegacyCoordinationEntries(state, raw["waiting_external"], "active", "waiting_external")
-	normalizeLegacyCoordinationEntries(state, raw["active_sessions"], "active", "")
-	normalizeLegacyCoordinationEntries(state, raw["parked_sessions"], "parked", "")
-
-	var recentSignals []string
-	if err := json.Unmarshal(raw["recent_signals"], &recentSignals); err == nil {
-		state.Blocked = append(state.Blocked, recentSignals...)
-	}
-	var nextActions []string
-	if err := json.Unmarshal(raw["next_actions"], &nextActions); err == nil {
-		state.PlanSummary = append(state.PlanSummary, nextActions...)
-	}
-	normalizeCoordinationState(state)
-	return state, nil
-}
-
-func normalizeLegacyCoordinationEntries(state *CoordinationState, raw json.RawMessage, defaultState, executionState string) {
-	if len(raw) == 0 {
-		return
-	}
-	var entries []legacyCoordinationEntry
-	if err := json.Unmarshal(raw, &entries); err != nil {
-		return
-	}
-	for _, entry := range entries {
-		name := strings.TrimSpace(entry.Session)
-		if name == "" {
-			name = strings.TrimSpace(entry.Owner)
-		}
-		if name == "" {
-			continue
-		}
-		scope := legacyCoordinationScope(entry.Scope)
-		current := state.Sessions[name]
-		if current.State == "" {
-			current.State = pickFirstNonEmpty(entry.State, entry.Status, defaultState)
-		}
-		if scope != "" && current.Scope == "" {
-			current.Scope = scope
-		}
-		blockedBy := pickFirstNonEmpty(entry.Reason, entry.Note)
-		if blockedBy != "" && current.BlockedBy == "" {
-			current.BlockedBy = blockedBy
-		}
-		if executionState != "" && current.ExecutionState == "" {
-			current.ExecutionState = executionState
-		}
-		if blockedBy != "" {
-			state.Blocked = append(state.Blocked, blockedBy)
-		}
-		state.Sessions[name] = current
-	}
-}
-
-func legacyCoordinationScope(scope any) string {
-	switch v := scope.(type) {
-	case string:
-		return strings.TrimSpace(v)
-	case []any:
-		parts := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
-				parts = append(parts, strings.TrimSpace(s))
-			}
-		}
-		return strings.Join(parts, ", ")
-	default:
-		return ""
-	}
-}
-
-func pickFirstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
-	return ""
+	return &state, nil
 }
 
 // normalizeCoordinationState ensures structural consistency without
@@ -269,23 +116,13 @@ func normalizeCoordinationState(state *CoordinationState) {
 	}
 }
 
-func mapOrEmpty(src map[string]string) map[string]string {
-	if src == nil {
-		return map[string]string{}
+func validateCoordinationState(state *CoordinationState) error {
+	if state == nil {
+		return fmt.Errorf("coordination state is nil")
 	}
-	return src
-}
-
-func mapSessionsOrEmpty(src map[string]CoordinationSession) map[string]CoordinationSession {
-	if src == nil {
-		return map[string]CoordinationSession{}
+	if state.Version <= 0 {
+		return fmt.Errorf("coordination state version must be positive")
 	}
-	return src
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	normalizeCoordinationState(state)
+	return nil
 }

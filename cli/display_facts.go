@@ -1,18 +1,11 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 )
-
-type displayStatusRecord struct {
-	Phase             string   `json:"phase,omitempty"`
-	RequiredRemaining *int     `json:"required_remaining,omitempty"`
-	ActiveSessions    []string `json:"active_sessions,omitempty"`
-}
 
 func refreshDisplayFacts(rc *RunContext) error {
 	if rc == nil {
@@ -42,23 +35,27 @@ func refreshDisplayFacts(rc *RunContext) error {
 	return nil
 }
 
-func printRunAdvisories(rc *RunContext) {
-	advisories := collectRunAdvisories(rc)
+func printRunAdvisories(rc *RunContext) error {
+	advisories, err := collectRunAdvisories(rc)
+	if err != nil {
+		return err
+	}
 	if len(advisories) == 0 {
-		return
+		return nil
 	}
 	fmt.Println("### advisories")
 	for _, advisory := range advisories {
 		fmt.Printf("- %s\n", advisory)
 	}
 	fmt.Println()
+	return nil
 }
 
-func collectRunAdvisories(rc *RunContext) []string {
+func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	if rc == nil {
-		return nil
+		return nil, nil
 	}
-	status, err := loadDisplayStatusRecord(RunStatusPath(rc.RunDir))
+	status, err := LoadRunStatusRecord(RunStatusPath(rc.RunDir))
 	closeoutFacts, closeoutErr := BuildRunCloseoutFacts(rc.RunDir)
 	if closeoutErr != nil {
 		closeoutFacts = RunCloseoutFacts{}
@@ -68,6 +65,8 @@ func collectRunAdvisories(rc *RunContext) []string {
 	advisories := make([]string, 0, 2)
 	if err == nil && status != nil && status.RequiredRemaining != nil && *status.RequiredRemaining == 0 && (!summaryExists || !completionExists) {
 		advisories = append(advisories, fmt.Sprintf("Closeout artifacts missing: required_remaining=0 summary_exists=%t completion_proof_exists=%t", summaryExists, completionExists))
+	} else if err != nil {
+		return nil, err
 	}
 	if activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir)); err == nil && activity != nil {
 		if activity.Budget.MaxDurationSeconds > 0 && activity.Budget.Exhausted && activity.Lifecycle.RunActive {
@@ -92,12 +91,15 @@ func collectRunAdvisories(rc *RunContext) []string {
 	}
 	meta, err := LoadRunMetadata(RunMetadataPath(rc.RunDir))
 	if err != nil || meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
-		return advisories
+		return advisories, nil
 	}
 	if status == nil || strings.TrimSpace(status.Phase) != "review" || (summaryExists && completionExists) {
-		return advisories
+		return advisories, nil
 	}
-	evolutionEntries, lastTrialAt := evolutionLogFacts(EvolutionLogPath(rc.RunDir))
+	evolutionEntries, lastTrialAt, err := evolutionLogFacts(EvolutionLogPath(rc.RunDir))
+	if err != nil {
+		return nil, err
+	}
 	parts := []string{
 		"phase=review",
 		fmt.Sprintf("active_sessions=%d", len(status.ActiveSessions)),
@@ -109,7 +111,7 @@ func collectRunAdvisories(rc *RunContext) []string {
 		parts = append(parts, "last_trial_record_at="+lastTrialAt)
 	}
 	advisories = append(advisories, "Potential evolve stall: "+strings.Join(parts, " "))
-	return advisories
+	return advisories, nil
 }
 
 func formatCoverageSummary(coverage RequiredCoverage) string {
@@ -184,38 +186,15 @@ func appendCoverageSummaryPart(parts *[]string, label string, values []string) {
 	*parts = append(*parts, label+"="+strings.Join(values, ","))
 }
 
-func loadDisplayStatusRecord(path string) (*displayStatusRecord, error) {
-	data, err := os.ReadFile(path)
+func evolutionLogFacts(path string) (int, string, error) {
+	events, err := LoadDurableLog(path, DurableSurfaceEvolution)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
+		return 0, "", err
 	}
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return nil, nil
+	if len(events) == 0 {
+		return 0, "", nil
 	}
-	var record displayStatusRecord
-	if err := json.Unmarshal(data, &record); err != nil {
-		return nil, err
-	}
-	return &record, nil
-}
-
-func evolutionLogFacts(path string) (int, string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0, ""
-	}
-	count := len(splitNonEmptyLines(string(data)))
-	if count == 0 {
-		return 0, ""
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return count, ""
-	}
-	return count, info.ModTime().UTC().Format(time.RFC3339)
+	return len(events), events[len(events)-1].At, nil
 }
 
 func fileExists(path string) bool {

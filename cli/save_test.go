@@ -290,7 +290,7 @@ func TestSaveDoesNotMutateRunStateFromRunStatusRecord(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(statusPath), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
-	if err := os.WriteFile(statusPath, []byte(`{"run":"demo","phase":"complete","required_remaining":0}`), 0o644); err != nil {
+	if err := os.WriteFile(statusPath, []byte(`{"version":1,"phase":"complete","required_remaining":0,"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write run status record: %v", err)
 	}
 
@@ -327,8 +327,8 @@ func TestSaveDoesNotMutateRunStateFromRunStatusRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read saved status record: %v", err)
 	}
-	if string(savedStatus) != `{"run":"demo","phase":"complete","required_remaining":0}` {
-		t.Fatalf("saved status record mismatch:\nwant: %s\ngot:  %s", `{"run":"demo","phase":"complete","required_remaining":0}`, string(savedStatus))
+	if string(savedStatus) != `{"version":1,"phase":"complete","required_remaining":0,"updated_at":"2026-03-28T10:00:00Z"}` {
+		t.Fatalf("saved status record mismatch:\nwant: %s\ngot:  %s", `{"version":1,"phase":"complete","required_remaining":0,"updated_at":"2026-03-28T10:00:00Z"}`, string(savedStatus))
 	}
 }
 

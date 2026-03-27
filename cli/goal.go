@@ -61,24 +61,11 @@ func LoadGoalState(path string) (*GoalState, error) {
 		}
 		return nil, err
 	}
-
-	var state GoalState
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return nil, fmt.Errorf("parse goal state: goal state is empty")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&state); err != nil {
+	state, err := parseGoalState(data)
+	if err != nil {
 		return nil, fmt.Errorf("parse goal state: %w", err)
 	}
-	if err := ensureJSONEOF(decoder); err != nil {
-		return nil, fmt.Errorf("parse goal state: %w", err)
-	}
-	if err := validateGoalStateInput(&state); err != nil {
-		return nil, fmt.Errorf("parse goal state: %w", err)
-	}
-	normalizeGoalState(&state)
-	return &state, nil
+	return state, nil
 }
 
 func SaveGoalState(path string, state *GoalState) error {
@@ -90,14 +77,11 @@ func SaveGoalState(path string, state *GoalState) error {
 	}
 	normalizeGoalState(state)
 	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return writeFileAtomic(path, data, 0o644)
 }
 
 func NewGoalState() *GoalState {
@@ -263,6 +247,26 @@ func validateGoalItemInput(item GoalItem) error {
 		}
 	}
 	return nil
+}
+
+func parseGoalState(data []byte) (*GoalState, error) {
+	var state GoalState
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil, fmt.Errorf("goal state is empty")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&state); err != nil {
+		return nil, err
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return nil, err
+	}
+	if err := validateGoalStateInput(&state); err != nil {
+		return nil, err
+	}
+	normalizeGoalState(&state)
+	return &state, nil
 }
 
 func ensureJSONEOF(decoder *json.Decoder) error {

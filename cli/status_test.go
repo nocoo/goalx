@@ -685,10 +685,10 @@ func TestStatusWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *test
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"review","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := os.WriteFile(EvolutionLogPath(runDir), []byte("{\"trial\":1}\n"), 0o644); err != nil {
+	if err := os.WriteFile(EvolutionLogPath(runDir), []byte("{\"version\":1,\"kind\":\"trial\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"master\",\"body\":{\"trial\":1}}\n"), 0o644); err != nil {
 		t.Fatalf("write evolution log: %v", err)
 	}
 
@@ -753,6 +753,7 @@ func TestStatusShowsExplicitCoverageFacts(t *testing.T) {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "session-9",
 		},
@@ -788,7 +789,7 @@ func TestStatusShowsExplicitCoverageFacts(t *testing.T) {
 
 func TestStatusWarnsAboutExplicitCoverageGapOutsideEvolve(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"working","required_remaining":2,"active_sessions":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":2,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
@@ -800,6 +801,7 @@ func TestStatusWarnsAboutExplicitCoverageGapOutsideEvolve(t *testing.T) {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "session-9",
 		},

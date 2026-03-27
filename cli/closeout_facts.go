@@ -11,7 +11,7 @@ type RunCloseoutFacts struct {
 }
 
 func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
-	status, err := loadDisplayStatusRecord(RunStatusPath(runDir))
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
 	if err != nil {
 		return RunCloseoutFacts{}, err
 	}

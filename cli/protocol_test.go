@@ -1346,7 +1346,8 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		"Intent: evolve",
 		"This run was launched with explicit `evolve` intent.",
 		"Trial record: `/tmp/evolution.jsonl`",
-		"Append a JSON line to `/tmp/evolution.jsonl` for every material trial",
+		"`goalx durable append evolution --run demo --file /abs/path.jsonl`",
+		"`version`, `kind`, `at`, `actor`, `body`",
 		"`required_remaining == 0` only means the current required baseline is covered.",
 		"Do not enter review or idle just because required items are covered.",
 		"Before you enter review or idle in `evolve`, do one of the following in durable state:",
@@ -1458,7 +1459,7 @@ func TestRenderMasterProtocolIncludesExplicitCoverageOwnershipGuidance(t *testin
 	}
 	text := string(out)
 	for _, want := range []string{
-		"When durable ownership becomes explicit, record it in `/tmp/coordination.json` as `owners` entries mapping `req-*` required items to owner tokens.",
+		"When durable ownership becomes explicit, replace `coordination` through `goalx durable replace coordination --run demo --file /abs/path.json` and record `owners` entries mapping `req-*` required items to owner tokens.",
 		"If `/tmp/coordination.json` has a non-empty `owners` map, open required items must not remain silently unmapped.",
 		"When explicit coverage facts show uncovered open work and reusable capacity exists, either dispatch or reassign it now, or record why this control cycle stays serial.",
 		"Do not infer ownership from journals or `owner_scope`.",
@@ -1686,7 +1687,8 @@ func TestRenderMasterProtocolStatusRecordIsFactsOnly(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`"phase":"working|complete"`,
+		`"version":1`,
+		`"phase":"working|review|complete"`,
 		`"required_remaining":0`,
 		`"keep_session":"session-N"`,
 		`"updated_at":"`,

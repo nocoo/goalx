@@ -203,6 +203,7 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "session-9",
 		},

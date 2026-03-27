@@ -96,6 +96,8 @@ Non-evolve intents default to no budget (master stops when the goal is met). Evo
 
 **Don't micromanage config or runtime files.** GoalX auto-detects engines and picks presets. Config overrides exist for users who want explicit control, not as a default path.
 
+**Do not hand-edit machine-consumed run surfaces.** If the user needs to update `goal.json`, `acceptance.json`, `coordination.json`, `status.json`, `goal-log.jsonl`, or `evolution.jsonl`, use `goalx durable replace|append` so GoalX validates canonical shape first.
+
 **Long-term memory is automatic.** GoalX maintains a user-scoped memory store under `~/.goalx/memory/`, compiles run-local `memory-query.json` and `memory-context.json`, and lets the master read the compiled context. Do not ask users to manage memory files unless they explicitly want to inspect or edit them.
 
 **Memory remains facts-first.** The framework may extract bounded proposals from grounded closeout artifacts, but proposals do not become canonical truth until promotion rules pass. Never describe secret values as persisted memory; only secret references are allowed.

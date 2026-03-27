@@ -47,11 +47,12 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 - This run was launched with explicit `evolve` intent.
 - Trial record: `{{.EvolutionLogPath}}`
 - Re-read `{{.EvolutionLogPath}}` before planning the next iteration or recovering from relaunch.
-- Append a JSON line to `{{.EvolutionLogPath}}` for every material trial: hypothesis, path/branch, decisive evidence, outcome, and next step.
+- Append every material trial through `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl`.
+- Use the canonical durable-log envelope for each appended event: `version`, `kind`, `at`, `actor`, `body`.
 - Run an explicit iteration loop: choose the highest-value next trial, execute it, review evidence, record the result, then continue, pivot, or consolidate.
 - `required_remaining == 0` only means the current required baseline is covered. It does not mean the run should stop.
 - Do not enter review or idle just because required items are covered.
-- Before you enter review or idle in `evolve`, do one of the following in durable state: append the next trial to `{{.EvolutionLogPath}}` and keep going, record a factual blocker that is truly outside your current permissions, credentials, or reachable environment, or record a diminishing-returns decision that cites recent trial evidence and the remaining upside.
+- Before you enter review or idle in `evolve`, do one of the following in durable state: append the next trial through `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl` and keep going, record a factual blocker that is truly outside your current permissions, credentials, or reachable environment, or record a diminishing-returns decision that cites recent trial evidence and the remaining upside.
 - Bias toward producing meaningful code or system improvements, not stopping at diagnosis alone.
 - When exploring divergent paths, use isolated worktrees and explicit base branches instead of mutating one branch blindly.
 - Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
@@ -106,7 +107,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.
 - Sessions without dedicated worktrees share the run worktree. Do not launch multiple simultaneous no-worktree sessions that modify files. Use `goalx add --worktree` for parallel isolation.
 - If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.
-- When durable ownership becomes explicit, record it in `{{.CoordinationPath}}` as `owners` entries mapping `req-*` required items to owner tokens.
+- When durable ownership becomes explicit, replace `coordination` through `goalx durable replace coordination --run {{.RunName}} --file /abs/path.json` and record `owners` entries mapping `req-*` required items to owner tokens.
 - If `{{.CoordinationPath}}` has a non-empty `owners` map, open required items must not remain silently unmapped.
 - When explicit coverage facts show uncovered open work and reusable capacity exists, either dispatch or reassign it now, or record why this control cycle stays serial.
 - Do not infer ownership from journals or `owner_scope`.
@@ -160,7 +161,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 - Read `goalx context --run {{.RunName}}` first. It is the canonical run-identity and path surface for this run.
 - Read the current run guidance surfaces before planning the first control cycle.
+- Initialize or replace machine-consumed structured surfaces through `goalx durable replace <goal|acceptance|coordination|status> --run {{.RunName}} --file /abs/path.json`.
+- Append machine-consumed event logs through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`.{{if .EvolutionLogPath}} Use `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl` for evolve trial records.{{end}}
 - Initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
+- Do not hand-edit `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.CoordinationPath}}`, `{{.StatusPath}}`, or `{{.GoalLogPath}}` in place.{{if .EvolutionLogPath}} Do not hand-edit `{{.EvolutionLogPath}}` in place.{{end}}
 - `goalx context --run {{.RunName}}` exposes the immutable run identity and current durable paths. `{{.CharterPath}}` remains the recovery source for relaunch/debug.
 - `{{.GoalPath}}` is the only mutable completion boundary. `{{.AcceptanceStatePath}}` is verification-only; it never authorizes shrinking the goal.
 - Goal boundary: `{{.GoalPath}}` defines required current-goal outcomes and optional improvements.
@@ -215,10 +219,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 {{end}}- Re-read `goalx context --run {{.RunName}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
 - If you use `{{.CompletionProofPath}}`, treat it as an agent-owned closeout/evidence surface. GoalX does not validate verdicts or proof structure there.
 - Keep the current recovery point and next-step checkpoint explicit in durable state whenever they materially change.
-- If you change the current goal boundary, update `{{.GoalPath}}` first and append the reason to `{{.GoalLogPath}}`.
+- If you change the current goal boundary, replace `goal` through `goalx durable replace goal --run {{.RunName}} --file /abs/path.json` first and append the reason through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`.
 - `goalx verify` only runs the acceptance command and records the exit code + output. It does not derive completion mode, build proof items, or update status.
-- If you keep closeout notes in `{{.CompletionProofPath}}`, you own the format and interpretation. Update `{{.StatusPath}}` yourself.
-- `{{.StatusPath}}` is your progress record. Update it when control health, goal coverage, acceptance state, or session lifecycle materially changes.
+- If you keep closeout notes in `{{.CompletionProofPath}}`, you own the format and interpretation. Replace `status` through `goalx durable replace status --run {{.RunName}} --file /abs/path.json` yourself.
+- `{{.StatusPath}}` is your progress record. Replace it when control health, goal coverage, acceptance state, or session lifecycle materially changes.
 - Keep detailed hypotheses, traces, and path comparisons in journals, not the coordination digest.
 - Log journal entries only for real decisions, investigations, redirects, takeovers, or completions.
 - Avoid sync-only liveness narration.
@@ -271,6 +275,8 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Read the current run context: `goalx context --run {{.RunName}}`
 - Read current GoalX affordances: `goalx afford --run {{.RunName}} master`
 - Use `goalx afford --run {{.RunName}} master` as the canonical command surface for dispatch, tell, park, resume, keep, save, and transitions.
+- Replace a structured durable surface: `goalx durable replace status --run {{.RunName}} --file /abs/path.json`
+- Append an event-log durable surface: `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`
 - Record acceptance results: `goalx verify --run {{.RunName}}`
 - Launch a route-first research worker: `goalx add --run {{.RunName}} --mode research --effort high --worktree "sub-goal"`
 - Launch a route-first develop worker: `goalx add --run {{.RunName}} --mode develop --effort medium --worktree "sub-goal"`
@@ -285,8 +291,8 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 ## Status
 
-`{{.StatusPath}}` is master-written. The framework does not populate it. Write it as JSON whenever run state materially changes:
+`{{.StatusPath}}` is master-written. The framework does not populate it. Replace it through `goalx durable replace status --run {{.RunName}} --file /abs/path.json` whenever run state materially changes:
 ```json
-{"phase":"working|complete","required_remaining":0,"open_required_ids":["req-1"],"active_sessions":["session-N"],"keep_session":"session-N","last_verified_at":"2026-03-26T00:00:00Z","updated_at":"2026-03-26T00:00:00Z"}
+{"version":1,"phase":"working|review|complete","required_remaining":0,"open_required_ids":["req-1"],"active_sessions":["session-N"],"keep_session":"session-N","last_verified_at":"2026-03-26T00:00:00Z","updated_at":"2026-03-26T00:00:00Z"}
 ```
 Set `keep_session` when a develop-mode session should be merged before stopping. Keep this file factual: progress coverage, active ownership, and latest verification timestamps belong here; verdicts belong in journals, proof, and summary.

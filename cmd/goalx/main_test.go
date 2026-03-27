@@ -264,6 +264,31 @@ func TestRunCommandDispatchesRun(t *testing.T) {
 	}
 }
 
+func TestRunCommandDispatchesDurable(t *testing.T) {
+	oldDurable := mainDurable
+	defer func() { mainDurable = oldDurable }()
+	called := false
+	mainDurable = func(_ string, args []string) error {
+		called = true
+		want := []string{"replace", "status", "--run", "demo", "--file", "/tmp/status.json"}
+		if len(args) != len(want) {
+			t.Fatalf("args = %v, want %v", args, want)
+		}
+		for i := range want {
+			if args[i] != want[i] {
+				t.Fatalf("args = %v, want %v", args, want)
+			}
+		}
+		return nil
+	}
+	if err := runCommand(t.TempDir(), "durable", []string{"replace", "status", "--run", "demo", "--file", "/tmp/status.json"}); err != nil {
+		t.Fatalf("runCommand durable: %v", err)
+	}
+	if !called {
+		t.Fatal("durable dispatch was not called")
+	}
+}
+
 func TestRunCommandRejectsLegacyTopLevelAliases(t *testing.T) {
 	for _, legacy := range []string{"auto", "research", "develop", "debate", "implement", "explore"} {
 		if err := runCommand(t.TempDir(), legacy, []string{"demo"}); !errors.Is(err, errUnknownCommand) {

@@ -35,6 +35,7 @@ Usage:
   goalx archive [--run RUN] <session> Git tag + preserve
   goalx save    [--run RUN]           Save run artifacts to user-scoped durable storage
   goalx verify  [--run RUN]           Run the effective acceptance command and record exit code + output
+  goalx durable <replace|append> ...  Validate and write canonical durable protocol surfaces
   goalx drop    [--run RUN]           Cleanup branch + worktree
   goalx report  [--run RUN]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
@@ -67,6 +68,7 @@ var (
 	mainLeaseLoop        = cli.LeaseLoop
 	mainContext          = cli.Context
 	mainAfford           = cli.Afford
+	mainDurable          = cli.Durable
 	notifySignalsContext = signal.NotifyContext
 )
 
@@ -151,6 +153,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Save(cwd, args)
 	case "verify":
 		return cli.Verify(cwd, args)
+	case "durable":
+		return mainDurable(cwd, args)
 	case "pulse":
 		return cli.Pulse(cwd, args)
 	case "drop":

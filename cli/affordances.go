@@ -125,6 +125,20 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Paths:   []string{ControlInboxDir(runDir)},
 		},
 		{
+			ID:      "durable-replace",
+			Kind:    "control",
+			Summary: "Replace a machine-consumed structured durable surface after validating canonical JSON shape.",
+			Command: fmt.Sprintf("goalx durable replace status --run %s --file /abs/path.json", runName),
+			Paths:   []string{GoalPath(runDir), AcceptanceStatePath(runDir), CoordinationPath(runDir), RunStatusPath(runDir)},
+		},
+		{
+			ID:      "durable-append",
+			Kind:    "control",
+			Summary: "Append a machine-consumed durable event log using the canonical JSONL envelope.",
+			Command: fmt.Sprintf("goalx durable append goal-log --run %s --file /abs/path.jsonl", runName),
+			Paths:   []string{GoalLogPath(runDir), EvolutionLogPath(runDir)},
+		},
+		{
 			ID:      "attach",
 			Kind:    "control",
 			Summary: "Attach to a tmux window for inspection or emergency manual intervention.",

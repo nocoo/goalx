@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	goalx "github.com/vonbai/goalx"
@@ -64,32 +62,22 @@ func LoadAcceptanceState(path string) (*AcceptanceState, error) {
 		}
 		return nil, err
 	}
-	var state AcceptanceState
-	if err := json.Unmarshal(data, &state); err != nil {
+	state, err := parseAcceptanceState(data)
+	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-	if state.Version <= 0 {
-		state.Version = 1
-	}
-	return &state, nil
+	return state, nil
 }
 
 func SaveAcceptanceState(path string, state *AcceptanceState) error {
 	if state == nil {
 		return fmt.Errorf("acceptance state is nil")
 	}
-	if state.Version <= 0 {
-		state.Version = 1
+	if err := validateAcceptanceState(state); err != nil {
+		return err
 	}
 	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return writeJSONFile(path, state)
 }
 
 func EnsureAcceptanceState(runDir string, cfg *goalx.Config, goalVersion int) (*AcceptanceState, error) {
@@ -105,26 +93,6 @@ func EnsureAcceptanceState(runDir string, cfg *goalx.Config, goalVersion int) (*
 		}
 		return state, nil
 	}
-
-	changed := false
-	defaultCommand := goalx.ResolveAcceptanceCommand(cfg)
-	if strings.TrimSpace(state.DefaultCommand) == "" && strings.TrimSpace(defaultCommand) != "" {
-		state.DefaultCommand = defaultCommand
-		changed = true
-	}
-	if strings.TrimSpace(state.EffectiveCommand) == "" && strings.TrimSpace(state.DefaultCommand) != "" {
-		state.EffectiveCommand = state.DefaultCommand
-		changed = true
-	}
-	if state.GoalVersion <= 0 && goalVersion > 0 {
-		state.GoalVersion = goalVersion
-		changed = true
-	}
-	if changed {
-		if err := SaveAcceptanceState(path, state); err != nil {
-			return nil, err
-		}
-	}
 	return state, nil
 }
 
@@ -132,3 +100,24 @@ func EnsureAcceptanceState(runDir string, cfg *goalx.Config, goalVersion int) (*
 // removed: they encoded governance policy
 // gate approval) and silently mutated agent-written data. Per facts-not-judgments,
 // the master agent owns all interpretation of acceptance state.
+
+func parseAcceptanceState(data []byte) (*AcceptanceState, error) {
+	var state AcceptanceState
+	if err := decodeStrictJSON(data, &state); err != nil {
+		return nil, err
+	}
+	if err := validateAcceptanceState(&state); err != nil {
+		return nil, err
+	}
+	return &state, nil
+}
+
+func validateAcceptanceState(state *AcceptanceState) error {
+	if state == nil {
+		return fmt.Errorf("acceptance state is nil")
+	}
+	if state.Version <= 0 {
+		return fmt.Errorf("acceptance state version must be positive")
+	}
+	return nil
+}

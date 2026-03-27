@@ -808,7 +808,7 @@ func TestSidecarFinalizesCompletedRunWhenMasterSessionIsGone(t *testing.T) {
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status: %v", err)
 	}
 	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
@@ -959,7 +959,7 @@ func TestSidecarKeepsCompletedRunAliveWhenUnreadMasterInboxExists(t *testing.T) 
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status: %v", err)
 	}
 	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
@@ -1064,7 +1064,7 @@ func TestSidecarFinalizesCompletedRunWhenMasterWindowMissingButWorkerWindowsRema
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status: %v", err)
 	}
 	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {

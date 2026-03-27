@@ -285,7 +285,7 @@ goalx/
 └── cmd/goalx/main.go     # Entry point
 ```
 
-**Master** reads the immutable `run-charter.json`, maintains `goal.json` as the mutable completion boundary, dispatches parallel work, rescues stuck sessions, and writes the final result to `summary.md`. If the master keeps closeout notes in `proof/completion.json`, it owns the format — the framework does not validate it.
+**Master** reads the immutable `run-charter.json`, maintains `goal.json` as the mutable completion boundary, dispatches parallel work, rescues stuck sessions, and writes the final result to `summary.md`. Machine-consumed run surfaces (`goal.json`, `acceptance.json`, `coordination.json`, `status.json`, `goal-log.jsonl`, `evolution.jsonl`) should be updated through `goalx durable replace|append`, not hand-edited in place. If the master keeps closeout notes in `proof/completion.json`, it owns the format — the framework does not validate it.
 
 **Subagent** resumes from durable identity + charter, executes hypothesis-driven research or structured TDD, and communicates via journal + inbox.
 
@@ -302,9 +302,21 @@ Every run gets its own git worktree. Sessions can optionally get sub-worktrees f
 ├── control/                       # inbox, dimensions, guidance
 ├── summary.md                     # canonical run result
 ├── reports/                       # supporting research outputs
+├── goal-log.jsonl                 # canonical goal-boundary decision log
 ├── evolution.jsonl                # trial record (evolve intent only)
 └── proof/                         # agent-owned closeout evidence
 ```
+
+## Durable Surface Contract
+
+GoalX draws a hard line between protocol shape and semantic meaning:
+
+- protocol shape is framework-owned
+- semantic content remains agent-owned
+
+Use `goalx durable replace <goal|acceptance|coordination|status> --run NAME --file /abs/path.json` for machine-consumed structured state.
+
+Use `goalx durable append <goal-log|evolution> --run NAME --file /abs/path.jsonl` for machine-consumed append-only logs. Each JSONL line must use the canonical envelope: `version`, `kind`, `at`, `actor`, `body`.
 
 ## HTTP API
 

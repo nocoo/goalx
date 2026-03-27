@@ -45,6 +45,7 @@ func TestBuildRequiredCoverageOnlyCountsOpenRequiredItems(t *testing.T) {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "workstream-a",
 			"req-2": "session-2",
@@ -79,6 +80,7 @@ func TestBuildRequiredCoverageDetectsMissingSessionOwner(t *testing.T) {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "session-9",
 		},
@@ -108,6 +110,7 @@ func TestBuildRequiredCoverageTreatsOpaqueOwnerTokenAsExplicitCoverage(t *testin
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "db-investigation",
 		},
@@ -137,6 +140,7 @@ func TestBuildRequiredCoverageIgnoresStaleCoordinationSessionRoster(t *testing.T
 		t.Fatalf("SaveGoalState: %v", err)
 	}
 	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
 		Owners: map[string]string{
 			"req-1": "session-9",
 		},

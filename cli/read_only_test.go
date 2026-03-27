@@ -256,7 +256,7 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
-	statusBefore := []byte(`{"run":"verify-run","phase":"working","required_remaining":1}`)
+	statusBefore := []byte(`{"version":1,"phase":"working","required_remaining":1,"updated_at":"2026-03-28T10:00:00Z"}`)
 	if err := os.MkdirAll(filepath.Dir(RunStatusPath(runDir)), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
@@ -350,7 +350,7 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
-	statusBefore := []byte(`{"run":"readonly-run","phase":"working","required_remaining":2,"active_sessions":["session-1"]}`)
+	statusBefore := []byte(`{"version":1,"phase":"working","required_remaining":2,"active_sessions":["session-1"],"updated_at":"2026-03-28T10:00:00Z"}`)
 	if err := os.MkdirAll(filepath.Dir(RunStatusPath(runDir)), 0o755); err != nil {
 		t.Fatalf("mkdir status dir: %v", err)
 	}
