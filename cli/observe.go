@@ -35,7 +35,9 @@ func Observe(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshDisplayFacts(rc)
+	if err := refreshDisplayFacts(rc); err != nil {
+		return err
+	}
 
 	fmt.Printf("## Run: %s — Observe\n\n", rc.Name)
 	printStatusControlSummary(rc)

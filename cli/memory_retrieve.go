@@ -34,6 +34,60 @@ type memoryRankedEntry struct {
 	Rank  memoryEntryRank
 }
 
+func RefreshRunMemoryContext(runDir string) error {
+	if err := EnsureMemoryControl(runDir); err != nil {
+		return err
+	}
+	query, err := BuildMemoryQuery(runDir)
+	if err != nil {
+		return err
+	}
+	if err := writeJSONFile(MemoryQueryPath(runDir), &query); err != nil {
+		return err
+	}
+	context, err := BuildMemoryContext(query)
+	if err != nil {
+		return err
+	}
+	return writeJSONFile(MemoryContextPath(runDir), context)
+}
+
+func LoadMemoryQueryFile(path string) (*MemoryQuery, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil, nil
+	}
+	query := &MemoryQuery{}
+	if err := json.Unmarshal(data, query); err != nil {
+		return nil, err
+	}
+	return query, nil
+}
+
+func LoadMemoryContextFile(path string) (*MemoryContext, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return nil, nil
+	}
+	context := &MemoryContext{}
+	if err := json.Unmarshal(data, context); err != nil {
+		return nil, err
+	}
+	return context, nil
+}
+
 func BuildMemoryQuery(runDir string) (MemoryQuery, error) {
 	query := MemoryQuery{}
 

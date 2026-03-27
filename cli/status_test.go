@@ -266,6 +266,54 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 	}
 }
 
+func TestStatusShowsMemoryContextPresenceFact(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	writeCanonicalMemoryEntries(t, map[MemoryKind][]MemoryEntry{
+		MemoryKindFact: {
+			{
+				ID:                "mem_status_memory",
+				Kind:              MemoryKindFact,
+				Statement:         "provider is cloudflare",
+				Selectors:         map[string]string{"project_id": goalx.ProjectID(repo)},
+				VerificationState: "validated",
+				Confidence:        "grounded",
+				CreatedAt:         "2026-03-27T00:00:00Z",
+				UpdatedAt:         "2026-03-27T00:00:00Z",
+			},
+		},
+	})
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Memory:",
+		"query_present=true",
+		"context_present=true",
+		"built_at=",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(strings.ToLower(out), "recommended") {
+		t.Fatalf("status output should stay factual:\n%s", out)
+	}
+
+	if _, err := os.Stat(MemoryQueryPath(runDir)); err != nil {
+		t.Fatalf("memory query path missing: %v", err)
+	}
+	if _, err := os.Stat(MemoryContextPath(runDir)); err != nil {
+		t.Fatalf("memory context path missing: %v", err)
+	}
+}
+
 func TestStatusShowsSessionTransportFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")

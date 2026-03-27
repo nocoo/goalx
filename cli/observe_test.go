@@ -309,6 +309,47 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	}
 }
 
+func TestObserveShowsMemoryContextPresenceFact(t *testing.T) {
+	repo, _, cfg, _ := writeGuidanceRunFixture(t)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+	writeCanonicalMemoryEntries(t, map[MemoryKind][]MemoryEntry{
+		MemoryKindFact: {
+			{
+				ID:                "mem_observe_memory",
+				Kind:              MemoryKindFact,
+				Statement:         "provider is cloudflare",
+				Selectors:         map[string]string{"project_id": goalx.ProjectID(repo)},
+				VerificationState: "validated",
+				Confidence:        "grounded",
+				CreatedAt:         "2026-03-27T00:00:00Z",
+				UpdatedAt:         "2026-03-27T00:00:00Z",
+			},
+		},
+	})
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Memory:",
+		"query_present=true",
+		"context_present=true",
+		"built_at=",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(strings.ToLower(out), "recommended") {
+		t.Fatalf("observe output should stay factual:\n%s", out)
+	}
+}
+
 func TestObserveWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

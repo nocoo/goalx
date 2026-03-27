@@ -26,7 +26,9 @@ func Status(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	refreshDisplayFacts(rc)
+	if err := refreshDisplayFacts(rc); err != nil {
+		return err
+	}
 
 	fmt.Printf("Run: %s\n", rc.Name)
 	printStatusControlSummary(rc)
@@ -222,6 +224,9 @@ func printStatusControlSummary(rc *RunContext) {
 		if coverage := formatCoverageSummary(activity.Coverage); coverage != "" {
 			fmt.Printf("Coverage: %s\n", coverage)
 		}
+	}
+	if memory := formatMemorySummary(rc.RunDir); memory != "" {
+		fmt.Printf("Memory: %s\n", memory)
 	}
 	fmt.Println()
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,5 +173,71 @@ func TestSidecarRefreshesMemorySeedsWithoutCanonicalMutation(t *testing.T) {
 	}
 	for path, want := range payloads {
 		assertFileUnchanged(t, path, want)
+	}
+}
+
+func TestSidecarRefreshesCompiledMemoryContext(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	if err := EnsureMemoryStore(); err != nil {
+		t.Fatalf("EnsureMemoryStore: %v", err)
+	}
+
+	writeCanonicalMemoryEntries(t, map[MemoryKind][]MemoryEntry{
+		MemoryKindFact: {
+			{
+				ID:                "mem_fact_1",
+				Kind:              MemoryKindFact,
+				Statement:         "host is ops-3",
+				Selectors:         map[string]string{"project_id": goalx.ProjectID(repo)},
+				VerificationState: "validated",
+				Confidence:        "grounded",
+				CreatedAt:         "2026-03-27T00:00:00Z",
+				UpdatedAt:         "2026-03-27T00:00:00Z",
+			},
+		},
+	})
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	var query MemoryQuery
+	queryData, err := os.ReadFile(MemoryQueryPath(runDir))
+	if err != nil {
+		t.Fatalf("ReadFile memory query: %v", err)
+	}
+	if err := json.Unmarshal(queryData, &query); err != nil {
+		t.Fatalf("json.Unmarshal memory query: %v", err)
+	}
+	if query.ProjectID != goalx.ProjectID(repo) {
+		t.Fatalf("memory query project_id = %q, want %q", query.ProjectID, goalx.ProjectID(repo))
+	}
+
+	var context MemoryContext
+	contextData, err := os.ReadFile(MemoryContextPath(runDir))
+	if err != nil {
+		t.Fatalf("ReadFile memory context: %v", err)
+	}
+	if err := json.Unmarshal(contextData, &context); err != nil {
+		t.Fatalf("json.Unmarshal memory context: %v", err)
+	}
+	if context.BuiltAt == "" {
+		t.Fatal("memory context built_at empty")
+	}
+	if len(context.Facts) != 1 || context.Facts[0] != "host is ops-3" {
+		t.Fatalf("memory context facts = %+v, want promoted canonical fact", context.Facts)
 	}
 }

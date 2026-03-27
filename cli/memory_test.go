@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -264,11 +265,61 @@ func writeCanonicalMemorySentinels(t *testing.T, home string) map[string][]byte 
 	t.Helper()
 
 	payloads := map[string][]byte{}
-	for _, path := range canonicalMemorySentinelPaths(home) {
+	entries := map[MemoryKind]MemoryEntry{
+		MemoryKindFact: {
+			ID:                "mem_sentinel_fact",
+			Kind:              MemoryKindFact,
+			Statement:         "host is sentinel",
+			Selectors:         map[string]string{"project_id": "sentinel"},
+			VerificationState: "validated",
+			Confidence:        "grounded",
+			CreatedAt:         "2026-03-27T00:00:00Z",
+			UpdatedAt:         "2026-03-27T00:00:00Z",
+		},
+		MemoryKindProcedure: {
+			ID:                "mem_sentinel_procedure",
+			Kind:              MemoryKindProcedure,
+			Statement:         "run sentinel checks first",
+			Selectors:         map[string]string{"project_id": "sentinel"},
+			VerificationState: "validated",
+			Confidence:        "grounded",
+			CreatedAt:         "2026-03-27T00:00:00Z",
+			UpdatedAt:         "2026-03-27T00:00:00Z",
+		},
+		MemoryKindPitfall: {
+			ID:                "mem_sentinel_pitfall",
+			Kind:              MemoryKindPitfall,
+			Statement:         "sentinel pitfall",
+			Selectors:         map[string]string{"project_id": "sentinel"},
+			VerificationState: "repeated",
+			Confidence:        "grounded",
+			CreatedAt:         "2026-03-27T00:00:00Z",
+			UpdatedAt:         "2026-03-27T00:00:00Z",
+		},
+		MemoryKindSecretRef: {
+			ID:                "mem_sentinel_secret",
+			Kind:              MemoryKindSecretRef,
+			Statement:         "secret reference is sentinel/vault/item",
+			Selectors:         map[string]string{"project_id": "sentinel", "service": "deploy"},
+			VerificationState: "validated",
+			Confidence:        "grounded",
+			CreatedAt:         "2026-03-27T00:00:00Z",
+			UpdatedAt:         "2026-03-27T00:00:00Z",
+		},
+	}
+	for _, kind := range []MemoryKind{MemoryKindFact, MemoryKindProcedure, MemoryKindPitfall, MemoryKindSecretRef} {
+		path := MemoryEntryPath(kind)
+		if !strings.HasPrefix(path, filepath.Join(home, ".goalx", "memory")) {
+			t.Fatalf("unexpected sentinel path %s for home %s", path, home)
+		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
 		}
-		data := []byte("sentinel:" + filepath.Base(path))
+		data, err := json.Marshal(entries[kind])
+		if err != nil {
+			t.Fatalf("marshal %s: %v", kind, err)
+		}
+		data = append(data, '\n')
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			t.Fatalf("write %s: %v", path, err)
 		}

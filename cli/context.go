@@ -21,6 +21,9 @@ func Context(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := RefreshRunMemoryContext(rc.RunDir); err != nil {
+		return err
+	}
 
 	index, err := BuildContextIndex(projectRoot, rc.Name, rc.RunDir)
 	if err != nil {

@@ -14,11 +14,14 @@ type displayStatusRecord struct {
 	ActiveSessions    []string `json:"active_sessions,omitempty"`
 }
 
-func refreshDisplayFacts(rc *RunContext) {
+func refreshDisplayFacts(rc *RunContext) error {
 	if rc == nil {
-		return
+		return nil
 	}
 	_ = reconcileControlDeliveries(rc.RunDir)
+	if err := RefreshRunMemoryContext(rc.RunDir); err != nil {
+		return err
+	}
 	if snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir); err == nil && snapshot != nil {
 		_ = SaveActivitySnapshot(rc.RunDir, snapshot)
 	}
@@ -30,12 +33,13 @@ func refreshDisplayFacts(rc *RunContext) {
 		if facts, err := BuildTransportFacts(rc.RunDir, rc.TmuxSession, masterEngine); err == nil && facts != nil {
 			_ = SaveTransportFacts(rc.RunDir, facts)
 		}
-		return
+		return nil
 	}
 	_ = SaveTransportFacts(rc.RunDir, &TransportFacts{
 		Version:   1,
 		CheckedAt: time.Now().UTC().Format(time.RFC3339),
 	})
+	return nil
 }
 
 func printRunAdvisories(rc *RunContext) {
@@ -151,6 +155,22 @@ func formatBudgetSummary(budget ActivityBudget) string {
 
 func formatBudgetDurationSeconds(seconds int64) string {
 	return (time.Duration(seconds) * time.Second).String()
+}
+
+func formatMemorySummary(runDir string) string {
+	queryPresent := fileExists(MemoryQueryPath(runDir))
+	contextPresent := fileExists(MemoryContextPath(runDir))
+	if !queryPresent && !contextPresent {
+		return ""
+	}
+	parts := []string{
+		fmt.Sprintf("query_present=%t", queryPresent),
+		fmt.Sprintf("context_present=%t", contextPresent),
+	}
+	if context, err := LoadMemoryContextFile(MemoryContextPath(runDir)); err == nil && context != nil && strings.TrimSpace(context.BuiltAt) != "" {
+		parts = append(parts, "built_at="+context.BuiltAt)
+	}
+	return strings.Join(parts, " ")
 }
 
 func appendCoverageSummaryPart(parts *[]string, label string, values []string) {

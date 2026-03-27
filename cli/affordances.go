@@ -221,6 +221,9 @@ func RefreshRunGuidance(projectRoot, runName, runDir string) error {
 	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
 		return err
 	}
+	if err := RefreshRunMemoryContext(runDir); err != nil {
+		return err
+	}
 	activity, err := BuildActivitySnapshot(projectRoot, runName, runDir)
 	if err != nil {
 		return err
