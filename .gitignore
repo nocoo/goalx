@@ -15,6 +15,7 @@ claude.md
 AGENTS.md
 .claude/
 .factory/
+example/
 
 # OS
 .DS_Store
