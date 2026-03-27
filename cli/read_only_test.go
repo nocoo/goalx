@@ -279,6 +279,46 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	assertFileUnchanged(t, RunStatusPath(runDir), statusBefore)
 }
 
+func TestStatusDoesNotMutateCanonicalMemory(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	payloads := writeCanonicalMemorySentinels(t, home)
+
+	_, runDir, _, _ := writeReadOnlyRunFixture(t, repo)
+
+	if err := Status(repo, []string{"--run", filepath.Base(runDir)}); err != nil {
+		t.Fatalf("Status: %v", err)
+	}
+
+	for path, want := range payloads {
+		assertFileUnchanged(t, path, want)
+	}
+}
+
+func TestObserveDoesNotMutateCanonicalMemory(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+	installFakeTmux(t, "master")
+	payloads := writeCanonicalMemorySentinels(t, home)
+
+	runName, _, _, _ := writeReadOnlyRunFixture(t, repo)
+
+	if err := Observe(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+
+	for path, want := range payloads {
+		assertFileUnchanged(t, path, want)
+	}
+}
+
 func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte, []byte) {
 	t.Helper()
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -42,6 +43,8 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 		"Run dir:",
 		"Closeout/evidence surface:",
 		"Context index:",
+		"Memory query:",
+		"Memory context:",
 		"## Provider Facts",
 		"GoalX canonical provider runtime is tmux + interactive TUI.",
 		"Interactive Codex sessions can use installed skills and configured MCP servers from the native TUI.",
@@ -99,8 +102,56 @@ func TestContextCommandJsonPrintsMachineReadableIndex(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(out, `"context_index_path"`) || !strings.Contains(out, `"run_name": "guidance-run"`) || !strings.Contains(out, `"run_identity"`) {
-		t.Fatalf("context json output missing expected keys:\n%s", out)
+	for _, want := range []string{
+		`"context_index_path"`,
+		`"memory_query_path"`,
+		`"memory_context_path"`,
+		`"run_name": "guidance-run"`,
+		`"run_identity"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("context json output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestContextIndexIncludesMemoryQueryAndContextPaths(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+
+	if index.MemoryQueryPath != MemoryQueryPath(runDir) {
+		t.Fatalf("MemoryQueryPath = %q, want %q", index.MemoryQueryPath, MemoryQueryPath(runDir))
+	}
+	if index.MemoryContextPath != MemoryContextPath(runDir) {
+		t.Fatalf("MemoryContextPath = %q, want %q", index.MemoryContextPath, MemoryContextPath(runDir))
+	}
+}
+
+func TestContextDoesNotMutateCanonicalMemory(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir: %v", err)
+	}
+	payloads := writeCanonicalMemorySentinels(t, home)
+
+	out := captureStdout(t, func() {
+		if err := Context(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Context: %v", err)
+		}
+	})
+	if !strings.Contains(out, "# GoalX Context") {
+		t.Fatalf("context output missing header:\n%s", out)
+	}
+
+	for path, want := range payloads {
+		assertFileUnchanged(t, path, want)
 	}
 }
 
