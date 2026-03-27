@@ -103,7 +103,7 @@ func TestDeliverDueControlRemindersRespectsCooldownAndCreatesDelivery(t *testing
 	calls := 0
 	send := func(target, engine string) (TransportDeliveryOutcome, error) {
 		calls++
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	start := time.Now().UTC()
@@ -138,7 +138,7 @@ func TestDeliverDueControlRemindersRespectsCooldownAndCreatesDelivery(t *testing
 	if err != nil {
 		t.Fatalf("LoadControlDeliveries: %v", err)
 	}
-	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "sent" || deliveries.Items[0].DedupeKey != "master-wake" {
+	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "accepted" || deliveries.Items[0].DedupeKey != "master-wake" {
 		t.Fatalf("unexpected deliveries: %+v", deliveries.Items)
 	}
 }
@@ -154,7 +154,7 @@ func TestDeliverDueControlRemindersUsesShortBufferedCooldown(t *testing.T) {
 
 	start := time.Now().UTC()
 	if err := DeliverDueControlReminders(runDir, "codex", 5*time.Minute, func(target, engine string) (TransportDeliveryOutcome, error) {
-		return TransportDeliveryOutcome{SubmitMode: "enter_only_repair", TransportState: "buffered"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "enter_only_repair", TransportState: "buffered_input"}, nil
 	}); err != nil {
 		t.Fatalf("DeliverDueControlReminders: %v", err)
 	}

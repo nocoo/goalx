@@ -16,7 +16,7 @@ func TestDeliverControlNudgeRecordsSentAndDedupesByKey(t *testing.T) {
 	calls := 0
 	send := func(target, engine string) (TransportDeliveryOutcome, error) {
 		calls++
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	if _, err := DeliverControlNudge(runDir, "tell:1", "tell:1", "gx-demo:master", "codex", send); err != nil {
@@ -33,11 +33,11 @@ func TestDeliverControlNudgeRecordsSentAndDedupesByKey(t *testing.T) {
 	if len(deliveries.Items) != 1 {
 		t.Fatalf("deliveries len = %d, want 1", len(deliveries.Items))
 	}
-	if deliveries.Items[0].Status != "sent" || deliveries.Items[0].DedupeKey != "tell:1" {
+	if deliveries.Items[0].Status != "accepted" || deliveries.Items[0].DedupeKey != "tell:1" {
 		t.Fatalf("unexpected delivery: %+v", deliveries.Items[0])
 	}
-	if deliveries.Items[0].SubmitMode != "payload_enter" || deliveries.Items[0].TransportState != "sent" {
-		t.Fatalf("delivery metadata = %+v, want submit_mode payload_enter and transport_state sent", deliveries.Items[0])
+	if deliveries.Items[0].SubmitMode != "payload_enter" || deliveries.Items[0].TransportState != "queued" {
+		t.Fatalf("delivery metadata = %+v, want submit_mode payload_enter and transport_state queued", deliveries.Items[0])
 	}
 	if calls != 1 {
 		t.Fatalf("deliver calls = %d, want 1", calls)
@@ -101,7 +101,7 @@ func TestDeliverControlNudgePersistsAcceptedAtWithoutLegacyAckedAt(t *testing.T)
 	}
 
 	if _, err := DeliverControlNudge(runDir, "tell:4", "tell:4", "gx-demo:master", "codex", func(target, engine string) (TransportDeliveryOutcome, error) {
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}); err != nil {
 		t.Fatalf("DeliverControlNudge: %v", err)
 	}
@@ -116,6 +116,54 @@ func TestDeliverControlNudgePersistsAcceptedAtWithoutLegacyAckedAt(t *testing.T)
 	}
 	if strings.Contains(text, "\"acked_at\":") {
 		t.Fatalf("deliveries should not persist legacy acked_at:\n%s", text)
+	}
+}
+
+func TestDeliverControlNudgeAcceptsOnlyCanonicalAcceptedStates(t *testing.T) {
+	runDir := t.TempDir()
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		state        string
+		wantAccepted bool
+	}{
+		{name: "queued", state: "queued", wantAccepted: true},
+		{name: "working", state: "working", wantAccepted: true},
+		{name: "compacting", state: "compacting", wantAccepted: true},
+		{name: "buffered", state: "buffered_input", wantAccepted: false},
+		{name: "interrupted", state: "interrupted", wantAccepted: false},
+		{name: "provider dialog", state: "provider_dialog", wantAccepted: false},
+		{name: "unknown", state: "unknown", wantAccepted: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dedupeKey := "tell:" + tt.state
+			got, err := DeliverControlNudge(runDir, dedupeKey, dedupeKey, "gx-demo:master", "codex", func(target, engine string) (TransportDeliveryOutcome, error) {
+				return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: tt.state}, nil
+			})
+			if err != nil {
+				t.Fatalf("DeliverControlNudge: %v", err)
+			}
+			if tt.wantAccepted {
+				if got.Status != "accepted" {
+					t.Fatalf("status = %q, want accepted for %s", got.Status, tt.state)
+				}
+				if got.AcceptedAt == "" {
+					t.Fatalf("accepted_at empty for accepted state %s: %+v", tt.state, got)
+				}
+				return
+			}
+			if got.AcceptedAt != "" {
+				t.Fatalf("accepted_at = %q, want empty for non-accepted state %s", got.AcceptedAt, tt.state)
+			}
+			if got.Status != tt.state {
+				t.Fatalf("status = %q, want %q", got.Status, tt.state)
+			}
+		})
 	}
 }
 
@@ -163,11 +211,11 @@ func TestAckControlInboxReconcilesPendingSessionDelivery(t *testing.T) {
 		t.Fatalf("deliveries len = %d, want 1", len(deliveries.Items))
 	}
 	got := deliveries.Items[0]
-	if got.Status != "sent" {
-		t.Fatalf("delivery status = %q, want sent after cursor reconciliation", got.Status)
+	if got.Status != "accepted" {
+		t.Fatalf("delivery status = %q, want accepted after cursor reconciliation", got.Status)
 	}
-	if got.TransportState != "sent" {
-		t.Fatalf("transport state = %q, want sent after cursor reconciliation", got.TransportState)
+	if got.TransportState != "" {
+		t.Fatalf("transport state = %q, want empty when cursor ack reconciles a previously unknown transport state", got.TransportState)
 	}
 	if got.AcceptedAt == "" {
 		t.Fatalf("accepted_at empty after cursor reconciliation: %+v", got)

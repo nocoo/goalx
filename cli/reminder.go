@@ -132,7 +132,7 @@ func controlReminderCooldown(interval time.Duration, attempts int, delivery *Con
 		return base
 	}
 	switch delivery.Status {
-	case "buffered":
+	case string(TUIStateBufferedInput):
 		cooldown := interval / 4
 		if cooldown < 5*time.Second {
 			cooldown = 5 * time.Second
@@ -141,7 +141,7 @@ func controlReminderCooldown(interval time.Duration, attempts int, delivery *Con
 			cooldown = 30 * time.Second
 		}
 		return cooldown
-	case "sent":
+	case "accepted":
 		return base
 	case "failed":
 		multiplier := attempts

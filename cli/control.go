@@ -227,12 +227,29 @@ func readControlInboxState(inboxPath, cursorPath string) ControlInboxState {
 }
 
 func hasUrgentUnread(runDir string) bool {
+	return hasUrgentUnreadTarget(runDir, "master")
+}
+
+func hasUrgentUnreadTarget(runDir, target string) bool {
+	inboxPath := MasterInboxPath(runDir)
+	cursorPath := MasterCursorPath(runDir)
+	if strings.TrimSpace(target) != "" && strings.TrimSpace(target) != "master" {
+		inboxPath = ControlInboxPath(runDir, target)
+		cursorPath = SessionCursorPath(runDir, target)
+	}
 	cursor, _ := LoadMasterCursorState(MasterCursorPath(runDir))
 	lastSeen := int64(0)
 	if cursor != nil {
 		lastSeen = cursor.LastSeenID
 	}
-	data, err := os.ReadFile(MasterInboxPath(runDir))
+	if cursorPath != MasterCursorPath(runDir) {
+		cursor, _ = LoadMasterCursorState(cursorPath)
+		lastSeen = 0
+		if cursor != nil {
+			lastSeen = cursor.LastSeenID
+		}
+	}
+	data, err := os.ReadFile(inboxPath)
 	if err != nil {
 		return false
 	}
@@ -317,100 +334,114 @@ func SendAgentNudge(target, engine string) error {
 }
 
 func SendAgentNudgeDetailed(target, engine string) (TransportDeliveryOutcome, error) {
+	return SubmitWakeTransport(target, engine)
+}
+
+func SubmitWakeTransport(target, engine string) (TransportDeliveryOutcome, error) {
 	before := inspectTransportTarget(target, "", "", engine)
+	switch normalizeTUITransportState(before.TransportState) {
+	case TUIStateQueued:
+		return TransportDeliveryOutcome{SubmitMode: "accepted_existing_queue", TransportState: before.TransportState}, nil
+	case TUIStateProviderDialog, TUIStateInterrupted, TUIStateUnknown:
+		return TransportDeliveryOutcome{SubmitMode: "blocked_no_submit", TransportState: before.TransportState}, nil
+	}
 	switch strings.TrimSpace(engine) {
 	case "codex":
-		if before.InputContainsWake {
+		if normalizeTUITransportState(before.TransportState) == TUIStateBufferedInput {
 			if err := sendAgentKeys(target, "", "Enter"); err != nil {
-				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair", TransportState: before.TransportState}, err
 			}
 			time.Sleep(150 * time.Millisecond)
 			after := inspectTransportTarget(target, "", "", engine)
 			return TransportDeliveryOutcome{
 				SubmitMode:     "enter_only_repair",
-				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+				TransportState: classifyTransportOutcome(before, after),
 			}, nil
 		}
 		if err := sendAgentKeys(target, transportWakeToken, ""); err != nil {
-			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter"}, err
+			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter", TransportState: before.TransportState}, err
 		}
 		time.Sleep(150 * time.Millisecond)
 		if err := sendAgentKeys(target, "", "Enter"); err != nil {
-			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter"}, err
+			return TransportDeliveryOutcome{SubmitMode: "payload_then_enter", TransportState: before.TransportState}, err
 		}
 		time.Sleep(150 * time.Millisecond)
 		after := inspectTransportTarget(target, "", "", engine)
-		if after.InputContainsWake && !after.WorkingVisible {
+		if normalizeTUITransportState(after.TransportState) == TUIStateBufferedInput {
 			if err := sendAgentKeys(target, "", "Enter"); err != nil {
-				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair", TransportState: after.TransportState}, err
 			}
 			time.Sleep(150 * time.Millisecond)
 			after = inspectTransportTarget(target, "", "", engine)
 			return TransportDeliveryOutcome{
 				SubmitMode:     "enter_only_repair",
-				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+				TransportState: classifyTransportOutcome(before, after),
 			}, nil
 		}
 		return TransportDeliveryOutcome{
 			SubmitMode:     "payload_then_enter",
-			TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+			TransportState: classifyTransportOutcome(before, after),
 		}, nil
 	case "claude-code":
-		if before.QueuedMessageVisible {
-			return TransportDeliveryOutcome{SubmitMode: "accepted_existing_queue", TransportState: "sent"}, nil
-		}
-		if before.InputContainsWake {
+		if normalizeTUITransportState(before.TransportState) == TUIStateBufferedInput {
 			if err := sendAgentKeys(target, "", "Enter"); err != nil {
-				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair"}, err
+				return TransportDeliveryOutcome{SubmitMode: "enter_only_repair", TransportState: before.TransportState}, err
 			}
 			time.Sleep(150 * time.Millisecond)
 			after := inspectTransportTarget(target, "", "", engine)
 			return TransportDeliveryOutcome{
 				SubmitMode:     "enter_only_repair",
-				TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+				TransportState: classifyTransportOutcome(before, after),
 			}, nil
 		}
 	}
 	if err := sendAgentKeys(target, transportWakeToken, "Enter"); err != nil {
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter"}, err
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: before.TransportState}, err
 	}
 	time.Sleep(150 * time.Millisecond)
 	after := inspectTransportTarget(target, "", "", engine)
 	return TransportDeliveryOutcome{
 		SubmitMode:     "payload_enter",
-		TransportState: classifyTransportOutcome(strings.TrimSpace(engine), before, after, true),
+		TransportState: classifyTransportOutcome(before, after),
 	}, nil
 }
 
-func classifyTransportOutcome(engine string, before, after TransportTargetFacts, submitted bool) string {
-	if after.InputContainsWake {
-		return "buffered"
+func EscalateInterruptTransport(target, engine, reason string) (TransportDeliveryOutcome, error) {
+	if err := SendEscape(target); err != nil {
+		return TransportDeliveryOutcome{SubmitMode: "interrupt_escape"}, err
 	}
-	switch engine {
-	case "claude-code":
-		if after.QueuedMessageVisible || after.WorkingVisible {
-			return "sent"
-		}
-		if submitted {
-			return "sent"
-		}
-	case "codex":
-		if after.WorkingVisible {
-			return "sent"
-		}
-		if submitted && !after.InputContainsWake {
-			return "sent"
-		}
+	time.Sleep(150 * time.Millisecond)
+	afterInterrupt := inspectTransportTarget(target, "", "", engine)
+	result := TransportDeliveryOutcome{
+		SubmitMode:     "interrupt_escape",
+		TransportState: afterInterrupt.TransportState,
+	}
+	switch normalizeTUITransportState(afterInterrupt.TransportState) {
+	case TUIStateQueued:
+		return result, nil
+	case TUIStateProviderDialog, TUIStateInterrupted, TUIStateUnknown:
+		return result, nil
 	default:
-		if after.WorkingVisible {
-			return "sent"
+		follow, err := SubmitWakeTransport(target, engine)
+		if err != nil {
+			return result, err
 		}
-		if submitted {
-			return "sent"
+		if follow.SubmitMode != "" {
+			result.SubmitMode = "interrupt_then_" + follow.SubmitMode
 		}
+		if follow.TransportState != "" {
+			result.TransportState = follow.TransportState
+		}
+		return result, nil
 	}
-	if before.InputContainsWake && !after.InputContainsWake {
-		return "sent"
+}
+
+func classifyTransportOutcome(before, after TransportTargetFacts) string {
+	if state := normalizeTUITransportState(after.TransportState); state != "" {
+		return string(state)
 	}
-	return ""
+	if state := normalizeTUITransportState(before.TransportState); state != "" {
+		return string(state)
+	}
+	return string(TUIStateUnknown)
 }

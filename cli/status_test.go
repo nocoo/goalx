@@ -637,7 +637,7 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
 		Version: 1,
 		Items: []ControlDelivery{
-			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "sent", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z", AcceptedAt: "2026-03-25T00:00:01Z"},
+			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "accepted", Target: "gx-demo:session-1", AttemptedAt: "2026-03-25T00:00:00Z", AcceptedAt: "2026-03-25T00:00:01Z", TransportState: "queued"},
 		},
 	}); err != nil {
 		t.Fatalf("SaveControlDeliveries: %v", err)
@@ -649,7 +649,7 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 				Target:                "session-1",
 				Window:                "session-1",
 				Engine:                "codex",
-				TransportState:        "buffered",
+				TransportState:        "buffered_input",
 				LastSubmitAttemptAt:   "1999-01-01T00:00:00Z",
 				LastTransportAcceptAt: "1999-01-01T00:00:01Z",
 			},
@@ -669,7 +669,7 @@ func TestStatusShowsSessionQueueFacts(t *testing.T) {
 		"unread=1",
 		"cursor=0/1",
 		"submit_at=2026-03-25T00:00:00Z",
-		"transport=sent",
+		"transport=queued",
 		"accepted_at=2026-03-25T00:00:01Z",
 	} {
 		if !strings.Contains(out, want) {

@@ -750,7 +750,7 @@ local_validation:
 	if err != nil {
 		t.Fatalf("LoadControlDeliveries: %v", err)
 	}
-	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "sent" {
+	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "unknown" {
 		t.Fatalf("unexpected deliveries: %+v", deliveries.Items)
 	}
 }

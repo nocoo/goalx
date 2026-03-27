@@ -218,34 +218,8 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, watcher, controlState); err != nil {
 			appendAuditLog(runDir, "transport watcher pre-queue snapshot warning: %v", err)
 		}
-		urgentUnread := hasUrgentUnread(runDir) || masterNeedsRecovery(runDir)
-		urgentTicks := controlState.UrgentUnreadTicks
-		if urgentUnread {
-			urgentTicks++
-			tmuxTarget := tmuxSession + ":master"
-			if urgentTicks == 1 {
-				if err := SendEscape(tmuxTarget); err != nil {
-					return err
-				}
-				time.Sleep(500 * time.Millisecond)
-				if err := sendAgentNudge(tmuxTarget, cfg.Master.Engine); err != nil {
-					return err
-				}
-			} else if urgentTicks >= 3 {
-				if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
-					return err
-				}
-				urgentTicks = 0
-			}
-		} else {
-			urgentTicks = 0
-		}
-		if urgentTicks != controlState.UrgentUnreadTicks {
-			controlState.UrgentUnreadTicks = urgentTicks
-			controlState.UpdatedAt = ""
-			if err := SaveControlRunState(ControlRunStatePath(runDir), controlState); err != nil {
-				return err
-			}
+		if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg); err != nil {
+			return err
 		}
 		if err := queueUnreadSessionWakeReminders(runDir, tmuxSession, runName, interval); err != nil {
 			return err
@@ -283,34 +257,8 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, nil, controlState); err != nil {
 		return err
 	}
-	urgentUnread := hasUrgentUnread(runDir) || masterNeedsRecovery(runDir)
-	urgentTicks := controlState.UrgentUnreadTicks
-	if urgentUnread {
-		urgentTicks++
-		tmuxTarget := tmuxSession + ":master"
-		if urgentTicks == 1 {
-			if err := SendEscape(tmuxTarget); err != nil {
-				return err
-			}
-			time.Sleep(500 * time.Millisecond)
-			if err := sendAgentNudge(tmuxTarget, cfg.Master.Engine); err != nil {
-				return err
-			}
-		} else if urgentTicks >= 3 {
-			if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
-				return err
-			}
-			urgentTicks = 0
-		}
-	} else {
-		urgentTicks = 0
-	}
-	if urgentTicks != controlState.UrgentUnreadTicks {
-		controlState.UrgentUnreadTicks = urgentTicks
-		controlState.UpdatedAt = ""
-		if err := SaveControlRunState(ControlRunStatePath(runDir), controlState); err != nil {
-			return err
-		}
+	if err := processUrgentTransportTargets(runDir, runName, tmuxSession, cfg); err != nil {
+		return err
 	}
 	if err := queueUnreadSessionWakeReminders(runDir, tmuxSession, runName, interval); err != nil {
 		return err
@@ -498,12 +446,77 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 	return nil
 }
 
+func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goalx.Config) error {
+	type urgentTarget struct {
+		name   string
+		tmux   string
+		engine string
+	}
+
+	targets := []urgentTarget{{
+		name:   "master",
+		tmux:   tmuxSession + ":master",
+		engine: cfg.Master.Engine,
+	}}
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return err
+	}
+	for _, idx := range indexes {
+		name := SessionName(idx)
+		windowName, err := resolveWindowName(runName, name)
+		if err != nil {
+			return err
+		}
+		identity, err := RequireSessionIdentity(runDir, name)
+		if err != nil {
+			continue
+		}
+		targets = append(targets, urgentTarget{
+			name:   name,
+			tmux:   tmuxSession + ":" + windowName,
+			engine: identity.Engine,
+		})
+	}
+
+	for _, target := range targets {
+		if !hasUrgentUnreadTarget(runDir, target.name) {
+			if err := resetUrgentEscalationAttempts(runDir, target.name); err != nil {
+				return err
+			}
+			continue
+		}
+		facts := loadTransportTargetFacts(runDir, target.name)
+		switch normalizeTUITransportState(facts.TransportState) {
+		case TUIStateProviderDialog:
+			continue
+		case TUIStateInterrupted:
+			outcome, err := EscalateInterruptTransport(target.tmux, target.engine, "urgent_unread")
+			if err != nil {
+				return err
+			}
+			if err := recordInterruptEscalation(runDir, target.name, "urgent_unread", outcome); err != nil {
+				return err
+			}
+		default:
+			outcome, err := sendAgentNudgeDetailed(target.tmux, target.engine)
+			if err != nil {
+				return err
+			}
+			if err := recordWakeSubmit(runDir, target.name, outcome); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func transportNeedsRepair(facts TransportTargetFacts) bool {
-	return facts.TransportState == "buffered" || facts.InputContainsWake
+	return facts.TransportState == string(TUIStateBufferedInput) || facts.InputContainsWake
 }
 
 func transportAcceptedRecently(facts TransportTargetFacts, window time.Duration, now time.Time) bool {
-	if strings.TrimSpace(facts.TransportState) != "sent" {
+	if !isAcceptedTUITransportState(facts.TransportState) {
 		return false
 	}
 	for _, ts := range []string{facts.LastTransportAcceptAt, facts.LastSubmitAttemptAt, facts.LastSampleAt} {
@@ -512,10 +525,6 @@ func transportAcceptedRecently(facts TransportTargetFacts, window time.Duration,
 		}
 	}
 	return false
-}
-
-func masterNeedsRecovery(runDir string) bool {
-	return loadTransportTargetFacts(runDir, "master").ProviderDialogVisible
 }
 
 func defaultLaunchRunSidecar(projectRoot, runName string, interval time.Duration) error {

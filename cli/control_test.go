@@ -104,7 +104,7 @@ func TestSendAgentNudgeCodexStagesPayloadAndSubmitSeparately(t *testing.T) {
 		return nil
 	}
 	captureAgentPane = func(target string) (string, error) {
-		return "idle prompt", nil
+		return "› ", nil
 	}
 
 	if err := SendAgentNudge("gx-demo:master", "codex"); err != nil {
@@ -154,8 +154,8 @@ func TestSendAgentNudgeCodexRepairsBufferedWakeWithEnterOnly(t *testing.T) {
 	if calls[0].target != "gx-demo:session-2" || calls[0].keys != "" || calls[0].submit != "Enter" {
 		t.Fatalf("codex repair send = %+v, want Enter-only submit", calls[0])
 	}
-	if outcome.SubmitMode != "enter_only_repair" || outcome.TransportState != "buffered" {
-		t.Fatalf("codex repair outcome = %+v, want enter_only_repair/buffered", outcome)
+	if outcome.SubmitMode != "enter_only_repair" || outcome.TransportState != "buffered_input" {
+		t.Fatalf("codex repair outcome = %+v, want enter_only_repair/buffered_input", outcome)
 	}
 }
 
@@ -181,8 +181,8 @@ func TestSendAgentNudgeClaudeTreatsQueuedWakeAsAccepted(t *testing.T) {
 	if called {
 		t.Fatal("sendAgentKeys called, want queued Claude wake treated as already accepted")
 	}
-	if outcome.SubmitMode != "accepted_existing_queue" || outcome.TransportState != "sent" {
-		t.Fatalf("claude queued outcome = %+v, want accepted_existing_queue/sent", outcome)
+	if outcome.SubmitMode != "accepted_existing_queue" || outcome.TransportState != "queued" {
+		t.Fatalf("claude queued outcome = %+v, want accepted_existing_queue/queued", outcome)
 	}
 }
 
@@ -207,7 +207,7 @@ func TestSendAgentNudgeNonCodexUsesExplicitWakePayload(t *testing.T) {
 				return nil
 			}
 			captureAgentPane = func(target string) (string, error) {
-				return "idle prompt", nil
+				return "› ", nil
 			}
 
 			if err := SendAgentNudge("gx-demo:master", tt.engine); err != nil {

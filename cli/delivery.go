@@ -170,8 +170,7 @@ func reconcileInboxDeliveryAcceptance(deliveries *ControlDeliveries, target stri
 		if !ok || messageID > cursor.LastSeenID {
 			continue
 		}
-		item.Status = "sent"
-		item.TransportState = "sent"
+		item.Status = "accepted"
 		item.LastError = ""
 		item.AcceptedAt = acceptedAt
 		if strings.TrimSpace(item.AttemptedAt) == "" {
@@ -249,7 +248,7 @@ func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, de
 	if item.DeliveryID == "" {
 		item.DeliveryID = newControlObjectID("delivery")
 	}
-	if dedupeOnSuccess && item.Status == "sent" && item.AcceptedAt != "" {
+	if dedupeOnSuccess && item.Status == "accepted" && item.AcceptedAt != "" {
 		if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); err != nil {
 			return nil, err
 		}
@@ -287,13 +286,16 @@ func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, de
 
 	item.SubmitMode = outcome.SubmitMode
 	item.TransportState = strings.TrimSpace(outcome.TransportState)
-	item.Status = "sent"
-	if item.TransportState != "" {
-		item.Status = item.TransportState
+	if item.TransportState == "" {
+		item.TransportState = string(TUIStateUnknown)
+	}
+	item.Status = item.TransportState
+	if isAcceptedTUITransportState(item.TransportState) {
+		item.Status = "accepted"
 	}
 	item.LastError = ""
 	item.AcceptedAt = ""
-	if item.Status == "sent" {
+	if item.Status == "accepted" {
 		item.AcceptedAt = now
 	}
 	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries); err != nil {

@@ -30,7 +30,7 @@ func TestTellWritesSessionInboxAndNudges(t *testing.T) {
 	}
 	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
 		gotTarget, gotEngine = target, engine
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	out := captureStdout(t, func() {
@@ -68,7 +68,7 @@ func TestTellWritesSessionInboxAndNudges(t *testing.T) {
 	if len(deliveries.Items) != 1 {
 		t.Fatalf("deliveries len = %d, want 1", len(deliveries.Items))
 	}
-	if deliveries.Items[0].Status != "sent" || deliveries.Items[0].Target != wantTarget {
+	if deliveries.Items[0].Status != "accepted" || deliveries.Items[0].Target != wantTarget {
 		t.Fatalf("unexpected delivery: %+v", deliveries.Items[0])
 	}
 }
@@ -151,7 +151,7 @@ func TestTellResolvesExplicitProjectSelectorOutsideProjectRoot(t *testing.T) {
 	}
 	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
 		called = true
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	if err := Tell(repoB, []string{"--run", goalx.ProjectID(repoA) + "/" + runName, "master", "decide and execute"}); err != nil {
@@ -172,7 +172,7 @@ func TestTellResolvesExplicitProjectSelectorOutsideProjectRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadControlDeliveries: %v", err)
 	}
-	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "sent" {
+	if len(deliveries.Items) != 1 || deliveries.Items[0].Status != "accepted" {
 		t.Fatalf("unexpected deliveries: %+v", deliveries.Items)
 	}
 }
@@ -197,7 +197,7 @@ func TestTellUrgentWritesUrgentMasterInboxMessage(t *testing.T) {
 	}
 	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
 		gotTarget, gotEngine = target, engine
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	out := captureStdout(t, func() {
@@ -273,7 +273,7 @@ func TestTellHelpDoesNotDeliverAnything(t *testing.T) {
 	}
 	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
 		called = true
-		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "queued"}, nil
 	}
 
 	out := captureStdout(t, func() {

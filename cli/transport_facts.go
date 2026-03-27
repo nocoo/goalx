@@ -159,38 +159,32 @@ func inspectTransportTarget(target, logicalTarget, window, engine string) Transp
 	facts.QueuedMessageVisible = targetQueuedMessageVisible(facts.Engine, recent)
 	facts.InputContainsWake = targetWakeBuffered(recent)
 	facts.ProviderDialogVisible, facts.ProviderDialogKind, facts.ProviderDialogHint = targetProviderDialogVisible(recent)
-	facts.TransportState = inferTransportState(facts.Engine, facts)
+	facts.TransportState = classifyTransportState(facts.Engine, facts, recent)
 	return facts
 }
 
-func inferTransportState(engine string, facts TransportTargetFacts) string {
-	switch strings.TrimSpace(engine) {
-	case "claude-code":
-		if facts.QueuedMessageVisible || facts.WorkingVisible {
-			return "sent"
-		}
-		if facts.InputContainsWake {
-			return "buffered"
-		}
-	case "codex":
-		if facts.QueuedMessageVisible {
-			return "sent"
-		}
-		if facts.InputContainsWake {
-			return "buffered"
-		}
-		if facts.WorkingVisible {
-			return "sent"
-		}
-	default:
-		if facts.InputContainsWake {
-			return "buffered"
-		}
-		if facts.WorkingVisible {
-			return "sent"
-		}
+func classifyTransportState(engine string, facts TransportTargetFacts, lines []string) string {
+	if targetWakeMixed(lines) {
+		return string(TUIStateUnknown)
 	}
-	return ""
+	switch {
+	case facts.ProviderDialogVisible:
+		return string(TUIStateProviderDialog)
+	case targetInterruptedVisible(engine, lines):
+		return string(TUIStateInterrupted)
+	case targetCompactingVisible(engine, lines):
+		return string(TUIStateCompacting)
+	case facts.QueuedMessageVisible:
+		return string(TUIStateQueued)
+	case facts.WorkingVisible:
+		return string(TUIStateWorking)
+	case facts.InputContainsWake:
+		return string(TUIStateBufferedInput)
+	case facts.PromptVisible:
+		return string(TUIStateIdlePrompt)
+	default:
+		return string(TUIStateUnknown)
+	}
 }
 
 func tailRecentNonEmptyLines(s string, limit int) []string {
@@ -213,6 +207,9 @@ func targetPromptVisible(lines []string) bool {
 
 func targetWorkingVisible(engine string, lines []string) bool {
 	joined := strings.Join(lines, "\n")
+	if targetCompactingVisible(engine, lines) {
+		return false
+	}
 	if strings.Contains(joined, "Working (") {
 		return true
 	}
@@ -221,6 +218,35 @@ func targetWorkingVisible(engine string, lines []string) bool {
 			if strings.Contains(joined, marker) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func targetCompactingVisible(engine string, lines []string) bool {
+	joined := strings.ToLower(strings.Join(lines, "\n"))
+	for _, marker := range []string{
+		"compacting conversation",
+		"compacting",
+		"compacted",
+		"context compression",
+	} {
+		if strings.Contains(joined, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func targetInterruptedVisible(engine string, lines []string) bool {
+	joined := strings.ToLower(strings.Join(lines, "\n"))
+	for _, marker := range []string{
+		"conversation interrupted",
+		"request interrupted",
+		"interrupted by user",
+	} {
+		if strings.Contains(joined, marker) {
+			return true
 		}
 	}
 	return false
@@ -241,7 +267,28 @@ func targetQueuedMessageVisible(engine string, lines []string) bool {
 func targetWakeBuffered(lines []string) bool {
 	for _, line := range trailingPromptLines(lines, 3) {
 		trimmed := strings.TrimSpace(line)
-		if (strings.HasPrefix(trimmed, "❯") || strings.HasPrefix(trimmed, "›")) && strings.Contains(trimmed, transportWakeToken) {
+		if !strings.HasPrefix(trimmed, "❯") && !strings.HasPrefix(trimmed, "›") {
+			continue
+		}
+		body := strings.TrimSpace(strings.TrimLeft(trimmed, "❯›"))
+		if body == transportWakeToken {
+			return true
+		}
+	}
+	return false
+}
+
+func targetWakeMixed(lines []string) bool {
+	for _, line := range trailingPromptLines(lines, 3) {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "❯") && !strings.HasPrefix(trimmed, "›") {
+			continue
+		}
+		body := strings.TrimSpace(strings.TrimLeft(trimmed, "❯›"))
+		if body == "" || body == transportWakeToken {
+			continue
+		}
+		if strings.Contains(body, transportWakeToken) {
 			return true
 		}
 	}
@@ -261,6 +308,18 @@ func targetProviderDialogVisible(lines []string) (bool, string, string) {
 				"permission needed",
 				"approval required",
 				"requires approval",
+			},
+		},
+		{
+			kind: "trust_prompt",
+			phrases: []string{
+				"do you trust the contents of this directory",
+				"yes, continue",
+				"quick safety check",
+				"yes, i trust this folder",
+				"enter to confirm",
+				"press enter to continue",
+				"security guide",
 			},
 		},
 		{
@@ -398,7 +457,7 @@ func applyLatestDeliveryFacts(runDir, logicalTarget string, facts *TransportTarg
 	facts.LastSubmitAttemptAt = delivery.AttemptedAt
 	facts.LastSubmitMode = delivery.SubmitMode
 	facts.LastTransportError = delivery.LastError
-	if delivery.AcceptedAt != "" && (strings.TrimSpace(delivery.TransportState) == "sent" || strings.TrimSpace(delivery.Status) == "sent") {
+	if delivery.AcceptedAt != "" && (isAcceptedTUITransportState(delivery.TransportState) || strings.TrimSpace(delivery.Status) == "accepted") {
 		facts.LastTransportAcceptAt = delivery.AcceptedAt
 	}
 	if transportState := strings.TrimSpace(delivery.TransportState); transportState != "" {
@@ -406,7 +465,9 @@ func applyLatestDeliveryFacts(runDir, logicalTarget string, facts *TransportTarg
 			facts.TransportState = transportState
 		}
 	}
-	if facts.TransportState == "" && strings.TrimSpace(delivery.Status) != "" && delivery.Status != "pending" {
-		facts.TransportState = delivery.Status
+	if facts.TransportState == "" {
+		if state := normalizeTUITransportState(delivery.Status); state != "" {
+			facts.TransportState = string(state)
+		}
 	}
 }

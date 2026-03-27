@@ -31,7 +31,6 @@ type ControlRunState struct {
 	LifecycleState       string            `json:"lifecycle_state,omitempty"`
 	Phase                string            `json:"phase,omitempty"`
 	ActiveSessionCount   int               `json:"active_session_count,omitempty"`
-	UrgentUnreadTicks    int               `json:"urgent_unread_ticks,omitempty"`
 	ProviderDialogAlerts map[string]string `json:"provider_dialog_alerts,omitempty"`
 	UpdatedAt            string            `json:"updated_at,omitempty"`
 }
@@ -189,6 +188,9 @@ func EnsureControlState(runDir string) error {
 		if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{Version: 1, Items: []ControlDelivery{}}); err != nil {
 			return err
 		}
+	}
+	if err := ensureTransportRecovery(runDir); err != nil {
+		return err
 	}
 	if err := EnsureMemoryControl(runDir); err != nil {
 		return err
