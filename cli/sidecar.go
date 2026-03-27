@@ -265,6 +265,9 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		if err := AppendExtractedMemoryProposals(runDir, time.Now().UTC()); err != nil {
 			return err
 		}
+		if err := PromoteMemoryProposals(); err != nil {
+			return err
+		}
 		if err := RefreshRunGuidance(projectRoot, runName, runDir); err != nil {
 			appendAuditLog(runDir, "guidance refresh warning: %v", err)
 		}
@@ -325,6 +328,9 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		return err
 	}
 	if err := AppendExtractedMemoryProposals(runDir, time.Now().UTC()); err != nil {
+		return err
+	}
+	if err := PromoteMemoryProposals(); err != nil {
 		return err
 	}
 	if err := RefreshRunGuidance(projectRoot, runName, runDir); err != nil {

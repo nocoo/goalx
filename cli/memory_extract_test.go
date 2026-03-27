@@ -202,6 +202,10 @@ func TestSaveAppendsExtractedMemoryProposals(t *testing.T) {
 			t.Fatalf("missing proposal statement %q in %q", want, statements)
 		}
 	}
+	facts := loadCanonicalEntriesByKind(t, MemoryKindFact)
+	if len(facts) != 2 {
+		t.Fatalf("canonical fact len = %d, want 2", len(facts))
+	}
 }
 
 func TestSidecarAppendsExtractedMemoryProposals(t *testing.T) {
@@ -250,6 +254,10 @@ func TestSidecarAppendsExtractedMemoryProposals(t *testing.T) {
 		if !strings.Contains(statements, want) {
 			t.Fatalf("missing proposal statement %q in %q", want, statements)
 		}
+	}
+	facts := loadCanonicalEntriesByKind(t, MemoryKindFact)
+	if len(facts) != 2 {
+		t.Fatalf("canonical fact len = %d, want 2", len(facts))
 	}
 }
 

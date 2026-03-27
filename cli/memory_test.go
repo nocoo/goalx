@@ -257,7 +257,6 @@ func canonicalMemorySentinelPaths(home string) []string {
 		filepath.Join(root, "entries", "procedures.jsonl"),
 		filepath.Join(root, "entries", "pitfalls.jsonl"),
 		filepath.Join(root, "entries", "secret_refs.jsonl"),
-		filepath.Join(root, "proposals", "2026-03-27.jsonl"),
 	}
 }
 

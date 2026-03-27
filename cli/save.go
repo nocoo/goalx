@@ -213,6 +213,9 @@ func Save(projectRoot string, args []string) error {
 	if err := AppendExtractedMemoryProposals(rc.RunDir, time.Now().UTC()); err != nil {
 		return fmt.Errorf("extract memory proposals: %w", err)
 	}
+	if err := PromoteMemoryProposals(); err != nil {
+		return fmt.Errorf("promote memory proposals: %w", err)
+	}
 
 	fmt.Printf("Saved run '%s' to %s\n", rc.Name, saveDir)
 	return nil
