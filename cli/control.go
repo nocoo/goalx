@@ -183,6 +183,9 @@ func AckControlInbox(runDir, target string) (*MasterCursorState, error) {
 	if err := SaveMasterCursorState(cursorPath, cursor); err != nil {
 		return nil, err
 	}
+	if err := reconcileTargetDeliveries(runDir, target, cursor); err != nil {
+		return nil, err
+	}
 	return cursor, nil
 }
 

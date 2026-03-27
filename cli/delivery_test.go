@@ -118,3 +118,58 @@ func TestDeliverControlNudgePersistsAcceptedAtWithoutLegacyAckedAt(t *testing.T)
 		t.Fatalf("deliveries should not persist legacy acked_at:\n%s", text)
 	}
 }
+
+func TestAckControlInboxReconcilesPendingSessionDelivery(t *testing.T) {
+	runDir := t.TempDir()
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if err := EnsureSessionControl(runDir, "session-1"); err != nil {
+		t.Fatalf("EnsureSessionControl: %v", err)
+	}
+	msg, err := AppendControlInboxMessage(runDir, "session-1", "develop", "master", "take the next slice")
+	if err != nil {
+		t.Fatalf("AppendControlInboxMessage: %v", err)
+	}
+	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
+		Version: 1,
+		Items: []ControlDelivery{
+			{
+				DeliveryID:  "del-1",
+				MessageID:   "session-inbox:session-1:1",
+				DedupeKey:   "session-inbox:session-1:1",
+				Target:      "gx-demo:session-1",
+				Status:      "pending",
+				AttemptedAt: "2026-03-27T00:00:00Z",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+
+	cursor, err := AckControlInbox(runDir, "session-1")
+	if err != nil {
+		t.Fatalf("AckControlInbox: %v", err)
+	}
+	if cursor.LastSeenID != msg.ID {
+		t.Fatalf("last seen id = %d, want %d", cursor.LastSeenID, msg.ID)
+	}
+
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlDeliveries: %v", err)
+	}
+	if len(deliveries.Items) != 1 {
+		t.Fatalf("deliveries len = %d, want 1", len(deliveries.Items))
+	}
+	got := deliveries.Items[0]
+	if got.Status != "sent" {
+		t.Fatalf("delivery status = %q, want sent after cursor reconciliation", got.Status)
+	}
+	if got.TransportState != "sent" {
+		t.Fatalf("transport state = %q, want sent after cursor reconciliation", got.TransportState)
+	}
+	if got.AcceptedAt == "" {
+		t.Fatalf("accepted_at empty after cursor reconciliation: %+v", got)
+	}
+}

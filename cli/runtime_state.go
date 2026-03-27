@@ -262,11 +262,28 @@ func SnapshotSessionRuntime(runDir, sessionName, worktreePath string) (SessionRu
 	}
 	if len(journalEntries) > 0 {
 		last := journalEntries[len(journalEntries)-1]
-		snapshot.State = last.Status
+		snapshot.State = sessionLifecycleStateFromJournalStatus(last.Status)
 		snapshot.OwnerScope = last.OwnerScope
 		snapshot.BlockedBy = last.BlockedBy
 	}
 	return snapshot, nil
+}
+
+func sessionLifecycleStateFromJournalStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" || isControlOnlySessionJournalStatus(status) {
+		return ""
+	}
+	return status
+}
+
+func isControlOnlySessionJournalStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "ack-session":
+		return true
+	default:
+		return false
+	}
 }
 
 func RefreshSessionRuntimeProjection(runDir, runName string) error {

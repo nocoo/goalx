@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -100,6 +101,104 @@ func deliveryTimestampWithin(ts string, window time.Duration, now time.Time) boo
 
 func DeliverControlNudge(runDir, messageID, dedupeKey, target, engine string, deliver TransportDeliverFunc) (*ControlDelivery, error) {
 	return deliverControlNudge(runDir, messageID, dedupeKey, target, engine, true, deliver)
+}
+
+func reconcileControlDeliveries(runDir string) error {
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil || deliveries == nil {
+		return err
+	}
+	updated := false
+	if cursor, err := LoadMasterCursorState(MasterCursorPath(runDir)); err == nil {
+		if reconcileInboxDeliveryAcceptance(deliveries, "master", cursor) {
+			updated = true
+		}
+	}
+	indexes, err := existingSessionIndexes(runDir)
+	if err != nil {
+		return err
+	}
+	for _, idx := range indexes {
+		sessionName := SessionName(idx)
+		cursor, err := LoadMasterCursorState(SessionCursorPath(runDir, sessionName))
+		if err != nil {
+			continue
+		}
+		if reconcileInboxDeliveryAcceptance(deliveries, sessionName, cursor) {
+			updated = true
+		}
+	}
+	if !updated {
+		return nil
+	}
+	return SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries)
+}
+
+func reconcileTargetDeliveries(runDir, target string, cursor *MasterCursorState) error {
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil || deliveries == nil {
+		return err
+	}
+	if !reconcileInboxDeliveryAcceptance(deliveries, target, cursor) {
+		return nil
+	}
+	return SaveControlDeliveries(ControlDeliveriesPath(runDir), deliveries)
+}
+
+func reconcileInboxDeliveryAcceptance(deliveries *ControlDeliveries, target string, cursor *MasterCursorState) bool {
+	if deliveries == nil || cursor == nil || cursor.LastSeenID <= 0 {
+		return false
+	}
+	acceptedAt := strings.TrimSpace(cursor.UpdatedAt)
+	if acceptedAt == "" {
+		acceptedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	updated := false
+	for i := range deliveries.Items {
+		item := &deliveries.Items[i]
+		if item.AcceptedAt != "" {
+			continue
+		}
+		switch strings.TrimSpace(item.Status) {
+		case "failed", "cancelled":
+			continue
+		}
+		messageID, ok := controlInboxDeliveryMessageID(target, item.MessageID)
+		if !ok {
+			messageID, ok = controlInboxDeliveryMessageID(target, item.DedupeKey)
+		}
+		if !ok || messageID > cursor.LastSeenID {
+			continue
+		}
+		item.Status = "sent"
+		item.TransportState = "sent"
+		item.LastError = ""
+		item.AcceptedAt = acceptedAt
+		if strings.TrimSpace(item.AttemptedAt) == "" {
+			item.AttemptedAt = acceptedAt
+		}
+		updated = true
+	}
+	return updated
+}
+
+func controlInboxDeliveryMessageID(target, raw string) (int64, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	prefix := "master-inbox:"
+	if target != "master" {
+		prefix = "session-inbox:" + target + ":"
+	}
+	if !strings.HasPrefix(raw, prefix) {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(raw, prefix), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
 }
 
 func deliverControlNudge(runDir, messageID, dedupeKey, target, engine string, dedupeOnSuccess bool, deliver TransportDeliverFunc) (*ControlDelivery, error) {
