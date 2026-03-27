@@ -190,6 +190,9 @@ func EnsureControlState(runDir string) error {
 			return err
 		}
 	}
+	if err := EnsureMemoryControl(runDir); err != nil {
+		return err
+	}
 	return nil
 }
 

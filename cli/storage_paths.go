@@ -5,13 +5,73 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
 
 func ProjectDataDir(projectRoot string) string {
+	return filepath.Join(userGoalxDir(), "runs", goalx.ProjectID(projectRoot))
+}
+
+func userGoalxDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".goalx", "runs", goalx.ProjectID(projectRoot))
+	return filepath.Join(home, ".goalx")
+}
+
+func MemoryRootDir() string {
+	return filepath.Join(userGoalxDir(), "memory")
+}
+
+func MemoryEntriesDir() string {
+	return filepath.Join(MemoryRootDir(), "entries")
+}
+
+func MemoryProposalsDir() string {
+	return filepath.Join(MemoryRootDir(), "proposals")
+}
+
+func MemoryIndexesDir() string {
+	return filepath.Join(MemoryRootDir(), "indexes")
+}
+
+func MemoryProjectsDir() string {
+	return filepath.Join(MemoryRootDir(), "projects")
+}
+
+func MemoryGCPath() string {
+	return filepath.Join(MemoryRootDir(), "gc.json")
+}
+
+func MemoryEntryPath(kind MemoryKind) string {
+	switch kind {
+	case MemoryKindFact:
+		return filepath.Join(MemoryEntriesDir(), "facts.jsonl")
+	case MemoryKindProcedure:
+		return filepath.Join(MemoryEntriesDir(), "procedures.jsonl")
+	case MemoryKindPitfall:
+		return filepath.Join(MemoryEntriesDir(), "pitfalls.jsonl")
+	case MemoryKindSecretRef:
+		return filepath.Join(MemoryEntriesDir(), "secret_refs.jsonl")
+	default:
+		panic("unknown memory kind")
+	}
+}
+
+func MemoryProposalPath(now time.Time) string {
+	return filepath.Join(MemoryProposalsDir(), now.UTC().Format("2006-01-02")+".jsonl")
+}
+
+func MemorySeedsPath(runDir string) string {
+	return filepath.Join(ControlDir(runDir), "memory-seeds.jsonl")
+}
+
+func MemoryQueryPath(runDir string) string {
+	return filepath.Join(ControlDir(runDir), "memory-query.json")
+}
+
+func MemoryContextPath(runDir string) string {
+	return filepath.Join(ControlDir(runDir), "memory-context.json")
 }
 
 func SavedRunsDir(projectRoot string) string {

@@ -147,31 +147,31 @@ func TestNormalizeMemoryEntrySerializesFullSchemaContract(t *testing.T) {
 		UpdatedAt:               "2026-03-27T00:00:00Z",
 	}
 
-	got, err := NormalizeMemoryEntry(entry)
+	normalized, err := NormalizeMemoryEntry(entry)
 	if err != nil {
 		t.Fatalf("NormalizeMemoryEntry(valid schema) = %v", err)
 	}
 
-	if got.VerificationState != entry.VerificationState ||
-		got.Confidence != entry.Confidence ||
-		got.RetrievedCount != entry.RetrievedCount ||
-		got.UsedCount != entry.UsedCount ||
-		got.SuccessAssociationCount != entry.SuccessAssociationCount ||
-		got.ContradictedCount != entry.ContradictedCount ||
-		got.ValidFrom != entry.ValidFrom ||
-		got.ValidTo != entry.ValidTo ||
-		got.SupersededBy != entry.SupersededBy ||
-		got.CreatedAt != entry.CreatedAt ||
-		got.UpdatedAt != entry.UpdatedAt {
-		t.Fatalf("NormalizeMemoryEntry changed canonical fields: got %+v", got)
+	if normalized.VerificationState != entry.VerificationState ||
+		normalized.Confidence != entry.Confidence ||
+		normalized.RetrievedCount != entry.RetrievedCount ||
+		normalized.UsedCount != entry.UsedCount ||
+		normalized.SuccessAssociationCount != entry.SuccessAssociationCount ||
+		normalized.ContradictedCount != entry.ContradictedCount ||
+		normalized.ValidFrom != entry.ValidFrom ||
+		normalized.ValidTo != entry.ValidTo ||
+		normalized.SupersededBy != entry.SupersededBy ||
+		normalized.CreatedAt != entry.CreatedAt ||
+		normalized.UpdatedAt != entry.UpdatedAt {
+		t.Fatalf("NormalizeMemoryEntry changed canonical fields: got %+v", normalized)
 	}
 
-	data, err := json.Marshal(got)
+	data, err := json.Marshal(normalized)
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	var got map[string]json.RawMessage
-	if err := json.Unmarshal(data, &got); err != nil {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(data, &payload); err != nil {
 		t.Fatalf("json.Unmarshal: %v", err)
 	}
 
@@ -194,11 +194,11 @@ func TestNormalizeMemoryEntrySerializesFullSchemaContract(t *testing.T) {
 		"created_at",
 		"updated_at",
 	}
-	if len(got) != len(wantKeys) {
-		t.Fatalf("normalized entry json keys = %d, want %d: %s", len(got), len(wantKeys), string(data))
+	if len(payload) != len(wantKeys) {
+		t.Fatalf("normalized entry json keys = %d, want %d: %s", len(payload), len(wantKeys), string(data))
 	}
 	for _, key := range wantKeys {
-		if _, ok := got[key]; !ok {
+		if _, ok := payload[key]; !ok {
 			t.Fatalf("normalized entry json missing key %q: %s", key, string(data))
 		}
 	}
