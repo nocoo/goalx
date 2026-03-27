@@ -59,8 +59,12 @@ func collectRunAdvisories(rc *RunContext) []string {
 		return nil
 	}
 	status, err := loadDisplayStatusRecord(RunStatusPath(rc.RunDir))
-	summaryExists := fileExists(SummaryPath(rc.RunDir))
-	completionExists := fileExists(CompletionStatePath(rc.RunDir))
+	closeoutFacts, closeoutErr := BuildRunCloseoutFacts(rc.RunDir)
+	if closeoutErr != nil {
+		closeoutFacts = RunCloseoutFacts{}
+	}
+	summaryExists := closeoutFacts.SummaryExists
+	completionExists := closeoutFacts.CompletionExists
 	advisories := make([]string, 0, 2)
 	if err == nil && status != nil && status.RequiredRemaining != nil && *status.RequiredRemaining == 0 && (!summaryExists || !completionExists) {
 		advisories = append(advisories, fmt.Sprintf("Closeout artifacts missing: required_remaining=0 summary_exists=%t completion_proof_exists=%t", summaryExists, completionExists))

@@ -161,7 +161,7 @@ func expireControlLeases(runDir string, skipHolders map[string]bool) error {
 	return nil
 }
 
-func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir string) error {
+func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
@@ -170,10 +170,16 @@ func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir string) error 
 	}
 	if runState != nil {
 		runState.Active = false
+		runState.Phase = "complete"
 		runState.UpdatedAt = now
 		if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 			return err
 		}
+	}
+
+	killRunPaneProcessTrees(runDir, tmuxSession)
+	if err := KillSessionIfExists(tmuxSession); err != nil {
+		return err
 	}
 
 	if err := MarkRunInactive(projectRoot, runName); err != nil {

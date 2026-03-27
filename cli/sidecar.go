@@ -84,6 +84,11 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 	shouldExpire := true
 	exitReason := "completed"
 	var watcher *TmuxControlWatcher
+	defer func() {
+		if shouldExpire {
+			_ = ExpireControlLease(runDir, "sidecar")
+		}
+	}()
 	appendAuditLog(runDir, "sidecar started pid=%d runID=%s epoch=%d", os.Getpid(), runID, epoch)
 	defer func() {
 		appendAuditLog(runDir, "sidecar exiting reason=%s", exitReason)
@@ -113,11 +118,6 @@ func runSidecarLoop(ctx context.Context, projectRoot, runName, runDir, runID str
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	defer func() {
-		if shouldExpire {
-			_ = ExpireControlLease(runDir, "sidecar")
-		}
-	}()
 
 	for {
 		select {
@@ -172,18 +172,6 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err != nil {
 		return err
 	}
-	if runState != nil && runState.Phase == "complete" && !SessionExists(tmuxSession) {
-		if unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)) > 0 {
-			if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
-				return err
-			}
-			return nil
-		}
-		if err := finalizeCompletedRunFromSidecar(projectRoot, runName, runDir); err != nil {
-			return err
-		}
-		return errSidecarCompleted
-	}
 	ttl := interval * 2
 	if ttl < time.Second {
 		ttl = time.Second
@@ -214,7 +202,29 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err != nil {
 		return err
 	}
-	presence, err = reconcileTargetPresenceRecovery(projectRoot, runDir, runName, tmuxSession, cfg, runState, presence)
+	closeoutFacts, err := BuildRunCloseoutFacts(runDir)
+	if err != nil {
+		return err
+	}
+	if closeoutFacts.Complete && targetPresenceMissing(presence["master"]) {
+		if closeoutFacts.MasterUnread > 0 {
+			if !presence["master"].SessionExists {
+				if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
+					return err
+				}
+			} else {
+				if err := relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession, cfg); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if err := finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession); err != nil {
+			return err
+		}
+		return errSidecarCompleted
+	}
+	presence, err = reconcileTargetPresenceRecovery(projectRoot, runDir, tmuxSession, cfg, runState, closeoutFacts.Complete, presence)
 	if err != nil {
 		return err
 	}
@@ -524,8 +534,8 @@ func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goa
 	return nil
 }
 
-func reconcileTargetPresenceRecovery(projectRoot, runDir, runName, tmuxSession string, cfg *goalx.Config, runState *RunRuntimeState, presence map[string]TargetPresenceFacts) (map[string]TargetPresenceFacts, error) {
-	if runState == nil || !runState.Active || strings.TrimSpace(runState.Phase) == "complete" {
+func reconcileTargetPresenceRecovery(projectRoot, runDir, tmuxSession string, cfg *goalx.Config, runState *RunRuntimeState, closeoutComplete bool, presence map[string]TargetPresenceFacts) (map[string]TargetPresenceFacts, error) {
+	if runState == nil || !runState.Active || closeoutComplete {
 		return presence, nil
 	}
 	if presence == nil {

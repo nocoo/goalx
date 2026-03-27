@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -803,10 +804,21 @@ func TestSidecarFinalizesCompletedRunWhenMasterSessionIsGone(t *testing.T) {
 		t.Fatalf("LoadRunRuntimeState: %v", err)
 	}
 	runState.Active = true
-	runState.Phase = "complete"
 	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"completed_at":"2026-03-27T16:02:03Z"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
 	}
 	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
@@ -943,10 +955,21 @@ func TestSidecarKeepsCompletedRunAliveWhenUnreadMasterInboxExists(t *testing.T) 
 		t.Fatalf("LoadRunRuntimeState: %v", err)
 	}
 	runState.Active = true
-	runState.Phase = "complete"
 	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"completed_at":"2026-03-27T16:02:03Z"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
 	}
 	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
@@ -1008,6 +1031,124 @@ esac
 		if !strings.Contains(logText, want) {
 			t.Fatalf("tmux log missing %q:\n%s", want, logText)
 		}
+	}
+}
+
+func TestSidecarFinalizesCompletedRunWhenMasterWindowMissingButWorkerWindowsRemain(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+
+	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState: %v", err)
+	}
+	runState.Active = true
+	runState.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), runState); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"phase":"complete","required_remaining":0,"active_sessions":[]}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"completed_at":"2026-03-27T16:02:03Z"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := RenewControlLease(runDir, "master", "run_demo", 1, time.Minute, "tmux", exitedProcessPID(t)); err != nil {
+		t.Fatalf("RenewControlLease master: %v", err)
+	}
+	if err := RenewControlLease(runDir, "session-1", "run_demo", 1, time.Minute, "tmux", exitedProcessPID(t)); err != nil {
+		t.Fatalf("RenewControlLease session-1: %v", err)
+	}
+
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	logPath := filepath.Join(fakeBin, "tmux.log")
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+echo "$@" >> "$TMUX_LOG"
+case "$1" in
+  has-session)
+    exit 0
+    ;;
+  list-windows)
+    printf 'session-1\n'
+    exit 0
+    ;;
+  list-panes)
+    printf '%s\t%%1\tsession-1\n' "$TMUX_SESSION_NAME"
+    exit 0
+    ;;
+  kill-session)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("TMUX_LOG", logPath)
+	t.Setenv("TMUX_SESSION_NAME", goalx.TmuxSessionName(repo, runName))
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSidecarTick(repo, runName, runDir, meta.RunID, meta.Epoch, 50*time.Millisecond, 4242); err == nil || !errors.Is(err, errSidecarCompleted) {
+		t.Fatalf("runSidecarTick err = %v, want %v", err, errSidecarCompleted)
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if controlState.LifecycleState != "completed" {
+		t.Fatalf("lifecycle_state = %q, want completed", controlState.LifecycleState)
+	}
+
+	runState, err = LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState after: %v", err)
+	}
+	if runState.Active {
+		t.Fatalf("run state still active: %+v", runState)
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	if !strings.Contains(string(logData), "kill-session -t "+goalx.TmuxSessionName(repo, runName)) {
+		t.Fatalf("tmux log missing kill-session:\n%s", string(logData))
 	}
 }
 
