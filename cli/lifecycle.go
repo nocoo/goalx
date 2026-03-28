@@ -290,7 +290,7 @@ func Resume(projectRoot string, args []string) error {
 }
 
 func Replace(projectRoot string, args []string) (err error) {
-	const usage = "usage: goalx replace [--run NAME] <session-name> [--mode MODE] [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--route-role ROLE] [--route-profile PROFILE] [--dimension SPEC]..."
+	const usage = "usage: goalx replace [--run NAME] <session-name> [--mode MODE] [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]..."
 	if printUsageIfHelp(args, usage) {
 		return nil
 	}
@@ -345,18 +345,6 @@ func Replace(projectRoot string, args []string) (err error) {
 				return err
 			}
 			opts.Effort = level
-		case "--route-role":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --route-role")
-			}
-			i++
-			opts.RouteRole = strings.TrimSpace(rest[i])
-		case "--route-profile":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --route-profile")
-			}
-			i++
-			opts.RouteProfile = strings.TrimSpace(rest[i])
 		case "--dimension":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("missing value for --dimension")
@@ -474,15 +462,13 @@ func Replace(projectRoot string, args []string) (err error) {
 
 	oldDimensions := goalx.ResolveDimensionNames(oldIdentity.Dimensions)
 	newSession := goalx.SessionConfig{
-		Hint:         scope,
-		Mode:         goalx.Mode(oldIdentity.Mode),
-		Effort:       oldIdentity.RequestedEffort,
-		RouteRole:    oldIdentity.RouteRole,
-		RouteProfile: oldIdentity.RouteProfile,
-		Dimensions:   append([]string(nil), oldDimensions...),
-		Target:       &oldIdentity.Target,
+		Hint:       scope,
+		Mode:       goalx.Mode(oldIdentity.Mode),
+		Effort:     oldIdentity.RequestedEffort,
+		Dimensions: append([]string(nil), oldDimensions...),
+		Target:     &oldIdentity.Target,
 	}
-	routeChanged := opts.Mode != "" || opts.Effort != "" || opts.RouteRole != "" || opts.RouteProfile != "" || len(opts.Dimensions) > 0
+	routeChanged := opts.Mode != "" || opts.Effort != "" || len(opts.Dimensions) > 0
 	if !routeChanged && !(explicitEngine || explicitModel) {
 		newSession.Engine = oldIdentity.Engine
 		newSession.Model = oldIdentity.Model
@@ -492,12 +478,6 @@ func Replace(projectRoot string, args []string) (err error) {
 	}
 	if opts.Effort != "" {
 		newSession.Effort = opts.Effort
-	}
-	if opts.RouteRole != "" {
-		newSession.RouteRole = opts.RouteRole
-	}
-	if opts.RouteProfile != "" {
-		newSession.RouteProfile = opts.RouteProfile
 	}
 	if len(opts.Dimensions) > 0 {
 		newSession.Dimensions = append([]string(nil), opts.Dimensions...)
@@ -536,14 +516,12 @@ func Replace(projectRoot string, args []string) (err error) {
 		effectiveSession.Model,
 		effectiveSession.Effort,
 		"",
-		effectiveSession.RouteProfile,
 		"",
 		target,
 	)
 	if err != nil {
 		return fmt.Errorf("create session identity: %w", err)
 	}
-	sessionIdentity.RouteRole = effectiveSession.RouteRole
 	sessionIdentity.ReplacesSession = oldSessionName
 	sessionIdentity.BaseExperimentID = oldIdentity.ExperimentID
 	sessionIdentity.BaseBranchSelector = replacementBaseSelector

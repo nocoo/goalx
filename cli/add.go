@@ -11,7 +11,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--route-role ROLE] [--route-profile PROFILE] [--worktree] [--base-branch BRANCH|session-N]`
+const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--worktree] [--base-branch BRANCH|session-N]`
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
@@ -33,7 +33,6 @@ func Add(projectRoot string, args []string) (err error) {
 	var explicitEngine, explicitModel bool
 	var flagEffort goalx.EffortLevel
 	var flagMode goalx.Mode
-	var flagRouteRole, flagRouteProfile string
 	var flagDimensions []string
 	useWorktree := false
 	baseBranchSelector := ""
@@ -81,18 +80,6 @@ func Add(projectRoot string, args []string) (err error) {
 			}
 			i++
 			flagDimensions = append(flagDimensions, splitListFlag(rest[i])...)
-		case "--route-role":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --route-role")
-			}
-			i++
-			flagRouteRole = rest[i]
-		case "--route-profile":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --route-profile")
-			}
-			i++
-			flagRouteProfile = rest[i]
 		case "--worktree":
 			useWorktree = true
 		case "--base-branch":
@@ -117,28 +104,8 @@ func Add(projectRoot string, args []string) (err error) {
 	if baseBranchSelector != "" && !useWorktree {
 		return fmt.Errorf("--base-branch requires --worktree")
 	}
-	switch strings.TrimSpace(flagRouteRole) {
-	case "research":
-		if flagMode == "" {
-			flagMode = goalx.ModeResearch
-		} else if flagMode != goalx.ModeResearch {
-			return fmt.Errorf("--route-role research requires --mode research")
-		}
-	case "develop":
-		if flagMode == "" {
-			flagMode = goalx.ModeDevelop
-		} else if flagMode != goalx.ModeDevelop {
-			return fmt.Errorf("--route-role develop requires --mode develop")
-		}
-	}
 	if flagMode == "" {
 		return fmt.Errorf("--mode is required")
-	}
-	if explicitEngine && flagRouteRole != "" {
-		return fmt.Errorf("--route-role cannot be combined with --engine/--model")
-	}
-	if explicitEngine && flagRouteProfile != "" {
-		return fmt.Errorf("--route-profile cannot be combined with --engine/--model")
 	}
 	hint := strings.Join(hintParts, " ")
 
@@ -146,12 +113,6 @@ func Add(projectRoot string, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if flagRouteProfile != "" {
-		if _, ok := rc.Config.Routing.Profiles[flagRouteProfile]; !ok {
-			return fmt.Errorf("unknown route profile %q", flagRouteProfile)
-		}
-	}
-
 	// Check run is active
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
@@ -205,12 +166,6 @@ func Add(projectRoot string, args []string) (err error) {
 		}
 		sessionCfg.Dimensions = append([]string(nil), flagDimensions...)
 	}
-	if flagRouteRole != "" {
-		sessionCfg.RouteRole = flagRouteRole
-	}
-	if flagRouteProfile != "" {
-		sessionCfg.RouteProfile = flagRouteProfile
-	}
 	renderCfg.Sessions[newNum-1] = sessionCfg
 	if renderCfg.Parallel < len(renderCfg.Sessions) {
 		renderCfg.Parallel = len(renderCfg.Sessions)
@@ -229,7 +184,6 @@ func Add(projectRoot string, args []string) (err error) {
 		effectiveSession.Model,
 		effectiveSession.Effort,
 		"",
-		effectiveSession.RouteProfile,
 		"",
 		target,
 	)
@@ -237,7 +191,6 @@ func Add(projectRoot string, args []string) (err error) {
 		return fmt.Errorf("create session identity: %w", err)
 	}
 	sessionIdentity.LocalValidationCommand = resolveSessionLocalValidationCommand(effectiveSession)
-	sessionIdentity.RouteRole = effectiveSession.RouteRole
 	dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
 	if err != nil {
 		return fmt.Errorf("load dimension catalog: %w", err)
@@ -540,8 +493,6 @@ func buildSessionDataList(runDir string, cfg *goalx.Config, engines map[string]g
 			Model:             model,
 			Mode:              mode,
 			Hint:              effective.Hint,
-			RouteRole:         identity.RouteRole,
-			RouteProfile:      identity.RouteProfile,
 			Dimensions:        dimensions,
 			EngineCommand:     engineCommand,
 		})

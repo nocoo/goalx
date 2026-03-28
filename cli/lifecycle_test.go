@@ -402,7 +402,7 @@ esac
 	}
 }
 
-func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.T) {
+func TestReplaceCreatesReplacementSessionWithExplicitOverrideAndLineage(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -441,10 +441,6 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
-	cfg.Routing = goalx.BuiltinDefaults.Routing
-	if err := SaveRunSpec(runDir, cfg); err != nil {
-		t.Fatalf("SaveRunSpec: %v", err)
-	}
 	coord, err := EnsureCoordinationState(runDir, cfg.Objective)
 	if err != nil {
 		t.Fatalf("EnsureCoordinationState: %v", err)
@@ -464,7 +460,7 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 		t.Fatal("session-1 identity missing")
 	}
 
-	if err := Replace(repo, []string{"--run", runName, "session-1", "--route-profile", "research_deep"}); err != nil {
+	if err := Replace(repo, []string{"--run", runName, "session-1", "--engine", "claude-code", "--model", "opus", "--effort", "high"}); err != nil {
 		t.Fatalf("Replace: %v", err)
 	}
 
@@ -536,9 +532,6 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	}
 	if identity.ReplacesSession != "session-1" {
 		t.Fatalf("replaces_session = %q, want session-1", identity.ReplacesSession)
-	}
-	if identity.RouteProfile != "research_deep" {
-		t.Fatalf("route_profile = %q, want research_deep", identity.RouteProfile)
 	}
 	if identity.Engine != "claude-code" || identity.Model != "opus" || identity.RequestedEffort != goalx.EffortHigh {
 		t.Fatalf("identity = %+v, want claude-code/opus/high", identity)
@@ -911,6 +904,20 @@ func TestReplaceRejectsDirtyDedicatedWorktreeTakeover(t *testing.T) {
 	}
 }
 
+func TestReplaceRejectsRemovedRouteFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := [][]string{
+		{"session-1", "--route-role", "research"},
+		{"session-1", "--route-profile", "research_deep"},
+	}
+	for _, args := range tests {
+		if err := Replace(t.TempDir(), args); err == nil {
+			t.Fatalf("Replace(%#v) unexpectedly succeeded", args)
+		}
+	}
+}
+
 func TestStatusShowsParkedSessionStateFromCoordination(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -1110,7 +1117,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err := SaveIdentityFence(IdentityFencePath(runDir), fence); err != nil {
 		t.Fatalf("SaveIdentityFence: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", "", cfg.Target)
+	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
