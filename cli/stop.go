@@ -29,6 +29,7 @@ func Stop(projectRoot string, args []string) error {
 	if err := stopRunSidecar(rc.RunDir); err != nil {
 		return err
 	}
+	finalLifecycle := stopLifecycleForRun(rc.RunDir)
 
 	if !SessionExists(rc.TmuxSession) {
 		killRunPaneProcessTrees(rc.RunDir, rc.TmuxSession)
@@ -36,11 +37,18 @@ func Stop(projectRoot string, args []string) error {
 		if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
 			state.Active = false
 			state.StoppedAt = time.Now().UTC().Format(time.RFC3339)
+			if finalLifecycle == "completed" {
+				state.Phase = "complete"
+			}
 			state.UpdatedAt = state.StoppedAt
 			_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 		}
-		_ = FinalizeControlRun(rc.RunDir, "stopped")
-		fmt.Printf("Run '%s' is not active (no tmux session).\n", rc.Name)
+		_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
+		if finalLifecycle == "completed" {
+			fmt.Printf("Run '%s' completed (no tmux session).\n", rc.Name)
+		} else {
+			fmt.Printf("Run '%s' is not active (no tmux session).\n", rc.Name)
+		}
 		return nil
 	}
 
@@ -53,11 +61,18 @@ func Stop(projectRoot string, args []string) error {
 	if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
 		state.Active = false
 		state.StoppedAt = time.Now().UTC().Format(time.RFC3339)
+		if finalLifecycle == "completed" {
+			state.Phase = "complete"
+		}
 		state.UpdatedAt = state.StoppedAt
 		_ = SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state)
 	}
 	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
-	_ = FinalizeControlRun(rc.RunDir, "stopped")
-	fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
+	_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
+	if finalLifecycle == "completed" {
+		fmt.Printf("Run '%s' completed (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
+	} else {
+		fmt.Printf("Run '%s' stopped (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
+	}
 	return nil
 }

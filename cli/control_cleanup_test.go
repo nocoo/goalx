@@ -167,3 +167,188 @@ esac
 		t.Fatalf("lifecycle_state = %q, want stopped", runState.LifecycleState)
 	}
 }
+
+func TestStopPreservesCompletedLifecycleWhenCloseoutExists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"verdict":"complete"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
+	}
+
+	origStopSidecar := stopRunSidecar
+	defer func() { stopRunSidecar = origStopSidecar }()
+	stopRunSidecar = func(runDir string) error { return nil }
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+case "$1" in
+  has-session)
+    exit 0
+    ;;
+  kill-session)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := Stop(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if controlState.LifecycleState != "completed" {
+		t.Fatalf("lifecycle_state = %q, want completed", controlState.LifecycleState)
+	}
+
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState: %v", err)
+	}
+	if runtimeState.Phase != "complete" {
+		t.Fatalf("run phase = %q, want complete", runtimeState.Phase)
+	}
+	if runtimeState.Active {
+		t.Fatalf("run should be inactive after stop: %+v", runtimeState)
+	}
+}
+
+func TestRefreshDisplayFactsRepairsCompletedRunAndCleansLeases(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write status: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"verdict":"complete"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "stopped"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+
+	shellPID, childPID, waitDone := startSleepProcessTree(t)
+	if err := RenewControlLease(runDir, "session-1", "run_demo", 1, time.Minute, "tmux", shellPID); err != nil {
+		t.Fatalf("RenewControlLease session-1: %v", err)
+	}
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+case "$1" in
+  has-session)
+    exit 1
+    ;;
+  kill-session)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	rc, err := buildRunContext(repo, runDir, runName)
+	if err != nil {
+		t.Fatalf("buildRunContext: %v", err)
+	}
+	if err := refreshDisplayFacts(rc); err != nil {
+		t.Fatalf("refreshDisplayFacts: %v", err)
+	}
+
+	select {
+	case <-waitDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("leased process tree did not exit after closeout repair")
+	}
+	waitForProcessExit(t, childPID)
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if controlState.LifecycleState != "completed" {
+		t.Fatalf("lifecycle_state = %q, want completed", controlState.LifecycleState)
+	}
+
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunRuntimeState: %v", err)
+	}
+	if runtimeState.Phase != "complete" {
+		t.Fatalf("run phase = %q, want complete", runtimeState.Phase)
+	}
+	if runtimeState.Active {
+		t.Fatalf("run should be inactive after repair: %+v", runtimeState)
+	}
+
+	lease, err := LoadControlLease(ControlLeasePath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadControlLease: %v", err)
+	}
+	if lease.PID != 0 || lease.RunID != "" {
+		t.Fatalf("session lease not expired after repair: %+v", lease)
+	}
+}

@@ -13,6 +13,50 @@ type finalizeControlRunOptions struct {
 	skipExpireHolders   map[string]bool
 }
 
+func completedCloseoutReady(runDir string) bool {
+	facts, err := BuildRunCloseoutFacts(runDir)
+	return err == nil && facts.Complete && facts.MasterUnread == 0
+}
+
+func stopLifecycleForRun(runDir string) string {
+	if completedCloseoutReady(runDir) {
+		return "completed"
+	}
+	return "stopped"
+}
+
+func repairCompletedRunFinalization(rc *RunContext) error {
+	if rc == nil || SessionExists(rc.TmuxSession) || !completedCloseoutReady(rc.RunDir) {
+		return nil
+	}
+	controlState, err := LoadControlRunState(ControlRunStatePath(rc.RunDir))
+	if err == nil && controlState != nil && controlState.LifecycleState == "completed" {
+		return nil
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
+		state.Active = false
+		state.Phase = "complete"
+		if state.StoppedAt == "" {
+			state.StoppedAt = now
+		}
+		state.UpdatedAt = now
+		if err := SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), state); err != nil {
+			return err
+		}
+	}
+
+	killRunPaneProcessTrees(rc.RunDir, rc.TmuxSession)
+	if err := KillSessionIfExists(rc.TmuxSession); err != nil {
+		return err
+	}
+	if err := MarkRunInactive(rc.ProjectRoot, rc.Name); err != nil {
+		return err
+	}
+	return FinalizeControlRun(rc.RunDir, "completed")
+}
+
 func FinalizeControlRun(runDir, lifecycle string) error {
 	return finalizeControlRun(runDir, lifecycle, finalizeControlRunOptions{killLeasedProcesses: true})
 }
