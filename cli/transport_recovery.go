@@ -23,6 +23,11 @@ type TransportRecoveryTarget struct {
 	LastInterruptReason              string `json:"last_interrupt_reason,omitempty"`
 	LastInterruptResultingState      string `json:"last_interrupt_resulting_state,omitempty"`
 	UrgentEscalationAttempts         int    `json:"urgent_escalation_attempts,omitempty"`
+	CurrentAttentionState            string `json:"current_attention_state,omitempty"`
+	CurrentAttentionFirstSeenAt      string `json:"current_attention_first_seen_at,omitempty"`
+	CurrentAttentionLastSeenAt       string `json:"current_attention_last_seen_at,omitempty"`
+	CurrentAttentionLastAlertAt      string `json:"current_attention_last_alert_at,omitempty"`
+	CurrentAttentionLastAlertReason  string `json:"current_attention_last_alert_reason,omitempty"`
 	CurrentMissingState              string `json:"current_missing_state,omitempty"`
 	CurrentMissingFirstSeenAt        string `json:"current_missing_first_seen_at,omitempty"`
 	CurrentMissingLastSeenAt         string `json:"current_missing_last_seen_at,omitempty"`
@@ -230,6 +235,49 @@ func recordMissingTargetRelaunchResult(runDir, target, missingState, result stri
 		} else {
 			entry.CurrentMissingLastRelaunchError = ""
 		}
+	})
+}
+
+func recordTargetAttentionObservation(runDir string, facts TargetAttentionFacts) error {
+	target := strings.TrimSpace(facts.Target)
+	if target == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		state := strings.TrimSpace(facts.AttentionState)
+		if state == "" || state == TargetAttentionHealthy || state == TargetAttentionNeedsAttention {
+			entry.CurrentAttentionState = ""
+			entry.CurrentAttentionFirstSeenAt = ""
+			entry.CurrentAttentionLastSeenAt = ""
+			entry.CurrentAttentionLastAlertAt = ""
+			entry.CurrentAttentionLastAlertReason = ""
+			return
+		}
+		if entry.CurrentAttentionState != state {
+			entry.CurrentAttentionState = state
+			entry.CurrentAttentionFirstSeenAt = now
+			entry.CurrentAttentionLastAlertAt = ""
+			entry.CurrentAttentionLastAlertReason = ""
+		}
+		entry.CurrentAttentionLastSeenAt = now
+	})
+}
+
+func recordTargetAttentionAlert(runDir, target, state, reason string) error {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	return updateTransportRecoveryTarget(runDir, target, func(entry *TransportRecoveryTarget) {
+		if entry.CurrentAttentionState == "" {
+			entry.CurrentAttentionState = strings.TrimSpace(state)
+			entry.CurrentAttentionFirstSeenAt = now
+		}
+		entry.CurrentAttentionLastSeenAt = now
+		entry.CurrentAttentionLastAlertAt = now
+		entry.CurrentAttentionLastAlertReason = strings.TrimSpace(reason)
 	})
 }
 

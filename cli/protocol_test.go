@@ -109,6 +109,35 @@ func TestRenderSubagentProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolTightensWakeLoopInboxHandling(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "ship it",
+		Mode:              goalx.ModeDevelop,
+		Engine:            "codex",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	want := `If wakes keep arriving while unread inbox or cursor lag remains, do not keep assuming "no new message". Re-read the inbox and acknowledge the latest processed entry before continuing.`
+	if !strings.Contains(text, want) {
+		t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+	}
+}
+
 func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -1038,6 +1067,35 @@ func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolBindsBlockedOwnersToImmediateIntervention(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Engine:      "codex",
+		ProjectRoot: "/tmp/project",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"An open required item with `owner_attention`, `owner_blocked`, or `owner_risky` facts is **not** a no-change fast path.",
+		"If a required item owner is blocked or risky, resolve it in the current control cycle: inspect directly (including shell/tmux if needed), redirect, park+replace, or take the work over yourself.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolIncludesReportsRoutingAndResearchCompletionGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -1499,6 +1557,69 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered master protocol should omit %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolRequiresActionOnBlockedOwnerFacts(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Engine:      "codex",
+		ProjectRoot: "/tmp/project",
+		GoalPath:    "/tmp/goal.json",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If a required item stays stuck, reassign it, split it, or take it over yourself.",
+		"Prefer direct recovery (shell/tmux intervention, local fallback path, or relaunch) over waiting.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolRequiresInboxRecheckOnRepeatedWake(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "ship it",
+		Mode:              goalx.ModeDevelop,
+		Engine:            "codex",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat any transport wake text as \"read the session inbox now\".",
+		"After a transport wake or `goalx wait` return, read `",
+		"Acknowledge the latest processed inbox entry:",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered subagent protocol missing %q:\n%s", want, text)
 		}
 	}
 }

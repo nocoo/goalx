@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -15,9 +16,6 @@ func refreshDisplayFacts(rc *RunContext) error {
 	if err := RefreshRunMemoryContext(rc.RunDir); err != nil {
 		return err
 	}
-	if snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir); err == nil && snapshot != nil {
-		_ = SaveActivitySnapshot(rc.RunDir, snapshot)
-	}
 	masterEngine := ""
 	if rc.Config != nil {
 		masterEngine = rc.Config.Master.Engine
@@ -26,12 +24,15 @@ func refreshDisplayFacts(rc *RunContext) error {
 		if facts, err := BuildTransportFacts(rc.RunDir, rc.TmuxSession, masterEngine); err == nil && facts != nil {
 			_ = SaveTransportFacts(rc.RunDir, facts)
 		}
-		return nil
+	} else {
+		_ = SaveTransportFacts(rc.RunDir, &TransportFacts{
+			Version:   1,
+			CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		})
 	}
-	_ = SaveTransportFacts(rc.RunDir, &TransportFacts{
-		Version:   1,
-		CheckedAt: time.Now().UTC().Format(time.RFC3339),
-	})
+	if snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir); err == nil && snapshot != nil {
+		_ = SaveActivitySnapshot(rc.RunDir, snapshot)
+	}
 	return nil
 }
 
@@ -73,13 +74,22 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 			advisories = append(advisories, "Budget exhausted: "+formatBudgetSummary(activity.Budget))
 		}
 		coverage := activity.Coverage
-		if coverage.OwnersPresent && (len(coverage.UnmappedOpenIDs) > 0 || len(coverage.OwnerSessionMissingIDs) > 0) {
-			parts := make([]string, 0, 3)
+		if coverage.OwnersPresent && (len(coverage.UnmappedOpenIDs) > 0 || len(coverage.OwnerSessionMissingIDs) > 0 || len(coverage.OwnerAttentionIDs) > 0 || len(coverage.OwnerBlockedIDs) > 0 || len(coverage.OwnerRiskyIDs) > 0) {
+			parts := make([]string, 0, 6)
 			if len(coverage.UnmappedOpenIDs) > 0 {
 				parts = append(parts, "unmapped_open="+strings.Join(coverage.UnmappedOpenIDs, ","))
 			}
 			if len(coverage.OwnerSessionMissingIDs) > 0 {
 				parts = append(parts, "owner_session_missing="+strings.Join(coverage.OwnerSessionMissingIDs, ","))
+			}
+			if len(coverage.OwnerAttentionIDs) > 0 {
+				parts = append(parts, "owner_attention="+strings.Join(coverage.OwnerAttentionIDs, ","))
+			}
+			if len(coverage.OwnerBlockedIDs) > 0 {
+				parts = append(parts, "owner_blocked="+strings.Join(coverage.OwnerBlockedIDs, ","))
+			}
+			if len(coverage.OwnerRiskyIDs) > 0 {
+				parts = append(parts, "owner_risky="+strings.Join(coverage.OwnerRiskyIDs, ","))
 			}
 			reusable := append([]string{}, coverage.IdleReusableSessions...)
 			reusable = append(reusable, coverage.ParkedReusableSessions...)
@@ -87,6 +97,12 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 				parts = append(parts, "reusable_sessions="+strings.Join(reusable, ","))
 			}
 			advisories = append(advisories, "Coverage facts: "+strings.Join(parts, " "))
+		}
+		if targetAttention := formatTargetAttentionAdvisory(activity.Attention); targetAttention != "" {
+			advisories = append(advisories, targetAttention)
+		}
+		if ownerAttention := formatOwnerAttentionAdvisory(rc.RunDir, coverage, activity.Attention); ownerAttention != "" {
+			advisories = append(advisories, ownerAttention)
 		}
 	}
 	meta, err := LoadRunMetadata(RunMetadataPath(rc.RunDir))
@@ -115,10 +131,16 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 }
 
 func formatCoverageSummary(coverage RequiredCoverage) string {
-	if len(coverage.OpenRequiredIDs) == 0 && len(coverage.OwnedOpenIDs) == 0 && len(coverage.UnmappedOpenIDs) == 0 && len(coverage.OwnerSessionMissingIDs) == 0 {
+	if len(coverage.OpenRequiredIDs) == 0 &&
+		len(coverage.OwnedOpenIDs) == 0 &&
+		len(coverage.UnmappedOpenIDs) == 0 &&
+		len(coverage.OwnerSessionMissingIDs) == 0 &&
+		len(coverage.OwnerAttentionIDs) == 0 &&
+		len(coverage.OwnerBlockedIDs) == 0 &&
+		len(coverage.OwnerRiskyIDs) == 0 {
 		return ""
 	}
-	parts := make([]string, 0, 7)
+	parts := make([]string, 0, 10)
 	if !coverage.OwnersPresent {
 		parts = append(parts, "coverage=unknown")
 	} else {
@@ -128,6 +150,9 @@ func formatCoverageSummary(coverage RequiredCoverage) string {
 	appendCoverageSummaryPart(&parts, "owned_open", coverage.OwnedOpenIDs)
 	appendCoverageSummaryPart(&parts, "unmapped_open", coverage.UnmappedOpenIDs)
 	appendCoverageSummaryPart(&parts, "owner_session_missing", coverage.OwnerSessionMissingIDs)
+	appendCoverageSummaryPart(&parts, "owner_attention", coverage.OwnerAttentionIDs)
+	appendCoverageSummaryPart(&parts, "owner_blocked", coverage.OwnerBlockedIDs)
+	appendCoverageSummaryPart(&parts, "owner_risky", coverage.OwnerRiskyIDs)
 	appendCoverageSummaryPart(&parts, "idle_reusable", coverage.IdleReusableSessions)
 	appendCoverageSummaryPart(&parts, "parked_reusable", coverage.ParkedReusableSessions)
 	return strings.Join(parts, " ")
@@ -184,6 +209,88 @@ func appendCoverageSummaryPart(parts *[]string, label string, values []string) {
 		return
 	}
 	*parts = append(*parts, label+"="+strings.Join(values, ","))
+}
+
+func formatOwnerAttentionAdvisory(runDir string, coverage RequiredCoverage, attention map[string]TargetAttentionFacts) string {
+	if len(coverage.OwnerAttentionIDs) == 0 && len(coverage.OwnerBlockedIDs) == 0 && len(coverage.OwnerRiskyIDs) == 0 {
+		return ""
+	}
+	coord, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil || coord == nil || len(coord.Owners) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(coverage.OwnerAttentionIDs)+len(coverage.OwnerBlockedIDs)+len(coverage.OwnerRiskyIDs))
+	appendOwnerAttentionParts(&parts, coord, attention, coverage.OwnerAttentionIDs)
+	appendOwnerAttentionParts(&parts, coord, attention, coverage.OwnerBlockedIDs)
+	appendOwnerAttentionParts(&parts, coord, attention, coverage.OwnerRiskyIDs)
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Owner attention: " + strings.Join(parts, " | ")
+}
+
+func appendOwnerAttentionParts(parts *[]string, coord *CoordinationState, attention map[string]TargetAttentionFacts, ids []string) {
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" || coord == nil {
+			continue
+		}
+		owner := strings.TrimSpace(coord.Owners[id])
+		if owner == "" {
+			continue
+		}
+		detail := id + " owner=" + owner
+		if facts, ok := attention[owner]; ok {
+			if state := strings.TrimSpace(facts.AttentionState); state != "" {
+				detail += " state=" + state
+			}
+			if facts.Unread > 0 {
+				detail += fmt.Sprintf(" unread=%d", facts.Unread)
+			}
+			if facts.CursorLag > 0 {
+				detail += fmt.Sprintf(" cursor_lag=%d", facts.CursorLag)
+			}
+			if facts.JournalStaleMinutes > 0 {
+				detail += fmt.Sprintf(" journal_stale=%dm", facts.JournalStaleMinutes)
+			}
+		}
+		*parts = append(*parts, detail)
+	}
+}
+
+func formatTargetAttentionAdvisory(attention map[string]TargetAttentionFacts) string {
+	if len(attention) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(attention))
+	for key, facts := range attention {
+		if targetAttentionNeedsAction(facts) {
+			keys = append(keys, key)
+		}
+	}
+	if len(keys) == 0 {
+		return ""
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		facts := attention[key]
+		part := key + ":" + facts.AttentionState
+		if facts.Unread > 0 {
+			part += fmt.Sprintf(" unread=%d", facts.Unread)
+		}
+		if facts.CursorLag > 0 {
+			part += fmt.Sprintf(" cursor_lag=%d", facts.CursorLag)
+		}
+		if facts.JournalStaleMinutes > 0 {
+			part += fmt.Sprintf(" journal_stale=%dm", facts.JournalStaleMinutes)
+		}
+		if facts.OutputStaleMinutes > 0 {
+			part += fmt.Sprintf(" output_stale=%dm", facts.OutputStaleMinutes)
+		}
+		parts = append(parts, part)
+	}
+	return "Target attention: " + strings.Join(parts, " | ")
 }
 
 func evolutionLogFacts(path string) (int, string, error) {

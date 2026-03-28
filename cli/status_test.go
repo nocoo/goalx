@@ -830,3 +830,141 @@ func TestStatusWarnsAboutExplicitCoverageGapOutsideEvolve(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusShowsBlockedOwnerAttentionFacts(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master prompt\n❯\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("session prompt\n❯\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+	for _, holder := range []string{"master", "sidecar", "session-1"} {
+		if err := RenewControlLease(runDir, holder, meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
+			t.Fatalf("RenewControlLease %s: %v", holder, err)
+		}
+	}
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Required: []GoalItem{{ID: "req-1", Text: "blocked item", State: goalItemStateOpen}},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Owners:  map[string]string{"req-1": "session-1"},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 24},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if _, err := appendControlInboxMessage(runDir, "session-1", "tell", "master", "continue batch 2", false); err != nil {
+		t.Fatalf("appendControlInboxMessage: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {Target: "session-1", Window: "session-1", Engine: "codex", TransportState: string(TUIStateIdlePrompt)},
+			"master":    {Target: "master", Window: "master", Engine: "codex", TransportState: string(TUIStateIdlePrompt)},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Attention:",
+		"session-1:transport_blocked",
+		"### advisories",
+		"Target attention:",
+		"Owner attention:",
+		"req-1 owner=session-1 state=transport_blocked",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestStatusWarnsAboutBlockedOwnerAttention(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("❯\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Required: []GoalItem{{ID: "req-1", Text: "ship UI polish", State: goalItemStateOpen}},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Owners:  map[string]string{"req-1": "session-1"},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if _, err := AppendControlInboxMessage(runDir, "session-1", "develop", "master", "polish the source detail page"); err != nil {
+		t.Fatalf("AppendControlInboxMessage: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 24},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
+		Version: 1,
+		Items: []ControlDelivery{
+			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "accepted", Target: "gx-demo:session-1", AttemptedAt: time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339), AcceptedAt: time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339), TransportState: string(TUIStateQueued)},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Owner attention:",
+		"req-1 owner=session-1",
+		"state=transport_blocked",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}

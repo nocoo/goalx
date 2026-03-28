@@ -229,6 +229,9 @@ func printStatusControlSummary(rc *RunContext) {
 		if coverage := formatCoverageSummary(activity.Coverage); coverage != "" {
 			fmt.Printf("Coverage: %s\n", coverage)
 		}
+		if attention := formatTargetAttentionAdvisory(activity.Attention); attention != "" {
+			fmt.Printf("Attention: %s\n", strings.TrimPrefix(attention, "Target attention: "))
+		}
 	}
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)

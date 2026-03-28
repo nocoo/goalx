@@ -11,6 +11,9 @@ type RequiredCoverage struct {
 	OwnedOpenIDs           []string `json:"owned_open_ids,omitempty"`
 	UnmappedOpenIDs        []string `json:"unmapped_open_ids,omitempty"`
 	OwnerSessionMissingIDs []string `json:"owner_session_missing_ids,omitempty"`
+	OwnerAttentionIDs      []string `json:"owner_attention_ids,omitempty"`
+	OwnerBlockedIDs        []string `json:"owner_blocked_ids,omitempty"`
+	OwnerRiskyIDs          []string `json:"owner_risky_ids,omitempty"`
 	IdleReusableSessions   []string `json:"idle_reusable_sessions,omitempty"`
 	ParkedReusableSessions []string `json:"parked_reusable_sessions,omitempty"`
 }
@@ -28,15 +31,18 @@ func BuildRequiredCoverage(runDir string) (RequiredCoverage, error) {
 	if err != nil {
 		return RequiredCoverage{}, err
 	}
-	return buildRequiredCoverage(goal, coord, sessionState, coverageSessionRoster(runDir, sessionState)), nil
+	return buildRequiredCoverage(goal, coord, sessionState, coverageSessionRoster(runDir, sessionState), loadTargetAttentionFacts(runDir)), nil
 }
 
-func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionState *SessionsRuntimeState, sessionRoster map[string]struct{}) RequiredCoverage {
+func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionState *SessionsRuntimeState, sessionRoster map[string]struct{}, attention map[string]TargetAttentionFacts) RequiredCoverage {
 	coverage := RequiredCoverage{
 		OpenRequiredIDs:        []string{},
 		OwnedOpenIDs:           []string{},
 		UnmappedOpenIDs:        []string{},
 		OwnerSessionMissingIDs: []string{},
+		OwnerAttentionIDs:      []string{},
+		OwnerBlockedIDs:        []string{},
+		OwnerRiskyIDs:          []string{},
 		IdleReusableSessions:   []string{},
 		ParkedReusableSessions: []string{},
 	}
@@ -80,6 +86,16 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 		if isSessionOwnerToken(owner) {
 			if _, ok := sessionRoster[owner]; !ok {
 				coverage.OwnerSessionMissingIDs = append(coverage.OwnerSessionMissingIDs, item.ID)
+				coverage.OwnerRiskyIDs = append(coverage.OwnerRiskyIDs, item.ID)
+				continue
+			}
+			switch attentionStateForOwner(attention, owner, sessionState, coord) {
+			case TargetAttentionNeedsAttention:
+				coverage.OwnerAttentionIDs = append(coverage.OwnerAttentionIDs, item.ID)
+			case TargetAttentionTransportBlocked, TargetAttentionProgressBlocked:
+				coverage.OwnerBlockedIDs = append(coverage.OwnerBlockedIDs, item.ID)
+			case TargetAttentionOwnershipRisky:
+				coverage.OwnerRiskyIDs = append(coverage.OwnerRiskyIDs, item.ID)
 			}
 		}
 	}
@@ -128,4 +144,20 @@ func sortedCoverageSessionNames(roster map[string]struct{}) []string {
 func isSessionOwnerToken(owner string) bool {
 	_, err := parseSessionIndex(strings.TrimSpace(owner))
 	return err == nil
+}
+
+func attentionStateForOwner(attention map[string]TargetAttentionFacts, owner string, sessionState *SessionsRuntimeState, coord *CoordinationState) string {
+	if owner = strings.TrimSpace(owner); owner == "" {
+		return ""
+	}
+	if attention != nil {
+		if facts, ok := attention[owner]; ok && strings.TrimSpace(facts.AttentionState) != "" {
+			return facts.AttentionState
+		}
+	}
+	switch coverageSessionLifecycleState(owner, sessionState, coord) {
+	case "parked", "done", "blocked":
+		return TargetAttentionOwnershipRisky
+	}
+	return ""
 }

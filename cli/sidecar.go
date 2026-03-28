@@ -251,6 +251,12 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, watcher, controlState); err != nil {
 			appendAuditLog(runDir, "transport watcher snapshot warning: %v", err)
 		}
+		if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
+			appendAuditLog(runDir, "activity snapshot warning: %v", err)
+		}
+		if err := processBlockedTargetAttention(runDir, presence); err != nil {
+			return err
+		}
 		if err := RefreshRunMemorySeeds(runDir); err != nil {
 			return err
 		}
@@ -262,9 +268,6 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		}
 		if err := RefreshRunGuidance(projectRoot, runName, runDir); err != nil {
 			appendAuditLog(runDir, "guidance refresh warning: %v", err)
-		}
-		if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
-			appendAuditLog(runDir, "activity snapshot warning: %v", err)
 		}
 		return nil
 	}
@@ -290,6 +293,12 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err := refreshTransportFactsForSidecar(runDir, tmuxSession, cfg.Master.Engine, nil, controlState); err != nil {
 		return err
 	}
+	if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
+		appendAuditLog(runDir, "activity snapshot warning: %v", err)
+	}
+	if err := processBlockedTargetAttention(runDir, presence); err != nil {
+		return err
+	}
 	if err := RefreshRunMemorySeeds(runDir); err != nil {
 		return err
 	}
@@ -301,9 +310,6 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	}
 	if err := RefreshRunGuidance(projectRoot, runName, runDir); err != nil {
 		appendAuditLog(runDir, "guidance refresh warning: %v", err)
-	}
-	if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
-		appendAuditLog(runDir, "activity snapshot warning: %v", err)
 	}
 	return nil
 }
@@ -462,6 +468,64 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 		}
 	}
 	return nil
+}
+
+func processBlockedTargetAttention(runDir string, presence map[string]TargetPresenceFacts) error {
+	attention := loadTargetAttentionFacts(runDir)
+	if len(attention) == 0 {
+		return nil
+	}
+	masterPresence := presence["master"]
+	masterAvailable := !targetPresenceMissing(masterPresence) && targetPresenceAvailableForTransport(masterPresence)
+	for target, facts := range attention {
+		if target == "master" {
+			continue
+		}
+		if err := recordTargetAttentionObservation(runDir, facts); err != nil {
+			return err
+		}
+		if !targetAttentionBlocked(facts) || !masterAvailable {
+			continue
+		}
+		recovery := loadTransportRecoveryTarget(runDir, target)
+		state := strings.TrimSpace(facts.AttentionState)
+		if recovery.CurrentAttentionState == state && recovery.CurrentAttentionLastAlertAt != "" {
+			continue
+		}
+		reason := formatBlockedTargetReason(facts)
+		appendAuditLog(runDir, "target_attention_alert target=%s state=%s reason=%s", target, state, reason)
+		body := fmt.Sprintf("Target attention needed in active GoalX run; target=%s state=%s %s", target, state, reason)
+		if _, err := appendControlInboxMessage(runDir, "master", "target-attention", "goalx sidecar", body, true); err != nil {
+			return err
+		}
+		if err := recordTargetAttentionAlert(runDir, target, state, reason); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func formatBlockedTargetReason(facts TargetAttentionFacts) string {
+	parts := []string{}
+	if facts.Unread > 0 {
+		parts = append(parts, fmt.Sprintf("unread=%d", facts.Unread))
+	}
+	if facts.CursorLag > 0 {
+		parts = append(parts, fmt.Sprintf("cursor_lag=%d", facts.CursorLag))
+	}
+	if facts.JournalStaleMinutes > 0 {
+		parts = append(parts, fmt.Sprintf("journal_stale=%dm", facts.JournalStaleMinutes))
+	}
+	if facts.OutputStaleMinutes > 0 {
+		parts = append(parts, fmt.Sprintf("output_stale=%dm", facts.OutputStaleMinutes))
+	}
+	if strings.TrimSpace(facts.TransportState) != "" {
+		parts = append(parts, "transport="+facts.TransportState)
+	}
+	if strings.TrimSpace(facts.RuntimeState) != "" {
+		parts = append(parts, "runtime="+facts.RuntimeState)
+	}
+	return strings.Join(parts, " ")
 }
 
 func processUrgentTransportTargets(runDir, runName, tmuxSession string, cfg *goalx.Config, presence map[string]TargetPresenceFacts) error {

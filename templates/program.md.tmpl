@@ -165,6 +165,7 @@ Session inbox is the latest assignment state, not a long conversation log. Check
 - Treat any transport wake text as "read the session inbox now". It is only a trigger, never the instruction payload.
 - Never execute transport wake text as a shell command.
 - After a transport wake or `goalx wait` return, read `{{.SessionInboxPath}}` before deciding what to do next.
+- If wakes keep arriving while unread inbox or cursor lag remains, do not keep assuming "no new message". Re-read the inbox and acknowledge the latest processed entry before continuing.
 
 ```bash
 cat {{.SessionInboxPath}}

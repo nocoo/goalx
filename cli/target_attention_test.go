@@ -1,0 +1,175 @@
+package cli
+
+import (
+	"testing"
+	"time"
+
+	goalx "github.com/vonbai/goalx"
+)
+
+func TestBuildTargetAttentionFactsMarksUnreadCursorLaggedIdleSessionBlocked(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 24},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if _, err := appendControlInboxMessage(runDir, "session-1", "tell", "master", "continue batch 2", false); err != nil {
+		t.Fatalf("appendControlInboxMessage: %v", err)
+	}
+	if err := SaveMasterCursorState(SessionCursorPath(runDir, "session-1"), &MasterCursorState{
+		LastSeenID: 0,
+		UpdatedAt:  time.Now().UTC().Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveMasterCursorState: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				Target:         "session-1",
+				Window:         "session-1",
+				Engine:         "codex",
+				TransportState: string(TUIStateIdlePrompt),
+				LastSampleAt:   time.Now().UTC().Format(time.RFC3339),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	snapshot := &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TargetPresenceFacts{
+			"session-1": {Target: "session-1", Kind: "session", State: TargetPresencePresent},
+		},
+		Sessions: map[string]ActivitySession{
+			"session-1": {LastOutputChangeAt: time.Now().Add(-24 * time.Minute).UTC().Format(time.RFC3339)},
+		},
+	}
+
+	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	if err != nil {
+		t.Fatalf("BuildTargetAttentionFacts: %v", err)
+	}
+	got := attention["session-1"]
+	if got.AttentionState != TargetAttentionTransportBlocked {
+		t.Fatalf("attention_state = %q, want %q (%+v)", got.AttentionState, TargetAttentionTransportBlocked, got)
+	}
+	if got.Unread != 1 || got.CursorLag != 1 {
+		t.Fatalf("queue facts wrong: %+v", got)
+	}
+	if got.JournalStaleMinutes != 24 {
+		t.Fatalf("journal stale = %d, want 24", got.JournalStaleMinutes)
+	}
+	_ = repo
+}
+
+func TestBuildTargetAttentionFactsMarksAcceptedWorkingSessionBlockedAfterGrace(t *testing.T) {
+	_, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 3},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if _, err := appendControlInboxMessage(runDir, "session-1", "tell", "master", "next slice", false); err != nil {
+		t.Fatalf("appendControlInboxMessage: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				Target:                "session-1",
+				Window:                "session-1",
+				Engine:                "codex",
+				TransportState:        string(TUIStateWorking),
+				LastSampleAt:          time.Now().UTC().Format(time.RFC3339),
+				LastTransportAcceptAt: time.Now().Add(-16 * time.Minute).UTC().Format(time.RFC3339),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	snapshot := &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TargetPresenceFacts{
+			"session-1": {Target: "session-1", Kind: "session", State: TargetPresencePresent},
+		},
+	}
+
+	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	if err != nil {
+		t.Fatalf("BuildTargetAttentionFacts: %v", err)
+	}
+	got := attention["session-1"]
+	if got.AttentionState != TargetAttentionTransportBlocked {
+		t.Fatalf("attention_state = %q, want %q (%+v)", got.AttentionState, TargetAttentionTransportBlocked, got)
+	}
+	if !got.DeliveryGraceExpired {
+		t.Fatalf("delivery grace should be expired: %+v", got)
+	}
+}
+
+func TestBuildRequiredCoverageMarksBlockedAndRiskyOwners(t *testing.T) {
+	_, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-2", State: "done", Mode: string(goalx.ModeDevelop)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-2: %v", err)
+	}
+
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Required: []GoalItem{
+			{ID: "req-1", Text: "blocked owner", State: goalItemStateOpen},
+			{ID: "req-2", Text: "risky owner", State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Owners: map[string]string{
+			"req-1": "session-1",
+			"req-2": "session-2",
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := SaveActivitySnapshot(runDir, &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Attention: map[string]TargetAttentionFacts{
+			"session-1": {Target: "session-1", AttentionState: TargetAttentionTransportBlocked},
+			"session-2": {Target: "session-2", AttentionState: TargetAttentionOwnershipRisky},
+		},
+	}); err != nil {
+		t.Fatalf("SaveActivitySnapshot: %v", err)
+	}
+
+	coverage, err := BuildRequiredCoverage(runDir)
+	if err != nil {
+		t.Fatalf("BuildRequiredCoverage: %v", err)
+	}
+	if len(coverage.OwnerBlockedIDs) != 1 || coverage.OwnerBlockedIDs[0] != "req-1" {
+		t.Fatalf("owner_blocked = %v, want [req-1]", coverage.OwnerBlockedIDs)
+	}
+	if len(coverage.OwnerRiskyIDs) != 1 || coverage.OwnerRiskyIDs[0] != "req-2" {
+		t.Fatalf("owner_risky = %v, want [req-2]", coverage.OwnerRiskyIDs)
+	}
+}

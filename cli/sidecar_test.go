@@ -1261,6 +1261,158 @@ func TestRunSidecarTickDoesNotAlertMissingParkedSession(t *testing.T) {
 	}
 }
 
+func TestProcessBlockedTargetAttentionAlertsMasterOnce(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	_, runDir, _, meta := writeTargetPresenceFixture(t)
+	if err := RenewControlLease(runDir, "master", meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
+		t.Fatalf("RenewControlLease master: %v", err)
+	}
+	if err := SaveActivitySnapshot(runDir, &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Attention: map[string]TargetAttentionFacts{
+			"session-1": {
+				Target:              "session-1",
+				AttentionState:      TargetAttentionTransportBlocked,
+				Unread:              1,
+				CursorLag:           1,
+				JournalStaleMinutes: 24,
+				RuntimeState:        "progress",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveActivitySnapshot: %v", err)
+	}
+
+	presence := map[string]TargetPresenceFacts{
+		"master":    {Target: "master", State: TargetPresencePresent},
+		"session-1": {Target: "session-1", State: TargetPresencePresent},
+	}
+	if err := processBlockedTargetAttention(runDir, presence); err != nil {
+		t.Fatalf("processBlockedTargetAttention first: %v", err)
+	}
+	if err := processBlockedTargetAttention(runDir, presence); err != nil {
+		t.Fatalf("processBlockedTargetAttention second: %v", err)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), `"type":"target-attention"`); got != 1 {
+		t.Fatalf("master inbox target-attention count = %d, want 1\n%s", got, string(inboxData))
+	}
+	if !strings.Contains(string(inboxData), "session-1") || !strings.Contains(string(inboxData), "transport_blocked") {
+		t.Fatalf("master inbox missing blocked target details:\n%s", string(inboxData))
+	}
+
+	recovery, err := LoadTransportRecovery(TransportRecoveryPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadTransportRecovery: %v", err)
+	}
+	got := recovery.Targets["session-1"]
+	if got.CurrentAttentionState != TargetAttentionTransportBlocked {
+		t.Fatalf("attention state = %q, want %q", got.CurrentAttentionState, TargetAttentionTransportBlocked)
+	}
+	if got.CurrentAttentionLastAlertAt == "" {
+		t.Fatalf("attention alert timestamp missing: %+v", got)
+	}
+}
+
+func TestRunSidecarTickAlertsBlockedSessionAttentionOnce(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("❯\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	if _, err := AppendControlInboxMessage(runDir, "session-1", "develop", "master", "take the next slice"); err != nil {
+		t.Fatalf("AppendControlInboxMessage: %v", err)
+	}
+	if err := RenewControlLease(runDir, "master", meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
+		t.Fatalf("RenewControlLease master: %v", err)
+	}
+	if err := RenewControlLease(runDir, "session-1", meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
+		t.Fatalf("RenewControlLease session-1: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 24},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	old := time.Now().UTC().Add(-24 * time.Minute)
+	if err := os.Chtimes(JournalPath(runDir, "session-1"), old, old); err != nil {
+		t.Fatalf("Chtimes session journal: %v", err)
+	}
+	if err := SaveControlDeliveries(ControlDeliveriesPath(runDir), &ControlDeliveries{
+		Version: 1,
+		Items: []ControlDelivery{
+			{DeliveryID: "del-1", DedupeKey: "session-wake:session-1", Status: "accepted", Target: goalx.TmuxSessionName(repo, cfg.Name) + ":session-1", AttemptedAt: time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339), AcceptedAt: time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339), TransportState: string(TUIStateQueued)},
+		},
+	}); err != nil {
+		t.Fatalf("SaveControlDeliveries: %v", err)
+	}
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick first: %v", err)
+	}
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick second: %v", err)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), `"type":"target-attention"`); got != 1 {
+		t.Fatalf("master inbox target-attention count = %d, want 1\n%s", got, string(inboxData))
+	}
+	if !strings.Contains(string(inboxData), `"urgent":true`) {
+		t.Fatalf("master inbox missing urgent target-attention fact:\n%s", string(inboxData))
+	}
+	if !strings.Contains(string(inboxData), "state=transport_blocked") {
+		t.Fatalf("master inbox missing blocked attention state:\n%s", string(inboxData))
+	}
+
+	recovery, err := LoadTransportRecovery(TransportRecoveryPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadTransportRecovery: %v", err)
+	}
+	target := recovery.Targets["session-1"]
+	if target.CurrentAttentionState != TargetAttentionTransportBlocked {
+		t.Fatalf("current attention state = %q, want %q", target.CurrentAttentionState, TargetAttentionTransportBlocked)
+	}
+	if target.CurrentAttentionFirstSeenAt == "" || target.CurrentAttentionLastAlertAt == "" {
+		t.Fatalf("attention timestamps missing: %+v", target)
+	}
+
+	auditData, err := os.ReadFile(filepath.Join(runDir, "sidecar.log"))
+	if err != nil {
+		t.Fatalf("read sidecar audit log: %v", err)
+	}
+	if got := strings.Count(string(auditData), "target_attention_alert target=session-1 state=transport_blocked"); got != 1 {
+		t.Fatalf("target attention alert should be recorded once:\n%s", string(auditData))
+	}
+}
+
 func TestRunSidecarTickQueuesSessionWakeForUnreadSessionInbox(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

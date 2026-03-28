@@ -14,17 +14,18 @@ import (
 )
 
 type ActivitySnapshot struct {
-	Version   int                            `json:"version"`
-	CheckedAt string                         `json:"checked_at,omitempty"`
-	Run       ActivityRunInfo                `json:"run"`
-	Lifecycle ActivityLifecycle              `json:"lifecycle"`
-	Queue     ActivityQueue                  `json:"queue"`
-	Budget    ActivityBudget                 `json:"budget,omitempty"`
-	Coverage  RequiredCoverage               `json:"coverage,omitempty"`
-	Root      WorktreeDiffStat               `json:"root"`
-	Targets   map[string]TargetPresenceFacts `json:"targets,omitempty"`
-	Actors    map[string]ActivityActor       `json:"actors,omitempty"`
-	Sessions  map[string]ActivitySession     `json:"sessions,omitempty"`
+	Version   int                             `json:"version"`
+	CheckedAt string                          `json:"checked_at,omitempty"`
+	Run       ActivityRunInfo                 `json:"run"`
+	Lifecycle ActivityLifecycle               `json:"lifecycle"`
+	Queue     ActivityQueue                   `json:"queue"`
+	Budget    ActivityBudget                  `json:"budget,omitempty"`
+	Coverage  RequiredCoverage                `json:"coverage,omitempty"`
+	Attention map[string]TargetAttentionFacts `json:"attention,omitempty"`
+	Root      WorktreeDiffStat                `json:"root"`
+	Targets   map[string]TargetPresenceFacts  `json:"targets,omitempty"`
+	Actors    map[string]ActivityActor        `json:"actors,omitempty"`
+	Sessions  map[string]ActivitySession      `json:"sessions,omitempty"`
 }
 
 type ActivityRunInfo struct {
@@ -147,6 +148,9 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 	tmuxSession := goalx.TmuxSessionName(projectRoot, runName)
 	controlState, _ := LoadControlRunState(ControlRunStatePath(runDir))
 	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	sessionState, _ := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	goalState, _ := LoadGoalState(GoalPath(runDir))
+	coordinationState, _ := LoadCoordinationState(CoordinationPath(runDir))
 	remindersDue, deliveriesFailed := controlQueueSummary(runDir)
 	snapshot := &ActivitySnapshot{
 		Version:   1,
@@ -182,11 +186,6 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 		snapshot.Lifecycle.RunActive = runtimeState.Active
 	}
 	snapshot.Budget = buildActivityBudget(cfg, runtimeState, meta, snapshot.CheckedAt)
-	coverage, err := BuildRequiredCoverage(runDir)
-	if err != nil {
-		return nil, err
-	}
-	snapshot.Coverage = coverage
 	targets, err := BuildTargetPresenceFacts(runDir, tmuxSession)
 	if err != nil {
 		return nil, err
@@ -255,6 +254,14 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 	if len(snapshot.Sessions) == 0 {
 		snapshot.Sessions = nil
 	}
+	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	if err != nil {
+		return nil, err
+	}
+	if len(attention) > 0 {
+		snapshot.Attention = attention
+	}
+	snapshot.Coverage = buildRequiredCoverage(goalState, coordinationState, sessionState, coverageSessionRoster(runDir, sessionState), attention)
 	return snapshot, nil
 }
 
