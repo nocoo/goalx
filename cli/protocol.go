@@ -109,6 +109,7 @@ type ProviderCapabilities struct {
 	StopHookSafetyNet                 bool
 	WebSearchAvailable                bool
 	ActionExecutionReminder           bool
+	AutonomyPersistenceReminder       bool
 }
 
 // RenderMasterProtocol renders master.md.tmpl to the run directory.
@@ -174,10 +175,11 @@ func providerCapabilities(engine string) ProviderCapabilities {
 	switch strings.TrimSpace(engine) {
 	case "claude-code":
 		return ProviderCapabilities{
-			ProviderLabel:            "Claude Code",
-			NativeSubagentsAvailable: true,
-			StopHookSafetyNet:        true,
-			WebSearchAvailable:       true,
+			ProviderLabel:               "Claude Code",
+			NativeSubagentsAvailable:    true,
+			StopHookSafetyNet:           true,
+			WebSearchAvailable:          true,
+			AutonomyPersistenceReminder: true,
 		}
 	case "codex":
 		return ProviderCapabilities{
@@ -197,7 +199,8 @@ func isZeroProviderCapabilities(c ProviderCapabilities) bool {
 		!c.NativeSubagentsRequireExplicitAsk &&
 		!c.StopHookSafetyNet &&
 		!c.WebSearchAvailable &&
-		!c.ActionExecutionReminder
+		!c.ActionExecutionReminder &&
+		!c.AutonomyPersistenceReminder
 }
 
 func existingProtocolPath(path string) string {
