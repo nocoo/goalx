@@ -633,6 +633,7 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 		"If a local validation command is configured, run it before handing work back:",
 		"Keep changes minimal and correct. Do not add unrelated improvements, but do not cut corners on the change you are making.",
 		"Respect file ownership from the current inbox assignment.",
+		"If the inbox assignment names an allowed edit boundary, stay inside it.",
 		"go test ./...",
 	} {
 		if !strings.Contains(modeSection, want) {
@@ -644,6 +645,96 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	}
 	if got := nonEmptyLineCount(modeSection); got > 25 {
 		t.Fatalf("develop mode section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
+	}
+}
+
+func TestRenderMasterProtocolRefinesReviewRoutingAndDepthCap(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		SummaryPath: "/tmp/summary.md",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Prefer native helpers or a different engine/model path for short review, validation, and adversarial checks.",
+		"Launch a durable review session only when the review itself needs multi-step durable ownership, worktree isolation, or mergeable output.",
+		"Default to one independent review round per implementation path.",
+		"If a review finds new decisive evidence, redirect or take over; otherwise arbitrate instead of spinning review/fix/re-review loops.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolAddsConditionalRacingPattern(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		SummaryPath: "/tmp/summary.md",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"When 2-3 paths are plausibly competitive and independent, prefer racing them in isolated worktrees instead of serial speculation.",
+		"Race only when the paths are worktree-safe, touch separable areas, and can be evaluated independently.",
+		"Compare the resulting branches with `goalx diff`, then `goalx keep` or manually adopt the winner.",
+		"Do not race shared config/schema changes, API contract changes, or naming/cross-cutting refactors that require one coherent decision.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolRequiresConcreteParallelAssignmentBoundaries(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		SummaryPath: "/tmp/summary.md",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"When dispatching parallel develop work, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -1767,10 +1858,12 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		"`required_remaining == 0` only means the current required baseline is covered.",
 		"Do not enter review or idle just because required items are covered.",
 		"Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.",
+		"Run an explicit iteration frontier: choose the highest-value next experiment or frontier, execute one or more independent experiments when warranted, review evidence, record the result, then continue, pivot, or consolidate.",
+		"A frontier may contain one experiment or multiple independent experiments when paths are worktree-safe and separately verifiable.",
 		"Record a factual blocker that is truly outside your current permissions, credentials, or reachable environment.",
 		"Record why the current path no longer justifies more budget or risk.",
 		"`goalx add --run demo --worktree --base-branch session-N`",
-		"Stop the iteration loop when budget is exhausted",
+		"Stop the iteration frontier when budget is exhausted",
 		"the user redirects or stops the run",
 		"recent experiments show diminishing returns",
 	} {
@@ -1828,7 +1921,7 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 		"Mechanical work belongs on codex-class workers. Judgment and final arbitration belong on opus-class workers.",
 		"Read the inbox every control cycle before making decisions.",
 		"If you finish a thinking block without a concrete next action, immediately enter `goalx wait --run demo master --timeout 300`.",
-		"If a session is stale for 15+ minutes while its lease is healthy, park it and replace it.",
+		"If a session is stale for 15+ minutes while its lease is healthy, inspect it in the current control cycle instead of waiting passively.",
 		"Reconfirm the immutable run objective from `goalx context --run demo` before declaring completion.",
 	} {
 		if !strings.Contains(text, want) {
@@ -1844,6 +1937,36 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered master protocol should omit %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolUsesInspectFirstStaleEscalation(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Mode:        goalx.ModeDevelop,
+		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		SummaryPath: "/tmp/summary.md",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If a session is stale for 15+ minutes while its lease is healthy, inspect it in the current control cycle instead of waiting passively.",
+		"If stale facts persist after inspection or follow-up recheck, or transport/pane facts show a real blockage, park it and replace it.",
+		"Long model waits or test runs are not by themselves proof that ownership failed.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
 }

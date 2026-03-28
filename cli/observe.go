@@ -173,6 +173,9 @@ func printObserveMasterQueue(runDir, masterEngine string) {
 	if lineage := rootWorktreeLineageSummary(runDir); lineage != "" {
 		fmt.Printf("Worktree: %s\n", lineage)
 	}
+	if experiments := formatExperimentSurfaceSummary(runDir); experiments != "" {
+		fmt.Printf("Experiments: %s\n", experiments)
+	}
 	printObserveTransportFacts(transport)
 }
 

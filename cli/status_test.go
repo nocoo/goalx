@@ -721,6 +721,50 @@ func TestStatusWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *test
 	}
 }
 
+func TestStatusShowsExperimentLineageFacts(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := os.WriteFile(ExperimentsLogPath(runDir), []byte(
+		"{\"version\":1,\"kind\":\"experiment.created\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"goalx\",\"body\":{\"experiment_id\":\"exp-1\",\"created_at\":\"2026-03-28T10:00:00Z\"}}\n"+
+			"{\"version\":1,\"kind\":\"experiment.integrated\",\"at\":\"2026-03-28T10:05:00Z\",\"actor\":\"goalx\",\"body\":{\"integration_id\":\"int-1\",\"result_experiment_id\":\"exp-2\",\"source_experiment_ids\":[\"exp-1\"],\"method\":\"keep\",\"recorded_at\":\"2026-03-28T10:05:00Z\"}}\n"), 0o644); err != nil {
+		t.Fatalf("write experiments log: %v", err)
+	}
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:                 1,
+		CurrentExperimentID:     "exp-2",
+		CurrentBranch:           "goalx/guidance-run/root",
+		CurrentCommit:           "abc123",
+		LastIntegrationID:       "int-1",
+		LastMethod:              "keep",
+		LastSourceExperimentIDs: []string{"exp-1"},
+		UpdatedAt:               "2026-03-28T10:05:00Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Experiments:",
+		"current=exp-2",
+		"entries=2",
+		"last_record_at=2026-03-28T10:05:00Z",
+		"last_method=keep",
+		"sources=exp-1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusShowsCoverageUnknownWhenOwnersMissing(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -185,6 +186,64 @@ func TestBuildAffordancesIncludesKeepCommands(t *testing.T) {
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("affordance commands missing %q:\n%s", want, joined)
+		}
+	}
+}
+
+func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := os.WriteFile(ExperimentsLogPath(runDir), []byte(
+		"{\"version\":1,\"kind\":\"experiment.created\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"goalx\",\"body\":{\"experiment_id\":\"exp-1\",\"created_at\":\"2026-03-28T10:00:00Z\"}}\n"+
+			"{\"version\":1,\"kind\":\"experiment.integrated\",\"at\":\"2026-03-28T10:05:00Z\",\"actor\":\"goalx\",\"body\":{\"integration_id\":\"int-1\",\"result_experiment_id\":\"exp-2\",\"source_experiment_ids\":[\"exp-1\"],\"method\":\"keep\",\"recorded_at\":\"2026-03-28T10:05:00Z\"}}\n"), 0o644); err != nil {
+		t.Fatalf("write experiments log: %v", err)
+	}
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:                 1,
+		CurrentExperimentID:     "exp-2",
+		CurrentBranch:           "goalx/guidance-run/root",
+		CurrentCommit:           "abc123",
+		LastIntegrationID:       "int-1",
+		LastMethod:              "keep",
+		LastSourceExperimentIDs: []string{"exp-1"},
+		UpdatedAt:               "2026-03-28T10:05:00Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	commands := make([]string, 0, len(doc.Items))
+	facts := make([]string, 0, len(doc.Items))
+	for _, item := range doc.Items {
+		commands = append(commands, item.Command)
+		facts = append(facts, strings.Join(item.Facts, "\n"))
+	}
+	joinedCommands := strings.Join(commands, "\n")
+	for _, want := range []string{
+		"goalx diff --run guidance-run session-1 session-2",
+		`goalx add --run guidance-run --mode develop --worktree --base-branch session-N "follow-on direction"`,
+	} {
+		if !strings.Contains(joinedCommands, want) {
+			t.Fatalf("affordance commands missing %q:\n%s", want, joinedCommands)
+		}
+	}
+	joinedFacts := strings.Join(facts, "\n")
+	for _, want := range []string{
+		"Current integrated experiment: `exp-2`.",
+		"Experiment entries: `2`.",
+		"Last experiment record: `2026-03-28T10:05:00Z`.",
+		"Last integration method: `keep`.",
+		"Last integration sources: `exp-1`.",
+	} {
+		if !strings.Contains(joinedFacts, want) {
+			t.Fatalf("affordance facts missing %q:\n%s", want, joinedFacts)
 		}
 	}
 }

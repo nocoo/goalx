@@ -187,7 +187,34 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Command: fmt.Sprintf("goalx keep --run %s", runName),
 		},
 	}
+	if index != nil && strings.TrimSpace(index.RunIdentity.Intent) == runIntentEvolve {
+		doc.Items = append(doc.Items,
+			AffordanceItem{
+				ID:      "diff-experiments",
+				Kind:    "control",
+				Summary: "Compare two session branches or experiment paths before keeping or partially adopting one.",
+				Command: fmt.Sprintf("goalx diff --run %s session-1 session-2", runName),
+			},
+			AffordanceItem{
+				ID:      "fork-experiment",
+				Kind:    "control",
+				Summary: "Fork a follow-on dedicated worktree from an existing session branch to continue or compete on a concrete direction.",
+				Command: fmt.Sprintf(`goalx add --run %s --mode develop --worktree --base-branch session-N "follow-on direction"`, runName),
+			},
+		)
+	}
 	if index != nil {
+		if facts, err := experimentAffordanceFacts(runDir); err != nil {
+			return nil, err
+		} else if len(facts) > 0 {
+			doc.Items = append(doc.Items, AffordanceItem{
+				ID:      "experiments",
+				Kind:    "fact",
+				Summary: "Canonical experiment lineage surfaces for the current integrated result and recorded experiment history.",
+				Facts:   facts,
+				Paths:   []string{index.ExperimentsLogPath, index.IntegrationStatePath},
+			})
+		}
 		if item := buildWorktreeBoundaryAffordance(index, normalizedTarget); item != nil {
 			doc.Items = append(doc.Items, *item)
 		}

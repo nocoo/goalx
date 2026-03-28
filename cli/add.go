@@ -155,6 +155,9 @@ func Add(projectRoot string, args []string) (err error) {
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
 	}
+	if err := requireRunBudgetAvailable(rc.RunDir, rc.Config); err != nil {
+		return err
+	}
 
 	// Determine next session number from the run's existing session artifacts.
 	newNum, err := nextAvailableSessionIndex(rc.ProjectRoot, rc.RunDir, rc.Config.Name)
@@ -376,35 +379,35 @@ func Add(projectRoot string, args []string) (err error) {
 	// Render protocol
 	protocolPath := filepath.Join(rc.RunDir, fmt.Sprintf("program-%d.md", newNum))
 	subData := ProtocolData{
-		RunName:                rc.Config.Name,
-		Objective:              rc.Config.Objective,
-		Mode:                   goalx.Mode(sessionIdentity.Mode),
-		Engine:                 sessionIdentity.Engine,
-		Sessions:               sessionDataList,
-		Target:                 sessionIdentity.Target,
-		LocalValidationCommand: sessionIdentity.LocalValidationCommand,
-		Context:                rc.Config.Context,
-		Budget:                 rc.Config.Budget,
-		SessionName:            sName,
-		SessionIndex:           newNum - 1,
-		CurrentDimensions:      CurrentSessionDimensions(rc.RunDir, sName, sessionIdentity.Dimensions),
-		JournalPath:            journalPath,
-		CharterPath:            RunCharterPath(rc.RunDir),
-		SessionIdentityPath:    sessionIdentityPath,
-		SessionInboxPath:       ControlInboxPath(rc.RunDir, sName),
-		SessionCursorPath:      SessionCursorPath(rc.RunDir, sName),
-		WorktreePath:           wtPath,
-		GoalPath:               GoalPath(rc.RunDir),
-		GoalLogPath:            GoalLogPath(rc.RunDir),
-		IdentityFencePath:      IdentityFencePath(rc.RunDir),
-		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
-		AcceptanceStatePath:    AcceptanceStatePath(rc.RunDir),
-		CompletionProofPath:    CompletionStatePath(rc.RunDir),
-		RunStatePath:           RunRuntimeStatePath(rc.RunDir),
-		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
-		ProjectRoot:            absProjectRoot,
-		RunWorktreePath:        runWT,
+		RunName:                   rc.Config.Name,
+		Objective:                 rc.Config.Objective,
+		Mode:                      goalx.Mode(sessionIdentity.Mode),
+		Engine:                    sessionIdentity.Engine,
+		Sessions:                  sessionDataList,
+		Target:                    sessionIdentity.Target,
+		LocalValidationCommand:    sessionIdentity.LocalValidationCommand,
+		Context:                   rc.Config.Context,
+		Budget:                    rc.Config.Budget,
+		SessionName:               sName,
+		SessionIndex:              newNum - 1,
+		CurrentDimensions:         CurrentSessionDimensions(rc.RunDir, sName, sessionIdentity.Dimensions),
+		JournalPath:               journalPath,
+		CharterPath:               RunCharterPath(rc.RunDir),
+		SessionIdentityPath:       sessionIdentityPath,
+		SessionInboxPath:          ControlInboxPath(rc.RunDir, sName),
+		SessionCursorPath:         SessionCursorPath(rc.RunDir, sName),
+		WorktreePath:              wtPath,
+		GoalPath:                  GoalPath(rc.RunDir),
+		GoalLogPath:               GoalLogPath(rc.RunDir),
+		IdentityFencePath:         IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath:       existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath:       AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath:       CompletionStatePath(rc.RunDir),
+		RunStatePath:              RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:         SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath:       ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:               absProjectRoot,
+		RunWorktreePath:           runWT,
 		SessionBaseBranchSelector: sessionIdentity.BaseBranchSelector,
 		SessionBaseBranch:         sessionIdentity.BaseBranch,
 	}

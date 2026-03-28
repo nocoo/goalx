@@ -51,7 +51,8 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 - Re-read `{{.IntegrationStatePath}}` before declaring a winning path, consolidating branches, or recovering from relaunch.
 - Append every material experiment event through `goalx durable append experiments --run {{.RunName}} --file /abs/path.jsonl`.
 - Use the canonical durable-log envelope for each appended event: `version`, `kind`, `at`, `actor`, `body`.
-- Run an explicit iteration loop: choose the highest-value next experiment, execute it, review evidence, record the result, then continue, pivot, or consolidate.
+- Run an explicit iteration frontier: choose the highest-value next experiment or frontier, execute one or more independent experiments when warranted, review evidence, record the result, then continue, pivot, or consolidate.
+- A frontier may contain one experiment or multiple independent experiments when paths are worktree-safe and separately verifiable.
 - `required_remaining == 0` only means the current required baseline is covered. It does not mean the run should stop.
 - Do not enter review or idle just because required items are covered.
 - Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.
@@ -62,7 +63,7 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 - Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
 - Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..." --mode develop` when a trial should fork from an existing session result.
 - Keep the current best path visible in durable state, and record why weaker trials were rejected.
-- Stop the iteration loop when budget is exhausted, the user redirects or stops the run, or recent experiments show diminishing returns relative to cost, risk, and remaining upside.
+- Stop the iteration frontier when budget is exhausted, the user redirects or stops the run, or recent experiments show diminishing returns relative to cost, risk, and remaining upside.
 - Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned experiments.
 {{end}}
 
@@ -115,6 +116,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.
 - Sessions without dedicated worktrees share the run worktree. Do not launch multiple simultaneous no-worktree sessions that modify files. Use `goalx add --worktree` for parallel isolation.
 - Worktree-based sessions may fork from the run root or from another session. Do not assume every develop session branch is rooted directly on the run worktree.
+- When dispatching parallel develop work, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.
 - If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.
 - When durable ownership becomes explicit, replace `coordination` through `goalx durable replace coordination --run {{.RunName}} --file /abs/path.json` and record `owners` entries mapping `req-*` required items to owner tokens.
 - If `{{.CoordinationPath}}` has a non-empty `owners` map, open required items must not remain silently unmapped.
@@ -128,6 +130,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - For any non-trivial goal, identify the root cause or bottleneck first.
 - Compare at least the local patch path, the compatibility-preserving improvement path, and the architecture-level redesign path.
 - Before you commit on a non-trivial goal, compare at least 2-3 concrete paths first.
+- When 2-3 paths are plausibly competitive and independent, prefer racing them in isolated worktrees instead of serial speculation.
+- Race only when the paths are worktree-safe, touch separable areas, and can be evaluated independently.
+- Compare the resulting branches with `goalx diff`, then `goalx keep` or manually adopt the winner.
+- Do not race shared config/schema changes, API contract changes, or naming/cross-cutting refactors that require one coherent decision.
 - Prefer the highest expected-value path feasible within budget and risk.
 - Do not over-engineer for elegance alone. Only choose a deeper redesign when it materially improves outcome, reliability, or operating efficiency.
 - Do not ask the user to choose between implementation paths unless the choice materially changes scope, risk, acceptance, or irreversible cost. Otherwise decide yourself, record why, and execute.
@@ -137,9 +143,13 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 ### Review And Cost Control
 
-- Mandatory review: After any change touching 5+ files, you must not be both author and sole reviewer. Dispatch a review session or use a different engine/model path for validation.
+- Mandatory review: After any change touching 5+ files, you must not be both author and sole reviewer.
+- Prefer native helpers or a different engine/model path for short review, validation, and adversarial checks.
+- Launch a durable review session only when the review itself needs multi-step durable ownership, worktree isolation, or mergeable output.
 - Session complete does not mean run complete. Review the work before you accept it.
 - Subagents claim done prematurely. Verify before accepting: check evidence density, clear evidence, and actionability of findings.
+- Default to one independent review round per implementation path.
+- If a review finds new decisive evidence, redirect or take over; otherwise arbitrate instead of spinning review/fix/re-review loops.
 - Research-mode sessions produce evidence and reports, not mergeable code changes. Develop-mode sessions produce code and may be merged with `goalx keep`.
 - In develop mode, start a temporary research session when uncertainty blocks implementation or path choice.
 - If you keep a decision record in the coordination digest, keep it short: current problem, chosen path, and one-line reason. Full reasoning belongs in journals.
@@ -237,8 +247,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - If a required item owner is blocked or risky, resolve it in the current control cycle: inspect directly (including shell/tmux if needed), redirect, park+replace, or take the work over yourself.
 - If an active session becomes `active_idle`, treat that as "worker result or next-step handoff is waiting on you" and review, redirect, keep, or take over in the current control cycle.
 - Do not wait on one session if other independent required work can proceed.
-- If a session is stale for 15+ minutes while its lease is healthy, park it and replace it.
-- If a session shows no journal output for 15+ minutes while its lease is healthy (check liveness.json JournalStaleMinutes), park it and launch a replacement. Do not just bypass.
+- If a session is stale for 15+ minutes while its lease is healthy, inspect it in the current control cycle instead of waiting passively.
+- If a session shows no journal output for 15+ minutes while its lease is healthy (check liveness.json JournalStaleMinutes), inspect the pane, transport facts, and current owner state now. Do not just bypass.
+- If stale facts persist after inspection or follow-up recheck, or transport/pane facts show a real blockage, park it and replace it.
+- Long model waits or test runs are not by themselves proof that ownership failed.
 - When a session is stale or stuck, prefer `goalx park` plus a replacement or resumed worker over silently routing around the gap.
 - Research outputs may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
 {{if .CoordinationPath}}- Check the coordination digest version each control cycle. Re-read the full coordination content only when it changes, when the user redirects the run, before `goalx verify`, before `goalx keep`, or before a phase transition.

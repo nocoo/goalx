@@ -129,6 +129,9 @@ func Resume(projectRoot string, args []string) error {
 	if !SessionExists(rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is not active (no tmux session)", rc.Name)
 	}
+	if err := requireRunBudgetAvailable(rc.RunDir, rc.Config); err != nil {
+		return err
+	}
 	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
 
 	idx, err := parseSessionIndex(sessionName)
@@ -198,35 +201,35 @@ func Resume(projectRoot string, args []string) error {
 		return fmt.Errorf("build session roster: %w", err)
 	}
 	subData := ProtocolData{
-		RunName:                rc.Config.Name,
-		Objective:              rc.Config.Objective,
-		Mode:                   goalx.Mode(sessionIdentity.Mode),
-		Engine:                 sessionIdentity.Engine,
-		Sessions:               sessionDataList,
-		Target:                 sessionIdentity.Target,
-		LocalValidationCommand: sessionIdentity.LocalValidationCommand,
-		Context:                rc.Config.Context,
-		Budget:                 rc.Config.Budget,
-		SessionName:            sessionName,
-		SessionIndex:           idx - 1,
-		CurrentDimensions:      CurrentSessionDimensions(rc.RunDir, sessionName, sessionIdentity.Dimensions),
-		JournalPath:            JournalPath(rc.RunDir, sessionName),
-		CharterPath:            RunCharterPath(rc.RunDir),
-		SessionIdentityPath:    SessionIdentityPath(rc.RunDir, sessionName),
-		SessionInboxPath:       ControlInboxPath(rc.RunDir, sessionName),
-		SessionCursorPath:      SessionCursorPath(rc.RunDir, sessionName),
-		WorktreePath:           wtPath,
-		GoalPath:               GoalPath(rc.RunDir),
-		GoalLogPath:            GoalLogPath(rc.RunDir),
-		IdentityFencePath:      IdentityFencePath(rc.RunDir),
-		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
-		AcceptanceStatePath:    AcceptanceStatePath(rc.RunDir),
-		CompletionProofPath:    CompletionStatePath(rc.RunDir),
-		RunStatePath:           RunRuntimeStatePath(rc.RunDir),
-		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
-		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
-		ProjectRoot:            absProjectRoot,
-		RunWorktreePath:        RunWorktreePath(rc.RunDir),
+		RunName:                   rc.Config.Name,
+		Objective:                 rc.Config.Objective,
+		Mode:                      goalx.Mode(sessionIdentity.Mode),
+		Engine:                    sessionIdentity.Engine,
+		Sessions:                  sessionDataList,
+		Target:                    sessionIdentity.Target,
+		LocalValidationCommand:    sessionIdentity.LocalValidationCommand,
+		Context:                   rc.Config.Context,
+		Budget:                    rc.Config.Budget,
+		SessionName:               sessionName,
+		SessionIndex:              idx - 1,
+		CurrentDimensions:         CurrentSessionDimensions(rc.RunDir, sessionName, sessionIdentity.Dimensions),
+		JournalPath:               JournalPath(rc.RunDir, sessionName),
+		CharterPath:               RunCharterPath(rc.RunDir),
+		SessionIdentityPath:       SessionIdentityPath(rc.RunDir, sessionName),
+		SessionInboxPath:          ControlInboxPath(rc.RunDir, sessionName),
+		SessionCursorPath:         SessionCursorPath(rc.RunDir, sessionName),
+		WorktreePath:              wtPath,
+		GoalPath:                  GoalPath(rc.RunDir),
+		GoalLogPath:               GoalLogPath(rc.RunDir),
+		IdentityFencePath:         IdentityFencePath(rc.RunDir),
+		AcceptanceNotesPath:       existingProtocolPath(AcceptanceNotesPath(rc.RunDir)),
+		AcceptanceStatePath:       AcceptanceStatePath(rc.RunDir),
+		CompletionProofPath:       CompletionStatePath(rc.RunDir),
+		RunStatePath:              RunRuntimeStatePath(rc.RunDir),
+		SessionsStatePath:         SessionsRuntimeStatePath(rc.RunDir),
+		ProjectRegistryPath:       ProjectRegistryPath(rc.ProjectRoot),
+		ProjectRoot:               absProjectRoot,
+		RunWorktreePath:           RunWorktreePath(rc.RunDir),
 		SessionBaseBranchSelector: sessionIdentity.BaseBranchSelector,
 		SessionBaseBranch:         sessionIdentity.BaseBranch,
 	}
@@ -377,6 +380,9 @@ func Replace(projectRoot string, args []string) error {
 	if _, err := parseSessionIndex(oldSessionName); err != nil {
 		return err
 	}
+	if err := requireRunBudgetAvailable(rc.RunDir, rc.Config); err != nil {
+		return err
+	}
 	oldIdentity, err := RequireSessionIdentity(rc.RunDir, oldSessionName)
 	if err != nil {
 		return fmt.Errorf("load session identity: %w", err)
@@ -520,6 +526,7 @@ func Replace(projectRoot string, args []string) error {
 	}
 	sessionIdentity.RouteRole = effectiveSession.RouteRole
 	sessionIdentity.ReplacesSession = oldSessionName
+	sessionIdentity.BaseExperimentID = oldIdentity.ExperimentID
 	sessionIdentity.BaseBranchSelector = replacementBaseSelector
 	sessionIdentity.BaseBranch = replacementBaseBranch
 	if len(effectiveSession.Dimensions) > 0 {
@@ -565,6 +572,18 @@ func Replace(projectRoot string, args []string) error {
 		if err := CopyGitignoredFiles(runWT, replacementWorktreePath); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: copy gitignored files to replacement worktree: %v\n", err)
 		}
+	}
+	if err := appendExperimentCreated(rc.RunDir, ExperimentCreatedBody{
+		ExperimentID:     sessionIdentity.ExperimentID,
+		Session:          newSessionName,
+		Branch:           replacementBranch,
+		Worktree:         replacementWorkdir,
+		Intent:           sessionIdentity.Mode,
+		BaseRef:          sessionIdentity.BaseBranch,
+		BaseExperimentID: sessionIdentity.BaseExperimentID,
+		CreatedAt:        sessionIdentity.CreatedAt,
+	}); err != nil {
+		return fmt.Errorf("append experiment.created for %s: %w", newSessionName, err)
 	}
 	if err := GenerateAdapter(sessionIdentity.Engine, replacementWorkdir, ControlInboxPath(rc.RunDir, newSessionName), SessionCursorPath(rc.RunDir, newSessionName)); err != nil {
 		return fmt.Errorf("generate adapter: %w", err)

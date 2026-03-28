@@ -243,6 +243,9 @@ func printStatusControlSummary(rc *RunContext) {
 	if lineage := rootWorktreeLineageSummary(rc.RunDir); lineage != "" {
 		fmt.Printf("Run worktree: %s\n", lineage)
 	}
+	if experiments := formatExperimentSurfaceSummary(rc.RunDir); experiments != "" {
+		fmt.Printf("Experiments: %s\n", experiments)
+	}
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)
 	}

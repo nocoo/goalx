@@ -456,6 +456,13 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	if err := SaveCoordinationState(CoordinationPath(runDir), coord); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
+	oldIdentity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity session-1: %v", err)
+	}
+	if oldIdentity == nil {
+		t.Fatal("session-1 identity missing")
+	}
 
 	if err := Replace(repo, []string{"--run", runName, "session-1", "--route-profile", "research_deep"}); err != nil {
 		t.Fatalf("Replace: %v", err)
@@ -542,6 +549,33 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	if identity.BaseBranch != "goalx/"+runName+"/1" {
 		t.Fatalf("base_branch = %q, want %q", identity.BaseBranch, "goalx/"+runName+"/1")
 	}
+	if identity.BaseExperimentID != oldIdentity.ExperimentID {
+		t.Fatalf("base_experiment_id = %q, want %q", identity.BaseExperimentID, oldIdentity.ExperimentID)
+	}
+	events, err := LoadDurableLog(ExperimentsLogPath(runDir), DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("LoadDurableLog: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("expected experiment log entry for replacement session")
+	}
+	last := events[len(events)-1]
+	if last.Kind != "experiment.created" {
+		t.Fatalf("last experiment kind = %q, want experiment.created", last.Kind)
+	}
+	var created ExperimentCreatedBody
+	if err := decodeStrictJSON(last.Body, &created); err != nil {
+		t.Fatalf("decode experiment.created: %v", err)
+	}
+	if created.Session != "session-2" {
+		t.Fatalf("created.Session = %q, want session-2", created.Session)
+	}
+	if created.ExperimentID != identity.ExperimentID {
+		t.Fatalf("created.ExperimentID = %q, want %q", created.ExperimentID, identity.ExperimentID)
+	}
+	if created.BaseExperimentID != oldIdentity.ExperimentID {
+		t.Fatalf("created.BaseExperimentID = %q, want %q", created.BaseExperimentID, oldIdentity.ExperimentID)
+	}
 
 	coord, err = LoadCoordinationState(CoordinationPath(runDir))
 	if err != nil {
@@ -565,6 +599,102 @@ func TestReplaceCreatesReplacementSessionWithRouteOverrideAndLineage(t *testing.
 	}
 	if !strings.Contains(logText, "new-window -t "+tmuxSession+" -n session-2 -c "+WorktreePath(runDir, runName, 2)+" env ") {
 		t.Fatalf("tmux log missing new-window for session-2:\n%s", logText)
+	}
+}
+
+func TestResumeFailsWhenRunBudgetIsExhausted(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	logPath := installFakeTmux(t, "master")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	cfg.Budget.MaxDuration = time.Second
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: "2000-01-01T00:00:00Z",
+		UpdatedAt: "2000-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	err = Resume(repo, []string{"--run", runName, "session-1"})
+	if err == nil {
+		t.Fatal("Resume error = nil, want budget exhausted")
+	}
+	for _, want := range []string{"budget exhausted", "max_duration=1s", "exhausted=true"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Resume error = %q, want substring %q", err, want)
+		}
+	}
+	logData, readErr := os.ReadFile(logPath)
+	if readErr != nil {
+		t.Fatalf("read tmux log: %v", readErr)
+	}
+	if strings.Contains(string(logData), "new-window") {
+		t.Fatalf("resume should not launch tmux window after exhausted budget:\n%s", string(logData))
+	}
+}
+
+func TestReplaceFailsWhenRunBudgetIsExhausted(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	installFakeTmux(t, "master session-1")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	cfg.Budget.MaxDuration = time.Second
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: "2000-01-01T00:00:00Z",
+		UpdatedAt: "2000-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	err = Replace(repo, []string{"--run", runName, "session-1"})
+	if err == nil {
+		t.Fatal("Replace error = nil, want budget exhausted")
+	}
+	for _, want := range []string{"budget exhausted", "max_duration=1s", "exhausted=true"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Replace error = %q, want substring %q", err, want)
+		}
+	}
+	if _, statErr := os.Stat(SessionIdentityPath(runDir, "session-2")); !os.IsNotExist(statErr) {
+		t.Fatalf("replacement session should not be created after exhausted budget, stat err = %v", statErr)
 	}
 }
 

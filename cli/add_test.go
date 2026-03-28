@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -145,6 +146,70 @@ local_validation:
 	}
 	if got := identity.Dimensions; len(got) != 1 || got[0].Name != "adversarial" || got[0].Guidance != goalx.BuiltinDimensions["adversarial"] {
 		t.Fatalf("session-2 dimensions = %#v, want resolved adversarial dimension", got)
+	}
+}
+
+func TestAddFailsWhenRunBudgetIsExhausted(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: fast
+parallel: 1
+sessions:
+  - hint: first
+    mode: develop
+target:
+  files: ["."]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	cfg.Budget.MaxDuration = time.Second
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: "2000-01-01T00:00:00Z",
+		UpdatedAt: "2000-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	err = Add(repo, []string{"second direction", "--mode", "develop", "--run", runName})
+	if err == nil {
+		t.Fatal("Add error = nil, want budget exhausted")
+	}
+	for _, want := range []string{"budget exhausted", "max_duration=1s", "exhausted=true"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Add error = %q, want substring %q", err, want)
+		}
+	}
+	if _, statErr := os.Stat(SessionIdentityPath(runDir, "session-2")); !os.IsNotExist(statErr) {
+		t.Fatalf("session-2 identity should not be created after exhausted budget, stat err = %v", statErr)
 	}
 }
 
