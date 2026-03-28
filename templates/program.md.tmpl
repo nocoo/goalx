@@ -19,6 +19,14 @@
 {{if .ActivityPath}}- Run activity facts: `{{.ActivityPath}}`{{end}}
 {{if .ContextIndexPath}}- Run context index: `{{.ContextIndexPath}}`{{end}}
 {{if .AffordancesPath}}- Run affordances: `{{.AffordancesPath}}`{{end}}
+{{if .RunWorktreePath}}- Run-root worktree: `{{.RunWorktreePath}}` — master integrates reviewed code here before anything reaches the source root{{end}}
+{{if .WorktreePath}}- Dedicated session worktree: `{{.WorktreePath}}`
+- Your default edit boundary is the dedicated session worktree above.
+- Do not edit the source root or run-root worktree from a dedicated session unless the master explicitly redirects you to inspect or integrate there.
+- If you discover accidental edits outside your assigned worktree, stop, record the boundary violation in the journal, and migrate or revert those edits before continuing.
+{{else}}- This session has no dedicated session worktree. You are operating directly in the run-root worktree and must assume other no-worktree sessions could overlap.{{end}}
+{{if .SessionBaseBranchSelector}}- Recorded parent/base selector: `{{.SessionBaseBranchSelector}}`{{end}}
+{{if .SessionBaseBranch}}- Recorded parent/base ref: `{{.SessionBaseBranch}}`{{end}}
 - Objective: {{.Objective}}
 {{if .LocalValidationCommand}}- Local validation command: `{{.LocalValidationCommand}}`{{end}}
 - Read current run context: `goalx context --run {{.RunName}}`
@@ -36,6 +44,8 @@ Do not rebuild the full chat history unless the current state is ambiguous.
 6. Inspect the current worktree state: `git status --short && git log --oneline -5`.
 7. Resume from the current files and latest durable state. Only dig deeper into older history if something is unclear.
 8. If the inbox is unchanged, no blocker or validation fact changed, and you still have a concrete next step, continue from local state instead of rereading broad run guidance.
+9. Reconfirm whether you are in a dedicated worktree or sharing the run-root worktree before editing. Do not assume exclusive file ownership in a shared worktree.
+10. In a dedicated session, keep bare `git` and file-edit operations inside your current session worktree. If you need to inspect the run-root or source root, do it explicitly with absolute paths or `git -C`.
 
 {{if .Sessions}}
 ## Team Context
@@ -99,6 +109,8 @@ You are a development subagent. Your code will be reviewed. Every change must be
 {{.LocalValidationCommand}}
 ```
 {{end}}- Keep changes minimal and correct. Do not add unrelated improvements, but do not cut corners on the change you are making.
+- If you changed code in a dedicated worktree and expect master to `goalx keep` your work, seal that boundary in a focused local commit before you go idle.
+- `goalx keep` only merges committed branch history; it does not carry uncommitted dirty worktree changes. Master may still manually adopt only part of your worktree when conflicts or overlap make that the better path.
 - Respect file ownership from the current inbox assignment. If ownership is unclear, stay within your assigned scope and note cross-session needs in the journal.
 - If the current inbox assignment or evidence suggests a likely root cause, verify it with a failing regression test or decisive counter-evidence before treating it as confirmed.
 {{end}}

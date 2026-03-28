@@ -133,6 +133,13 @@ func Status(projectRoot string, args []string) error {
 				summary += fmt.Sprintf(" | dirty=%d", sess.DirtyFiles)
 			}
 		}
+		if worktree := sessionWorktreeSurfaceSummary(rc.RunDir, rc.Config.Name, sName, sessionState); worktree != "" {
+			if summary == "no entries" {
+				summary = worktree
+			} else {
+				summary += " | " + worktree
+			}
+		}
 		if launch := sessionLaunchFacts(rc.RunDir, sName); launch != "" {
 			if summary == "no entries" {
 				summary = launch
@@ -232,6 +239,9 @@ func printStatusControlSummary(rc *RunContext) {
 		if attention := formatTargetAttentionAdvisory(activity.Attention); attention != "" {
 			fmt.Printf("Attention: %s\n", strings.TrimPrefix(attention, "Target attention: "))
 		}
+	}
+	if lineage := rootWorktreeLineageSummary(rc.RunDir); lineage != "" {
+		fmt.Printf("Run worktree: %s\n", lineage)
 	}
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)

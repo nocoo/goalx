@@ -27,6 +27,7 @@ type ContextIndex struct {
 	SummaryPath         string             `json:"summary_path,omitempty"`
 	ControlDir          string             `json:"control_dir,omitempty"`
 	ActivityPath        string             `json:"activity_path,omitempty"`
+	WorktreeSnapshotPath string            `json:"worktree_snapshot_path,omitempty"`
 	TransportFactsPath  string             `json:"transport_facts_path,omitempty"`
 	MemoryQueryPath     string             `json:"memory_query_path,omitempty"`
 	MemoryContextPath   string             `json:"memory_context_path,omitempty"`
@@ -61,13 +62,16 @@ type ContextMaster struct {
 }
 
 type ContextSession struct {
-	Name         string `json:"name,omitempty"`
-	Mode         string `json:"mode,omitempty"`
-	WindowName   string `json:"window_name,omitempty"`
-	WorktreePath string `json:"worktree_path,omitempty"`
-	JournalPath  string `json:"journal_path,omitempty"`
-	InboxPath    string `json:"inbox_path,omitempty"`
-	CursorPath   string `json:"cursor_path,omitempty"`
+	Name               string `json:"name,omitempty"`
+	Mode               string `json:"mode,omitempty"`
+	WindowName         string `json:"window_name,omitempty"`
+	WorktreePath       string `json:"worktree_path,omitempty"`
+	JournalPath        string `json:"journal_path,omitempty"`
+	InboxPath          string `json:"inbox_path,omitempty"`
+	CursorPath         string `json:"cursor_path,omitempty"`
+	Branch             string `json:"branch,omitempty"`
+	BaseBranchSelector string `json:"base_branch_selector,omitempty"`
+	BaseBranch         string `json:"base_branch,omitempty"`
 }
 
 type ProviderFact struct {
@@ -145,6 +149,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		SummaryPath:         SummaryPath(runDir),
 		ControlDir:          ControlDir(runDir),
 		ActivityPath:        ActivityPath(runDir),
+		WorktreeSnapshotPath: WorktreeSnapshotPath(runDir),
 		TransportFactsPath:  TransportFactsPath(runDir),
 		MemoryQueryPath:     MemoryQueryPath(runDir),
 		MemoryContextPath:   MemoryContextPath(runDir),
@@ -179,12 +184,25 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		}
 		if identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, name)); err == nil && identity != nil {
 			session.Mode = identity.Mode
+			session.BaseBranchSelector = identity.BaseBranchSelector
+			session.BaseBranch = identity.BaseBranch
 			index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine(name, identity.Engine)...)
 		}
-		if session.Mode == "" {
-			if sessionsState, err := EnsureSessionsRuntimeState(runDir); err == nil {
-				if current, ok := sessionsState.Sessions[name]; ok {
+		if sessionsState, err := EnsureSessionsRuntimeState(runDir); err == nil {
+			if current, ok := sessionsState.Sessions[name]; ok {
+				if session.Mode == "" {
 					session.Mode = current.Mode
+				}
+				session.Branch = current.Branch
+			}
+		}
+		if session.BaseBranchSelector == "" || session.BaseBranch == "" {
+			if lineage, err := loadSessionWorktreeLineage(runDir, name); err == nil && lineage != nil {
+				if session.BaseBranchSelector == "" {
+					session.BaseBranchSelector = lineage.ParentSelector
+				}
+				if session.BaseBranch == "" {
+					session.BaseBranch = lineage.ParentRef
 				}
 			}
 		}

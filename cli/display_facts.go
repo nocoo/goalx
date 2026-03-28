@@ -16,6 +16,9 @@ func refreshDisplayFacts(rc *RunContext) error {
 	if err := RefreshRunMemoryContext(rc.RunDir); err != nil {
 		return err
 	}
+	if err := RefreshWorktreeSnapshot(rc.RunDir); err != nil {
+		return err
+	}
 	masterEngine := ""
 	if rc.Config != nil {
 		masterEngine = rc.Config.Master.Engine

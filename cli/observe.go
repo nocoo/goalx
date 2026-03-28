@@ -65,9 +65,10 @@ func Observe(projectRoot string, args []string) error {
 		if err != nil {
 			return err
 		}
+		sessionState, _ := EnsureSessionsRuntimeState(rc.RunDir)
 		for _, num := range sessionIndexes {
 			fmt.Printf("### %s\n", SessionName(num))
-			printObserveSessionQueue(rc.RunDir, SessionName(num), rc.Config.Master.Engine)
+			printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState, rc.Config.Master.Engine)
 			if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 				fmt.Println(label)
 			}
@@ -91,10 +92,11 @@ func Observe(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	sessionState, _ := EnsureSessionsRuntimeState(rc.RunDir)
 	for _, num := range sessionIndexes {
 		windowName := sessionWindowName(rc.Config.Name, num)
 		fmt.Printf("### %s\n", SessionName(num))
-		printObserveSessionQueue(rc.RunDir, SessionName(num), rc.Config.Master.Engine)
+		printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState, rc.Config.Master.Engine)
 		if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 			fmt.Println(label)
 		} else {
@@ -137,7 +139,7 @@ func printObserveStatusSection(title, path string) {
 	fmt.Println()
 }
 
-func printObserveSessionQueue(runDir, sessionName, masterEngine string) {
+func printObserveSessionQueue(runDir, runName, sessionName string, sessionState *SessionsRuntimeState, masterEngine string) {
 	state := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
 	transport := loadTransportTargetFacts(runDir, sessionName)
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
@@ -148,6 +150,9 @@ func printObserveSessionQueue(runDir, sessionName, masterEngine string) {
 		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
+	if worktree := sessionWorktreeSurfaceSummary(runDir, runName, sessionName, sessionState); worktree != "" {
+		fmt.Printf("Worktree: %s\n", worktree)
+	}
 	if launch := sessionLaunchFacts(runDir, sessionName); launch != "" {
 		fmt.Printf("Launch: %s\n", launch)
 	}
@@ -165,6 +170,9 @@ func printObserveMasterQueue(runDir, masterEngine string) {
 		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
+	if lineage := rootWorktreeLineageSummary(runDir); lineage != "" {
+		fmt.Printf("Worktree: %s\n", lineage)
+	}
 	printObserveTransportFacts(transport)
 }
 

@@ -226,6 +226,9 @@ func Resume(projectRoot string, args []string) error {
 		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
 		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
 		ProjectRoot:            absProjectRoot,
+		RunWorktreePath:        RunWorktreePath(rc.RunDir),
+		SessionBaseBranchSelector: sessionIdentity.BaseBranchSelector,
+		SessionBaseBranch:         sessionIdentity.BaseBranch,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, idx-1); err != nil {
 		return fmt.Errorf("render protocol: %w", err)
@@ -492,6 +495,8 @@ func Replace(projectRoot string, args []string) error {
 	}
 	sessionIdentity.RouteRole = effectiveSession.RouteRole
 	sessionIdentity.ReplacesSession = oldSessionName
+	sessionIdentity.BaseBranchSelector = oldIdentity.BaseBranchSelector
+	sessionIdentity.BaseBranch = oldIdentity.BaseBranch
 	if len(effectiveSession.Dimensions) > 0 {
 		dimensionsCatalog, err := loadDimensionCatalog(rc.ProjectRoot)
 		if err != nil {

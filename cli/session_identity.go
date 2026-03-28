@@ -18,6 +18,8 @@ type SessionIdentity struct {
 	Mode                   string                    `json:"mode,omitempty"`
 	Engine                 string                    `json:"engine,omitempty"`
 	Model                  string                    `json:"model,omitempty"`
+	BaseBranchSelector     string                    `json:"base_branch_selector,omitempty"`
+	BaseBranch             string                    `json:"base_branch,omitempty"`
 	LocalValidationCommand string                    `json:"local_validation_command,omitempty"`
 	RequestedEffort        goalx.EffortLevel         `json:"requested_effort,omitempty"`
 	EffectiveEffort        string                    `json:"effective_effort,omitempty"`
@@ -143,6 +145,8 @@ func normalizeSessionIdentity(identity *SessionIdentity) {
 	if identity.Version <= 0 {
 		identity.Version = 1
 	}
+	identity.BaseBranchSelector = strings.TrimSpace(identity.BaseBranchSelector)
+	identity.BaseBranch = strings.TrimSpace(identity.BaseBranch)
 	identity.LocalValidationCommand = strings.TrimSpace(identity.LocalValidationCommand)
 }
 

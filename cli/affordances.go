@@ -171,17 +171,20 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		{
 			ID:      "keep-session",
 			Kind:    "control",
-			Summary: "Merge a reviewed develop session branch into the run worktree only; this does not merge into the source root yet.",
+			Summary: "Merge a reviewed develop session branch into the run worktree only. goalx keep only merges committed session branch history relative to that session's recorded parent/base ref; dirty uncommitted work must be committed first. If you need partial adoption or conflict resolution, inspect the session worktree and integrate manually. This does not merge into the source root yet.",
 			Command: fmt.Sprintf("goalx keep --run %s session-N", runName),
 		},
 		{
 			ID:      "keep-run",
 			Kind:    "control",
-			Summary: "Merge the run worktree into the source root when source HEAD still descends from the run base revision; skips if already integrated.",
+			Summary: "Merge the run worktree into the source root when source HEAD still descends from the run base revision; skips if already integrated. This is distinct from goalx keep session-N, which only merges a committed session branch into the run worktree.",
 			Command: fmt.Sprintf("goalx keep --run %s", runName),
 		},
 	}
 	if index != nil {
+		if item := buildWorktreeBoundaryAffordance(index, normalizedTarget); item != nil {
+			doc.Items = append(doc.Items, *item)
+		}
 		if facts := providerFactsForTarget(index.ProviderFacts, normalizedTarget); len(facts) > 0 {
 			doc.Items = append(doc.Items, AffordanceItem{
 				ID:      "provider-facts",
@@ -200,6 +203,82 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		})
 	}
 	return doc, nil
+}
+
+func buildWorktreeBoundaryAffordance(index *ContextIndex, target string) *AffordanceItem {
+	if index == nil {
+		return nil
+	}
+	item := &AffordanceItem{
+		ID:   "worktree-boundary",
+		Kind: "fact",
+	}
+	if strings.TrimSpace(target) == "" || target == "master" {
+		item.Summary = "Understand source-root, run-root, and session lineage boundaries before inspecting, keeping, or manually integrating work."
+		if index.ProjectRoot != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Source root: `%s`.", index.ProjectRoot))
+			item.Paths = append(item.Paths, index.ProjectRoot)
+		}
+		if index.RunWorktree != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Run-root integration boundary: `%s`.", index.RunWorktree))
+			item.Paths = append(item.Paths, index.RunWorktree)
+		}
+		item.Facts = append(item.Facts, "`goalx keep session-N` merges committed session branch history into the run-root worktree only.")
+		item.Facts = append(item.Facts, "`goalx keep --run NAME` is the separate source-root merge step.")
+		for _, session := range index.Sessions {
+			fact := fmt.Sprintf("%s", session.Name)
+			if session.WorktreePath != "" {
+				fact += fmt.Sprintf(": worktree `%s`", session.WorktreePath)
+				item.Paths = append(item.Paths, session.WorktreePath)
+			} else {
+				fact += ": shared run-root worktree"
+			}
+			if session.BaseBranchSelector != "" {
+				fact += fmt.Sprintf(", base selector `%s`", session.BaseBranchSelector)
+			}
+			if session.BaseBranch != "" {
+				fact += fmt.Sprintf(", base ref `%s`", session.BaseBranch)
+			}
+			item.Facts = append(item.Facts, fact+".")
+		}
+		item.Paths = dedupeStrings(item.Paths)
+		return item
+	}
+	for _, session := range index.Sessions {
+		if session.Name != target {
+			continue
+		}
+		item.Summary = "Understand this session's default edit boundary and recorded lineage before changing files."
+		if session.WorktreePath != "" {
+			item.Facts = append(item.Facts, "Default edit boundary is this session's dedicated worktree.")
+			item.Paths = append(item.Paths, session.WorktreePath)
+		} else {
+			item.Facts = append(item.Facts, "This session shares the run-root worktree; assume overlap with other no-worktree sessions.")
+		}
+		if index.RunWorktree != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Run-root integration boundary: `%s`.", index.RunWorktree))
+			item.Paths = append(item.Paths, index.RunWorktree)
+		}
+		if index.ProjectRoot != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Source root: `%s`.", index.ProjectRoot))
+			item.Paths = append(item.Paths, index.ProjectRoot)
+		}
+		if session.WorktreePath != "" {
+			item.Facts = append(item.Facts, "Do not edit the source root or run-root worktree from a dedicated session unless master explicitly redirects you to inspect or integrate there.")
+		}
+		if session.BaseBranchSelector != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Recorded parent/base selector: `%s`.", session.BaseBranchSelector))
+		}
+		if session.BaseBranch != "" {
+			item.Facts = append(item.Facts, fmt.Sprintf("Recorded parent/base ref: `%s`.", session.BaseBranch))
+		}
+		if session.WorktreePath != "" {
+			item.Facts = append(item.Facts, "If you discover accidental edits outside your assigned worktree, stop, record the boundary violation, and migrate or revert those edits before continuing.")
+		}
+		item.Paths = dedupeStrings(item.Paths)
+		return item
+	}
+	return nil
 }
 
 func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
@@ -245,6 +324,9 @@ func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
 
 func RefreshRunGuidance(projectRoot, runName, runDir string) error {
 	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
+		return err
+	}
+	if err := RefreshWorktreeSnapshot(runDir); err != nil {
 		return err
 	}
 	if err := RefreshRunMemoryContext(runDir); err != nil {
@@ -354,4 +436,24 @@ func renderProviderFactLines(target string, facts []ProviderFact) []string {
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }

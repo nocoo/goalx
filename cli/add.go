@@ -273,25 +273,34 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	engineCmd := launchSpec.Command
 	sessionIdentity.EffectiveEffort = launchSpec.EffectiveEffort
-	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
-		return fmt.Errorf("write session identity: %w", err)
-	}
-	sessionIdentityWritten = true
-
 	workdir := runWT
 	wtPath := ""
 	branch := ""
+	baseBranch := ""
+	baseBranchHint := ""
 	if useWorktree {
 		wtPath = WorktreePath(rc.RunDir, rc.Config.Name, newNum)
 		branch = fmt.Sprintf("goalx/%s/%d", rc.Config.Name, newNum)
-		baseBranch := ""
 		if baseBranchSelector != "" {
 			resolvedBaseBranch, err := resolveAddBaseBranchSelector(rc.RunDir, rc.Config.Name, baseBranchSelector)
 			if err != nil {
 				return err
 			}
 			baseBranch = resolvedBaseBranch
+			baseBranchHint = baseBranchSelector
+		} else {
+			baseBranch = fmt.Sprintf("goalx/%s/root", rc.Config.Name)
+			baseBranchHint = "run-root"
 		}
+		sessionIdentity.BaseBranchSelector = baseBranchHint
+		sessionIdentity.BaseBranch = baseBranch
+	}
+	if err := SaveSessionIdentity(sessionIdentityPath, sessionIdentity); err != nil {
+		return fmt.Errorf("write session identity: %w", err)
+	}
+	sessionIdentityWritten = true
+
+	if useWorktree {
 		if err := CreateWorktree(runWT, wtPath, branch, baseBranch); err != nil {
 			return fmt.Errorf("create worktree: %w", err)
 		}
@@ -371,6 +380,9 @@ func Add(projectRoot string, args []string) (err error) {
 		SessionsStatePath:      SessionsRuntimeStatePath(rc.RunDir),
 		ProjectRegistryPath:    ProjectRegistryPath(rc.ProjectRoot),
 		ProjectRoot:            absProjectRoot,
+		RunWorktreePath:        runWT,
+		SessionBaseBranchSelector: sessionIdentity.BaseBranchSelector,
+		SessionBaseBranch:         sessionIdentity.BaseBranch,
 	}
 	if err := RenderSubagentProtocol(subData, rc.RunDir, newNum-1); err != nil {
 		return fmt.Errorf("render protocol: %w", err)

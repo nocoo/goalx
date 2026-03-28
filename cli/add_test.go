@@ -327,6 +327,19 @@ local_validation:
 	if string(data) != "from session 1\n" {
 		t.Fatalf("session-2 feature.txt = %q, want session-1 branch contents", string(data))
 	}
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-2 identity missing")
+	}
+	if identity.BaseBranchSelector != "session-1" {
+		t.Fatalf("BaseBranchSelector = %q, want session-1", identity.BaseBranchSelector)
+	}
+	if identity.BaseBranch != "goalx/"+runName+"/1" {
+		t.Fatalf("BaseBranch = %q, want %q", identity.BaseBranch, "goalx/"+runName+"/1")
+	}
 }
 
 func TestAddWorktreeBaseBranchFailsForSharedSession(t *testing.T) {
@@ -375,6 +388,58 @@ local_validation:
 	err := Add(repo, []string{"follow up slice", "--mode", "develop", "--worktree", "--base-branch", "session-1", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "has no dedicated branch") {
 		t.Fatalf("Add error = %v, want dedicated branch error", err)
+	}
+}
+
+func TestAddWorktreeWithoutExplicitBaseRecordsRunRootParent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: develop
+objective: implement audit fixes
+roles:
+  develop:
+    engine: codex
+    model: gpt-5.4
+parallel: 0
+target:
+  files: ["src/"]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+runName+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+
+	if err := Add(repo, []string{"new slice", "--mode", "develop", "--worktree", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	if identity.BaseBranchSelector != "run-root" {
+		t.Fatalf("BaseBranchSelector = %q, want run-root", identity.BaseBranchSelector)
+	}
+	if identity.BaseBranch != "goalx/"+runName+"/root" {
+		t.Fatalf("BaseBranch = %q, want %q", identity.BaseBranch, "goalx/"+runName+"/root")
 	}
 }
 

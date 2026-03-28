@@ -28,7 +28,23 @@ func TestAffordCommandRejectsPositionalRunWhenRunFlagProvided(t *testing.T) {
 
 func TestContextCommandPrintsRunIndex(t *testing.T) {
 	repo, _, cfg, _ := writeGuidanceRunFixture(t)
-	seedGuidanceSessionFixture(t, goalx.RunDir(repo, cfg.Name), cfg)
+	runDir := goalx.RunDir(repo, cfg.Name)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	identity.BaseBranchSelector = "run-root"
+	identity.BaseBranch = "goalx/" + cfg.Name + "/root"
+	if err := os.Remove(SessionIdentityPath(runDir, "session-1")); err != nil {
+		t.Fatalf("remove session identity for rewrite: %v", err)
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity rewrite: %v", err)
+	}
 
 	out := captureStdout(t, func() {
 		if err := Context(repo, []string{"--run", cfg.Name}); err != nil {
@@ -49,6 +65,8 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 		"GoalX canonical provider runtime is tmux + interactive TUI.",
 		"Interactive Codex sessions can use installed skills and configured MCP servers from the native TUI.",
 		"session-1",
+		"base selector",
+		"run-root",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("context output missing %q:\n%s", want, out)
@@ -72,6 +90,44 @@ func TestAffordCommandPrintsMarkdownAffordances(t *testing.T) {
 		"goalx afford --run " + cfg.Name + " master",
 		"## provider-facts",
 		"## tell",
+		"only merges committed session branch history",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("afford output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestAffordCommandPrintsSessionWorktreeBoundaryFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	identity.BaseBranchSelector = "run-root"
+	identity.BaseBranch = "goalx/" + cfg.Name + "/root"
+	if err := os.Remove(SessionIdentityPath(runDir, "session-1")); err != nil {
+		t.Fatalf("remove session identity for rewrite: %v", err)
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Afford(repo, []string{"--run", cfg.Name, "session-1"}); err != nil {
+			t.Fatalf("Afford: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"## worktree-boundary",
+		"Default edit boundary is this session's dedicated worktree.",
+		"Do not edit the source root or run-root worktree from a dedicated session unless master explicitly redirects you to inspect or integrate there.",
+		"Recorded parent/base selector: `run-root`.",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("afford output missing %q:\n%s", want, out)

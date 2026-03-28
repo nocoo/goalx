@@ -34,6 +34,7 @@ type ProtocolData struct {
 	Preferences            goalx.PreferencesConfig
 	TmuxSession            string
 	ProjectRoot            string
+	RunWorktreePath        string
 	SummaryPath            string
 	GoalPath               string
 	GoalLogPath            string
@@ -77,6 +78,8 @@ type ProtocolData struct {
 	SessionInboxPath    string
 	SessionCursorPath   string
 	WorktreePath        string
+	SessionBaseBranchSelector string
+	SessionBaseBranch         string
 }
 
 // SessionData is per-session info for the master protocol.
@@ -128,6 +131,9 @@ func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 	}
 	if data.GoalLogPath == "" && data.GoalPath != "" {
 		data.GoalLogPath = filepath.Join(filepath.Dir(data.GoalPath), "goal-log.jsonl")
+	}
+	if data.RunWorktreePath == "" && runDir != "" {
+		data.RunWorktreePath = RunWorktreePath(runDir)
 	}
 	if data.EvolutionLogPath == "" && runDir != "" && data.Intent == runIntentEvolve {
 		data.EvolutionLogPath = EvolutionLogPath(runDir)

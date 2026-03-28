@@ -193,10 +193,8 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 			return err
 		}
 	}
-	if snapshot, err := SnapshotWorktrees(runDir); err == nil {
-		if err := SaveWorktreeSnapshot(runDir, snapshot); err != nil {
-			return err
-		}
+	if err := RefreshWorktreeSnapshot(runDir); err != nil {
+		return err
 	}
 	presence, err := BuildTargetPresenceFacts(runDir, tmuxSession)
 	if err != nil {

@@ -910,6 +910,49 @@ func TestStatusShowsBlockedOwnerAttentionFacts(t *testing.T) {
 	}
 }
 
+func TestStatusShowsForkedSessionWorktreeLineage(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	seedForkedWorktreeLineageFixture(t, repo, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	session1Capture := filepath.Join(t.TempDir(), "session-1-pane.txt")
+	session2Capture := filepath.Join(t.TempDir(), "session-2-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master prompt\n❯\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(session1Capture, []byte("session-1 prompt\n❯\n"), 0o644); err != nil {
+		t.Fatalf("write session-1 capture: %v", err)
+	}
+	if err := os.WriteFile(session2Capture, []byte("session-2 prompt\n❯\n"), 0o644); err != nil {
+		t.Fatalf("write session-2 capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", session1Capture)
+	t.Setenv("TMUX_SESSION2_CAPTURE", session2Capture)
+	installGuidanceFakeTmux(t, []string{"session-1", "session-2"})
+	for _, holder := range []string{"master", "sidecar", "session-1", "session-2"} {
+		if err := RenewControlLease(runDir, holder, meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
+			t.Fatalf("RenewControlLease %s: %v", holder, err)
+		}
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Run worktree: branch=goalx/" + cfg.Name + "/root parent=source-root",
+		"branch=goalx/" + cfg.Name + "/1 parent=run-root",
+		"branch=goalx/" + cfg.Name + "/2 parent=session-1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusWarnsAboutBlockedOwnerAttention(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	seedGuidanceSessionFixture(t, runDir, cfg)
@@ -1036,5 +1079,46 @@ func TestStatusShowsActiveIdleSessionAttention(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestStatusShowsSharedRunRootWorktreeSummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("shared session pane\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	identity, err := NewSessionIdentity(runDir, "session-1", "shared slice", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.EffortMedium, "medium", "develop", "", goalx.TargetConfig{})
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:  "session-1",
+		State: "active",
+		Mode:  string(goalx.ModeDevelop),
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "shared run-root worktree") {
+		t.Fatalf("status output missing shared run-root worktree summary:\n%s", out)
 	}
 }

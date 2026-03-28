@@ -154,6 +154,9 @@ func TestKeepMergesSessionBranchIntoRunWorktree(t *testing.T) {
 	if err := CreateWorktree(runWT, sessionWT, sessionBranch); err != nil {
 		t.Fatalf("CreateWorktree session root: %v", err)
 	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), makeKeepSessionIdentity(t, runDir, "session-1", runName, "run-root", runBranch)); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
 	writeAndCommit(t, sessionWT, "feature.txt", "session change\n", "session change")
 
 	out := captureStdout(t, func() {
@@ -209,6 +212,9 @@ func TestKeepReportsDirtyRunWorktreePath(t *testing.T) {
 	if err := CreateWorktree(runWT, sessionWT, sessionBranch); err != nil {
 		t.Fatalf("CreateWorktree session root: %v", err)
 	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), makeKeepSessionIdentity(t, runDir, "session-1", runName, "run-root", runBranch)); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
 	writeAndCommit(t, sessionWT, "feature.txt", "session change\n", "session change")
 	if err := os.WriteFile(filepath.Join(runWT, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {
 		t.Fatalf("write dirty file: %v", err)
@@ -229,6 +235,99 @@ func TestKeepReportsDirtyRunWorktreePath(t *testing.T) {
 	}
 }
 
+func TestKeepRejectsDirtySessionBoundaryBeforeMerging(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	runName := "keep-run"
+	runDir := writeKeepRunFixture(t, repo, runName)
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", runName)
+	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+
+	sessionWT := WorktreePath(runDir, runName, 1)
+	sessionBranch := fmt.Sprintf("goalx/%s/1", runName)
+	if err := CreateWorktree(runWT, sessionWT, sessionBranch); err != nil {
+		t.Fatalf("CreateWorktree session root: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionWT, "feature.txt"), []byte("dirty session change\n"), 0o644); err != nil {
+		t.Fatalf("write dirty feature: %v", err)
+	}
+	identity := makeKeepSessionIdentity(t, runDir, "session-1", runName, "run-root", runBranch)
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:         "session-1",
+		State:        "idle",
+		Mode:         string(goalx.ModeDevelop),
+		Branch:       sessionBranch,
+		WorktreePath: sessionWT,
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	err := Keep(repo, []string{"--run", runName, "session-1"})
+	if err == nil {
+		t.Fatal("expected Keep to reject dirty session worktree")
+	}
+	for _, want := range []string{"session-1", "uncommitted changes", "commit", "feature.txt"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Keep error = %v, want substring %q", err, want)
+		}
+	}
+}
+
+func TestKeepRejectsSessionWithoutCommittedBoundaryRelativeToParent(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	if err := EnsureProjectGoalxIgnored(repo); err != nil {
+		t.Fatalf("EnsureProjectGoalxIgnored: %v", err)
+	}
+
+	runName := "keep-run"
+	runDir := writeKeepRunFixture(t, repo, runName)
+	runWT := RunWorktreePath(runDir)
+	runBranch := fmt.Sprintf("goalx/%s/root", runName)
+	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+
+	sessionWT := WorktreePath(runDir, runName, 1)
+	sessionBranch := fmt.Sprintf("goalx/%s/1", runName)
+	if err := CreateWorktree(runWT, sessionWT, sessionBranch); err != nil {
+		t.Fatalf("CreateWorktree session root: %v", err)
+	}
+	identity := makeKeepSessionIdentity(t, runDir, "session-1", runName, "run-root", runBranch)
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:         "session-1",
+		State:        "idle",
+		Mode:         string(goalx.ModeDevelop),
+		Branch:       sessionBranch,
+		WorktreePath: sessionWT,
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	err := Keep(repo, []string{"--run", runName, "session-1"})
+	if err == nil {
+		t.Fatal("expected Keep to reject session branch with no committed boundary")
+	}
+	for _, want := range []string{"session-1", "no committed branch changes", runBranch} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Keep error = %v, want substring %q", err, want)
+		}
+	}
+}
+
 func TestKeepHelpExplainsRunAndSessionMergeSemantics(t *testing.T) {
 	out := captureStdout(t, func() {
 		if err := Keep(t.TempDir(), []string{"--help"}); err != nil {
@@ -240,6 +339,9 @@ func TestKeepHelpExplainsRunAndSessionMergeSemantics(t *testing.T) {
 		"merge the run worktree branch into the source root",
 		"require source-root HEAD to still descend from the run base revision",
 		"merge that develop session branch into the run worktree",
+		"only committed session branch history is merged",
+		"dirty session worktrees must be committed first",
+		"inspect the session worktree and merge manually",
 		"this does not merge into the source root yet",
 	} {
 		if !strings.Contains(out, want) {
@@ -273,5 +375,28 @@ func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	charter, err := NewRunCharter(runDir, cfg.Name, cfg.Objective, meta)
+	if err != nil {
+		t.Fatalf("NewRunCharter: %v", err)
+	}
+	if err := SaveRunCharter(RunCharterPath(runDir), charter); err != nil {
+		t.Fatalf("SaveRunCharter: %v", err)
+	}
 	return runDir
+}
+
+func makeKeepSessionIdentity(t *testing.T, runDir, sessionName, runName, baseSelector, baseBranch string) *SessionIdentity {
+	t.Helper()
+
+	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(goalx.ModeDevelop), goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", "", goalx.TargetConfig{Files: []string{"."}})
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	identity.BaseBranchSelector = baseSelector
+	identity.BaseBranch = baseBranch
+	return identity
 }

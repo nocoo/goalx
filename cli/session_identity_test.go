@@ -125,6 +125,41 @@ func TestSessionIdentityRoundTripKeepsSourceAndRole(t *testing.T) {
 	}
 }
 
+func TestSessionIdentityRoundTripKeepsRecordedWorktreeBase(t *testing.T) {
+	runDir := t.TempDir()
+	meta := &RunMetadata{Version: 1, Objective: "ship", ProtocolVersion: 2, RunID: "run_1", RootRunID: "run_1", Epoch: 1}
+	charter, err := NewRunCharter(runDir, "demo", "demo objective", meta)
+	if err != nil {
+		t.Fatalf("NewRunCharter: %v", err)
+	}
+	if err := SaveRunCharter(RunCharterPath(runDir), charter); err != nil {
+		t.Fatalf("SaveRunCharter: %v", err)
+	}
+
+	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.EffortMedium, "medium", "", "", goalx.TargetConfig{Files: []string{"web/"}})
+	if err != nil {
+		t.Fatalf("NewSessionIdentity: %v", err)
+	}
+	identity.BaseBranchSelector = "session-1"
+	identity.BaseBranch = "goalx/demo/1"
+
+	path := SessionIdentityPath(runDir, "session-2")
+	if err := SaveSessionIdentity(path, identity); err != nil {
+		t.Fatalf("SaveSessionIdentity: %v", err)
+	}
+
+	reloaded, err := LoadSessionIdentity(path)
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if reloaded.BaseBranchSelector != "session-1" {
+		t.Fatalf("BaseBranchSelector = %q, want session-1", reloaded.BaseBranchSelector)
+	}
+	if reloaded.BaseBranch != "goalx/demo/1" {
+		t.Fatalf("BaseBranch = %q, want goalx/demo/1", reloaded.BaseBranch)
+	}
+}
+
 func TestLoadSessionIdentityDoesNotDefaultMode(t *testing.T) {
 	runDir := t.TempDir()
 	path := SessionIdentityPath(runDir, "session-1")

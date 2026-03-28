@@ -26,6 +26,9 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
 		WorktreePath:           "/tmp/worktree",
+		RunWorktreePath:        "/tmp/run-root",
+		SessionBaseBranchSelector: "run-root",
+		SessionBaseBranch:         "goalx/demo/root",
 	}
 
 	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
@@ -42,6 +45,10 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Journal: `/tmp/journal.jsonl`",
 		"Session inbox: `/tmp/control/inbox/session-1.jsonl`",
 		"Session cursor: `/tmp/control/session-1-cursor.json`",
+		"Run-root worktree: `/tmp/run-root`",
+		"Dedicated session worktree: `/tmp/worktree`",
+		"Recorded parent/base selector: `run-root`",
+		"Recorded parent/base ref: `goalx/demo/root`",
 		"Objective: ship it",
 		"Local validation command: `go test ./...`",
 		"`goalx context --run demo`",
@@ -102,6 +109,84 @@ func TestRenderSubagentProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	for _, want := range []string{
 		"If the inbox is unchanged, no blocker or validation fact changed, and you still have a concrete next step, continue from local state instead of rereading broad run guidance.",
 		"Do not write liveness-only journal entries or repeatedly restate unchanged assignment state.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolRequiresCommittedBoundaryBeforeKeepHandoff(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:                "demo",
+		Objective:              "ship it",
+		Mode:                   goalx.ModeDevelop,
+		Engine:                 "codex",
+		ProjectRoot:            "/tmp/project",
+		SessionName:            "session-1",
+		Target:                 goalx.TargetConfig{Files: []string{"main.go"}},
+		LocalValidationCommand: "go test ./...",
+		JournalPath:            "/tmp/journal.jsonl",
+		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
+		WorktreePath:           "/tmp/worktree",
+		RunWorktreePath:        "/tmp/run-root",
+		SessionBaseBranchSelector: "run-root",
+		SessionBaseBranch:         "goalx/demo/root",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If you changed code in a dedicated worktree and expect master to `goalx keep` your work, seal that boundary in a focused local commit before you go idle.",
+		"`goalx keep` only merges committed branch history; it does not carry uncommitted dirty worktree changes.",
+		"Master may still manually adopt only part of your worktree when conflicts or overlap make that the better path.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolForbidsDedicatedSessionEditingSourceRoot(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:                   "demo",
+		Objective:                 "ship it",
+		Mode:                      goalx.ModeDevelop,
+		Engine:                    "codex",
+		ProjectRoot:               "/tmp/source-root",
+		SessionName:               "session-1",
+		JournalPath:               "/tmp/journal.jsonl",
+		SessionInboxPath:          "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:         "/tmp/control/session-1-cursor.json",
+		WorktreePath:              "/tmp/session-1",
+		RunWorktreePath:           "/tmp/run-root",
+		SessionBaseBranchSelector: "run-root",
+		SessionBaseBranch:         "goalx/demo/root",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Your default edit boundary is the dedicated session worktree above.",
+		"Do not edit the source root or run-root worktree from a dedicated session unless the master explicitly redirects you to inspect or integrate there.",
+		"If you discover accidental edits outside your assigned worktree, stop, record the boundary violation in the journal, and migrate or revert those edits before continuing.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
@@ -1026,6 +1111,37 @@ func TestRenderMasterProtocolIncludesGoalxWaitLoopGuidance(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderMasterProtocolClarifiesKeepUsesRecordedParentBoundary(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:     "demo",
+		Objective:   "ship it",
+		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Mode:        goalx.ModeDevelop,
+		SummaryPath: "/tmp/summary.md",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+		for _, want := range []string{
+			"`goalx keep --run demo session-N` only merges committed session branch history relative to that session's recorded parent/base ref.",
+			"Do not assume every develop session branch is rooted directly on the run worktree.",
+			"If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.",
+			"If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.",
+		} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
 }

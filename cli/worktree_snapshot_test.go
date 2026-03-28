@@ -9,6 +9,78 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
+func seedForkedWorktreeLineageFixture(t *testing.T, repo, runDir string, cfg *goalx.Config) (string, string, string) {
+	t.Helper()
+
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+cfg.Name+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	writeAndCommit(t, runWT, "root.txt", "root\n", "root change")
+
+	session1WT := WorktreePath(runDir, cfg.Name, 1)
+	if err := CreateWorktree(runWT, session1WT, "goalx/"+cfg.Name+"/1"); err != nil {
+		t.Fatalf("CreateWorktree session-1: %v", err)
+	}
+	writeAndCommit(t, session1WT, "one.txt", "one\n", "session-1 change")
+
+	session2WT := WorktreePath(runDir, cfg.Name, 2)
+	if err := CreateWorktree(runWT, session2WT, "goalx/"+cfg.Name+"/2", "goalx/"+cfg.Name+"/1"); err != nil {
+		t.Fatalf("CreateWorktree session-2: %v", err)
+	}
+	writeAndCommit(t, session2WT, "two.txt", "two\n", "session-2 change")
+
+	for _, sess := range []struct {
+		name         string
+		worktreePath string
+		branch       string
+		baseSelector string
+		baseBranch   string
+	}{
+		{
+			name:         "session-1",
+			worktreePath: session1WT,
+			branch:       "goalx/" + cfg.Name + "/1",
+			baseSelector: "run-root",
+			baseBranch:   "goalx/" + cfg.Name + "/root",
+		},
+		{
+			name:         "session-2",
+			worktreePath: session2WT,
+			branch:       "goalx/" + cfg.Name + "/2",
+			baseSelector: "session-1",
+			baseBranch:   "goalx/" + cfg.Name + "/1",
+		},
+	} {
+		if err := EnsureSessionControl(runDir, sess.name); err != nil {
+			t.Fatalf("EnsureSessionControl %s: %v", sess.name, err)
+		}
+		if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+			Name:         sess.name,
+			State:        "active",
+			Mode:         string(goalx.ModeDevelop),
+			Branch:       sess.branch,
+			WorktreePath: sess.worktreePath,
+		}); err != nil {
+			t.Fatalf("UpsertSessionRuntimeState %s: %v", sess.name, err)
+		}
+		identity, err := NewSessionIdentity(runDir, sess.name, sessionRoleKind(goalx.ModeDevelop), goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", "", goalx.TargetConfig{})
+		if err != nil {
+			t.Fatalf("NewSessionIdentity %s: %v", sess.name, err)
+		}
+		identity.BaseBranchSelector = sess.baseSelector
+		identity.BaseBranch = sess.baseBranch
+		if err := SaveSessionIdentity(SessionIdentityPath(runDir, sess.name), identity); err != nil {
+			t.Fatalf("SaveSessionIdentity %s: %v", sess.name, err)
+		}
+		if err := os.WriteFile(JournalPath(runDir, sess.name), []byte("{\"round\":1,\"status\":\"active\",\"desc\":\"working\"}\n"), 0o644); err != nil {
+			t.Fatalf("write %s journal: %v", sess.name, err)
+		}
+	}
+
+	return runWT, session1WT, session2WT
+}
+
 func TestSnapshotWorktreesReportsDirtyRootAndSessionStats(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -68,6 +140,86 @@ func TestSnapshotWorktreesReportsDirtyRootAndSessionStats(t *testing.T) {
 	session := snapshot.Sessions["session-1"]
 	if session.DirtyFiles != 1 || session.Insertions != 0 || session.Deletions != 1 {
 		t.Fatalf("unexpected session snapshot: %+v", session)
+	}
+}
+
+func TestSnapshotWorktreesIncludesForkedLineageFacts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
+	cfg := &goalx.Config{
+		Name:      "sidecar-run",
+		Mode:      goalx.ModeDevelop,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureRunMetadata: %v", err)
+	}
+	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+
+	_, _, _ = seedForkedWorktreeLineageFixture(t, repo, runDir, cfg)
+
+	snapshot, err := SnapshotWorktrees(runDir)
+	if err != nil {
+		t.Fatalf("SnapshotWorktrees: %v", err)
+	}
+
+	if snapshot.RootLineage.ParentSelector != "source-root" {
+		t.Fatalf("root parent selector = %q, want source-root", snapshot.RootLineage.ParentSelector)
+	}
+	if snapshot.RootLineage.AheadCommits < 1 {
+		t.Fatalf("root ahead commits = %d, want >= 1", snapshot.RootLineage.AheadCommits)
+	}
+	session2 := snapshot.SessionLineage["session-2"]
+	if session2.ParentSelector != "session-1" {
+		t.Fatalf("session-2 parent selector = %q, want session-1", session2.ParentSelector)
+	}
+	if session2.ParentRef != "goalx/"+cfg.Name+"/1" {
+		t.Fatalf("session-2 parent ref = %q, want %q", session2.ParentRef, "goalx/"+cfg.Name+"/1")
+	}
+	if session2.AheadCommits < 1 {
+		t.Fatalf("session-2 ahead commits = %d, want >= 1", session2.AheadCommits)
+	}
+}
+
+func TestRefreshRunGuidanceWritesSessionLineageSnapshot(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedForkedWorktreeLineageFixture(t, repo, runDir, cfg)
+
+	if err := RefreshRunGuidance(repo, cfg.Name, runDir); err != nil {
+		t.Fatalf("RefreshRunGuidance: %v", err)
+	}
+
+	snapshot, err := LoadWorktreeSnapshot(WorktreeSnapshotPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadWorktreeSnapshot: %v", err)
+	}
+	if snapshot == nil || snapshot.RootLineage == nil {
+		t.Fatalf("root lineage missing after refresh: %+v", snapshot)
+	}
+	if got := snapshot.RootLineage.ParentSelector; got != "source-root" {
+		t.Fatalf("root parent selector = %q, want source-root", got)
+	}
+	session2, ok := snapshot.SessionLineage["session-2"]
+	if !ok {
+		t.Fatalf("session-2 lineage missing after refresh: %+v", snapshot.SessionLineage)
+	}
+	if session2.ParentSelector != "session-1" {
+		t.Fatalf("session-2 parent selector = %q, want session-1", session2.ParentSelector)
+	}
+	if session2.ParentRef != "goalx/"+cfg.Name+"/1" {
+		t.Fatalf("session-2 parent ref = %q, want %q", session2.ParentRef, "goalx/"+cfg.Name+"/1")
 	}
 }
 

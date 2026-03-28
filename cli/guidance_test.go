@@ -140,6 +140,7 @@ case "$1" in
     case "$target" in
       *:master) cat "$TMUX_MASTER_CAPTURE" ;;
       *:session-1) cat "$TMUX_SESSION1_CAPTURE" ;;
+      *:session-2) cat "$TMUX_SESSION2_CAPTURE" ;;
     esac
     exit 0
     ;;

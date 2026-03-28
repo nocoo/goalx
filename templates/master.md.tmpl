@@ -73,6 +73,8 @@ goalx dimension [--run NAME] <session-N> --add creative
 goalx dimension [--run NAME] <session-N> --remove depth
 ```
 {{end}}
+{{if .RunWorktreePath}}Run-root integration boundary: `{{.RunWorktreePath}}`
+{{end}}
 Write supporting findings to `{{.ReportsDir}}`. The final user-facing run result belongs in `{{.SummaryPath}}`.
 
 {{if or .Preferences.Research.Guidance .Preferences.Develop.Guidance .Preferences.Simple.Guidance}}
@@ -106,6 +108,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Treat configured `parallel` as initial fan-out guidance, not a permanent ceiling; you may still add or resume more durable workers later when the goal warrants it.
 - Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.
 - Sessions without dedicated worktrees share the run worktree. Do not launch multiple simultaneous no-worktree sessions that modify files. Use `goalx add --worktree` for parallel isolation.
+- Worktree-based sessions may fork from the run root or from another session. Do not assume every develop session branch is rooted directly on the run worktree.
 - If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.
 - When durable ownership becomes explicit, replace `coordination` through `goalx durable replace coordination --run {{.RunName}} --file /abs/path.json` and record `owners` entries mapping `req-*` required items to owner tokens.
 - If `{{.CoordinationPath}}` has a non-empty `owners` map, open required items must not remain silently unmapped.
@@ -254,9 +257,14 @@ Use routing profiles, routing rules, and these preferences together when choosin
 2. Run `goalx verify --run {{.RunName}}` when you need fresh acceptance evidence. It only records exit code + output; you interpret the result.
 3. Dispatch or run review before accepting non-trivial work, especially after any change touching 5+ files.
 4. Merge any session worktrees with `goalx keep --run {{.RunName}} session-N`.
-5. Run `git status --short` before you say "ready for commit" or "ready for closeout".
-6. If `required_remaining` reached 0, closeout is not complete until `{{.SummaryPath}}` and `{{.CompletionProofPath}}` exist, unless you have already recorded a factual blocker explaining why they do not.
-7. Write the final run result to `{{.SummaryPath}}`, keep supporting reports in `{{.ReportsDir}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
+5. `goalx keep --run {{.RunName}} session-N` only merges committed session branch history relative to that session's recorded parent/base ref. It does not include uncommitted dirty worktree changes.
+6. If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.
+7. If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.
+8. Use `goalx status`, `goalx observe`, `goalx context`, and `goalx afford` to confirm the current run-root lineage and the session's recorded parent/base ref before merging.
+9. If a dedicated session reports or you observe edits landing in the source root or the wrong worktree, treat that as a worktree-boundary violation. Inspect directly, migrate or revert the misplaced edits, and re-establish clean boundaries before you keep or continue delegating.
+10. Run `git status --short` before you say "ready for commit" or "ready for closeout".
+11. If `required_remaining` reached 0, closeout is not complete until `{{.SummaryPath}}` and `{{.CompletionProofPath}}` exist, unless you have already recorded a factual blocker explaining why they do not.
+12. Write the final run result to `{{.SummaryPath}}`, keep supporting reports in `{{.ReportsDir}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
 
 ### Phase Transition
 

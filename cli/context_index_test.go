@@ -102,6 +102,42 @@ func TestContextIndexIncludesSessionRoster(t *testing.T) {
 	}
 }
 
+func TestContextIndexIncludesSessionWorktreeLineage(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	identity.BaseBranchSelector = "run-root"
+	identity.BaseBranch = "goalx/" + cfg.Name + "/root"
+	if err := os.Remove(SessionIdentityPath(runDir, "session-1")); err != nil {
+		t.Fatalf("remove session identity for rewrite: %v", err)
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity rewrite: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if len(index.Sessions) != 1 {
+		t.Fatalf("sessions len = %d, want 1", len(index.Sessions))
+	}
+	session := index.Sessions[0]
+	if session.BaseBranchSelector != "run-root" {
+		t.Fatalf("BaseBranchSelector = %q, want run-root", session.BaseBranchSelector)
+	}
+	if session.BaseBranch != "goalx/"+cfg.Name+"/root" {
+		t.Fatalf("BaseBranch = %q, want %q", session.BaseBranch, "goalx/"+cfg.Name+"/root")
+	}
+}
+
 func TestProviderFactsIncludeTUICapabilityFactsWithoutRoutingAdvice(t *testing.T) {
 	claudeFacts := providerFactsForEngine("master", "claude-code")
 	if len(claudeFacts) == 0 {
