@@ -168,6 +168,18 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Summary: "Replace a stale or unsuitable durable worker.",
 			Command: fmt.Sprintf("goalx replace --run %s session-N --mode research --effort high", runName),
 		},
+		{
+			ID:      "keep-session",
+			Kind:    "control",
+			Summary: "Merge a reviewed develop session branch into the run worktree only; this does not merge into the source root yet.",
+			Command: fmt.Sprintf("goalx keep --run %s session-N", runName),
+		},
+		{
+			ID:      "keep-run",
+			Kind:    "control",
+			Summary: "Merge the run worktree into the source root when source HEAD still descends from the run base revision; skips if already integrated.",
+			Command: fmt.Sprintf("goalx keep --run %s", runName),
+		},
 	}
 	if index != nil {
 		if facts := providerFactsForTarget(index.ProviderFacts, normalizedTarget); len(facts) > 0 {

@@ -179,6 +179,29 @@ func TestActivitySnapshotContainsNoJudgmentFields(t *testing.T) {
 	}
 }
 
+func TestBuildActivitySnapshotFailsOnInvalidCoordinationState(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master is waiting\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", masterCapture)
+	installGuidanceFakeTmux(t, nil)
+
+	if err := os.WriteFile(CoordinationPath(runDir), []byte("{\n  \"version\": 1,\n  \"owners\": [],\n  \"unknown\": true\n}\n"), 0o644); err != nil {
+		t.Fatalf("write invalid coordination: %v", err)
+	}
+
+	_, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
+	if err == nil {
+		t.Fatal("expected BuildActivitySnapshot to fail on invalid coordination state")
+	}
+	if !strings.Contains(err.Error(), "coordination.json") || !strings.Contains(err.Error(), "parse") {
+		t.Fatalf("BuildActivitySnapshot error = %v, want explicit coordination parse failure", err)
+	}
+}
+
 func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")

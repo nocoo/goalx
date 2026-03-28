@@ -146,11 +146,26 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 	now := time.Now().UTC().Format(time.RFC3339)
 	previous, _ := LoadActivitySnapshot(ActivityPath(runDir))
 	tmuxSession := goalx.TmuxSessionName(projectRoot, runName)
-	controlState, _ := LoadControlRunState(ControlRunStatePath(runDir))
-	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
-	sessionState, _ := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
-	goalState, _ := LoadGoalState(GoalPath(runDir))
-	coordinationState, _ := LoadCoordinationState(CoordinationPath(runDir))
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	sessionState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	goalState, err := LoadGoalState(GoalPath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	coordinationState, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	remindersDue, deliveriesFailed := controlQueueSummary(runDir)
 	snapshot := &ActivitySnapshot{
 		Version:   1,
@@ -194,7 +209,10 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 	snapshot.Actors["master"] = buildActivityActor(runDir, "master", tmuxSession, "master", previousActor(previous, "master"), snapshot.CheckedAt)
 	snapshot.Actors["sidecar"] = buildActivityActor(runDir, "sidecar", tmuxSession, "", previousActor(previous, "sidecar"), snapshot.CheckedAt)
 
-	liveness, _ := LoadLivenessState(LivenessPath(runDir))
+	liveness, err := LoadLivenessState(LivenessPath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	worktreeSnapshot, _ := LoadWorktreeSnapshot(WorktreeSnapshotPath(runDir))
 	transportFacts, _ := LoadTransportFacts(TransportFactsPath(runDir))
 	if worktreeSnapshot != nil {
@@ -254,7 +272,7 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 	if len(snapshot.Sessions) == 0 {
 		snapshot.Sessions = nil
 	}
-	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	attention, err := buildTargetAttentionFacts(runDir, snapshot, sessionState, coordinationState, liveness)
 	if err != nil {
 		return nil, err
 	}

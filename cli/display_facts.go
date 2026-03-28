@@ -21,17 +21,31 @@ func refreshDisplayFacts(rc *RunContext) error {
 		masterEngine = rc.Config.Master.Engine
 	}
 	if SessionExists(rc.TmuxSession) {
-		if facts, err := BuildTransportFacts(rc.RunDir, rc.TmuxSession, masterEngine); err == nil && facts != nil {
-			_ = SaveTransportFacts(rc.RunDir, facts)
+		facts, err := BuildTransportFacts(rc.RunDir, rc.TmuxSession, masterEngine)
+		if err != nil {
+			return err
+		}
+		if facts != nil {
+			if err := SaveTransportFacts(rc.RunDir, facts); err != nil {
+				return err
+			}
 		}
 	} else {
-		_ = SaveTransportFacts(rc.RunDir, &TransportFacts{
+		if err := SaveTransportFacts(rc.RunDir, &TransportFacts{
 			Version:   1,
 			CheckedAt: time.Now().UTC().Format(time.RFC3339),
-		})
+		}); err != nil {
+			return err
+		}
 	}
-	if snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir); err == nil && snapshot != nil {
-		_ = SaveActivitySnapshot(rc.RunDir, snapshot)
+	snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir)
+	if err != nil {
+		return err
+	}
+	if snapshot != nil {
+		if err := SaveActivitySnapshot(rc.RunDir, snapshot); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -69,7 +83,11 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	if activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir)); err == nil && activity != nil {
+	activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir))
+	if err != nil {
+		return nil, err
+	}
+	if activity != nil {
 		if activity.Budget.MaxDurationSeconds > 0 && activity.Budget.Exhausted && activity.Lifecycle.RunActive {
 			advisories = append(advisories, "Budget exhausted: "+formatBudgetSummary(activity.Budget))
 		}

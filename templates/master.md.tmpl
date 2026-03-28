@@ -190,6 +190,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - On each control cycle or transport wake, first read `{{.IdentityFencePath}}`, `{{.ControlRunStatePath}}`, `{{.MasterInboxPath}}`, `{{.ControlRemindersPath}}`, `{{.ControlDeliveriesPath}}`, `{{.RunStatePath}}`, and `{{.SessionsStatePath}}`.
 - If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.
 - An open required item with `owner_attention`, `owner_blocked`, or `owner_risky` facts is **not** a no-change fast path.
+- An active session with `active_idle`, `transport_blocked`, `progress_blocked`, or `ownership_risky` facts is **not** a no-change fast path.
 - In a no-change fast path, do not rerun broad control narration. After any truly necessary spot checks, go straight back to `goalx wait --run {{.RunName}} master --timeout 300`.
 - Do not use `goalx status` as a default heartbeat.
 - Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.
@@ -217,6 +218,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - If the only remaining gap is proof or verification that you can execute yourself, run it now instead of waiting for another cycle.
 - If a required item stays stuck, reassign it, split it, or take it over yourself.
 - If a required item owner is blocked or risky, resolve it in the current control cycle: inspect directly (including shell/tmux if needed), redirect, park+replace, or take the work over yourself.
+- If an active session becomes `active_idle`, treat that as "worker result or next-step handoff is waiting on you" and review, redirect, keep, or take over in the current control cycle.
 - Do not wait on one session if other independent required work can proceed.
 - If a session is stale for 15+ minutes while its lease is healthy, park it and replace it.
 - If a session shows no journal output for 15+ minutes while its lease is healthy (check liveness.json JournalStaleMinutes), park it and launch a replacement. Do not just bypass.

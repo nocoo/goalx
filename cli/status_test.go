@@ -584,6 +584,12 @@ func TestStatusPrefersLatestJournalStateOverStaleRuntimeActive(t *testing.T) {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
 	seedRunCharterForTests(t, runDir, cfg.Name, repo)
+	if _, err := EnsureRuntimeState(runDir, &cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
 	if _, err := EnsureSessionsRuntimeState(runDir); err != nil {
 		t.Fatalf("EnsureSessionsRuntimeState: %v", err)
 	}
@@ -962,6 +968,70 @@ func TestStatusWarnsAboutBlockedOwnerAttention(t *testing.T) {
 		"Owner attention:",
 		"req-1 owner=session-1",
 		"state=transport_blocked",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestStatusShowsActiveIdleSessionAttention(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("idle prompt\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle", Mode: string(goalx.ModeDevelop)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 2},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TransportTargetFacts{
+			"master":    {Target: "master", Window: "master", Engine: "codex", TransportState: string(TUIStateIdlePrompt)},
+			"session-1": {Target: "session-1", Window: "session-1", Engine: "codex", TransportState: string(TUIStateIdlePrompt)},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Attention:",
+		"session-1:active_idle",
+		"Target attention:",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)

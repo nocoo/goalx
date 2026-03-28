@@ -9,9 +9,21 @@ import (
 	"strings"
 )
 
+const keepHelpText = `usage: goalx keep [--run NAME] [session-name]
+
+Without a session name:
+- merge the run worktree branch into the source root
+- require source-root HEAD to still descend from the run base revision
+- skip the merge when the run tree is already integrated
+
+With session-N:
+- merge that develop session branch into the run worktree
+- record selection.json so the kept session is durable
+- this does not merge into the source root yet`
+
 // Keep merges or preserves a specific session from a run.
 func Keep(projectRoot string, args []string) error {
-	if printUsageIfHelp(args, "usage: goalx keep [--run NAME] [session-name]") {
+	if printUsageIfHelp(args, keepHelpText) {
 		return nil
 	}
 	runName, rest, err := extractRunFlag(args)

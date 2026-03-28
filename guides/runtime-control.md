@@ -58,7 +58,8 @@ goalx archive --run NAME session-4
 
 - `park` pauses a session and keeps its worktree
 - `resume` restarts a parked session
-- `keep` merges work
+- `keep --run NAME session-N` merges a reviewed session branch into the run worktree
+- `keep --run NAME` merges the run worktree into the source root when lineage is still valid
 - `archive` preserves a session branch
 
 ## Finish Or Clean Up

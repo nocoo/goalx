@@ -31,7 +31,11 @@ func BuildRequiredCoverage(runDir string) (RequiredCoverage, error) {
 	if err != nil {
 		return RequiredCoverage{}, err
 	}
-	return buildRequiredCoverage(goal, coord, sessionState, coverageSessionRoster(runDir, sessionState), loadTargetAttentionFacts(runDir)), nil
+	attention, err := loadTargetAttentionFacts(runDir)
+	if err != nil {
+		return RequiredCoverage{}, err
+	}
+	return buildRequiredCoverage(goal, coord, sessionState, coverageSessionRoster(runDir, sessionState), attention), nil
 }
 
 func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionState *SessionsRuntimeState, sessionRoster map[string]struct{}, attention map[string]TargetAttentionFacts) RequiredCoverage {
@@ -90,7 +94,7 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 				continue
 			}
 			switch attentionStateForOwner(attention, owner, sessionState, coord) {
-			case TargetAttentionNeedsAttention:
+			case TargetAttentionNeedsAttention, TargetAttentionActiveIdle:
 				coverage.OwnerAttentionIDs = append(coverage.OwnerAttentionIDs, item.ID)
 			case TargetAttentionTransportBlocked, TargetAttentionProgressBlocked:
 				coverage.OwnerBlockedIDs = append(coverage.OwnerBlockedIDs, item.ID)
@@ -155,9 +159,19 @@ func attentionStateForOwner(attention map[string]TargetAttentionFacts, owner str
 			return facts.AttentionState
 		}
 	}
-	switch coverageSessionLifecycleState(owner, sessionState, coord) {
-	case "parked", "done", "blocked":
+	coordState := ""
+	if coord != nil && coord.Sessions != nil {
+		coordState = strings.TrimSpace(coord.Sessions[owner].State)
+	}
+	if coordState == "parked" || coordState == "kept" {
+		return ""
+	}
+	runtimeState := coverageSessionLifecycleState(owner, sessionState, coord)
+	switch {
+	case (coordState == "active" || coordState == "progress") && (runtimeState == "parked" || runtimeState == "done" || runtimeState == "blocked"):
 		return TargetAttentionOwnershipRisky
+	case (coordState == "active" || coordState == "progress") && runtimeState == "idle":
+		return TargetAttentionActiveIdle
 	}
 	return ""
 }

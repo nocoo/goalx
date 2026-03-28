@@ -8,6 +8,7 @@ import (
 const (
 	TargetAttentionHealthy          = "healthy"
 	TargetAttentionNeedsAttention   = "needs_attention"
+	TargetAttentionActiveIdle       = "active_idle"
 	TargetAttentionTransportBlocked = "transport_blocked"
 	TargetAttentionProgressBlocked  = "progress_blocked"
 	TargetAttentionOwnershipRisky   = "ownership_risky"
@@ -16,13 +17,11 @@ const (
 
 type TargetAttentionFacts struct {
 	Target                string `json:"target,omitempty"`
-	Kind                  string `json:"kind,omitempty"`
 	InboxLastID           int64  `json:"inbox_last_id,omitempty"`
 	CursorLastSeenID      int64  `json:"cursor_last_seen_id,omitempty"`
 	Unread                int    `json:"unread,omitempty"`
 	CursorLag             int64  `json:"cursor_lag,omitempty"`
 	TransportState        string `json:"transport_state,omitempty"`
-	TransportAccepted     bool   `json:"transport_accepted,omitempty"`
 	LastTransportAcceptAt string `json:"last_transport_accept_at,omitempty"`
 	DeliveryGraceExpired  bool   `json:"delivery_grace_expired,omitempty"`
 	JournalStaleMinutes   int    `json:"journal_stale_minutes,omitempty"`
@@ -38,26 +37,30 @@ func BuildTargetAttentionFacts(runDir string, snapshot *ActivitySnapshot) (map[s
 	if err != nil {
 		return nil, err
 	}
+	coordinationState, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	liveness, err := LoadLivenessState(LivenessPath(runDir))
 	if err != nil {
 		return nil, err
 	}
-	return buildTargetAttentionFacts(runDir, snapshot, sessionState, liveness), nil
+	return buildTargetAttentionFacts(runDir, snapshot, sessionState, coordinationState, liveness)
 }
 
-func loadTargetAttentionFacts(runDir string) map[string]TargetAttentionFacts {
+func loadTargetAttentionFacts(runDir string) (map[string]TargetAttentionFacts, error) {
 	activity, err := LoadActivitySnapshot(ActivityPath(runDir))
 	if err == nil && activity != nil && len(activity.Attention) > 0 {
-		return activity.Attention
+		return activity.Attention, nil
 	}
 	attention, err := BuildTargetAttentionFacts(runDir, activity)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return attention
+	return attention, nil
 }
 
-func buildTargetAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, liveness *LivenessState) map[string]TargetAttentionFacts {
+func buildTargetAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, coordinationState *CoordinationState, liveness *LivenessState) (map[string]TargetAttentionFacts, error) {
 	now := time.Now().UTC()
 	if snapshot != nil {
 		if checkedAt, err := time.Parse(time.RFC3339, strings.TrimSpace(snapshot.CheckedAt)); err == nil {
@@ -71,16 +74,16 @@ func buildTargetAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessio
 
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
-		return facts
+		return nil, err
 	}
 	for _, idx := range indexes {
 		name := SessionName(idx)
-		facts[name] = buildSessionAttentionFacts(runDir, name, snapshot, sessionState, liveness, transportFacts, now)
+		facts[name] = buildSessionAttentionFacts(runDir, name, snapshot, sessionState, coordinationState, liveness, transportFacts, now)
 	}
 	if len(facts) == 0 {
-		return nil
+		return nil, nil
 	}
-	return facts
+	return facts, nil
 }
 
 func buildMasterAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, liveness *LivenessState, transportFacts *TransportFacts, now time.Time) TargetAttentionFacts {
@@ -88,13 +91,11 @@ func buildMasterAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessio
 	transport := latestAttentionTransportFacts(transportFacts, "master")
 	facts := TargetAttentionFacts{
 		Target:                "master",
-		Kind:                  "master",
 		InboxLastID:           inbox.LastID,
 		CursorLastSeenID:      inbox.LastSeenID,
 		Unread:                inbox.Unread,
 		CursorLag:             inbox.LastID - inbox.LastSeenID,
 		TransportState:        canonicalTransportStateOrUnknown(transport.TransportState),
-		TransportAccepted:     isAcceptedTUITransportState(transport.TransportState),
 		LastTransportAcceptAt: transport.LastTransportAcceptAt,
 		DeliveryGraceExpired:  transportAcceptExpired(transport.LastTransportAcceptAt, now),
 		PresenceState:         attentionPresenceState(snapshot, "master"),
@@ -105,22 +106,21 @@ func buildMasterAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessio
 	if liveness != nil {
 		facts.JournalStaleMinutes = liveness.Master.JournalStaleMinutes
 	}
-	facts.AttentionState = deriveTargetAttentionState(facts)
+	facts.AttentionState = deriveTargetAttentionState(facts, "")
 	return facts
 }
 
-func buildSessionAttentionFacts(runDir, sessionName string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, liveness *LivenessState, transportFacts *TransportFacts, now time.Time) TargetAttentionFacts {
+func buildSessionAttentionFacts(runDir, sessionName string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, coordinationState *CoordinationState, liveness *LivenessState, transportFacts *TransportFacts, now time.Time) TargetAttentionFacts {
 	inbox := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
 	transport := latestAttentionTransportFacts(transportFacts, sessionName)
+	coordinationSessionState := attentionCoordinationState(coordinationState, sessionName)
 	facts := TargetAttentionFacts{
 		Target:                sessionName,
-		Kind:                  "session",
 		InboxLastID:           inbox.LastID,
 		CursorLastSeenID:      inbox.LastSeenID,
 		Unread:                inbox.Unread,
 		CursorLag:             inbox.LastID - inbox.LastSeenID,
 		TransportState:        canonicalTransportStateOrUnknown(transport.TransportState),
-		TransportAccepted:     isAcceptedTUITransportState(transport.TransportState),
 		LastTransportAcceptAt: transport.LastTransportAcceptAt,
 		DeliveryGraceExpired:  transportAcceptExpired(transport.LastTransportAcceptAt, now),
 		PresenceState:         attentionPresenceState(snapshot, sessionName),
@@ -133,7 +133,7 @@ func buildSessionAttentionFacts(runDir, sessionName string, snapshot *ActivitySn
 			facts.JournalStaleMinutes = live.JournalStaleMinutes
 		}
 	}
-	facts.AttentionState = deriveTargetAttentionState(facts)
+	facts.AttentionState = deriveTargetAttentionState(facts, coordinationSessionState)
 	return facts
 }
 
@@ -156,6 +156,13 @@ func attentionRuntimeState(sessionState *SessionsRuntimeState, target string) st
 		return ""
 	}
 	return strings.TrimSpace(sessionState.Sessions[target].State)
+}
+
+func attentionCoordinationState(coordinationState *CoordinationState, target string) string {
+	if coordinationState == nil || coordinationState.Sessions == nil {
+		return ""
+	}
+	return strings.TrimSpace(coordinationState.Sessions[target].State)
 }
 
 func attentionLastOutputChangeAt(snapshot *ActivitySnapshot, target string) string {
@@ -193,24 +200,39 @@ func transportAcceptExpired(ts string, now time.Time) bool {
 	return strings.TrimSpace(ts) != ""
 }
 
-func deriveTargetAttentionState(facts TargetAttentionFacts) string {
+func deriveTargetAttentionState(facts TargetAttentionFacts, coordinationState string) string {
 	presence := strings.TrimSpace(facts.PresenceState)
 	runtimeState := strings.TrimSpace(facts.RuntimeState)
+	coordState := strings.TrimSpace(coordinationState)
 	transportState := normalizeTUITransportState(facts.TransportState)
+	activeOwner := coordState == "active" || coordState == "progress"
+	inactiveSession := coordState == "parked" || coordState == "kept"
+	staleJournal := facts.JournalStaleMinutes >= targetAttentionStaleMinutes
+	staleOutput := facts.OutputStaleMinutes >= targetAttentionStaleMinutes
+	hasOutputSignal := strings.TrimSpace(facts.LastOutputChangeAt) != ""
 
 	switch {
-	case presence != "" && presence != TargetPresencePresent && presence != TargetPresenceUnknown:
+	case inactiveSession:
+		return TargetAttentionHealthy
+	case presence == TargetPresenceParked:
+		return TargetAttentionHealthy
+	case activeOwner && presence != "" && presence != TargetPresencePresent && presence != TargetPresenceUnknown:
 		return TargetAttentionOwnershipRisky
-	case runtimeState == "parked" || runtimeState == "done" || runtimeState == "blocked":
+	case activeOwner && (runtimeState == "parked" || runtimeState == "done" || runtimeState == "blocked"):
 		return TargetAttentionOwnershipRisky
 	case facts.Unread > 0 && facts.CursorLag > 0:
 		if facts.DeliveryGraceExpired || facts.JournalStaleMinutes >= targetAttentionStaleMinutes || transportState == TUIStateInterrupted || transportState == TUIStateProviderDialog || transportState == TUIStateBufferedInput {
 			return TargetAttentionTransportBlocked
 		}
 		return TargetAttentionNeedsAttention
-	case facts.JournalStaleMinutes >= targetAttentionStaleMinutes || facts.OutputStaleMinutes >= targetAttentionStaleMinutes:
+	case activeOwner && runtimeState == "idle" && facts.Unread == 0 && facts.CursorLag == 0 && presence == TargetPresencePresent:
+		return TargetAttentionActiveIdle
+	case staleJournal || staleOutput:
 		if runtimeState == "" || runtimeState == "active" || runtimeState == "progress" || runtimeState == "working" {
-			return TargetAttentionProgressBlocked
+			if staleOutput || (!hasOutputSignal && staleJournal) {
+				return TargetAttentionProgressBlocked
+			}
+			return TargetAttentionNeedsAttention
 		}
 		return TargetAttentionNeedsAttention
 	case facts.Unread > 0 || facts.CursorLag > 0:
@@ -220,18 +242,18 @@ func deriveTargetAttentionState(facts TargetAttentionFacts) string {
 	}
 }
 
-func targetAttentionBlocked(attention TargetAttentionFacts) bool {
+func targetAttentionNeedsAction(attention TargetAttentionFacts) bool {
 	switch strings.TrimSpace(attention.AttentionState) {
-	case TargetAttentionTransportBlocked, TargetAttentionProgressBlocked:
+	case TargetAttentionNeedsAttention, TargetAttentionActiveIdle, TargetAttentionTransportBlocked, TargetAttentionProgressBlocked, TargetAttentionOwnershipRisky:
 		return true
 	default:
 		return false
 	}
 }
 
-func targetAttentionNeedsAction(attention TargetAttentionFacts) bool {
+func targetAttentionEscalates(attention TargetAttentionFacts) bool {
 	switch strings.TrimSpace(attention.AttentionState) {
-	case TargetAttentionNeedsAttention, TargetAttentionTransportBlocked, TargetAttentionProgressBlocked, TargetAttentionOwnershipRisky:
+	case TargetAttentionActiveIdle, TargetAttentionTransportBlocked, TargetAttentionProgressBlocked, TargetAttentionOwnershipRisky:
 		return true
 	default:
 		return false

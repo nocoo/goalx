@@ -1058,6 +1058,7 @@ func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.",
+		"An active session with `active_idle`, `transport_blocked`, `progress_blocked`, or `ownership_risky` facts is **not** a no-change fast path.",
 		"Do not use `goalx status` as a default heartbeat.",
 		"Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.",
 	} {
@@ -1089,6 +1090,7 @@ func TestRenderMasterProtocolBindsBlockedOwnersToImmediateIntervention(t *testin
 	for _, want := range []string{
 		"An open required item with `owner_attention`, `owner_blocked`, or `owner_risky` facts is **not** a no-change fast path.",
 		"If a required item owner is blocked or risky, resolve it in the current control cycle: inspect directly (including shell/tmux if needed), redirect, park+replace, or take the work over yourself.",
+		"If an active session becomes `active_idle`, treat that as \"worker result or next-step handoff is waiting on you\" and review, redirect, keep, or take over in the current control cycle.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q:\n%s", want, text)

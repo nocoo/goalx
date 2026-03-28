@@ -41,8 +41,12 @@ goalx focus --run NAME
 goalx park --run NAME session-N
 goalx resume --run NAME session-N
 goalx keep --run NAME session-N
+goalx keep --run NAME
 goalx archive --run NAME session-N
 ```
+
+- `goalx keep --run NAME session-N` merges a reviewed develop session branch into the run worktree only.
+- `goalx keep --run NAME` merges the run worktree into the source root, but only when source-root `HEAD` still descends from the run base revision.
 
 ## Closeout
 

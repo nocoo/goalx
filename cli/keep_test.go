@@ -229,6 +229,25 @@ func TestKeepReportsDirtyRunWorktreePath(t *testing.T) {
 	}
 }
 
+func TestKeepHelpExplainsRunAndSessionMergeSemantics(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Keep(t.TempDir(), []string{"--help"}); err != nil {
+			t.Fatalf("Keep --help: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"usage: goalx keep [--run NAME] [session-name]",
+		"merge the run worktree branch into the source root",
+		"require source-root HEAD to still descend from the run base revision",
+		"merge that develop session branch into the run worktree",
+		"this does not merge into the source root yet",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("keep help missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 	t.Helper()
 

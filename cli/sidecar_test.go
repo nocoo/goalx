@@ -1261,14 +1261,20 @@ func TestRunSidecarTickDoesNotAlertMissingParkedSession(t *testing.T) {
 	}
 }
 
-func TestProcessBlockedTargetAttentionAlertsMasterOnce(t *testing.T) {
+func TestProcessTargetAttentionAlertsMasterOnce(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	_, runDir, _, meta := writeTargetPresenceFixture(t)
+	repo, runDir, cfg, meta := writeTargetPresenceFixture(t)
 	if err := RenewControlLease(runDir, "master", meta.RunID, meta.Epoch, time.Minute, "tmux", os.Getpid()); err != nil {
 		t.Fatalf("RenewControlLease master: %v", err)
 	}
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
 	if err := SaveActivitySnapshot(runDir, &ActivitySnapshot{
 		Version:   1,
 		CheckedAt: time.Now().UTC().Format(time.RFC3339),
@@ -1290,11 +1296,11 @@ func TestProcessBlockedTargetAttentionAlertsMasterOnce(t *testing.T) {
 		"master":    {Target: "master", State: TargetPresencePresent},
 		"session-1": {Target: "session-1", State: TargetPresencePresent},
 	}
-	if err := processBlockedTargetAttention(runDir, presence); err != nil {
-		t.Fatalf("processBlockedTargetAttention first: %v", err)
+	if _, err := processTargetAttentionAlerts(runDir, goalx.TmuxSessionName(repo, cfg.Name), cfg.Master.Engine, presence); err != nil {
+		t.Fatalf("processTargetAttentionAlerts first: %v", err)
 	}
-	if err := processBlockedTargetAttention(runDir, presence); err != nil {
-		t.Fatalf("processBlockedTargetAttention second: %v", err)
+	if _, err := processTargetAttentionAlerts(runDir, goalx.TmuxSessionName(repo, cfg.Name), cfg.Master.Engine, presence); err != nil {
+		t.Fatalf("processTargetAttentionAlerts second: %v", err)
 	}
 
 	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
@@ -1318,6 +1324,21 @@ func TestProcessBlockedTargetAttentionAlertsMasterOnce(t *testing.T) {
 	}
 	if got.CurrentAttentionLastAlertAt == "" {
 		t.Fatalf("attention alert timestamp missing: %+v", got)
+	}
+
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlDeliveries: %v", err)
+	}
+	found := false
+	for _, item := range deliveries.Items {
+		if strings.HasPrefix(item.DedupeKey, "master-attention:session-1:transport_blocked") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected immediate master-attention delivery, got %+v", deliveries.Items)
 	}
 }
 

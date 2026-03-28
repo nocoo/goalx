@@ -252,9 +252,9 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 			appendAuditLog(runDir, "transport watcher snapshot warning: %v", err)
 		}
 		if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
-			appendAuditLog(runDir, "activity snapshot warning: %v", err)
+			return err
 		}
-		if err := processBlockedTargetAttention(runDir, presence); err != nil {
+		if _, err := processTargetAttentionAlerts(runDir, tmuxSession, cfg.Master.Engine, presence); err != nil {
 			return err
 		}
 		if err := RefreshRunMemorySeeds(runDir); err != nil {
@@ -294,9 +294,9 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 		return err
 	}
 	if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
-		appendAuditLog(runDir, "activity snapshot warning: %v", err)
+		return err
 	}
-	if err := processBlockedTargetAttention(runDir, presence); err != nil {
+	if _, err := processTargetAttentionAlerts(runDir, tmuxSession, cfg.Master.Engine, presence); err != nil {
 		return err
 	}
 	if err := RefreshRunMemorySeeds(runDir); err != nil {
@@ -470,21 +470,25 @@ func queueUnreadSessionWakeReminders(runDir, tmuxSession, runName string, interv
 	return nil
 }
 
-func processBlockedTargetAttention(runDir string, presence map[string]TargetPresenceFacts) error {
-	attention := loadTargetAttentionFacts(runDir)
+func processTargetAttentionAlerts(runDir, tmuxSession, masterEngine string, presence map[string]TargetPresenceFacts) (bool, error) {
+	attention, err := loadTargetAttentionFacts(runDir)
+	if err != nil {
+		return false, err
+	}
 	if len(attention) == 0 {
-		return nil
+		return false, nil
 	}
 	masterPresence := presence["master"]
 	masterAvailable := !targetPresenceMissing(masterPresence) && targetPresenceAvailableForTransport(masterPresence)
+	alerted := false
 	for target, facts := range attention {
 		if target == "master" {
 			continue
 		}
 		if err := recordTargetAttentionObservation(runDir, facts); err != nil {
-			return err
+			return false, err
 		}
-		if !targetAttentionBlocked(facts) || !masterAvailable {
+		if !targetAttentionEscalates(facts) || !masterAvailable {
 			continue
 		}
 		recovery := loadTransportRecoveryTarget(runDir, target)
@@ -496,13 +500,18 @@ func processBlockedTargetAttention(runDir string, presence map[string]TargetPres
 		appendAuditLog(runDir, "target_attention_alert target=%s state=%s reason=%s", target, state, reason)
 		body := fmt.Sprintf("Target attention needed in active GoalX run; target=%s state=%s %s", target, state, reason)
 		if _, err := appendControlInboxMessage(runDir, "master", "target-attention", "goalx sidecar", body, true); err != nil {
-			return err
+			return false, err
 		}
 		if err := recordTargetAttentionAlert(runDir, target, state, reason); err != nil {
-			return err
+			return false, err
 		}
+		dedupeKey := fmt.Sprintf("master-attention:%s:%s", target, state)
+		if _, err := deliverControlNudge(runDir, dedupeKey, dedupeKey, tmuxSession+":master", masterEngine, false, sendAgentNudgeDetailed); err != nil {
+			return false, err
+		}
+		alerted = true
 	}
-	return nil
+	return alerted, nil
 }
 
 func formatBlockedTargetReason(facts TargetAttentionFacts) string {
