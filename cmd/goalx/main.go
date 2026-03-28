@@ -28,6 +28,7 @@ Usage:
   goalx review  [--run RUN]           Compare all sessions
   goalx diff    [--run RUN] <a> [b]   Diff session code/reports
   goalx keep    [--run NAME] <session> Merge/preserve session
+  goalx integrate [--run NAME] --method METHOD --from SOURCE[,SOURCE...] Record a master-owned run-root integration
   goalx park    [--run NAME] <session> Park a session for later reuse
   goalx resume  [--run NAME] <session> Resume a parked session
   goalx replace [--run NAME] <session> [flags] Replace a session with a new routed owner
@@ -138,6 +139,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Diff(cwd, args)
 	case "keep":
 		return cli.Keep(cwd, args)
+	case "integrate":
+		return cli.Integrate(cwd, args)
 	case "park":
 		return cli.Park(cwd, args)
 	case "resume":

@@ -35,8 +35,8 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 	if err != nil {
 		return fmt.Errorf("load run metadata: %w", err)
 	}
-	if err := ensureEvolutionSurface(runDir, meta); err != nil {
-		return fmt.Errorf("init evolution surface: %w", err)
+	if err := ensureExperimentsSurface(runDir); err != nil {
+		return fmt.Errorf("init experiments surface: %w", err)
 	}
 	masterData, err := buildMasterProtocolData(projectRoot, runDir, tmuxSession, cfg, engines, engineCmd, meta)
 	if err != nil {
@@ -102,8 +102,8 @@ func relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession string, cfg *g
 	if err != nil {
 		return fmt.Errorf("load run metadata: %w", err)
 	}
-	if err := ensureEvolutionSurface(runDir, meta); err != nil {
-		return fmt.Errorf("init evolution surface: %w", err)
+	if err := ensureExperimentsSurface(runDir); err != nil {
+		return fmt.Errorf("init experiments surface: %w", err)
 	}
 	masterData, err := buildMasterProtocolData(projectRoot, runDir, tmuxSession, cfg, engines, engineCmd, meta)
 	if err != nil {

@@ -53,12 +53,14 @@ Dimensions shape how the agents think about the problem. They do not change the 
 goalx park --run NAME session-3
 goalx resume --run NAME session-3
 goalx keep --run NAME session-2
+goalx integrate --run NAME --method partial_adopt --from run-root,session-2
 goalx archive --run NAME session-4
 ```
 
 - `park` pauses a session and keeps its worktree
 - `resume` restarts a parked session
 - `keep --run NAME session-N` merges a reviewed session branch into the run worktree
+- `integrate --run NAME --method ... --from ...` records the lineage of a manual run-root integration that master already completed
 - `keep --run NAME` merges the run worktree into the source root when lineage is still valid
 - `archive` preserves a session branch
 

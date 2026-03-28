@@ -55,6 +55,31 @@ func TestBuildAffordancesExposeTransportFactsPath(t *testing.T) {
 	}
 }
 
+func TestBuildAffordancesExposeCanonicalExperimentPaths(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	var foundExperiments bool
+	var foundIntegration bool
+	for _, item := range doc.Items {
+		for _, path := range item.Paths {
+			if path == ExperimentsLogPath(runDir) {
+				foundExperiments = true
+			}
+			if path == IntegrationStatePath(runDir) {
+				foundIntegration = true
+			}
+		}
+	}
+	if !foundExperiments || !foundIntegration {
+		t.Fatalf("canonical experiment paths missing from affordances: experiments=%v integration=%v items=%+v", foundExperiments, foundIntegration, doc.Items)
+	}
+}
+
 func TestRenderAffordancesMarkdownUsesCurrentRunPaths(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 
@@ -155,6 +180,7 @@ func TestBuildAffordancesIncludesKeepCommands(t *testing.T) {
 	joined := strings.Join(commands, "\n")
 	for _, want := range []string{
 		"goalx keep --run guidance-run session-N",
+		"goalx integrate --run guidance-run --method partial_adopt --from session-1,session-2",
 		"goalx keep --run guidance-run",
 	} {
 		if !strings.Contains(joined, want) {
@@ -172,6 +198,7 @@ func TestBuildAffordancesIncludesProviderFactsForClaudeTargets(t *testing.T) {
 	identity := &SessionIdentity{
 		Version:         1,
 		SessionName:     sessionName,
+		ExperimentID:    "exp_guidance_claude_target_1",
 		RoleKind:        "research",
 		Mode:            "research",
 		Engine:          "claude-code",

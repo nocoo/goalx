@@ -71,6 +71,7 @@ Use durable GoalX commands. Do not type instructions directly into tmux as the n
 ```bash
 goalx verify
 goalx result
+goalx integrate --run NAME --method partial_adopt --from run-root,session-2
 goalx keep
 goalx save
 ```
@@ -92,6 +93,7 @@ goalx run "goal" --intent evolve --budget 8h
 - run root worktree = the integration boundary for the run
 - session worktree = an isolated worker boundary
 - `goalx keep --run NAME session-N` merges session work into the run root
+- `goalx integrate --run NAME --method ... --from ...` records a manual run-root integration after master merged or cherry-picked work there
 - `goalx keep --run NAME` merges the run root back into your source root
 
 ## 9. Keep The Mental Model Straight

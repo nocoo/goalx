@@ -93,7 +93,7 @@ goalx run "this project keeps getting better until the budget runs out" --intent
 `evolve` is the open-ended improvement mode:
 
 - the master chooses the highest-value next iteration
-- GoalX records the iteration trail in `evolution.jsonl`
+- GoalX records the iteration trail in `experiments.jsonl`
 - the run can continue, pivot, consolidate, or stop when budget or diminishing returns say so
 
 ### Continue A Saved Run
@@ -127,6 +127,7 @@ source root
 The merge boundaries are explicit:
 
 - `goalx keep --run NAME session-N` merges a reviewed develop session branch into the run root worktree
+- `goalx integrate --run NAME --method partial_adopt --from session-1,session-2` records a master-owned run-root result after manual merge, cherry-pick, or partial adoption
 - `goalx keep --run NAME` merges the run root worktree back into your source root
 
 This matters because GoalX is built for parallel research and implementation without losing merge discipline.

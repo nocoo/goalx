@@ -340,6 +340,26 @@ local_validation:
 	if identity.BaseBranch != "goalx/"+runName+"/1" {
 		t.Fatalf("BaseBranch = %q, want %q", identity.BaseBranch, "goalx/"+runName+"/1")
 	}
+	parentIdentity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity session-1: %v", err)
+	}
+	if parentIdentity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	if identity.BaseExperimentID != parentIdentity.ExperimentID {
+		t.Fatalf("BaseExperimentID = %q, want %q", identity.BaseExperimentID, parentIdentity.ExperimentID)
+	}
+	if strings.TrimSpace(identity.ExperimentID) == "" {
+		t.Fatal("session-2 ExperimentID empty")
+	}
+	events, err := LoadDurableLog(ExperimentsLogPath(runDir), DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("LoadDurableLog: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("expected experiment.created event for session-2")
+	}
 }
 
 func TestAddWorktreeBaseBranchFailsForSharedSession(t *testing.T) {

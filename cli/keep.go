@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -23,7 +21,7 @@ With session-N:
 - dirty session worktrees must be committed first
 - require a recorded session parent/base ref to define the merge boundary
 - if conflicts or partial adoption are required, inspect the session worktree and merge manually
-- record selection.json so the kept session is durable
+- record integration.json so the kept session is durable
 - this does not merge into the source root yet`
 
 // Keep merges or preserves a specific session from a run.
@@ -101,7 +99,7 @@ func Keep(projectRoot string, args []string) error {
 		wtPath = WorktreePath(rc.RunDir, rc.Config.Name, idx)
 	}
 	if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
-		selectionBaseSelector, selectionBaseBranch, err := requireSessionKeepBoundary(rc.RunDir, rc.Config.Name, sessionName, wtPath, branch)
+		_, _, err := requireSessionKeepBoundary(rc.RunDir, rc.Config.Name, sessionName, wtPath, branch)
 		if err != nil {
 			return err
 		}
@@ -111,18 +109,18 @@ func Keep(projectRoot string, args []string) error {
 		}
 		if integrated {
 			fmt.Printf("Session %s already integrated into run worktree.\n", sessionName)
-			return writeKeepSelection(rc.RunDir, sessionName, branch, selectionBaseSelector, selectionBaseBranch)
+			return writeKeepIntegration(rc.RunDir, sessionName, branch, "keep", runWT)
 		}
 		if err := MergeWorktree(runWT, branch); err != nil {
 			return fmt.Errorf("merge %s: %w", branch, err)
 		}
 		fmt.Printf("Merged %s into run worktree.\n", branch)
-		if err := writeKeepSelection(rc.RunDir, sessionName, branch, selectionBaseSelector, selectionBaseBranch); err != nil {
+		if err := writeKeepIntegration(rc.RunDir, sessionName, branch, "keep", runWT); err != nil {
 			return err
 		}
 	} else {
 		fmt.Printf("Session %s has no worktree (changes already in run worktree).\n", sessionName)
-		if err := writeKeepSelection(rc.RunDir, sessionName, branch, "", ""); err != nil {
+		if err := writeKeepIntegration(rc.RunDir, sessionName, branch, "keep", runWT); err != nil {
 			return err
 		}
 	}
@@ -193,25 +191,27 @@ func dirtyWorktreePaths(worktreePath string) ([]string, error) {
 	return dirtyPaths, nil
 }
 
-func writeKeepSelection(runDir, sessionName, branch, baseSelector, baseBranch string) error {
-	selection := map[string]string{
-		"kept":   sessionName,
-		"branch": branch,
-	}
-	if strings.TrimSpace(baseSelector) != "" {
-		selection["base_selector"] = strings.TrimSpace(baseSelector)
-	}
-	if strings.TrimSpace(baseBranch) != "" {
-		selection["base_branch"] = strings.TrimSpace(baseBranch)
-	}
-	data, err := json.MarshalIndent(selection, "", "  ")
+func writeKeepIntegration(runDir, sessionName, branch, method, runWorktree string) error {
+	identity, err := RequireSessionIdentity(runDir, sessionName)
 	if err != nil {
-		return fmt.Errorf("marshal selection.json: %w", err)
+		return fmt.Errorf("load %s identity: %w", sessionName, err)
 	}
-	selPath := filepath.Join(runDir, "selection.json")
-	if err := os.WriteFile(selPath, data, 0644); err != nil {
-		return fmt.Errorf("write selection.json: %w", err)
+	if strings.TrimSpace(identity.ExperimentID) == "" {
+		return fmt.Errorf("session %s has no experiment_id", sessionName)
 	}
-	fmt.Printf("Selection recorded: %s\n", selPath)
+	currentCommit, err := gitHeadRevision(runWorktree)
+	if err != nil {
+		return fmt.Errorf("resolve run-worktree head: %w", err)
+	}
+	if err := recordIntegration(runDir, IntegrationRecord{
+		ResultExperimentID:  identity.ExperimentID,
+		ResultBranch:        branch,
+		ResultCommit:        currentCommit,
+		Method:              method,
+		SourceExperimentIDs: []string{identity.ExperimentID},
+	}); err != nil {
+		return err
+	}
+	fmt.Printf("Integration recorded: %s\n", IntegrationStatePath(runDir))
 	return nil
 }

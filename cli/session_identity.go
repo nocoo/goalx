@@ -18,6 +18,8 @@ type SessionIdentity struct {
 	Mode                   string                    `json:"mode,omitempty"`
 	Engine                 string                    `json:"engine,omitempty"`
 	Model                  string                    `json:"model,omitempty"`
+	ExperimentID           string                    `json:"experiment_id,omitempty"`
+	BaseExperimentID       string                    `json:"base_experiment_id,omitempty"`
 	BaseBranchSelector     string                    `json:"base_branch_selector,omitempty"`
 	BaseBranch             string                    `json:"base_branch,omitempty"`
 	LocalValidationCommand string                    `json:"local_validation_command,omitempty"`
@@ -75,6 +77,7 @@ func NewSessionIdentity(runDir, sessionName, roleKind string, mode goalx.Mode, e
 		Mode:            string(mode),
 		Engine:          engine,
 		Model:           model,
+		ExperimentID:    newExperimentID(),
 		RequestedEffort: requestedEffort,
 		EffectiveEffort: effectiveEffort,
 		RouteProfile:    routeProfile,
@@ -119,6 +122,9 @@ func SaveSessionIdentity(path string, identity *SessionIdentity) error {
 	if identity.CreatedAt == "" {
 		identity.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	}
+	if strings.TrimSpace(identity.ExperimentID) == "" {
+		return fmt.Errorf("session identity experiment_id is required")
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -145,6 +151,8 @@ func normalizeSessionIdentity(identity *SessionIdentity) {
 	if identity.Version <= 0 {
 		identity.Version = 1
 	}
+	identity.ExperimentID = strings.TrimSpace(identity.ExperimentID)
+	identity.BaseExperimentID = strings.TrimSpace(identity.BaseExperimentID)
 	identity.BaseBranchSelector = strings.TrimSpace(identity.BaseBranchSelector)
 	identity.BaseBranch = strings.TrimSpace(identity.BaseBranch)
 	identity.LocalValidationCommand = strings.TrimSpace(identity.LocalValidationCommand)

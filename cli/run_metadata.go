@@ -76,7 +76,7 @@ func SaveRunMetadata(path string, meta *RunMetadata) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return writeFileAtomic(path, data, 0o644)
 }
 
 func EnsureRunMetadata(runDir, projectRoot, objective string) (*RunMetadata, error) {

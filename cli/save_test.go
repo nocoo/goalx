@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,7 +198,7 @@ func TestSaveCopiesGoalBoundaryArtifacts(t *testing.T) {
 	}
 }
 
-func TestSaveCopiesDevelopSelectionAndCoordinationState(t *testing.T) {
+func TestSaveCopiesDevelopIntegrationAndExperimentState(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -223,9 +224,21 @@ func TestSaveCopiesDevelopSelectionAndCoordinationState(t *testing.T) {
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
 
-	selection := `{"kept":"session-2","branch":"goalx/demo/2"}`
-	if err := os.WriteFile(filepath.Join(runDir, "selection.json"), []byte(selection), 0o644); err != nil {
-		t.Fatalf("write selection.json: %v", err)
+	experiments := `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"goalx","body":{"experiment_id":"exp-2","created_at":"2026-03-28T10:00:00Z"}}`
+	if err := os.WriteFile(ExperimentsLogPath(runDir), []byte(experiments), 0o644); err != nil {
+		t.Fatalf("write experiments.jsonl: %v", err)
+	}
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-2",
+		CurrentBranch:       "goalx/demo/2",
+		CurrentCommit:       "abc123",
+		LastIntegrationID:   "int-1",
+		LastMethod:          "keep",
+		LastSourceExperimentIDs: []string{"exp-2"},
+		UpdatedAt:           "2026-03-28T10:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
 	}
 	coordination := `{"version":1,"owners":{"req-1":"session-2"}}`
 	if err := os.WriteFile(CoordinationPath(runDir), []byte(coordination), 0o644); err != nil {
@@ -236,10 +249,15 @@ func TestSaveCopiesDevelopSelectionAndCoordinationState(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "selection.json")); err != nil {
-		t.Fatalf("read saved selection.json: %v", err)
-	} else if string(got) != selection {
-		t.Fatalf("saved selection.json = %q, want %q", string(got), selection)
+	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "integration.json")); err != nil {
+		t.Fatalf("read saved integration.json: %v", err)
+	} else if !strings.Contains(string(got), `"current_experiment_id": "exp-2"`) {
+		t.Fatalf("saved integration.json = %q", string(got))
+	}
+	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "experiments.jsonl")); err != nil {
+		t.Fatalf("read saved experiments.jsonl: %v", err)
+	} else if string(got) != experiments {
+		t.Fatalf("saved experiments.jsonl = %q, want %q", string(got), experiments)
 	}
 	if got, err := os.ReadFile(filepath.Join(SavedRunDir(projectRoot, runName), "coordination.json")); err != nil {
 		t.Fatalf("read saved coordination.json: %v", err)

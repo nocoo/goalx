@@ -161,7 +161,7 @@ func hasUnsavedRunArtifacts(projectRoot string, rc *RunContext) (bool, error) {
 
 	for _, path := range []string{
 		filepath.Join(rc.RunDir, "summary.md"),
-		filepath.Join(rc.RunDir, "selection.json"),
+		IntegrationStatePath(rc.RunDir),
 	} {
 		if info, err := os.Stat(path); err == nil && !info.IsDir() && info.Size() > 0 {
 			return true, nil

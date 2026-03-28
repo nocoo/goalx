@@ -1,9 +1,13 @@
 package cli
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -63,6 +67,64 @@ func TestAppendMasterInboxMessageAssignsMonotonicIDs(t *testing.T) {
 	for _, want := range []string{`"type":"control-cycle"`, `"type":"tell"`, `"source":"user"`, `"body":"focus on e2e"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("inbox missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestAppendMasterInboxMessageConcurrentWritersPreserveUniqueMonotonicIDs(t *testing.T) {
+	runDir := t.TempDir()
+	if err := EnsureMasterControl(runDir); err != nil {
+		t.Fatalf("EnsureMasterControl: %v", err)
+	}
+
+	const writers = 24
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	errCh := make(chan error, writers)
+	for i := 0; i < writers; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := AppendMasterInboxMessage(runDir, "tell", "user", fmt.Sprintf("msg-%02d", i))
+			errCh <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("AppendMasterInboxMessage concurrent append: %v", err)
+		}
+	}
+
+	data, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read inbox: %v", err)
+	}
+	lines := splitNonEmptyLines(string(data))
+	if len(lines) != writers {
+		t.Fatalf("inbox lines = %d, want %d", len(lines), writers)
+	}
+	ids := make([]int, 0, len(lines))
+	seen := make(map[int]struct{}, len(lines))
+	for _, line := range lines {
+		var msg MasterInboxMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			t.Fatalf("unmarshal inbox line: %v", err)
+		}
+		ids = append(ids, int(msg.ID))
+		if _, ok := seen[int(msg.ID)]; ok {
+			t.Fatalf("duplicate message id %d in inbox:\n%s", msg.ID, string(data))
+		}
+		seen[int(msg.ID)] = struct{}{}
+	}
+	sort.Ints(ids)
+	for i, id := range ids {
+		if want := i + 1; id != want {
+			t.Fatalf("sorted ids[%d] = %d, want %d", i, id, want)
 		}
 	}
 }

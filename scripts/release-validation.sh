@@ -231,6 +231,8 @@ ACTIVE_RUNS+=("manual-start")
 sleep 3
 status_output="$("${GOALX_BIN}" status --run manual-start 2>&1)"
 expect_contains "${status_output}" "manual-start"
+seed_run_artifacts "manual-start" "Manual Start Summary" "Manual Start Report"
+"${GOALX_BIN}" save manual-start >/dev/null
 "${GOALX_BIN}" stop --run manual-start >/dev/null
 "${GOALX_BIN}" drop --run manual-start >/dev/null
 
@@ -260,11 +262,24 @@ git -C "${deliver_worker_dir}" add worker-note.txt
 git -C "${deliver_worker_dir}" commit -m "smoke worker change" >/dev/null
 "${GOALX_BIN}" keep --run deliver-smoke session-1 >/dev/null
 assert_file "${deliver_run_dir}/worktrees/root/worker-note.txt"
+"${GOALX_BIN}" add --run deliver-smoke --mode develop --worktree "prepare a manually integrated change" >/dev/null
+sleep 2
+deliver_worker_dir_2="${deliver_run_dir}/worktrees/deliver-smoke-2"
+assert_dir "${deliver_worker_dir_2}"
+cat > "${deliver_worker_dir_2}/worker-note-2.txt" <<'EOF'
+session-2 change manually integrated into the run worktree
+EOF
+git -C "${deliver_worker_dir_2}" add worker-note-2.txt
+git -C "${deliver_worker_dir_2}" commit -m "smoke worker change 2" >/dev/null
+git -C "${deliver_run_dir}/worktrees/root" cherry-pick "goalx/deliver-smoke/2" >/dev/null
+"${GOALX_BIN}" integrate --run deliver-smoke --method cherry_pick --from run-root,session-2 >/dev/null
+integration_state="$(cat "${deliver_run_dir}/integration.json")"
+expect_contains "${integration_state}" '"last_method": "cherry_pick"'
 "${GOALX_BIN}" add --run deliver-smoke --mode research "exercise park and resume" >/dev/null
 sleep 2
-"${GOALX_BIN}" park --run deliver-smoke session-2 >/dev/null
-"${GOALX_BIN}" resume --run deliver-smoke session-2 >/dev/null
-"${GOALX_BIN}" dimension --run deliver-smoke session-2 --set depth,evidence >/dev/null
+"${GOALX_BIN}" park --run deliver-smoke session-3 >/dev/null
+"${GOALX_BIN}" resume --run deliver-smoke session-3 >/dev/null
+"${GOALX_BIN}" dimension --run deliver-smoke session-3 --set depth,evidence >/dev/null
 "${GOALX_BIN}" verify --run deliver-smoke >/dev/null
 seed_run_artifacts "deliver-smoke" "Deliver Smoke Summary" "Deliver Smoke Report"
 "${GOALX_BIN}" save deliver-smoke >/dev/null
@@ -273,6 +288,7 @@ deliver_save_dir="$(saved_dir_for deliver-smoke)"
 assert_file "${deliver_save_dir}/run-charter.json"
 assert_file "${deliver_save_dir}/summary.md"
 assert_file "${deliver_save_dir}/sessions/session-1/identity.json"
+assert_file "${deliver_save_dir}/integration.json"
 deliver_result="$("${GOALX_BIN}" result deliver-smoke 2>&1)"
 expect_contains "${deliver_result}" "Deliver Smoke Summary"
 "${GOALX_BIN}" stop --run deliver-smoke >/dev/null
@@ -310,6 +326,8 @@ sleep 3
 debate_status="$("${GOALX_BIN}" status --run debate-smoke 2>&1)"
 expect_contains "${debate_status}" "debate-smoke"
 "${GOALX_BIN}" observe --run debate-smoke >/dev/null
+seed_run_artifacts "debate-smoke" "Debate Smoke Summary" "Debate Smoke Report"
+"${GOALX_BIN}" save debate-smoke >/dev/null
 "${GOALX_BIN}" stop --run debate-smoke >/dev/null
 "${GOALX_BIN}" drop --run debate-smoke >/dev/null
 
@@ -321,6 +339,8 @@ sleep 3
 implement_status="$("${GOALX_BIN}" status --run implement-smoke 2>&1)"
 expect_contains "${implement_status}" "implement-smoke"
 "${GOALX_BIN}" verify --run implement-smoke >/dev/null
+seed_run_artifacts "implement-smoke" "Implement Smoke Summary" "Implement Smoke Report"
+"${GOALX_BIN}" save implement-smoke >/dev/null
 "${GOALX_BIN}" stop --run implement-smoke >/dev/null
 "${GOALX_BIN}" drop --run implement-smoke >/dev/null
 
@@ -332,6 +352,8 @@ sleep 3
 explore_status="$("${GOALX_BIN}" status --run explore-smoke 2>&1)"
 expect_contains "${explore_status}" "explore-smoke"
 "${GOALX_BIN}" observe --run explore-smoke >/dev/null
+seed_run_artifacts "explore-smoke" "Explore Smoke Summary" "Explore Smoke Report"
+"${GOALX_BIN}" save explore-smoke >/dev/null
 "${GOALX_BIN}" stop --run explore-smoke >/dev/null
 "${GOALX_BIN}" drop --run explore-smoke >/dev/null
 

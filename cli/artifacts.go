@@ -63,7 +63,7 @@ func SaveArtifacts(path string, manifest *ArtifactsManifest) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return writeFileAtomic(path, data, 0o644)
 }
 
 func EnsureArtifactsManifest(runDir string) (*ArtifactsManifest, error) {
@@ -289,6 +289,12 @@ func CollectSavedResearchContext(runDir string) ([]string, []string, error) {
 	summaryPath := SummaryPath(runDir)
 	if info, err := os.Stat(summaryPath); err == nil && !info.IsDir() && info.Size() > 0 {
 		addPath(summaryPath)
+	}
+	if info, err := os.Stat(ExperimentsLogPath(runDir)); err == nil && !info.IsDir() && info.Size() > 0 {
+		addPath(ExperimentsLogPath(runDir))
+	}
+	if info, err := os.Stat(IntegrationStatePath(runDir)); err == nil && !info.IsDir() && info.Size() > 0 {
+		addPath(IntegrationStatePath(runDir))
 	}
 	if entries, err := os.ReadDir(ReportsDir(runDir)); err == nil {
 		for _, entry := range entries {

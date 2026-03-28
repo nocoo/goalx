@@ -105,7 +105,7 @@ func TestRelaunchMasterRerendersProtocolWithFreshFacts(t *testing.T) {
 		"Run started at (UTC):",
 		"Intent: evolve",
 		"This run was launched with explicit `evolve` intent.",
-		"evolution.jsonl",
+		"experiments.jsonl",
 		"`goalx afford --run lifecycle-run master`",
 	} {
 		if !strings.Contains(text, want) {

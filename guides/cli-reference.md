@@ -41,11 +41,13 @@ goalx focus --run NAME
 goalx park --run NAME session-N
 goalx resume --run NAME session-N
 goalx keep --run NAME session-N
+goalx integrate --run NAME --method partial_adopt --from run-root,session-N
 goalx keep --run NAME
 goalx archive --run NAME session-N
 ```
 
 - `goalx keep --run NAME session-N` merges a reviewed develop session branch into the run worktree only.
+- `goalx integrate --run NAME --method ... --from ...` records the current run-root result after master manually merged, cherry-picked, or partially adopted work there.
 - `goalx keep --run NAME` merges the run worktree into the source root, but only when source-root `HEAD` still descends from the run base revision.
 
 ## Closeout
@@ -75,7 +77,7 @@ goalx durable replace coordination --run NAME --file /abs/path.json
 goalx durable replace status --run NAME --file /abs/path.json
 
 goalx durable append goal-log --run NAME --file /abs/path.jsonl
-goalx durable append evolution --run NAME --file /abs/path.jsonl
+goalx durable append experiments --run NAME --file /abs/path.jsonl
 ```
 
 Use the durable command for machine-consumed run surfaces. Do not hand-edit those files in place.

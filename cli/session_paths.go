@@ -32,9 +32,9 @@ func SummaryPath(runDir string) string {
 	return filepath.Join(runDir, "summary.md")
 }
 
-// EvolutionLogPath returns the canonical evolve trial-record surface.
-func EvolutionLogPath(runDir string) string {
-	return filepath.Join(runDir, "evolution.jsonl")
+// ExperimentsLogPath returns the canonical experiment ledger surface.
+func ExperimentsLogPath(runDir string) string {
+	return filepath.Join(runDir, "experiments.jsonl")
 }
 
 // WorktreePath returns the worktree directory for a session.

@@ -18,7 +18,7 @@ func TestDurableSurfaceRegistryResolvesKnownSurfaces(t *testing.T) {
 		{name: "coordination", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: CoordinationPath(runDir)},
 		{name: "status", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: RunStatusPath(runDir)},
 		{name: "goal-log", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: GoalLogPath(runDir)},
-		{name: "evolution", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: EvolutionLogPath(runDir)},
+		{name: "experiments", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: ExperimentsLogPath(runDir)},
 		{name: "summary", class: DurableSurfaceClassArtifact, writeMode: DurableSurfaceWriteModeReplace, strict: false, wantPath: SummaryPath(runDir)},
 		{name: "completion-proof", class: DurableSurfaceClassArtifact, writeMode: DurableSurfaceWriteModeReplace, strict: false, wantPath: CompletionStatePath(runDir)},
 	}

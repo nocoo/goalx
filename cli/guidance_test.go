@@ -61,6 +61,7 @@ func seedGuidanceSessionFixture(t *testing.T, runDir string, cfg *goalx.Config) 
 	identity := &SessionIdentity{
 		Version:         1,
 		SessionName:     sessionName,
+		ExperimentID:    "exp_guidance_session_1",
 		RoleKind:        "develop",
 		Mode:            string(goalx.ModeDevelop),
 		Engine:          "codex",

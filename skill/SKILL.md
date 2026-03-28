@@ -110,7 +110,7 @@ goalx run "this project keeps getting better until the budget runs out" --intent
 Important facts:
 
 - the master chooses each next iteration
-- the run records an iteration trail in `evolution.jsonl`
+- the run records an iteration trail in `experiments.jsonl`
 - budget is a fact the master sees and manages against
 - the framework does not force-stop on meaning; the agents decide when to consolidate, continue, or stop
 
@@ -138,6 +138,7 @@ GoalX uses explicit worktree boundaries so parallel work stays mergeable.
 ```bash
 goalx add --run NAME --mode develop --worktree "task"
 goalx keep --run NAME session-1
+goalx integrate --run NAME --method partial_adopt --from run-root,session-2
 goalx keep --run NAME
 ```
 
@@ -146,9 +147,11 @@ Meaning:
 - run root worktree = the integration boundary for the run
 - session worktree = an isolated worker boundary
 - `goalx keep --run NAME session-N` = merge session branch into the run root
+- `goalx integrate --run NAME --method ... --from ...` = record the current run-root result after master manually integrated work there
 - `goalx keep --run NAME` = merge run root back into the source root
 
 Do not describe `keep` as a generic "save my work" command. It is a merge boundary command.
+Do not describe `integrate` as a merge command. It records lineage for a run-root state that master already produced.
 
 ## Effort, Dimensions, And Control
 

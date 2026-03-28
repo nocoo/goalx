@@ -27,16 +27,9 @@ var durableLogKinds = map[DurableSurfaceName]map[string]struct{}{
 		"note":       {},
 		"update":     {},
 	},
-	DurableSurfaceEvolution: {
-		"trial":               {},
-		"pivot":               {},
-		"blocker":             {},
-		"diminishing_returns": {},
-		"consolidation":       {},
-		"checkpoint":          {},
-		"closeout":            {},
-		"note":                {},
-		"update":              {},
+	DurableSurfaceExperiments: {
+		"experiment.created":    {},
+		"experiment.integrated": {},
 	},
 }
 
@@ -63,23 +56,24 @@ func AppendDurableLog(path string, surface DurableSurfaceName, data []byte) erro
 	if len(events) == 0 {
 		return fmt.Errorf("durable log append payload is empty")
 	}
-
-	existing, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	var buf bytes.Buffer
-	if len(existing) > 0 {
-		buf.Write(existing)
-		if existing[len(existing)-1] != '\n' {
+	return withExclusiveFileLock(path, func() error {
+		existing, err := os.ReadFile(path)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		var buf bytes.Buffer
+		if len(existing) > 0 {
+			buf.Write(existing)
+			if existing[len(existing)-1] != '\n' {
+				buf.WriteByte('\n')
+			}
+		}
+		buf.Write(data)
+		if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
 			buf.WriteByte('\n')
 		}
-	}
-	buf.Write(data)
-	if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] != '\n' {
-		buf.WriteByte('\n')
-	}
-	return writeFileAtomic(path, buf.Bytes(), 0o644)
+		return writeFileAtomic(path, buf.Bytes(), 0o644)
+	})
 }
 
 func parseDurableLogBuffer(data []byte, surface DurableSurfaceName) ([]DurableLogEvent, error) {
@@ -139,6 +133,11 @@ func validateDurableLogEvent(event DurableLogEvent, surface DurableSurfaceName) 
 	var body map[string]json.RawMessage
 	if err := json.Unmarshal(event.Body, &body); err != nil {
 		return fmt.Errorf("durable log event body must be a JSON object: %w", err)
+	}
+	if surface == DurableSurfaceExperiments {
+		if err := validateExperimentLogBody(kind, event.Body); err != nil {
+			return err
+		}
 	}
 	return nil
 }

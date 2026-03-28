@@ -132,6 +132,7 @@ Prefer durable GoalX commands over direct transport input:
 - `goalx resume --run NAME session-N` to restart a parked session
 - `goalx replace --run NAME session-N --route-profile PROFILE` to hand the same slice to a new routed owner
 - `goalx keep --run NAME session-N` to merge a develop session branch
+- `goalx integrate --run NAME --method partial_adopt --from run-root,session-N` to record a manual run-root integration after master merged or cherry-picked work itself
 
 `--parallel` is not a permanent cap. Master may still add or resume more durable sessions later if the goal warrants it.
 

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,16 +70,16 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 		},
 	}, nil)
 
-	selection := map[string]string{
-		"kept":   "session-1",
-		"branch": branch,
-	}
-	data, err := json.Marshal(selection)
-	if err != nil {
-		t.Fatalf("marshal selection: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "selection.json"), data, 0o644); err != nil {
-		t.Fatalf("write selection.json: %v", err)
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-1",
+		CurrentBranch:       branch,
+		CurrentCommit:       strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
+		LastIntegrationID:   "int-1",
+		LastMethod:          "keep",
+		LastSourceExperimentIDs: []string{"exp-1"},
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
 	}
 
 	out := captureStdout(t, func() {
@@ -90,7 +89,8 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"session-1",
+		"exp-1",
+		branch,
 		"feat: update readme",
 		"README.md |",
 	} {
@@ -120,16 +120,16 @@ func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
 		"summary.md": "# Final Result\n\nship it\n",
 	})
 
-	selection := map[string]string{
-		"kept":   "session-1",
-		"branch": branch,
-	}
-	data, err := json.Marshal(selection)
-	if err != nil {
-		t.Fatalf("marshal selection: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(runDir, "selection.json"), data, 0o644); err != nil {
-		t.Fatalf("write selection.json: %v", err)
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-1",
+		CurrentBranch:       branch,
+		CurrentCommit:       strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
+		LastIntegrationID:   "int-1",
+		LastMethod:          "keep",
+		LastSourceExperimentIDs: []string{"exp-1"},
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
 	}
 
 	out := captureStdout(t, func() {
@@ -143,6 +143,26 @@ func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
 	}
 	if strings.Contains(out, "feat: update readme") {
 		t.Fatalf("result output should prefer summary surface over branch summary:\n%s", out)
+	}
+}
+
+func TestResultFailsWhenDevelopIntegrationMissing(t *testing.T) {
+	projectRoot := t.TempDir()
+
+	writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
+		Name: "dev-run",
+		Mode: goalx.ModeDevelop,
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+	}, nil)
+
+	err := Result(projectRoot, []string{"dev-run"})
+	if err == nil {
+		t.Fatal("expected develop result to fail without integration.json")
+	}
+	if !strings.Contains(err.Error(), "integration.json") {
+		t.Fatalf("Result error = %v, want integration.json failure", err)
 	}
 }
 

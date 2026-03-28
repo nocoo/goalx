@@ -131,29 +131,39 @@ func appendControlInboxMessage(runDir, target, typ, source, body string, urgent 
 	if target != "master" {
 		inboxPath = ControlInboxPath(runDir, target)
 	}
-	nextID, err := nextMasterInboxID(inboxPath)
+	var (
+		msg MasterInboxMessage
+		err error
+	)
+	err = withExclusiveFileLock(inboxPath, func() error {
+		nextID, err := nextMasterInboxID(inboxPath)
+		if err != nil {
+			return err
+		}
+		msg = MasterInboxMessage{
+			ID:        nextID,
+			Type:      typ,
+			Source:    source,
+			Body:      body,
+			Urgent:    urgent,
+			CreatedAt: time.Now().Format(time.RFC3339),
+		}
+		f, err := os.OpenFile(inboxPath, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return fmt.Errorf("open control inbox: %w", err)
+		}
+		defer f.Close()
+		line, err := json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("marshal master inbox message: %w", err)
+		}
+		if _, err := f.Write(append(line, '\n')); err != nil {
+			return fmt.Errorf("append control inbox: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		return MasterInboxMessage{}, err
-	}
-	msg := MasterInboxMessage{
-		ID:        nextID,
-		Type:      typ,
-		Source:    source,
-		Body:      body,
-		Urgent:    urgent,
-		CreatedAt: time.Now().Format(time.RFC3339),
-	}
-	f, err := os.OpenFile(inboxPath, os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return MasterInboxMessage{}, fmt.Errorf("open control inbox: %w", err)
-	}
-	defer f.Close()
-	line, err := json.Marshal(msg)
-	if err != nil {
-		return MasterInboxMessage{}, fmt.Errorf("marshal master inbox message: %w", err)
-	}
-	if _, err := f.Write(append(line, '\n')); err != nil {
-		return MasterInboxMessage{}, fmt.Errorf("append control inbox: %w", err)
 	}
 	return msg, nil
 }
@@ -322,7 +332,7 @@ func SaveMasterCursorState(path string, state *MasterCursorState) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := writeFileAtomic(path, data, 0o644); err != nil {
 		return fmt.Errorf("write master cursor state: %w", err)
 	}
 	return nil

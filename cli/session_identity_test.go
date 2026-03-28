@@ -57,6 +57,9 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	if identity.RouteProfile != "deep-codex" {
 		t.Fatalf("route profile = %q", identity.RouteProfile)
 	}
+	if strings.TrimSpace(identity.ExperimentID) == "" {
+		t.Fatal("ExperimentID empty")
+	}
 	if identity.OriginCharterID != charter.CharterID {
 		t.Fatalf("OriginCharterID = %q, want %q", identity.OriginCharterID, charter.CharterID)
 	}
@@ -88,6 +91,9 @@ func TestSessionIdentityPathAndRoundTrip(t *testing.T) {
 	}
 	if reloaded.LocalValidationCommand != "go test ./..." {
 		t.Fatalf("reloaded local validation = %q", reloaded.LocalValidationCommand)
+	}
+	if reloaded.ExperimentID != identity.ExperimentID {
+		t.Fatalf("ExperimentID = %q, want %q", reloaded.ExperimentID, identity.ExperimentID)
 	}
 }
 
@@ -142,6 +148,7 @@ func TestSessionIdentityRoundTripKeepsRecordedWorktreeBase(t *testing.T) {
 	}
 	identity.BaseBranchSelector = "session-1"
 	identity.BaseBranch = "goalx/demo/1"
+	identity.BaseExperimentID = "exp_parent"
 
 	path := SessionIdentityPath(runDir, "session-2")
 	if err := SaveSessionIdentity(path, identity); err != nil {
@@ -157,6 +164,9 @@ func TestSessionIdentityRoundTripKeepsRecordedWorktreeBase(t *testing.T) {
 	}
 	if reloaded.BaseBranch != "goalx/demo/1" {
 		t.Fatalf("BaseBranch = %q, want goalx/demo/1", reloaded.BaseBranch)
+	}
+	if reloaded.BaseExperimentID != "exp_parent" {
+		t.Fatalf("BaseExperimentID = %q, want exp_parent", reloaded.BaseExperimentID)
 	}
 }
 

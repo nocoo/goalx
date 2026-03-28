@@ -694,7 +694,7 @@ func TestStatusWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *test
 	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := os.WriteFile(EvolutionLogPath(runDir), []byte("{\"version\":1,\"kind\":\"trial\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"master\",\"body\":{\"trial\":1}}\n"), 0o644); err != nil {
+	if err := os.WriteFile(ExperimentsLogPath(runDir), []byte("{\"version\":1,\"kind\":\"experiment.created\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"master\",\"body\":{\"experiment_id\":\"exp-1\",\"created_at\":\"2026-03-28T10:00:00Z\"}}\n"), 0o644); err != nil {
 		t.Fatalf("write evolution log: %v", err)
 	}
 
@@ -709,7 +709,7 @@ func TestStatusWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *test
 		"Potential evolve stall:",
 		"phase=review",
 		"active_sessions=0",
-		"evolution_entries=1",
+		"experiment_entries=1",
 		"summary_exists=false",
 		"completion_proof_exists=false",
 		"Closeout artifacts missing:",

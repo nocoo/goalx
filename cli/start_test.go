@@ -366,6 +366,115 @@ esac
 	}
 }
 
+func TestStartInitializesRootExperimentLineage(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+
+	goalxDir := filepath.Join(repo, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "demo",
+		Mode:      goalx.ModeResearch,
+		Objective: "audit auth flow",
+		Roles: goalx.RoleDefaultsConfig{
+			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "gpt-5.4",
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	binDir := t.TempDir()
+	stateDir := t.TempDir()
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+state="${GOALX_FAKE_TMUX_STATE:?}"
+mkdir -p "$state"
+cmd="$1"
+shift
+case "$cmd" in
+  has-session)
+    target="$2"
+    if [ -f "$state/session_$target" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  new-session)
+    name=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "-s" ]; then
+        shift
+        name="$1"
+        break
+      fi
+      shift
+    done
+    : > "$state/session_$name"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
+
+	origLaunchSidecar := launchRunSidecar
+	defer func() { launchRunSidecar = origLaunchSidecar }()
+	launchRunSidecar = func(projectRoot, runName string, interval time.Duration) error {
+		return nil
+	}
+
+	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, cfg.Name)
+	events, err := LoadDurableLog(ExperimentsLogPath(runDir), DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("LoadDurableLog: %v", err)
+	}
+	if len(events) != 1 || events[0].Kind != "experiment.created" {
+		t.Fatalf("unexpected experiment events: %#v", events)
+	}
+	state, err := LoadIntegrationState(IntegrationStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadIntegrationState: %v", err)
+	}
+	if state == nil {
+		t.Fatal("integration state missing")
+	}
+	if strings.TrimSpace(state.CurrentExperimentID) == "" {
+		t.Fatal("CurrentExperimentID empty")
+	}
+	if state.CurrentBranch != "goalx/demo/root" {
+		t.Fatalf("CurrentBranch = %q, want goalx/demo/root", state.CurrentBranch)
+	}
+}
+
 func TestStartRefreshesActivityAfterMasterLaunch(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

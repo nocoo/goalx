@@ -45,21 +45,25 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 ### Evolve Intent
 
 - This run was launched with explicit `evolve` intent.
-- Trial record: `{{.EvolutionLogPath}}`
-- Re-read `{{.EvolutionLogPath}}` before planning the next iteration or recovering from relaunch.
-- Append every material trial through `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl`.
+- Experiment ledger: `{{.ExperimentsLogPath}}`
+- Current integrated path: `{{.IntegrationStatePath}}`
+- Re-read `{{.ExperimentsLogPath}}` before planning the next iteration or recovering from relaunch.
+- Re-read `{{.IntegrationStatePath}}` before declaring a winning path, consolidating branches, or recovering from relaunch.
+- Append every material experiment event through `goalx durable append experiments --run {{.RunName}} --file /abs/path.jsonl`.
 - Use the canonical durable-log envelope for each appended event: `version`, `kind`, `at`, `actor`, `body`.
-- Run an explicit iteration loop: choose the highest-value next trial, execute it, review evidence, record the result, then continue, pivot, or consolidate.
+- Run an explicit iteration loop: choose the highest-value next experiment, execute it, review evidence, record the result, then continue, pivot, or consolidate.
 - `required_remaining == 0` only means the current required baseline is covered. It does not mean the run should stop.
 - Do not enter review or idle just because required items are covered.
-- Before you enter review or idle in `evolve`, do one of the following in durable state: append the next trial through `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl` and keep going, record a factual blocker that is truly outside your current permissions, credentials, or reachable environment, or record a diminishing-returns decision that cites recent trial evidence and the remaining upside.
+- Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.
+- Record a factual blocker that is truly outside your current permissions, credentials, or reachable environment.
+- Record why the current path no longer justifies more budget or risk.
 - Bias toward producing meaningful code or system improvements, not stopping at diagnosis alone.
 - When exploring divergent paths, use isolated worktrees and explicit base branches instead of mutating one branch blindly.
 - Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
 - Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..." --mode develop` when a trial should fork from an existing session result.
 - Keep the current best path visible in durable state, and record why weaker trials were rejected.
-- Stop the iteration loop when budget is exhausted, the user redirects or stops the run, or recent trials show diminishing returns relative to cost, risk, and remaining upside.
-- Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned trials.
+- Stop the iteration loop when budget is exhausted, the user redirects or stops the run, or recent experiments show diminishing returns relative to cost, risk, and remaining upside.
+- Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned experiments.
 {{end}}
 
 ## Resources
@@ -74,6 +78,8 @@ goalx dimension [--run NAME] <session-N> --remove depth
 ```
 {{end}}
 {{if .RunWorktreePath}}Run-root integration boundary: `{{.RunWorktreePath}}`
+{{end}}
+{{if .IntegrationStatePath}}Current integrated experiment state: `{{.IntegrationStatePath}}`
 {{end}}
 Write supporting findings to `{{.ReportsDir}}`. The final user-facing run result belongs in `{{.SummaryPath}}`.
 
@@ -165,9 +171,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Read `goalx context --run {{.RunName}}` first. It is the canonical run-identity and path surface for this run.
 - Read the current run guidance surfaces before planning the first control cycle.
 - Initialize or replace machine-consumed structured surfaces through `goalx durable replace <goal|acceptance|coordination|status> --run {{.RunName}} --file /abs/path.json`.
-- Append machine-consumed event logs through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`.{{if .EvolutionLogPath}} Use `goalx durable append evolution --run {{.RunName}} --file /abs/path.jsonl` for evolve trial records.{{end}}
+- Append machine-consumed event logs through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`. Use `goalx durable append experiments --run {{.RunName}} --file /abs/path.jsonl` for experiment lineage records.
+- Treat `{{.IntegrationStatePath}}` as the framework-owned fact for the currently integrated winning path. Read it; do not rewrite it by hand.
 - Initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
-- Do not hand-edit `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.CoordinationPath}}`, `{{.StatusPath}}`, or `{{.GoalLogPath}}` in place.{{if .EvolutionLogPath}} Do not hand-edit `{{.EvolutionLogPath}}` in place.{{end}}
+- Do not hand-edit `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.CoordinationPath}}`, `{{.StatusPath}}`, `{{.GoalLogPath}}`, `{{.ExperimentsLogPath}}`, or `{{.IntegrationStatePath}}` in place.
 - `goalx context --run {{.RunName}}` exposes the immutable run identity and current durable paths. `{{.CharterPath}}` remains the recovery source for relaunch/debug.
 - `{{.GoalPath}}` is the only mutable completion boundary. `{{.AcceptanceStatePath}}` is verification-only; it never authorizes shrinking the goal.
 - Goal boundary: `{{.GoalPath}}` defines required current-goal outcomes and optional improvements.
@@ -262,11 +269,12 @@ Use routing profiles, routing rules, and these preferences together when choosin
 5. `goalx keep --run {{.RunName}} session-N` only merges committed session branch history relative to that session's recorded parent/base ref. It does not include uncommitted dirty worktree changes.
 6. If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.
 7. If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.
-8. Use `goalx status`, `goalx observe`, `goalx context`, and `goalx afford` to confirm the current run-root lineage and the session's recorded parent/base ref before merging.
-9. If a dedicated session reports or you observe edits landing in the source root or the wrong worktree, treat that as a worktree-boundary violation. Inspect directly, migrate or revert the misplaced edits, and re-establish clean boundaries before you keep or continue delegating.
-10. Run `git status --short` before you say "ready for commit" or "ready for closeout".
-11. If `required_remaining` reached 0, closeout is not complete until `{{.SummaryPath}}` and `{{.CompletionProofPath}}` exist, unless you have already recorded a factual blocker explaining why they do not.
-12. Write the final run result to `{{.SummaryPath}}`, keep supporting reports in `{{.ReportsDir}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
+8. After you finish a manual run-root integration, record it with `goalx integrate --run {{.RunName}} --method partial_adopt --from session-N,session-M`.
+9. Use `goalx status`, `goalx observe`, `goalx context`, and `goalx afford` to confirm the current run-root lineage and the session's recorded parent/base ref before merging.
+10. If a dedicated session reports or you observe edits landing in the source root or the wrong worktree, treat that as a worktree-boundary violation. Inspect directly, migrate or revert the misplaced edits, and re-establish clean boundaries before you keep or continue delegating.
+11. Run `git status --short` before you say "ready for commit" or "ready for closeout".
+12. If `required_remaining` reached 0, closeout is not complete until `{{.SummaryPath}}` and `{{.CompletionProofPath}}` exist, unless you have already recorded a factual blocker explaining why they do not.
+13. Write the final run result to `{{.SummaryPath}}`, keep supporting reports in `{{.ReportsDir}}`, update `{{.StatusPath}}`, and stop sessions. The run worktree stays for user review.
 
 ### Phase Transition
 
@@ -297,6 +305,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Replace a structured durable surface: `goalx durable replace status --run {{.RunName}} --file /abs/path.json`
 - Append an event-log durable surface: `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`
 - Record acceptance results: `goalx verify --run {{.RunName}}`
+- Record a manual run-root integration: `goalx integrate --run {{.RunName}} --method partial_adopt --from session-N,session-M`
 - Launch a route-first research worker: `goalx add --run {{.RunName}} --mode research --effort high --worktree "sub-goal"`
 - Launch a route-first develop worker: `goalx add --run {{.RunName}} --mode develop --effort medium --worktree "sub-goal"`
 - Launch an explicit override worker: `goalx add --run {{.RunName}} --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`

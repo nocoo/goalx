@@ -133,19 +133,19 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	if status == nil || strings.TrimSpace(status.Phase) != "review" || (summaryExists && completionExists) {
 		return advisories, nil
 	}
-	evolutionEntries, lastTrialAt, err := evolutionLogFacts(EvolutionLogPath(rc.RunDir))
+	experimentEntries, lastExperimentAt, err := experimentsLogFacts(ExperimentsLogPath(rc.RunDir))
 	if err != nil {
 		return nil, err
 	}
 	parts := []string{
 		"phase=review",
 		fmt.Sprintf("active_sessions=%d", len(status.ActiveSessions)),
-		fmt.Sprintf("evolution_entries=%d", evolutionEntries),
+		fmt.Sprintf("experiment_entries=%d", experimentEntries),
 		fmt.Sprintf("summary_exists=%t", summaryExists),
 		fmt.Sprintf("completion_proof_exists=%t", completionExists),
 	}
-	if lastTrialAt != "" {
-		parts = append(parts, "last_trial_record_at="+lastTrialAt)
+	if lastExperimentAt != "" {
+		parts = append(parts, "last_experiment_record_at="+lastExperimentAt)
 	}
 	advisories = append(advisories, "Potential evolve stall: "+strings.Join(parts, " "))
 	return advisories, nil
@@ -314,8 +314,8 @@ func formatTargetAttentionAdvisory(attention map[string]TargetAttentionFacts) st
 	return "Target attention: " + strings.Join(parts, " | ")
 }
 
-func evolutionLogFacts(path string) (int, string, error) {
-	events, err := LoadDurableLog(path, DurableSurfaceEvolution)
+func experimentsLogFacts(path string) (int, string, error) {
+	events, err := LoadDurableLog(path, DurableSurfaceExperiments)
 	if err != nil {
 		return 0, "", err
 	}

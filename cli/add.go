@@ -278,6 +278,7 @@ func Add(projectRoot string, args []string) (err error) {
 	branch := ""
 	baseBranch := ""
 	baseBranchHint := ""
+	baseExperimentID := ""
 	if useWorktree {
 		wtPath = WorktreePath(rc.RunDir, rc.Config.Name, newNum)
 		branch = fmt.Sprintf("goalx/%s/%d", rc.Config.Name, newNum)
@@ -288,10 +289,21 @@ func Add(projectRoot string, args []string) (err error) {
 			}
 			baseBranch = resolvedBaseBranch
 			baseBranchHint = baseBranchSelector
+			if _, err := parseSessionIndex(baseBranchSelector); err == nil {
+				parentIdentity, err := RequireSessionIdentity(rc.RunDir, baseBranchSelector)
+				if err != nil {
+					return fmt.Errorf("load %s identity: %w", baseBranchSelector, err)
+				}
+				if strings.TrimSpace(parentIdentity.ExperimentID) == "" {
+					return fmt.Errorf("session %s has no experiment_id", baseBranchSelector)
+				}
+				baseExperimentID = parentIdentity.ExperimentID
+			}
 		} else {
 			baseBranch = fmt.Sprintf("goalx/%s/root", rc.Config.Name)
 			baseBranchHint = "run-root"
 		}
+		sessionIdentity.BaseExperimentID = baseExperimentID
 		sessionIdentity.BaseBranchSelector = baseBranchHint
 		sessionIdentity.BaseBranch = baseBranch
 	}
@@ -308,6 +320,18 @@ func Add(projectRoot string, args []string) (err error) {
 			fmt.Fprintf(os.Stderr, "warning: copy gitignored files to session worktree: %v\n", err)
 		}
 		workdir = wtPath
+	}
+	if err := appendExperimentCreated(rc.RunDir, ExperimentCreatedBody{
+		ExperimentID:     sessionIdentity.ExperimentID,
+		Session:          sName,
+		Branch:           branch,
+		Worktree:         workdir,
+		Intent:           sessionIdentity.Mode,
+		BaseRef:          sessionIdentity.BaseBranch,
+		BaseExperimentID: sessionIdentity.BaseExperimentID,
+		CreatedAt:        sessionIdentity.CreatedAt,
+	}); err != nil {
+		return fmt.Errorf("append experiment.created for %s: %w", sName, err)
 	}
 	absProjectRoot, _ := filepath.Abs(rc.ProjectRoot)
 

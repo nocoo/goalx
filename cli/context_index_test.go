@@ -32,6 +32,12 @@ func TestBuildContextIndexIncludesRunAnchors(t *testing.T) {
 	if index.TransportFactsPath != TransportFactsPath(runDir) {
 		t.Fatalf("transport_facts_path = %q, want %q", index.TransportFactsPath, TransportFactsPath(runDir))
 	}
+	if index.ExperimentsLogPath != ExperimentsLogPath(runDir) {
+		t.Fatalf("experiments_log_path = %q, want %q", index.ExperimentsLogPath, ExperimentsLogPath(runDir))
+	}
+	if index.IntegrationStatePath != IntegrationStatePath(runDir) {
+		t.Fatalf("integration_state_path = %q, want %q", index.IntegrationStatePath, IntegrationStatePath(runDir))
+	}
 	if index.Master.Engine != "codex" || index.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %+v, want codex/gpt-5.4", index.Master)
 	}
@@ -188,6 +194,7 @@ func TestContextIndexUsesRunWorktreeForSharedSession(t *testing.T) {
 	identity := &SessionIdentity{
 		Version:         1,
 		SessionName:     sessionName,
+		ExperimentID:    "exp_guidance_shared_session_1",
 		RoleKind:        "develop",
 		Mode:            string(goalx.ModeDevelop),
 		Engine:          "codex",

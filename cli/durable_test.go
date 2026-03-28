@@ -47,20 +47,20 @@ func TestDurableCommandAppendsEventLog(t *testing.T) {
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
-	payloadPath := filepath.Join(t.TempDir(), "evolution.jsonl")
-	if err := os.WriteFile(payloadPath, []byte(`{"version":1,"kind":"trial","at":"2026-03-28T10:00:00Z","actor":"master","body":{"hypothesis":"x"}}`), 0o644); err != nil {
+	payloadPath := filepath.Join(t.TempDir(), "experiments.jsonl")
+	if err := os.WriteFile(payloadPath, []byte(`{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`), 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
 
-	if err := Durable(repo, []string{"append", "evolution", "--run", cfg.Name, "--file", payloadPath}); err != nil {
+	if err := Durable(repo, []string{"append", "experiments", "--run", cfg.Name, "--file", payloadPath}); err != nil {
 		t.Fatalf("Durable append: %v", err)
 	}
 
-	events, err := LoadDurableLog(EvolutionLogPath(runDir), DurableSurfaceEvolution)
+	events, err := LoadDurableLog(ExperimentsLogPath(runDir), DurableSurfaceExperiments)
 	if err != nil {
 		t.Fatalf("LoadDurableLog: %v", err)
 	}
-	if len(events) != 1 || events[0].Kind != "trial" {
+	if len(events) != 1 || events[0].Kind != "experiment.created" {
 		t.Fatalf("unexpected events: %#v", events)
 	}
 }

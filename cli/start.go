@@ -260,8 +260,25 @@ func bootstrapStartDurables(projectRoot string, state *startRunState, cfg *goalx
 	if err := SaveRunMetadata(RunMetadataPath(state.runDir), meta); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("write run metadata: %w", err)
 	}
-	if err := ensureEvolutionSurface(state.runDir, meta); err != nil {
-		return "", "", nil, 0, "", fmt.Errorf("init evolution surface: %w", err)
+	if err := ensureExperimentsSurface(state.runDir); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init experiments surface: %w", err)
+	}
+	baseRef := strings.TrimSpace(meta.BaseRevision)
+	baseExperimentID := ""
+	if metaPatch != nil && strings.TrimSpace(metaPatch.SourceRun) != "" {
+		sourceState, err := ResolveIntegrationState(projectRoot, goalx.Slugify(metaPatch.SourceRun))
+		if err != nil {
+			return "", "", nil, 0, "", fmt.Errorf("load source integration state: %w", err)
+		}
+		if sourceState != nil {
+			baseExperimentID = sourceState.CurrentExperimentID
+			if strings.TrimSpace(sourceState.CurrentBranch) != "" {
+				baseRef = sourceState.CurrentBranch
+			}
+		}
+	}
+	if err := initializeRootExperimentLineageWithBase(state.runDir, state.runWorktree, cfg.Name, meta.Intent, baseRef, baseExperimentID); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init root experiment lineage: %w", err)
 	}
 	if _, err := EnsureArtifactsManifest(state.runDir); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("init artifacts manifest: %w", err)
@@ -424,7 +441,7 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 		Intent:                 intent,
 		CurrentTime:            time.Now().UTC().Format(time.RFC3339),
 		RunStartedAt:           runStartedAt,
-		EvolutionLogPath:       evolutionLogPathForIntent(runDir, intent),
+		ExperimentsLogPath:     ExperimentsLogPath(runDir),
 		Mode:                   cfg.Mode,
 		Engines:                engines,
 		Sessions:               sessionDataList,
@@ -441,6 +458,7 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 		CharterPath:            RunCharterPath(runDir),
 		GoalPath:               GoalPath(runDir),
 		GoalLogPath:            GoalLogPath(runDir),
+		IntegrationStatePath:   IntegrationStatePath(runDir),
 		IdentityFencePath:      IdentityFencePath(runDir),
 		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(runDir)),
 		AcceptanceStatePath:    AcceptanceStatePath(runDir),
@@ -466,16 +484,6 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 	}, nil
 }
 
-func ensureEvolutionSurface(runDir string, meta *RunMetadata) error {
-	if meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
-		return nil
-	}
-	return ensureEmptyFile(EvolutionLogPath(runDir))
-}
-
-func evolutionLogPathForIntent(runDir, intent string) string {
-	if strings.TrimSpace(intent) != runIntentEvolve {
-		return ""
-	}
-	return EvolutionLogPath(runDir)
+func ensureExperimentsSurface(runDir string) error {
+	return ensureEmptyFile(ExperimentsLogPath(runDir))
 }

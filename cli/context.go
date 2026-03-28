@@ -88,6 +88,8 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Reports dir", index.ReportsDir)
 	writeContextLine("Charter", index.CharterPath)
 	writeContextLine("Goal", index.GoalPath)
+	writeContextLine("Experiment ledger", index.ExperimentsLogPath)
+	writeContextLine("Integration state", index.IntegrationStatePath)
 	writeContextLine("Acceptance", index.AcceptanceStatePath)
 	writeContextLine("Closeout/evidence surface", index.CompletionProofPath)
 	writeContextLine("Coordination", index.CoordinationPath)

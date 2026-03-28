@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,11 +11,6 @@ import (
 
 	goalx "github.com/vonbai/goalx"
 )
-
-type selectionJSON struct {
-	Kept   string `json:"kept"`
-	Branch string `json:"branch"`
-}
 
 type resultRun struct {
 	Name   string
@@ -57,7 +51,26 @@ func Result(projectRoot string, args []string) error {
 		return err
 	}
 
-	if data, err := loadResultSurface(target.Dir); err == nil {
+	if target.Config.Mode == goalx.ModeDevelop {
+		if data, err := os.ReadFile(SummaryPath(target.Dir)); err == nil && len(data) > 0 {
+			if full {
+				fmt.Print(string(data))
+				return nil
+			}
+			printRunResult(data)
+			return nil
+		} else if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read summary: %w", err)
+		}
+		if data, err := loadResultFallback(target.Dir); err == nil {
+			if full {
+				fmt.Print(string(data))
+				return nil
+			}
+			printRunResult(data)
+			return nil
+		}
+	} else if data, err := loadResultSurface(target.Dir); err == nil {
 		if full {
 			fmt.Print(string(data))
 			return nil
@@ -66,21 +79,22 @@ func Result(projectRoot string, args []string) error {
 		return nil
 	}
 
-	selection, err := loadResultSelection(projectRoot, target.Dir, target.Config.Name)
+	integration, err := loadResultIntegration(projectRoot, target.Dir, target.Config.Name)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Kept: %s\n", selection.Kept)
-	logOut, err := exec.Command("git", "-C", projectRoot, "log", "--oneline", "-5", selection.Branch).CombinedOutput()
+	fmt.Printf("Experiment: %s\n", integration.CurrentExperimentID)
+	fmt.Printf("Branch: %s\n", integration.CurrentBranch)
+	logOut, err := exec.Command("git", "-C", projectRoot, "log", "--oneline", "-5", integration.CurrentBranch).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git log %s: %w: %s", selection.Branch, err, logOut)
+		return fmt.Errorf("git log %s: %w: %s", integration.CurrentBranch, err, logOut)
 	}
 	fmt.Print(string(logOut))
 
-	diffOut, err := exec.Command("git", "-C", projectRoot, "show", "--stat", "--format=", selection.Branch).CombinedOutput()
+	diffOut, err := exec.Command("git", "-C", projectRoot, "show", "--stat", "--format=", integration.CurrentBranch).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git show %s: %w: %s", selection.Branch, err, diffOut)
+		return fmt.Errorf("git show %s: %w: %s", integration.CurrentBranch, err, diffOut)
 	}
 	fmt.Print(string(diffOut))
 	return nil
@@ -142,7 +156,8 @@ func loadResultFallback(runDir string) ([]byte, error) {
 		contextFiles = nil
 	}
 	for _, path := range contextFiles {
-		if path == SummaryPath(runDir) || filepath.Base(path) == "summary.md" {
+		switch filepath.Base(path) {
+		case "summary.md", "experiments.jsonl", "integration.json":
 			continue
 		}
 		data, err := os.ReadFile(path)
@@ -273,24 +288,19 @@ func summarizeSectionLines(section string, limit int) string {
 	return strings.Join(append(lines[:limit], fmt.Sprintf("... (%d more lines)", len(lines)-limit)), "\n")
 }
 
-func loadResultSelection(projectRoot, savedRunDir, runName string) (*selectionJSON, error) {
+func loadResultIntegration(projectRoot, savedRunDir, runName string) (*IntegrationState, error) {
 	for _, path := range []string{
-		filepath.Join(savedRunDir, "selection.json"),
-		filepath.Join(goalx.RunDir(projectRoot, runName), "selection.json"),
+		filepath.Join(savedRunDir, "integration.json"),
+		filepath.Join(goalx.RunDir(projectRoot, runName), "integration.json"),
 	} {
-		data, err := os.ReadFile(path)
+		state, err := LoadIntegrationState(path)
 		if err != nil {
-			continue
-		}
-		var selection selectionJSON
-		if err := json.Unmarshal(data, &selection); err != nil {
 			return nil, fmt.Errorf("parse %s: %w", path, err)
 		}
-		if selection.Kept == "" || selection.Branch == "" {
-			return nil, fmt.Errorf("selection in %s is incomplete", path)
+		if state != nil {
+			return state, nil
 		}
-		return &selection, nil
 	}
 
-	return nil, fmt.Errorf("selection.json not found for develop run %q", runName)
+	return nil, fmt.Errorf("integration.json not found for develop run %q", runName)
 }

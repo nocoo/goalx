@@ -21,6 +21,8 @@ type ContextIndex struct {
 	ReportsDir          string             `json:"reports_dir,omitempty"`
 	CharterPath         string             `json:"charter_path,omitempty"`
 	GoalPath            string             `json:"goal_path,omitempty"`
+	ExperimentsLogPath  string             `json:"experiments_log_path,omitempty"`
+	IntegrationStatePath string            `json:"integration_state_path,omitempty"`
 	AcceptanceStatePath string             `json:"acceptance_state_path,omitempty"`
 	CompletionProofPath string             `json:"completion_proof_path,omitempty"`
 	CoordinationPath    string             `json:"coordination_path,omitempty"`
@@ -143,6 +145,8 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		ReportsDir:          ReportsDir(runDir),
 		CharterPath:         RunCharterPath(runDir),
 		GoalPath:            GoalPath(runDir),
+		ExperimentsLogPath:  ExperimentsLogPath(runDir),
+		IntegrationStatePath: IntegrationStatePath(runDir),
 		AcceptanceStatePath: AcceptanceStatePath(runDir),
 		CompletionProofPath: CompletionStatePath(runDir),
 		CoordinationPath:    CoordinationPath(runDir),

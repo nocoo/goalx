@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	goalx "github.com/vonbai/goalx"
@@ -32,7 +31,7 @@ func SaveRunSpec(runDir string, cfg *goalx.Config) error {
 	if err != nil {
 		return fmt.Errorf("marshal run spec: %w", err)
 	}
-	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+	if err := writeFileAtomic(RunSpecPath(runDir), data, 0o644); err != nil {
 		return fmt.Errorf("write run spec: %w", err)
 	}
 	return nil

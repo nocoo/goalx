@@ -71,7 +71,7 @@ func SaveAffordances(runDir string, doc *AffordancesDocument) error {
 	if err := writeJSONFile(AffordancesJSONPath(runDir), doc); err != nil {
 		return err
 	}
-	return os.WriteFile(AffordancesMarkdownPath(runDir), []byte(RenderAffordancesMarkdown(doc)), 0o644)
+	return writeFileAtomic(AffordancesMarkdownPath(runDir), []byte(RenderAffordancesMarkdown(doc)), 0o644)
 }
 
 func BuildAffordances(projectRoot, runName, runDir, target string) (*AffordancesDocument, error) {
@@ -136,7 +136,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "control",
 			Summary: "Append a machine-consumed durable event log using the canonical JSONL envelope.",
 			Command: fmt.Sprintf("goalx durable append goal-log --run %s --file /abs/path.jsonl", runName),
-			Paths:   []string{GoalLogPath(runDir), EvolutionLogPath(runDir)},
+			Paths:   []string{GoalLogPath(runDir), ExperimentsLogPath(runDir)},
 		},
 		{
 			ID:      "attach",
@@ -175,6 +175,12 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Command: fmt.Sprintf("goalx keep --run %s session-N", runName),
 		},
 		{
+			ID:      "integrate",
+			Kind:    "control",
+			Summary: "Record the lineage of a manual run-root integration after master has already merged, cherry-picked, or partially adopted work in the run-root worktree. goalx integrate requires a clean run-root worktree and does not perform the merge itself.",
+			Command: fmt.Sprintf("goalx integrate --run %s --method partial_adopt --from session-1,session-2", runName),
+		},
+		{
 			ID:      "keep-run",
 			Kind:    "control",
 			Summary: "Merge the run worktree into the source root when source HEAD still descends from the run base revision; skips if already integrated. This is distinct from goalx keep session-N, which only merges a committed session branch into the run worktree.",
@@ -199,7 +205,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "path",
 			Summary: "Absolute run paths for durable state and reports.",
 			Command: "",
-			Paths:   []string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath},
+			Paths:   []string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.ExperimentsLogPath, index.IntegrationStatePath},
 		})
 	}
 	return doc, nil
@@ -224,6 +230,7 @@ func buildWorktreeBoundaryAffordance(index *ContextIndex, target string) *Afford
 			item.Paths = append(item.Paths, index.RunWorktree)
 		}
 		item.Facts = append(item.Facts, "`goalx keep session-N` merges committed session branch history into the run-root worktree only.")
+		item.Facts = append(item.Facts, "`goalx integrate` records the current run-root result after master manually merged, cherry-picked, or partially adopted work there.")
 		item.Facts = append(item.Facts, "`goalx keep --run NAME` is the separate source-root merge step.")
 		for _, session := range index.Sessions {
 			fact := fmt.Sprintf("%s", session.Name)

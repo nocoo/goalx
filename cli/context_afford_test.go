@@ -57,6 +57,8 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 		"## Run Identity",
 		"Objective:",
 		"Run dir:",
+		"Experiment ledger:",
+		"Integration state:",
 		"Closeout/evidence surface:",
 		"Context index:",
 		"Memory query:",
@@ -160,6 +162,8 @@ func TestContextCommandJsonPrintsMachineReadableIndex(t *testing.T) {
 
 	for _, want := range []string{
 		`"context_index_path"`,
+		`"experiments_log_path"`,
+		`"integration_state_path"`,
 		`"memory_query_path"`,
 		`"memory_context_path"`,
 		`"run_name": "guidance-run"`,
@@ -220,6 +224,7 @@ func TestAffordCommandPrintsProviderFactsForClaudeSession(t *testing.T) {
 	identity := &SessionIdentity{
 		Version:         1,
 		SessionName:     sessionName,
+		ExperimentID:    "exp_guidance_claude_session_1",
 		RoleKind:        "research",
 		Mode:            string(goalx.ModeResearch),
 		Engine:          "claude-code",

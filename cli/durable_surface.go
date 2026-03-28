@@ -19,7 +19,7 @@ const (
 	DurableSurfaceCoordination    DurableSurfaceName = "coordination"
 	DurableSurfaceStatus          DurableSurfaceName = "status"
 	DurableSurfaceGoalLog         DurableSurfaceName = "goal-log"
-	DurableSurfaceEvolution       DurableSurfaceName = "evolution"
+	DurableSurfaceExperiments     DurableSurfaceName = "experiments"
 	DurableSurfaceSummary         DurableSurfaceName = "summary"
 	DurableSurfaceCompletionProof DurableSurfaceName = "completion-proof"
 )
@@ -74,13 +74,13 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		FrameworkReadsBody: false,
 		Path:               GoalLogPath,
 	},
-	DurableSurfaceEvolution: {
-		Name:               DurableSurfaceEvolution,
+	DurableSurfaceExperiments: {
+		Name:               DurableSurfaceExperiments,
 		Class:              DurableSurfaceClassEventLog,
 		WriteMode:          DurableSurfaceWriteModeAppend,
 		Strict:             true,
 		FrameworkReadsBody: false,
-		Path:               EvolutionLogPath,
+		Path:               ExperimentsLogPath,
 	},
 	DurableSurfaceSummary: {
 		Name:               DurableSurfaceSummary,

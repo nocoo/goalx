@@ -12,21 +12,22 @@ import (
 func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		RunName:                "demo",
-		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
-		Engine:                 "codex",
-		ProjectRoot:            "/tmp/project",
-		Target:                 goalx.TargetConfig{Files: []string{"main.go"}},
-		GoalPath:               "/tmp/goal.json",
-		AcceptanceStatePath:    "/tmp/acceptance.json",
-		LocalValidationCommand: "go test ./...",
-		SessionName:            "session-1",
-		JournalPath:            "/tmp/journal.jsonl",
-		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
-		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
-		WorktreePath:           "/tmp/worktree",
-		RunWorktreePath:        "/tmp/run-root",
+		RunName:                   "demo",
+		Objective:                 "ship it",
+		Mode:                      goalx.ModeDevelop,
+		Engine:                    "codex",
+		ProjectRoot:               "/tmp/project",
+		Target:                    goalx.TargetConfig{Files: []string{"main.go"}},
+		GoalPath:                  "/tmp/goal.json",
+		IntegrationStatePath:      "/tmp/integration.json",
+		AcceptanceStatePath:       "/tmp/acceptance.json",
+		LocalValidationCommand:    "go test ./...",
+		SessionName:               "session-1",
+		JournalPath:               "/tmp/journal.jsonl",
+		SessionInboxPath:          "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:         "/tmp/control/session-1-cursor.json",
+		WorktreePath:              "/tmp/worktree",
+		RunWorktreePath:           "/tmp/run-root",
 		SessionBaseBranchSelector: "run-root",
 		SessionBaseBranch:         "goalx/demo/root",
 	}
@@ -45,6 +46,7 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Journal: `/tmp/journal.jsonl`",
 		"Session inbox: `/tmp/control/inbox/session-1.jsonl`",
 		"Session cursor: `/tmp/control/session-1-cursor.json`",
+		"Run integration state: `/tmp/integration.json`",
 		"Run-root worktree: `/tmp/run-root`",
 		"Dedicated session worktree: `/tmp/worktree`",
 		"Recorded parent/base selector: `run-root`",
@@ -119,19 +121,19 @@ func TestRenderSubagentProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 func TestRenderSubagentProtocolRequiresCommittedBoundaryBeforeKeepHandoff(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		RunName:                "demo",
-		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
-		Engine:                 "codex",
-		ProjectRoot:            "/tmp/project",
-		SessionName:            "session-1",
-		Target:                 goalx.TargetConfig{Files: []string{"main.go"}},
-		LocalValidationCommand: "go test ./...",
-		JournalPath:            "/tmp/journal.jsonl",
-		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
-		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
-		WorktreePath:           "/tmp/worktree",
-		RunWorktreePath:        "/tmp/run-root",
+		RunName:                   "demo",
+		Objective:                 "ship it",
+		Mode:                      goalx.ModeDevelop,
+		Engine:                    "codex",
+		ProjectRoot:               "/tmp/project",
+		SessionName:               "session-1",
+		Target:                    goalx.TargetConfig{Files: []string{"main.go"}},
+		LocalValidationCommand:    "go test ./...",
+		JournalPath:               "/tmp/journal.jsonl",
+		SessionInboxPath:          "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:         "/tmp/control/session-1-cursor.json",
+		WorktreePath:              "/tmp/worktree",
+		RunWorktreePath:           "/tmp/run-root",
 		SessionBaseBranchSelector: "run-root",
 		SessionBaseBranch:         "goalx/demo/root",
 	}
@@ -1184,12 +1186,13 @@ func TestRenderMasterProtocolClarifiesKeepUsesRecordedParentBoundary(t *testing.
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-		for _, want := range []string{
-			"`goalx keep --run demo session-N` only merges committed session branch history relative to that session's recorded parent/base ref.",
-			"Do not assume every develop session branch is rooted directly on the run worktree.",
-			"If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.",
-			"If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.",
-		} {
+	for _, want := range []string{
+		"`goalx keep --run demo session-N` only merges committed session branch history relative to that session's recorded parent/base ref.",
+		"Do not assume every develop session branch is rooted directly on the run worktree.",
+		"If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.",
+		"If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.",
+		"After you finish a manual run-root integration, record it with `goalx integrate --run demo --method partial_adopt --from session-N,session-M`.",
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
@@ -1611,21 +1614,22 @@ func TestRenderMasterProtocolIncludesOptimizationDoctrine(t *testing.T) {
 func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:           "ship it",
-		RunName:             "demo",
-		Mode:                goalx.ModeAuto,
-		Intent:              runIntentEvolve,
-		CurrentTime:         "2026-03-27T08:00:00Z",
-		RunStartedAt:        "2026-03-27T06:00:00Z",
-		EvolutionLogPath:    "/tmp/evolution.jsonl",
-		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		TmuxSession:         "ar-demo",
-		SummaryPath:         "/tmp/summary.md",
-		AcceptanceStatePath: "/tmp/acceptance.json",
-		GoalPath:            "/tmp/goal.json",
-		StatusPath:          "/tmp/status.json",
-		CoordinationPath:    "/tmp/coordination.json",
-		EngineCommand:       "codex --model gpt-5.4",
+		Objective:            "ship it",
+		RunName:              "demo",
+		Mode:                 goalx.ModeAuto,
+		Intent:               runIntentEvolve,
+		CurrentTime:          "2026-03-27T08:00:00Z",
+		RunStartedAt:         "2026-03-27T06:00:00Z",
+		ExperimentsLogPath:   "/tmp/experiments.jsonl",
+		IntegrationStatePath: "/tmp/integration.json",
+		Master:               goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:          "ar-demo",
+		SummaryPath:          "/tmp/summary.md",
+		AcceptanceStatePath:  "/tmp/acceptance.json",
+		GoalPath:             "/tmp/goal.json",
+		StatusPath:           "/tmp/status.json",
+		CoordinationPath:     "/tmp/coordination.json",
+		EngineCommand:        "codex --model gpt-5.4",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1642,18 +1646,19 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		"Run started at (UTC): 2026-03-27T06:00:00Z",
 		"Intent: evolve",
 		"This run was launched with explicit `evolve` intent.",
-		"Trial record: `/tmp/evolution.jsonl`",
-		"`goalx durable append evolution --run demo --file /abs/path.jsonl`",
+		"Experiment ledger: `/tmp/experiments.jsonl`",
+		"Current integrated path: `/tmp/integration.json`",
+		"`goalx durable append experiments --run demo --file /abs/path.jsonl`",
 		"`version`, `kind`, `at`, `actor`, `body`",
 		"`required_remaining == 0` only means the current required baseline is covered.",
 		"Do not enter review or idle just because required items are covered.",
-		"Before you enter review or idle in `evolve`, do one of the following in durable state:",
-		"record a factual blocker that is truly outside your current permissions, credentials, or reachable environment",
-		"record a diminishing-returns decision that cites recent trial evidence and the remaining upside",
+		"Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.",
+		"Record a factual blocker that is truly outside your current permissions, credentials, or reachable environment.",
+		"Record why the current path no longer justifies more budget or risk.",
 		"`goalx add --run demo --worktree --base-branch session-N`",
 		"Stop the iteration loop when budget is exhausted",
 		"the user redirects or stops the run",
-		"recent trials show diminishing returns",
+		"recent experiments show diminishing returns",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)

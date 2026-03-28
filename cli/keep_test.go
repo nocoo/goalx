@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -179,16 +178,28 @@ func TestKeepMergesSessionBranchIntoRunWorktree(t *testing.T) {
 		t.Fatalf("source root should remain unchanged before root keep, stat err = %v", err)
 	}
 
-	selectionData, err := os.ReadFile(filepath.Join(runDir, "selection.json"))
+	integration, err := LoadIntegrationState(IntegrationStatePath(runDir))
 	if err != nil {
-		t.Fatalf("read selection.json: %v", err)
+		t.Fatalf("LoadIntegrationState: %v", err)
 	}
-	var selection map[string]string
-	if err := json.Unmarshal(selectionData, &selection); err != nil {
-		t.Fatalf("unmarshal selection.json: %v", err)
+	if integration == nil {
+		t.Fatal("integration state missing")
 	}
-	if selection["kept"] != "session-1" || selection["branch"] != sessionBranch {
-		t.Fatalf("selection = %#v", selection)
+	if integration.CurrentExperimentID != identityExperimentID(t, runDir, "session-1") {
+		t.Fatalf("CurrentExperimentID = %q", integration.CurrentExperimentID)
+	}
+	if integration.CurrentBranch != sessionBranch {
+		t.Fatalf("CurrentBranch = %q, want %q", integration.CurrentBranch, sessionBranch)
+	}
+	if integration.LastMethod != "keep" {
+		t.Fatalf("LastMethod = %q, want keep", integration.LastMethod)
+	}
+	events, err := LoadDurableLog(ExperimentsLogPath(runDir), DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("LoadDurableLog: %v", err)
+	}
+	if len(events) == 0 || events[len(events)-1].Kind != "experiment.integrated" {
+		t.Fatalf("unexpected experiment events: %#v", events)
 	}
 }
 
@@ -399,4 +410,16 @@ func makeKeepSessionIdentity(t *testing.T, runDir, sessionName, runName, baseSel
 	identity.BaseBranchSelector = baseSelector
 	identity.BaseBranch = baseBranch
 	return identity
+}
+
+func identityExperimentID(t *testing.T, runDir, sessionName string) string {
+	t.Helper()
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, sessionName))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity(%s): %v", sessionName, err)
+	}
+	if identity == nil {
+		t.Fatalf("%s identity missing", sessionName)
+	}
+	return identity.ExperimentID
 }
