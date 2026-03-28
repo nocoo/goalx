@@ -107,6 +107,7 @@ type ProviderCapabilities struct {
 	NativeSubagentsRequireExplicitAsk bool
 	StopHookSafetyNet                 bool
 	WebSearchAvailable                bool
+	ExplicitActionDiscipline          bool
 }
 
 // RenderMasterProtocol renders master.md.tmpl to the run directory.
@@ -179,6 +180,7 @@ func providerCapabilities(engine string) ProviderCapabilities {
 			ProviderLabel:                     "Codex CLI",
 			NativeSubagentsAvailable:          true,
 			NativeSubagentsRequireExplicitAsk: true,
+			ExplicitActionDiscipline:          true,
 		}
 	default:
 		return ProviderCapabilities{}
@@ -190,7 +192,8 @@ func isZeroProviderCapabilities(c ProviderCapabilities) bool {
 		!c.NativeSubagentsAvailable &&
 		!c.NativeSubagentsRequireExplicitAsk &&
 		!c.StopHookSafetyNet &&
-		!c.WebSearchAvailable
+		!c.WebSearchAvailable &&
+		!c.ExplicitActionDiscipline
 }
 
 func existingProtocolPath(path string) string {

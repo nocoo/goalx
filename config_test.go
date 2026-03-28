@@ -470,9 +470,14 @@ func TestResolveLaunchSpecUnknownEngine(t *testing.T) {
 }
 
 func TestResolvePrompt(t *testing.T) {
-	p := ResolvePrompt(BuiltinEngines, "claude-code", "/tmp/master.md")
-	if p != "Read /tmp/master.md and follow it exactly." {
-		t.Errorf("prompt = %q", p)
+	claudePrompt := ResolvePrompt(BuiltinEngines, "claude-code", "/tmp/master.md")
+	if claudePrompt != "Read /tmp/master.md and follow it exactly." {
+		t.Errorf("claude prompt = %q", claudePrompt)
+	}
+
+	codexPrompt := ResolvePrompt(BuiltinEngines, "codex", "/tmp/master.md")
+	if codexPrompt != "Read /tmp/master.md and follow it exactly. Execute protocol instructions by taking real tool actions in this turn; do not stop after stating intent." {
+		t.Errorf("codex prompt = %q", codexPrompt)
 	}
 }
 

@@ -221,7 +221,7 @@ var BuiltinEngines = map[string]EngineConfig{
 	"codex": {
 		Description: "Fast code editing, testing, and implementation work.",
 		Command:     "codex -m {model_id} -a never -s danger-full-access",
-		Prompt:      "Read {protocol} and follow it exactly.",
+		Prompt:      "Read {protocol} and follow it exactly. Execute protocol instructions by taking real tool actions in this turn; do not stop after stating intent.",
 		EffortMode:  "config",
 		EffortKey:   "model_reasoning_effort",
 		EffortMap: map[string]string{
