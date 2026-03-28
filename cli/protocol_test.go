@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -237,6 +238,28 @@ func TestProviderCapabilitiesMarksOnlyCodexForActionExecutionReminder(t *testing
 	}
 }
 
+func TestProviderCapabilitiesMarksOnlyClaudeForAutonomyPersistenceReminder(t *testing.T) {
+	claudeCaps := providerCapabilities("claude-code")
+	claudeValue := reflect.ValueOf(claudeCaps)
+	claudeField := claudeValue.FieldByName("AutonomyPersistenceReminder")
+	if !claudeField.IsValid() {
+		t.Fatalf("claude capabilities missing AutonomyPersistenceReminder field: %+v", claudeCaps)
+	}
+	if !claudeField.Bool() {
+		t.Fatalf("claude capabilities should enable autonomy persistence reminder: %+v", claudeCaps)
+	}
+
+	codexCaps := providerCapabilities("codex")
+	codexValue := reflect.ValueOf(codexCaps)
+	codexField := codexValue.FieldByName("AutonomyPersistenceReminder")
+	if !codexField.IsValid() {
+		t.Fatalf("codex capabilities missing AutonomyPersistenceReminder field: %+v", codexCaps)
+	}
+	if codexField.Bool() {
+		t.Fatalf("codex capabilities should not enable autonomy persistence reminder: %+v", codexCaps)
+	}
+}
+
 func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -368,6 +391,109 @@ func TestRenderSubagentProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered claude protocol should omit %q:\n%s", unwanted, text)
 		}
+	}
+}
+
+func TestRenderSubagentProtocolIncludesClaudeAutonomyPersistenceGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "investigate auth",
+		Mode:              goalx.ModeResearch,
+		Engine:            "claude-code",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		Target:            goalx.TargetConfig{Files: []string{"report.md"}},
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"## Autonomy Persistence",
+		"If a concrete next step exists inside your current assignment, execute it before idling.",
+		"Do not ask master to confirm local method choices inside assigned scope. Act, record, continue.",
+		"Context compaction is routine. Recover from inbox, journal, and current files instead of stopping early.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolOmitsClaudeAutonomyPersistenceGuidanceForCodex(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:                "demo",
+		Objective:              "ship it",
+		Mode:                   goalx.ModeDevelop,
+		Engine:                 "codex",
+		ProjectRoot:            "/tmp/project",
+		SessionName:            "session-1",
+		Target:                 goalx.TargetConfig{Files: []string{"main.go"}},
+		LocalValidationCommand: "go test ./...",
+		JournalPath:            "/tmp/journal.jsonl",
+		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, unwanted := range []string{
+		"## Autonomy Persistence",
+		"If a concrete next step exists inside your current assignment, execute it before idling.",
+		"Do not ask master to confirm local method choices inside assigned scope. Act, record, continue.",
+		"Context compaction is routine. Recover from inbox, journal, and current files instead of stopping early.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered codex protocol should omit %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolDropsRedundantResearchOnlyDoneLine(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "investigate auth",
+		Mode:              goalx.ModeResearch,
+		Engine:            "claude-code",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		Target:            goalx.TargetConfig{Files: []string{"report.md"}},
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	unwanted := "Do not declare yourself done. The master decides when to stop."
+	if strings.Contains(text, unwanted) {
+		t.Fatalf("rendered protocol should omit %q:\n%s", unwanted, text)
 	}
 }
 
@@ -1885,6 +2011,39 @@ func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolIncludesClaudeAutonomyPersistenceGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If helper work becomes multi-step, durable, worktree-bound, or expected to produce mergeable output, move it into `goalx add` instead of extending native-helper ownership.",
+		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
+		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -1919,6 +2078,39 @@ func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolOmitsClaudeAutonomyPersistenceGuidanceForCodex(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "codex exec",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, unwanted := range []string{
+		"If helper work becomes multi-step, durable, worktree-bound, or expected to produce mergeable output, move it into `goalx add` instead of extending native-helper ownership.",
+		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
+		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered codex master protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 }
