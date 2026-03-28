@@ -27,6 +27,8 @@ type TargetAttentionFacts struct {
 	JournalStaleMinutes   int    `json:"journal_stale_minutes,omitempty"`
 	LastOutputChangeAt    string `json:"last_output_change_at,omitempty"`
 	OutputStaleMinutes    int    `json:"output_stale_minutes,omitempty"`
+	LastWorktreeChangeAt  string `json:"last_worktree_change_at,omitempty"`
+	WorktreeStaleMinutes  int    `json:"worktree_stale_minutes,omitempty"`
 	PresenceState         string `json:"presence_state,omitempty"`
 	RuntimeState          string `json:"runtime_state,omitempty"`
 	AttentionState        string `json:"attention_state,omitempty"`
@@ -127,6 +129,8 @@ func buildSessionAttentionFacts(runDir, sessionName string, snapshot *ActivitySn
 		RuntimeState:          attentionRuntimeState(sessionState, sessionName),
 		LastOutputChangeAt:    attentionLastOutputChangeAt(snapshot, sessionName),
 		OutputStaleMinutes:    attentionOutputStaleMinutes(snapshot, sessionName, now),
+		LastWorktreeChangeAt:  attentionLastWorktreeChangeAt(snapshot, sessionName),
+		WorktreeStaleMinutes:  attentionWorktreeStaleMinutes(snapshot, sessionName, now),
 	}
 	if liveness != nil && liveness.Sessions != nil {
 		if live, ok := liveness.Sessions[sessionName]; ok {
@@ -185,6 +189,17 @@ func attentionOutputStaleMinutes(snapshot *ActivitySnapshot, target string, now 
 	return staleMinutesSince(attentionLastOutputChangeAt(snapshot, target), now)
 }
 
+func attentionLastWorktreeChangeAt(snapshot *ActivitySnapshot, target string) string {
+	if snapshot == nil || snapshot.Sessions == nil {
+		return ""
+	}
+	return strings.TrimSpace(snapshot.Sessions[target].LastWorktreeChangeAt)
+}
+
+func attentionWorktreeStaleMinutes(snapshot *ActivitySnapshot, target string, now time.Time) int {
+	return staleMinutesSince(attentionLastWorktreeChangeAt(snapshot, target), now)
+}
+
 func staleMinutesSince(ts string, now time.Time) int {
 	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(ts))
 	if err != nil || parsed.IsZero() || parsed.After(now) {
@@ -209,7 +224,11 @@ func deriveTargetAttentionState(facts TargetAttentionFacts, coordinationState st
 	inactiveSession := coordState == "parked" || coordState == "kept"
 	staleJournal := facts.JournalStaleMinutes >= targetAttentionStaleMinutes
 	staleOutput := facts.OutputStaleMinutes >= targetAttentionStaleMinutes
+	staleWorktree := facts.WorktreeStaleMinutes >= targetAttentionStaleMinutes
 	hasOutputSignal := strings.TrimSpace(facts.LastOutputChangeAt) != ""
+	hasWorktreeSignal := strings.TrimSpace(facts.LastWorktreeChangeAt) != ""
+	freshOutput := hasOutputSignal && !staleOutput
+	freshWorktree := hasWorktreeSignal && !staleWorktree
 
 	switch {
 	case inactiveSession:
@@ -227,9 +246,12 @@ func deriveTargetAttentionState(facts TargetAttentionFacts, coordinationState st
 		return TargetAttentionNeedsAttention
 	case activeOwner && runtimeState == "idle" && !isAcceptedTUITransportState(string(transportState)) && facts.Unread == 0 && facts.CursorLag == 0 && presence == TargetPresencePresent:
 		return TargetAttentionActiveIdle
-	case staleJournal || staleOutput:
+	case staleJournal || staleOutput || staleWorktree:
 		if runtimeState == "" || runtimeState == "active" || runtimeState == "progress" || runtimeState == "working" {
-			if staleOutput || (!hasOutputSignal && staleJournal) {
+			if freshOutput || freshWorktree {
+				return TargetAttentionHealthy
+			}
+			if staleOutput || staleWorktree || (!hasOutputSignal && !hasWorktreeSignal && staleJournal) {
 				return TargetAttentionProgressBlocked
 			}
 			return TargetAttentionNeedsAttention

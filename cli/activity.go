@@ -82,6 +82,8 @@ type ActivitySession struct {
 	DirtyFiles            int    `json:"dirty_files,omitempty"`
 	Insertions            int    `json:"insertions,omitempty"`
 	Deletions             int    `json:"deletions,omitempty"`
+	WorktreeFingerprint   string `json:"worktree_fingerprint,omitempty"`
+	LastWorktreeChangeAt  string `json:"last_worktree_change_at,omitempty"`
 	PanePresent           bool   `json:"pane_present,omitempty"`
 	PaneHash              string `json:"pane_hash,omitempty"`
 	LastOutputChangeAt    string `json:"last_output_change_at,omitempty"`
@@ -250,6 +252,8 @@ func BuildActivitySnapshot(projectRoot, runName, runDir string) (*ActivitySnapsh
 				session.DirtyFiles = diff.DirtyFiles
 				session.Insertions = diff.Insertions
 				session.Deletions = diff.Deletions
+				session.WorktreeFingerprint = diff.DiffFingerprint
+				session.LastWorktreeChangeAt = carryWorktreeChangeTime(previousSession(previous, name), session, snapshot.CheckedAt)
 			}
 		}
 		inboxState := readControlInboxState(ControlInboxPath(runDir, name), SessionCursorPath(runDir, name))
@@ -374,6 +378,16 @@ func (a ActivityActor) getLastOutputChangeAt() string { return a.LastOutputChang
 func (s ActivitySession) getPaneHash() string         { return s.PaneHash }
 func (s ActivitySession) getLastOutputChangeAt() string {
 	return s.LastOutputChangeAt
+}
+
+func carryWorktreeChangeTime(previous, current ActivitySession, fallback string) string {
+	if current.DirtyFiles == 0 || strings.TrimSpace(current.WorktreeFingerprint) == "" {
+		return ""
+	}
+	if previous.WorktreeFingerprint != "" && previous.WorktreeFingerprint == current.WorktreeFingerprint && previous.LastWorktreeChangeAt != "" {
+		return previous.LastWorktreeChangeAt
+	}
+	return fallback
 }
 
 func capturePaneHash(tmuxSession, window string) (string, bool) {

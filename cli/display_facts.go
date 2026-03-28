@@ -274,6 +274,9 @@ func appendOwnerAttentionParts(parts *[]string, coord *CoordinationState, attent
 			if facts.JournalStaleMinutes > 0 {
 				detail += fmt.Sprintf(" journal_stale=%dm", facts.JournalStaleMinutes)
 			}
+			if facts.WorktreeStaleMinutes > 0 {
+				detail += fmt.Sprintf(" worktree_stale=%dm", facts.WorktreeStaleMinutes)
+			}
 		}
 		*parts = append(*parts, detail)
 	}
@@ -308,6 +311,9 @@ func formatTargetAttentionAdvisory(attention map[string]TargetAttentionFacts) st
 		}
 		if facts.OutputStaleMinutes > 0 {
 			part += fmt.Sprintf(" output_stale=%dm", facts.OutputStaleMinutes)
+		}
+		if facts.WorktreeStaleMinutes > 0 {
+			part += fmt.Sprintf(" worktree_stale=%dm", facts.WorktreeStaleMinutes)
 		}
 		parts = append(parts, part)
 	}

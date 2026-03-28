@@ -500,6 +500,9 @@ func formatBlockedTargetReason(facts TargetAttentionFacts) string {
 	if facts.OutputStaleMinutes > 0 {
 		parts = append(parts, fmt.Sprintf("output_stale=%dm", facts.OutputStaleMinutes))
 	}
+	if facts.WorktreeStaleMinutes > 0 {
+		parts = append(parts, fmt.Sprintf("worktree_stale=%dm", facts.WorktreeStaleMinutes))
+	}
 	if strings.TrimSpace(facts.TransportState) != "" {
 		parts = append(parts, "transport="+facts.TransportState)
 	}

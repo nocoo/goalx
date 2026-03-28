@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -316,6 +318,69 @@ func TestBuildTargetAttentionFactsDoesNotMarkMasterBlockedWhenPaneIsStillChangin
 	}
 	if got := attention["master"].AttentionState; got == TargetAttentionProgressBlocked {
 		t.Fatalf("attention_state = %q, want not progress_blocked", got)
+	}
+}
+
+func TestBuildTargetAttentionFactsTreatsFreshWorktreeProgressAsHealthy(t *testing.T) {
+	_, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "active", Mode: string(goalx.ModeDevelop)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 24},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+
+	payload := map[string]any{
+		"version":    1,
+		"checked_at": time.Now().UTC().Format(time.RFC3339),
+		"targets": map[string]any{
+			"session-1": map[string]any{
+				"target": "session-1",
+				"state":  TargetPresencePresent,
+			},
+		},
+		"sessions": map[string]any{
+			"session-1": map[string]any{
+				"dirty_files":             9,
+				"last_output_change_at":   time.Now().Add(-24 * time.Minute).UTC().Format(time.RFC3339),
+				"last_worktree_change_at": time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339),
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Marshal activity payload: %v", err)
+	}
+	if err := os.WriteFile(ActivityPath(runDir), append(data, '\n'), 0o644); err != nil {
+		t.Fatalf("write activity payload: %v", err)
+	}
+
+	snapshot, err := LoadActivitySnapshot(ActivityPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadActivitySnapshot: %v", err)
+	}
+	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	if err != nil {
+		t.Fatalf("BuildTargetAttentionFacts: %v", err)
+	}
+	if got := attention["session-1"].AttentionState; got != TargetAttentionHealthy {
+		t.Fatalf("attention_state = %q, want %q", got, TargetAttentionHealthy)
 	}
 }
 

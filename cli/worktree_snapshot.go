@@ -2,28 +2,32 @@ package cli
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
 
 type WorktreeSnapshot struct {
-	CheckedAt      string                         `json:"checked_at"`
-	Root           WorktreeDiffStat              `json:"root"`
-	RootLineage    *WorktreeLineage              `json:"root_lineage,omitempty"`
-	Sessions       map[string]WorktreeDiffStat   `json:"sessions,omitempty"`
-	SessionLineage map[string]WorktreeLineage    `json:"session_lineage,omitempty"`
+	CheckedAt      string                      `json:"checked_at"`
+	Root           WorktreeDiffStat            `json:"root"`
+	RootLineage    *WorktreeLineage            `json:"root_lineage,omitempty"`
+	Sessions       map[string]WorktreeDiffStat `json:"sessions,omitempty"`
+	SessionLineage map[string]WorktreeLineage  `json:"session_lineage,omitempty"`
 }
 
 type WorktreeDiffStat struct {
-	DirtyFiles int `json:"dirty_files"`
-	Insertions int `json:"insertions"`
-	Deletions  int `json:"deletions"`
+	DirtyFiles      int    `json:"dirty_files"`
+	Insertions      int    `json:"insertions"`
+	Deletions       int    `json:"deletions"`
+	DiffFingerprint string `json:"diff_fingerprint,omitempty"`
 }
 
 type WorktreeLineage struct {
@@ -154,19 +158,97 @@ func snapshotWorktreeDiffStat(worktreePath string) (WorktreeDiffStat, error) {
 	if err != nil {
 		return WorktreeDiffStat{}, err
 	}
+	fingerprint, err := snapshotWorktreeDiffFingerprint(worktreePath, dirtyFiles)
+	if err != nil {
+		return WorktreeDiffStat{}, err
+	}
 	out, err := exec.Command("git", "-C", worktreePath, "diff", "--shortstat").CombinedOutput()
 	if err != nil {
 		if os.IsNotExist(err) || bytes.Contains(bytes.ToLower(out), []byte("not a git repository")) {
-			return WorktreeDiffStat{DirtyFiles: dirtyFiles}, nil
+			return WorktreeDiffStat{DirtyFiles: dirtyFiles, DiffFingerprint: fingerprint}, nil
 		}
 		return WorktreeDiffStat{}, fmt.Errorf("git diff --shortstat in %s: %w: %s", worktreePath, err, out)
 	}
 	text := string(out)
 	return WorktreeDiffStat{
-		DirtyFiles: dirtyFiles,
-		Insertions: parseShortstatCount(shortstatInsertionsRE, text),
-		Deletions:  parseShortstatCount(shortstatDeletionsRE, text),
+		DirtyFiles:      dirtyFiles,
+		Insertions:      parseShortstatCount(shortstatInsertionsRE, text),
+		Deletions:       parseShortstatCount(shortstatDeletionsRE, text),
+		DiffFingerprint: fingerprint,
 	}, nil
+}
+
+func snapshotWorktreeDiffFingerprint(worktreePath string, dirtyFiles int) (string, error) {
+	if !worktreePathAvailable(worktreePath) || dirtyFiles == 0 {
+		return "", nil
+	}
+	statusOut, err := exec.Command("git", "-C", worktreePath, "status", "--porcelain=v1", "-uall").CombinedOutput()
+	if err != nil {
+		if os.IsNotExist(err) || bytes.Contains(bytes.ToLower(statusOut), []byte("not a git repository")) {
+			return "", nil
+		}
+		return "", fmt.Errorf("git status --porcelain=v1 -uall in %s: %w: %s", worktreePath, err, statusOut)
+	}
+	stagedOut, err := exec.Command("git", "-C", worktreePath, "diff", "--binary", "--cached", "--no-color", "--no-ext-diff").CombinedOutput()
+	if err != nil {
+		if os.IsNotExist(err) || bytes.Contains(bytes.ToLower(stagedOut), []byte("not a git repository")) {
+			return "", nil
+		}
+		return "", fmt.Errorf("git diff --binary --cached in %s: %w: %s", worktreePath, err, stagedOut)
+	}
+	unstagedOut, err := exec.Command("git", "-C", worktreePath, "diff", "--binary", "--no-color", "--no-ext-diff").CombinedOutput()
+	if err != nil {
+		if os.IsNotExist(err) || bytes.Contains(bytes.ToLower(unstagedOut), []byte("not a git repository")) {
+			return "", nil
+		}
+		return "", fmt.Errorf("git diff --binary in %s: %w: %s", worktreePath, err, unstagedOut)
+	}
+	untrackedFiles, err := gitUntrackedFiles(worktreePath)
+	if err != nil {
+		return "", err
+	}
+
+	hasher := sha256.New()
+	hasher.Write([]byte(strings.TrimSpace(string(statusOut))))
+	hasher.Write([]byte("\n--staged--\n"))
+	hasher.Write(stagedOut)
+	hasher.Write([]byte("\n--unstaged--\n"))
+	hasher.Write(unstagedOut)
+	for _, relPath := range untrackedFiles {
+		hasher.Write([]byte("\n--untracked--\n"))
+		hasher.Write([]byte(relPath))
+		hasher.Write([]byte{'\n'})
+		data, err := os.ReadFile(filepath.Join(worktreePath, relPath))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("read untracked file %s in %s: %w", relPath, worktreePath, err)
+		}
+		hasher.Write(data)
+	}
+	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func gitUntrackedFiles(worktreePath string) ([]string, error) {
+	out, err := exec.Command("git", "-C", worktreePath, "ls-files", "--others", "--exclude-standard", "-z").CombinedOutput()
+	if err != nil {
+		if os.IsNotExist(err) || bytes.Contains(bytes.ToLower(out), []byte("not a git repository")) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("git ls-files --others --exclude-standard in %s: %w: %s", worktreePath, err, out)
+	}
+	raw := strings.Split(string(out), "\x00")
+	files := make([]string, 0, len(raw))
+	for _, file := range raw {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+		files = append(files, file)
+	}
+	sort.Strings(files)
+	return files, nil
 }
 
 func parseShortstatCount(pattern *regexp.Regexp, text string) int {

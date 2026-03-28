@@ -143,6 +143,63 @@ func TestBuildActivitySnapshotTracksPaneHashChanges(t *testing.T) {
 	}
 }
 
+func TestBuildActivitySnapshotTracksWorktreeChangeTime(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("session pane\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	writeWorktreeSnapshotFixture(t, runDir, "fp-1", 3)
+	first, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildActivitySnapshot first: %v", err)
+	}
+	firstChangeAt := activitySessionStringField(t, first, "session-1", "last_worktree_change_at")
+	if firstChangeAt == "" {
+		t.Fatalf("expected first snapshot to record last_worktree_change_at: %+v", first.Sessions["session-1"])
+	}
+	if err := SaveActivitySnapshot(runDir, first); err != nil {
+		t.Fatalf("SaveActivitySnapshot first: %v", err)
+	}
+
+	time.Sleep(1100 * time.Millisecond)
+
+	writeWorktreeSnapshotFixture(t, runDir, "fp-1", 3)
+	second, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildActivitySnapshot second: %v", err)
+	}
+	secondChangeAt := activitySessionStringField(t, second, "session-1", "last_worktree_change_at")
+	if secondChangeAt != firstChangeAt {
+		t.Fatalf("last_worktree_change_at changed without diff change: first=%q second=%q", firstChangeAt, secondChangeAt)
+	}
+	if err := SaveActivitySnapshot(runDir, second); err != nil {
+		t.Fatalf("SaveActivitySnapshot second: %v", err)
+	}
+
+	time.Sleep(1100 * time.Millisecond)
+
+	writeWorktreeSnapshotFixture(t, runDir, "fp-2", 4)
+	third, err := BuildActivitySnapshot(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildActivitySnapshot third: %v", err)
+	}
+	thirdChangeAt := activitySessionStringField(t, third, "session-1", "last_worktree_change_at")
+	if thirdChangeAt == secondChangeAt {
+		t.Fatalf("last_worktree_change_at did not change after diff change: second=%q third=%q", secondChangeAt, thirdChangeAt)
+	}
+}
+
 func TestActivitySnapshotContainsNoJudgmentFields(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
@@ -266,6 +323,46 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 	if got, want := snapshot.Coverage.ParkedReusableSessions, []string{"session-2"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("coverage parked_reusable_sessions = %v, want %v", got, want)
 	}
+}
+
+func writeWorktreeSnapshotFixture(t *testing.T, runDir, fingerprint string, insertions int) {
+	t.Helper()
+
+	payload := map[string]any{
+		"checked_at": time.Now().UTC().Format(time.RFC3339),
+		"sessions": map[string]any{
+			"session-1": map[string]any{
+				"dirty_files":      2,
+				"insertions":       insertions,
+				"deletions":        1,
+				"diff_fingerprint": fingerprint,
+			},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Marshal worktree snapshot fixture: %v", err)
+	}
+	if err := os.WriteFile(WorktreeSnapshotPath(runDir), append(data, '\n'), 0o644); err != nil {
+		t.Fatalf("write worktree snapshot fixture: %v", err)
+	}
+}
+
+func activitySessionStringField(t *testing.T, snapshot *ActivitySnapshot, sessionName, field string) string {
+	t.Helper()
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("Marshal activity snapshot: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal activity snapshot: %v", err)
+	}
+	sessions, _ := decoded["sessions"].(map[string]any)
+	session, _ := sessions[sessionName].(map[string]any)
+	value, _ := session[field].(string)
+	return value
 }
 
 func TestBuildActivitySnapshotIncludesBudgetFacts(t *testing.T) {
