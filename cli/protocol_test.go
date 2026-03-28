@@ -223,6 +223,18 @@ func TestRenderSubagentProtocolTightensWakeLoopInboxHandling(t *testing.T) {
 	}
 }
 
+func TestProviderCapabilitiesMarksOnlyCodexForActionExecutionReminder(t *testing.T) {
+	codexCaps := providerCapabilities("codex")
+	if !codexCaps.ActionExecutionReminder {
+		t.Fatalf("codex capabilities should enable action execution reminder: %+v", codexCaps)
+	}
+
+	claudeCaps := providerCapabilities("claude-code")
+	if claudeCaps.ActionExecutionReminder {
+		t.Fatalf("claude capabilities should not enable action execution reminder: %+v", claudeCaps)
+	}
+}
+
 func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -297,7 +309,7 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 		"Native subagents are transient helpers inside this session.",
 		"This engine only starts native subagents when you explicitly invoke them.",
 		"## Execution Discipline",
-		"When this protocol tells you to read, run, append, ack, verify, commit, or wait, perform the real tool action in this turn.",
+		"When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.",
 		"Do not end a turn after saying you will do something next. Execute the next tool call now.",
 		"Do not give them durable ownership.",
 		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
@@ -348,7 +360,7 @@ func TestRenderSubagentProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
 	text := string(out)
 	for _, unwanted := range []string{
 		"## Execution Discipline",
-		"When this protocol tells you to read, run, append, ack, verify, commit, or wait, perform the real tool action in this turn.",
+		"When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.",
 		"Do not end a turn after saying you will do something next. Execute the next tool call now.",
 	} {
 		if strings.Contains(text, unwanted) {
@@ -1892,7 +1904,7 @@ func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(
 	text := string(out)
 	for _, want := range []string{
 		"Codex CLI native subagents are available in this session.",
-		"**Execution rule**: When this protocol says read, run, check, inspect, verify, replace, append, tell, park, keep, or wait, perform the real tool action in this control cycle. Stating intent is not action.",
+		"**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.",
 		"This engine only starts native subagents when you explicitly invoke them.",
 		"The runtime truth is the provider-native interactive TUI.",
 		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
@@ -1928,7 +1940,7 @@ func TestRenderMasterProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	unwanted := "**Execution rule**: When this protocol says read, run, check, inspect, verify, replace, append, tell, park, keep, or wait, perform the real tool action in this control cycle. Stating intent is not action."
+	unwanted := "**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action."
 	if strings.Contains(text, unwanted) {
 		t.Fatalf("rendered claude master protocol should omit %q:\n%s", unwanted, text)
 	}

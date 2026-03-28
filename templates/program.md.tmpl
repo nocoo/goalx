@@ -147,9 +147,9 @@ You are running in {{.SessionCapabilities.ProviderLabel}}.
 {{end}}
 {{end}}
 
-{{if .SessionCapabilities.ExplicitActionDiscipline}}## Execution Discipline
+{{if .SessionCapabilities.ActionExecutionReminder}}## Execution Discipline
 
-- When this protocol tells you to read, run, append, ack, verify, commit, or wait, perform the real tool action in this turn.
+- When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.
 - Do not end a turn after saying you will do something next. Execute the next tool call now.
 - Do not guess file or inbox contents from memory. Read the file or run the command.
 - After one meaningful step, continue until you are blocked, validated, or actually waiting on `goalx wait`.

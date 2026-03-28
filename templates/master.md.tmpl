@@ -186,7 +186,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 
 ### Control Loop
 
-{{if .MasterCapabilities.ExplicitActionDiscipline}}**Execution rule**: When this protocol says read, run, check, inspect, verify, replace, append, tell, park, keep, or wait, perform the real tool action in this control cycle. Stating intent is not action.
+{{if .MasterCapabilities.ActionExecutionReminder}}**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.
 {{end}}
 - **Monitoring loop**: Always use `goalx wait --run {{.RunName}} master --timeout 300` between control cycles. Never use `sleep`.
 {{if .MasterCapabilities.StopHookSafetyNet}}- {{.MasterCapabilities.ProviderLabel}} Stop hook is only a safety net. Your normal idle path should still be `goalx wait`.
