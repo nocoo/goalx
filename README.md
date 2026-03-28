@@ -1,7 +1,7 @@
 # GoalX
 
 ```bash
-goalx run "the authentication system is secure and all vulnerabilities are fixed"
+goalx run "this product is a working investor-ready demo someone can open and immediately understand"
 # go to sleep
 # wake up to results
 ```
@@ -74,15 +74,28 @@ Zero config is fine. GoalX auto-detects installed engines and picks the best ava
 Describe the destination, not the route:
 
 ```bash
-goalx run "the API layer has no N+1 query issues and performs within acceptable limits"
+goalx run "the dashboard feels production-ready, fast, and clear on desktop and mobile"
 ```
 
 Useful launch shapes:
 
 ```bash
-goalx run "all public endpoints and their auth requirements are documented" --intent research
-goalx run "all public endpoints are rate-limited and protected" --intent develop
+goalx run "we understand why ranking quality regressed and have an evidence-backed recovery plan" --intent research
+goalx run "users can complete the core workflow reliably in production" --intent develop
 goalx run "this project is production-ready" --intent evolve --budget 8h
+```
+
+## Representative Goals
+
+These are the kinds of goals GoalX is built for. Each one describes the end state, not the implementation plan.
+
+```bash
+goalx run "this repository is a working investor-ready demo someone can open and immediately understand"
+goalx run "the product deploys cleanly to the target host and is reachable without manual repair steps"
+goalx run "the research pipeline produces trustworthy summaries, evidence, and deduplicated results across sources"
+goalx run "the dashboard feels production-grade, fast, and clear on desktop and mobile"
+goalx run "we understand why quality regressed and have an actionable, evidence-backed fix plan" --intent research
+goalx run "the project keeps getting better until the budget runs out" --intent evolve --budget 8h
 ```
 
 Continue an existing run with an explicit next-step intent:

@@ -21,9 +21,10 @@ Describe the destination, not the implementation checklist.
 Good:
 
 ```bash
-goalx run "the deploy works reliably in production"
+goalx run "the product deploys cleanly to the target host and is reachable without manual repair steps"
 goalx run "this repository has a high-quality architecture audit and an actionable fix plan"
-goalx run "the authentication system is secure and verified"
+goalx run "users can complete the core workflow reliably in production"
+goalx run "the dashboard feels production-ready on desktop and mobile"
 ```
 
 Bad:
