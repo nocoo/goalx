@@ -225,7 +225,7 @@ func deriveTargetAttentionState(facts TargetAttentionFacts, coordinationState st
 			return TargetAttentionTransportBlocked
 		}
 		return TargetAttentionNeedsAttention
-	case activeOwner && runtimeState == "idle" && facts.Unread == 0 && facts.CursorLag == 0 && presence == TargetPresencePresent:
+	case activeOwner && runtimeState == "idle" && !isAcceptedTUITransportState(string(transportState)) && facts.Unread == 0 && facts.CursorLag == 0 && presence == TargetPresencePresent:
 		return TargetAttentionActiveIdle
 	case staleJournal || staleOutput:
 		if runtimeState == "" || runtimeState == "active" || runtimeState == "progress" || runtimeState == "working" {

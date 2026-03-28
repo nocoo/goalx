@@ -92,3 +92,44 @@ func TestRefreshSessionRuntimeProjectionPreservesParkedState(t *testing.T) {
 		t.Fatalf("session-1 state = %q, want parked", got)
 	}
 }
+
+func TestRefreshSessionRuntimeProjectionPreservesActiveStateWhenJournalHasNotAdvanced(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:             "session-1",
+		State:            "active",
+		Mode:             string(goalx.ModeDevelop),
+		LastRound:        3,
+		LastJournalState: "idle",
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte("{\"round\":3,\"status\":\"idle\",\"desc\":\"awaiting master\",\"owner_scope\":\"ui slice\"}\n"), 0o644); err != nil {
+		t.Fatalf("write journal: %v", err)
+	}
+
+	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
+		t.Fatalf("RefreshSessionRuntimeProjection: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	sess := state.Sessions["session-1"]
+	if got := sess.State; got != "active" {
+		t.Fatalf("session-1 state = %q, want active", got)
+	}
+	if got := sess.LastJournalState; got != "idle" {
+		t.Fatalf("session-1 last_journal_state = %q, want idle", got)
+	}
+	if got := sess.OwnerScope; got != "ui slice" {
+		t.Fatalf("session-1 owner_scope = %q, want ui slice", got)
+	}
+}

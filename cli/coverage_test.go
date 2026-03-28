@@ -165,3 +165,39 @@ func TestBuildRequiredCoverageIgnoresStaleCoordinationSessionRoster(t *testing.T
 		t.Fatalf("parked_reusable_sessions = %v, want empty for stale coordination-only roster", coverage.ParkedReusableSessions)
 	}
 }
+
+func TestBuildRequiredCoverageDoesNotReuseOpenOwnerSessions(t *testing.T) {
+	_, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Required: []GoalItem{
+			{ID: "req-1", Text: "owned item", State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Owners: map[string]string{
+			"req-1": "session-1",
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle"}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-1: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-2", State: "idle"}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-2: %v", err)
+	}
+
+	coverage, err := BuildRequiredCoverage(runDir)
+	if err != nil {
+		t.Fatalf("BuildRequiredCoverage: %v", err)
+	}
+	if got, want := coverage.IdleReusableSessions, []string{"session-2"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("idle_reusable_sessions = %v, want %v", got, want)
+	}
+}

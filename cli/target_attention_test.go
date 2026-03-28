@@ -187,6 +187,67 @@ func TestBuildTargetAttentionFactsMarksActiveIdleOwnerForMasterFollowUp(t *testi
 	}
 }
 
+func TestBuildTargetAttentionFactsDoesNotMarkAcceptedWorkingOwnerActiveIdle(t *testing.T) {
+	_, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle", Mode: string(goalx.ModeDevelop)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	if err := SaveLivenessState(runDir, &LivenessState{
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},
+		Sessions: map[string]LivenessEntry{
+			"session-1": {Lease: "healthy", PIDAlive: true, HasWorktree: true, JournalStaleMinutes: 3},
+		},
+	}); err != nil {
+		t.Fatalf("SaveLivenessState: %v", err)
+	}
+	if err := SaveTransportFacts(runDir, &TransportFacts{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TransportTargetFacts{
+			"session-1": {
+				Target:                "session-1",
+				Window:                "session-1",
+				Engine:                "codex",
+				TransportState:        string(TUIStateWorking),
+				LastSampleAt:          time.Now().UTC().Format(time.RFC3339),
+				LastTransportAcceptAt: time.Now().UTC().Format(time.RFC3339),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveTransportFacts: %v", err)
+	}
+
+	snapshot := &ActivitySnapshot{
+		Version:   1,
+		CheckedAt: time.Now().UTC().Format(time.RFC3339),
+		Targets: map[string]TargetPresenceFacts{
+			"session-1": {Target: "session-1", State: TargetPresencePresent},
+		},
+		Sessions: map[string]ActivitySession{
+			"session-1": {LastOutputChangeAt: time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)},
+		},
+	}
+
+	attention, err := BuildTargetAttentionFacts(runDir, snapshot)
+	if err != nil {
+		t.Fatalf("BuildTargetAttentionFacts: %v", err)
+	}
+	if got := attention["session-1"].AttentionState; got != TargetAttentionHealthy {
+		t.Fatalf("attention_state = %q, want %q", got, TargetAttentionHealthy)
+	}
+}
+
 func TestBuildTargetAttentionFactsIgnoresParkedReusableSessions(t *testing.T) {
 	_, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	seedGuidanceSessionFixture(t, runDir, cfg)

@@ -57,8 +57,12 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 		normalizeCoordinationState(coord)
 	}
 	coverage.OwnersPresent = coord != nil && len(coord.Owners) > 0
+	openOwnerSessions := openRequiredOwnerSessions(goal, coord)
 
 	for _, sessionName := range sortedCoverageSessionNames(sessionRoster) {
+		if _, owned := openOwnerSessions[sessionName]; owned {
+			continue
+		}
 		switch coverageSessionLifecycleState(sessionName, sessionState, coord) {
 		case "idle":
 			coverage.IdleReusableSessions = append(coverage.IdleReusableSessions, sessionName)
@@ -123,6 +127,11 @@ func coverageSessionRoster(runDir string, sessionState *SessionsRuntimeState) ma
 }
 
 func coverageSessionLifecycleState(sessionName string, sessionState *SessionsRuntimeState, coord *CoordinationState) string {
+	if coord != nil && coord.Sessions != nil {
+		if state := strings.TrimSpace(coord.Sessions[sessionName].State); state != "" {
+			return state
+		}
+	}
 	if sessionState != nil {
 		if sess, ok := sessionState.Sessions[sessionName]; ok {
 			if state := strings.TrimSpace(sess.State); state != "" {
@@ -148,6 +157,24 @@ func sortedCoverageSessionNames(roster map[string]struct{}) []string {
 func isSessionOwnerToken(owner string) bool {
 	_, err := parseSessionIndex(strings.TrimSpace(owner))
 	return err == nil
+}
+
+func openRequiredOwnerSessions(goal *GoalState, coord *CoordinationState) map[string]struct{} {
+	owners := map[string]struct{}{}
+	if goal == nil || coord == nil || coord.Owners == nil {
+		return owners
+	}
+	for _, item := range goal.Required {
+		if normalizeGoalItemState(item.State) != goalItemStateOpen {
+			continue
+		}
+		owner := strings.TrimSpace(coord.Owners[item.ID])
+		if !isSessionOwnerToken(owner) {
+			continue
+		}
+		owners[owner] = struct{}{}
+	}
+	return owners
 }
 
 func attentionStateForOwner(attention map[string]TargetAttentionFacts, owner string, sessionState *SessionsRuntimeState, coord *CoordinationState) string {

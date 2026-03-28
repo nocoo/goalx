@@ -305,14 +305,28 @@ func RefreshSessionRuntimeProjection(runDir, runName string) error {
 		if session, ok := state.Sessions[sessionName]; ok && session.Mode != "" {
 			snapshot.Mode = session.Mode
 		}
-		if session, ok := state.Sessions[sessionName]; ok && strings.TrimSpace(session.State) == "parked" {
-			snapshot.State = "parked"
+		if session, ok := state.Sessions[sessionName]; ok && shouldPreserveSessionRuntimeState(session, snapshot) {
+			snapshot.State = strings.TrimSpace(session.State)
 		}
 		if err := UpsertSessionRuntimeState(runDir, snapshot); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func shouldPreserveSessionRuntimeState(current, snapshot SessionRuntimeState) bool {
+	switch strings.TrimSpace(current.State) {
+	case "parked", "stopped":
+		return true
+	case "active":
+		return current.LastRound > 0 &&
+			current.LastRound == snapshot.LastRound &&
+			strings.TrimSpace(current.LastJournalState) != "" &&
+			strings.TrimSpace(current.LastJournalState) == strings.TrimSpace(snapshot.LastJournalState)
+	default:
+		return false
+	}
 }
 
 func snapshotWorktreeState(worktreePath string) (int, string, error) {
