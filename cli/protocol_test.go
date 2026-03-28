@@ -75,6 +75,40 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "ship it",
+		Mode:              goalx.ModeDevelop,
+		Engine:            "codex",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		Target:            goalx.TargetConfig{Files: []string{"main.go"}},
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If the inbox is unchanged, no blocker or validation fact changed, and you still have a concrete next step, continue from local state instead of rereading broad run guidance.",
+		"Do not write liveness-only journal entries or repeatedly restate unchanged assignment state.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -963,6 +997,43 @@ func TestRenderMasterProtocolIncludesGoalxWaitLoopGuidance(t *testing.T) {
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:         "ship it",
+		RunName:           "demo",
+		Mode:              goalx.ModeDevelop,
+		Master:            goalx.MasterConfig{Engine: "codex", Model: "best"},
+		TmuxSession:       "ar-demo",
+		SummaryPath:       "/tmp/summary.md",
+		StatusPath:        "/tmp/status.json",
+		CoordinationPath:  "/tmp/coordination.json",
+		MasterInboxPath:   "/tmp/control/inbox/master.jsonl",
+		RunStatePath:      "/tmp/state/run.json",
+		SessionsStatePath: "/tmp/state/sessions.json",
+		EngineCommand:     "codex exec",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.",
+		"Do not use `goalx status` as a default heartbeat.",
+		"Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
 }

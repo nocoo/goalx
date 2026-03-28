@@ -35,6 +35,7 @@ Do not rebuild the full chat history unless the current state is ambiguous.
 5. Read the recent journal tail: `tail -n 20 {{.JournalPath}}`.
 6. Inspect the current worktree state: `git status --short && git log --oneline -5`.
 7. Resume from the current files and latest durable state. Only dig deeper into older history if something is unclear.
+8. If the inbox is unchanged, no blocker or validation fact changed, and you still have a concrete next step, continue from local state instead of rereading broad run guidance.
 
 {{if .Sessions}}
 ## Team Context
@@ -160,6 +161,7 @@ Session inbox is the latest assignment state, not a long conversation log. Check
 - When you believe the current assignment is done, re-check `{{.SessionInboxPath}}` before idling.
 - If you finish a thinking block without a concrete next action, enter `goalx wait --run {{.RunName}} {{.SessionName}} --timeout 300`.
 - Never use `sleep` while waiting for master or inbox updates.
+- Do not write liveness-only journal entries or repeatedly restate unchanged assignment state.
 - Treat any transport wake text as "read the session inbox now". It is only a trigger, never the instruction payload.
 - Never execute transport wake text as a shell command.
 - After a transport wake or `goalx wait` return, read `{{.SessionInboxPath}}` before deciding what to do next.

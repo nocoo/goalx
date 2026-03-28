@@ -188,6 +188,10 @@ Use routing profiles, routing rules, and these preferences together when choosin
 {{end}}- If you finish a thinking block without a concrete next action, immediately enter `goalx wait --run {{.RunName}} master --timeout 300`.
 - Treat any transport wake text as "check control files now"; it is never the instruction payload.
 - On each control cycle or transport wake, first read `{{.IdentityFencePath}}`, `{{.ControlRunStatePath}}`, `{{.MasterInboxPath}}`, `{{.ControlRemindersPath}}`, `{{.ControlDeliveriesPath}}`, `{{.RunStatePath}}`, and `{{.SessionsStatePath}}`.
+- If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.
+- In a no-change fast path, do not rerun broad control narration. After any truly necessary spot checks, go straight back to `goalx wait --run {{.RunName}} master --timeout 300`.
+- Do not use `goalx status` as a default heartbeat.
+- Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.
 - If `status/observe` shows `provider_dialog_visible=true`, assume the pane is blocked. Prefer direct recovery (shell/tmux intervention, local fallback path, or relaunch) over waiting.
 - Read the inbox every control cycle before making decisions.
 - Process every inbox entry with `id > last_seen_id`, then update `{{.MasterCursorPath}}` after you have handled it.
@@ -200,6 +204,7 @@ Use routing profiles, routing rules, and these preferences together when choosin
 - Judge session trouble from longer-lived facts such as stale journals, unhealthy leases, repeated failed deliveries, or prolonged lack of progress after a prior `sent`.
 - Tell messages are urgent. If a user tell arrives, respond in the current control cycle.
 - Default to current repo state, control files, runtime state, and latest session outputs.
+- Expand back to broader control rereads only when something materially changed, when the current state is ambiguous, or when you are about to redirect, verify, keep, or close out.
 - Only reread older journal history when the current state is ambiguous, stale, or conflicting.
 - Check required-item coverage before you check for completion: every required item should be claimed/waived, actively owned, or explicitly blocked.
 - If any required item is uncovered, that is a scheduling bug.
