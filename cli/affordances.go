@@ -118,6 +118,20 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Paths:   []string{AffordancesJSONPath(runDir), AffordancesMarkdownPath(runDir)},
 		},
 		{
+			ID:      "verify",
+			Kind:    "control",
+			Summary: "Run the active acceptance checks and refresh recorded evidence before review or closeout.",
+			Command: fmt.Sprintf("goalx verify --run %s", runName),
+			Paths:   []string{AcceptanceStatePath(runDir), RunStatusPath(runDir), AcceptanceEvidencePath(runDir)},
+		},
+		{
+			ID:      "closeout",
+			Kind:    "fact",
+			Summary: "Status, acceptance, and closeout surfaces for final review and run completion.",
+			Facts:   buildCloseoutAffordanceFacts(index),
+			Paths:   []string{AcceptanceStatePath(runDir), RunStatusPath(runDir), SummaryPath(runDir), CompletionStatePath(runDir)},
+		},
+		{
 			ID:      "tell",
 			Kind:    "control",
 			Summary: "Dispatch or redirect durable session work through the control plane.",
@@ -258,10 +272,48 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "path",
 			Summary: "Absolute run paths for durable state and reports.",
 			Command: "",
-			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
+			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.StatusPath, index.AcceptanceStatePath, index.SummaryPath, index.CompletionProofPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
 		})
 	}
 	return doc, nil
+}
+
+func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
+	if index == nil {
+		return nil
+	}
+	facts := make([]string, 0, 8)
+	if index.RunStatus != nil {
+		facts = append(facts,
+			fmt.Sprintf("status.phase=`%s`.", blankAsUnknown(index.RunStatus.Phase)),
+			fmt.Sprintf("status.required_remaining=`%d`.", index.RunStatus.RequiredRemaining),
+			fmt.Sprintf("goal.required_remaining=`%d`.", index.RunStatus.GoalRequiredRemaining),
+			fmt.Sprintf("status_matches_goal=`%t`.", index.RunStatus.StatusMatchesGoal),
+		)
+		if len(index.RunStatus.GoalRemainingRequiredIDs) > 0 {
+			facts = append(facts, fmt.Sprintf("goal.remaining_ids=`%s`.", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ",")))
+		}
+	}
+	if index.Acceptance != nil {
+		facts = append(facts, fmt.Sprintf("acceptance.active_checks=`%d`.", index.Acceptance.ActiveCheckCount))
+		if index.Acceptance.LastExitCode != nil {
+			facts = append(facts, fmt.Sprintf("acceptance.last_exit_code=`%d`.", *index.Acceptance.LastExitCode))
+		}
+		if index.Acceptance.LastCheckedAt != "" {
+			facts = append(facts, fmt.Sprintf("acceptance.last_checked_at=`%s`.", index.Acceptance.LastCheckedAt))
+		}
+	}
+	if index.Closeout != nil {
+		facts = append(facts,
+			fmt.Sprintf("summary_exists=`%t`.", index.Closeout.SummaryExists),
+			fmt.Sprintf("completion_proof_exists=`%t`.", index.Closeout.CompletionProofExists),
+			fmt.Sprintf("ready_to_finalize=`%t`.", index.Closeout.ReadyToFinalize),
+		)
+	}
+	if len(facts) == 0 {
+		return nil
+	}
+	return facts
 }
 
 func buildEvolveFactsAffordance(index *ContextIndex) *AffordanceItem {

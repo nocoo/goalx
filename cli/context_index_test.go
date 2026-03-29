@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -343,6 +344,104 @@ func TestBuildContextIndexIncludesObjectiveIntegritySummary(t *testing.T) {
 		"Goal clause coverage: `1/1`",
 		"Acceptance clause coverage: `1/1`",
 		"Integrity OK: `true`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestBuildContextIndexIncludesRunStatusAcceptanceAndCloseoutSummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	evidencePath := filepath.Join(runDir, "evidence.txt")
+	if err := os.WriteFile(evidencePath, []byte("evidence\n"), 0o644); err != nil {
+		t.Fatalf("write evidence: %v", err)
+	}
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:            "req-1",
+				Text:          "ship feature",
+				Source:        goalItemSourceUser,
+				Role:          goalItemRoleOutcome,
+				State:         goalItemStateClaimed,
+				EvidencePaths: []string{evidencePath},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+		Version:     2,
+		GoalVersion: 1,
+		Checks: []AcceptanceCheck{
+			{ID: "chk-1", Label: "verify", Command: "printf ok", State: acceptanceCheckStateActive},
+		},
+		LastResult: AcceptanceResult{
+			CheckedAt:    "2026-03-28T10:00:00Z",
+			ExitCode:     intPtr(0),
+			EvidencePath: AcceptanceEvidencePath(runDir),
+		},
+	}); err != nil {
+		t.Fatalf("SaveAcceptanceState: %v", err)
+	}
+	requiredRemaining := 0
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseComplete,
+		RequiredRemaining: &requiredRemaining,
+		LastVerifiedAt:    "2026-03-28T10:00:00Z",
+		UpdatedAt:         "2026-03-28T10:05:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(CompletionStatePath(runDir)), 0o755); err != nil {
+		t.Fatalf("mkdir proof dir: %v", err)
+	}
+	if err := os.WriteFile(CompletionStatePath(runDir), []byte(`{"verdict":"complete"}`), 0o644); err != nil {
+		t.Fatalf("write completion proof: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.RunStatus == nil {
+		t.Fatal("run status summary missing")
+	}
+	if index.RunStatus.RequiredRemaining != 0 || index.RunStatus.GoalRequiredRemaining != 0 || !index.RunStatus.StatusMatchesGoal {
+		t.Fatalf("run status summary = %+v, want aligned zero remaining", index.RunStatus)
+	}
+	if index.Acceptance == nil {
+		t.Fatal("acceptance summary missing")
+	}
+	if index.Acceptance.ActiveCheckCount != 1 || index.Acceptance.LastExitCode == nil || *index.Acceptance.LastExitCode != 0 {
+		t.Fatalf("acceptance summary = %+v, want one passing active check", index.Acceptance)
+	}
+	if index.Closeout == nil {
+		t.Fatal("closeout summary missing")
+	}
+	if !index.Closeout.SummaryExists || !index.Closeout.CompletionProofExists || !index.Closeout.ReadyToFinalize {
+		t.Fatalf("closeout summary = %+v, want ready closeout", index.Closeout)
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"## Run Status",
+		"Required remaining (status): `0`",
+		"Required remaining (goal): `0`",
+		"Status matches goal: `true`",
+		"## Acceptance",
+		"Active checks: `1`",
+		"Last exit code: `0`",
+		"## Closeout",
+		"Summary exists: `true`",
+		"Completion proof exists: `true`",
+		"Ready to finalize: `true`",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered context missing %q:\n%s", want, rendered)

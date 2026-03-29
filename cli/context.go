@@ -93,6 +93,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Charter", index.CharterPath)
 	writeContextLine("Objective contract", index.ObjectiveContractPath)
 	writeContextLine("Goal", index.GoalPath)
+	writeContextLine("Status", index.StatusPath)
 	writeContextLine("Experiment ledger", index.ExperimentsLogPath)
 	writeContextLine("Integration state", index.IntegrationStatePath)
 	writeContextLine("Evolve facts", index.EvolveFactsPath)
@@ -133,6 +134,30 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Required by source", formatContextCountMap(index.GoalBoundary.RequiredBySource))
 		writeContextLine("Required by role", formatContextCountMap(index.GoalBoundary.RequiredByRole))
 		writeContextLine("Required by state", formatContextCountMap(index.GoalBoundary.RequiredByState))
+	}
+	if index.RunStatus != nil {
+		b.WriteString("\n## Run Status\n\n")
+		writeContextLine("Phase", index.RunStatus.Phase)
+		writeContextLine("Required remaining (status)", fmt.Sprintf("%d", index.RunStatus.RequiredRemaining))
+		writeContextLine("Required remaining (goal)", fmt.Sprintf("%d", index.RunStatus.GoalRequiredRemaining))
+		writeContextLine("Goal remaining IDs", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ", "))
+		writeContextLine("Status matches goal", fmt.Sprintf("%t", index.RunStatus.StatusMatchesGoal))
+		writeContextLine("Last verified at", index.RunStatus.LastVerifiedAt)
+	}
+	if index.Acceptance != nil {
+		b.WriteString("\n## Acceptance\n\n")
+		writeContextLine("Active checks", fmt.Sprintf("%d", index.Acceptance.ActiveCheckCount))
+		writeContextLine("Last checked at", index.Acceptance.LastCheckedAt)
+		if index.Acceptance.LastExitCode != nil {
+			writeContextLine("Last exit code", fmt.Sprintf("%d", *index.Acceptance.LastExitCode))
+		}
+		writeContextLine("Evidence path", index.Acceptance.EvidencePath)
+	}
+	if index.Closeout != nil {
+		b.WriteString("\n## Closeout\n\n")
+		writeContextLine("Summary exists", fmt.Sprintf("%t", index.Closeout.SummaryExists))
+		writeContextLine("Completion proof exists", fmt.Sprintf("%t", index.Closeout.CompletionProofExists))
+		writeContextLine("Ready to finalize", fmt.Sprintf("%t", index.Closeout.ReadyToFinalize))
 	}
 	if index.ObjectiveIntegrity != nil {
 		b.WriteString("\n## Objective Contract\n\n")

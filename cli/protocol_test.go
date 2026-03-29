@@ -1568,18 +1568,20 @@ func TestRenderMasterProtocolClarifiesKeepUsesRecordedParentBoundary(t *testing.
 func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:         "ship it",
-		RunName:           "demo",
-		Mode:              goalx.ModeDevelop,
-		Master:            goalx.MasterConfig{Engine: "codex", Model: "best"},
-		TmuxSession:       "ar-demo",
-		SummaryPath:       "/tmp/summary.md",
-		StatusPath:        "/tmp/status.json",
-		CoordinationPath:  "/tmp/coordination.json",
-		MasterInboxPath:   "/tmp/control/inbox/master.jsonl",
-		RunStatePath:      "/tmp/state/run.json",
-		SessionsStatePath: "/tmp/state/sessions.json",
-		EngineCommand:     "codex exec",
+		Objective:           "ship it",
+		RunName:             "demo",
+		Mode:                goalx.ModeDevelop,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "best"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		CompletionProofPath: "/tmp/proof/completion.json",
+		StatusPath:          "/tmp/status.json",
+		GoalPath:            "/tmp/goal.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		MasterInboxPath:     "/tmp/control/inbox/master.jsonl",
+		RunStatePath:        "/tmp/state/run.json",
+		SessionsStatePath:   "/tmp/state/sessions.json",
+		EngineCommand:       "codex exec",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1593,6 +1595,8 @@ func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.",
+		"If `required_remaining` is 0 but `/tmp/summary.md` or `/tmp/proof/completion.json` is missing, that control cycle is **not** a no-change fast path.",
+		"If `/tmp/status.json` disagrees with `/tmp/goal.json` about required remaining work, treat `/tmp/goal.json` as canonical and repair `/tmp/status.json` before you idle or close out.",
 		"An active session with `active_idle`, `transport_blocked`, `progress_blocked`, or `ownership_risky` facts is **not** a no-change fast path.",
 		"Do not use `goalx status` as a default heartbeat.",
 		"Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.",

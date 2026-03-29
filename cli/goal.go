@@ -164,6 +164,31 @@ func SummarizeGoalState(state *GoalState) GoalSummary {
 	return summary
 }
 
+func goalRemainingRequiredIDs(state *GoalState) []string {
+	if state == nil {
+		return nil
+	}
+	normalizeGoalState(state)
+	ids := make([]string, 0, len(state.Required))
+	for _, item := range state.Required {
+		switch normalizeGoalItemState(item.State) {
+		case goalItemStateClaimed:
+			continue
+		case goalItemStateWaived:
+			if strings.TrimSpace(item.ApprovalRef) != "" {
+				continue
+			}
+		}
+		if strings.TrimSpace(item.ID) != "" {
+			ids = append(ids, item.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
 func ValidateGoalStateForVerification(state *GoalState) (GoalSummary, error) {
 	summary := SummarizeGoalState(state)
 	if state == nil {

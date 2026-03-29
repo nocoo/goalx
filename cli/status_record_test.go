@@ -61,3 +61,34 @@ func TestLoadRunStatusRecordRejectsMissingVersion(t *testing.T) {
 		t.Fatalf("LoadRunStatusRecord error = %v, want version failure", err)
 	}
 }
+
+func TestSaveRunStatusRecordRejectsRequiredRemainingDriftFromGoal(t *testing.T) {
+	runDir := t.TempDir()
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship it",
+				Source: goalItemSourceUser,
+				Role:   goalItemRoleOutcome,
+				State:  goalItemStateOpen,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+
+	requiredRemaining := 0
+	err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseReview,
+		RequiredRemaining: &requiredRemaining,
+	})
+	if err == nil {
+		t.Fatal("SaveRunStatusRecord should reject required_remaining drift")
+	}
+	if !strings.Contains(err.Error(), "required_remaining=0 does not match goal required_remaining=1") {
+		t.Fatalf("SaveRunStatusRecord error = %v, want required_remaining drift", err)
+	}
+}

@@ -24,6 +24,7 @@ type ContextIndex struct {
 	CharterPath           string                     `json:"charter_path,omitempty"`
 	ObjectiveContractPath string                     `json:"objective_contract_path,omitempty"`
 	GoalPath              string                     `json:"goal_path,omitempty"`
+	StatusPath            string                     `json:"status_path,omitempty"`
 	ExperimentsLogPath    string                     `json:"experiments_log_path,omitempty"`
 	IntegrationStatePath  string                     `json:"integration_state_path,omitempty"`
 	AcceptanceStatePath   string                     `json:"acceptance_state_path,omitempty"`
@@ -46,6 +47,9 @@ type ContextIndex struct {
 	Evolve                *ContextEvolve             `json:"evolve,omitempty"`
 	ObjectiveIntegrity    *ContextObjectiveIntegrity `json:"objective_integrity,omitempty"`
 	GoalBoundary          *ContextGoalBoundary       `json:"goal_boundary,omitempty"`
+	RunStatus             *ContextRunStatus          `json:"run_status,omitempty"`
+	Acceptance            *ContextAcceptance         `json:"acceptance,omitempty"`
+	Closeout              *ContextCloseout           `json:"closeout,omitempty"`
 	Selection             *ContextSelection          `json:"selection,omitempty"`
 	Sessions              []ContextSession           `json:"sessions,omitempty"`
 	ProviderRuntimeFacts  []ProviderRuntimeFact      `json:"provider_runtime_facts,omitempty"`
@@ -84,6 +88,28 @@ type ContextGoalBoundary struct {
 	RequiredBySource map[string]int `json:"required_by_source,omitempty"`
 	RequiredByRole   map[string]int `json:"required_by_role,omitempty"`
 	RequiredByState  map[string]int `json:"required_by_state,omitempty"`
+}
+
+type ContextRunStatus struct {
+	Phase                    string   `json:"phase,omitempty"`
+	RequiredRemaining        int      `json:"required_remaining"`
+	GoalRequiredRemaining    int      `json:"goal_required_remaining"`
+	GoalRemainingRequiredIDs []string `json:"goal_remaining_required_ids,omitempty"`
+	StatusMatchesGoal        bool     `json:"status_matches_goal"`
+	LastVerifiedAt           string   `json:"last_verified_at,omitempty"`
+}
+
+type ContextAcceptance struct {
+	ActiveCheckCount int    `json:"active_check_count"`
+	LastCheckedAt    string `json:"last_checked_at,omitempty"`
+	LastExitCode     *int   `json:"last_exit_code,omitempty"`
+	EvidencePath     string `json:"evidence_path,omitempty"`
+}
+
+type ContextCloseout struct {
+	SummaryExists         bool `json:"summary_exists"`
+	CompletionProofExists bool `json:"completion_proof_exists"`
+	ReadyToFinalize       bool `json:"ready_to_finalize"`
 }
 
 type ContextEvolve struct {
@@ -225,6 +251,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		CharterPath:           RunCharterPath(runDir),
 		ObjectiveContractPath: ObjectiveContractPath(runDir),
 		GoalPath:              GoalPath(runDir),
+		StatusPath:            RunStatusPath(runDir),
 		ExperimentsLogPath:    ExperimentsLogPath(runDir),
 		IntegrationStatePath:  IntegrationStatePath(runDir),
 		AcceptanceStatePath:   AcceptanceStatePath(runDir),
@@ -250,6 +277,21 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		return nil, err
 	} else if goalState != nil {
 		index.GoalBoundary = contextGoalBoundary(goalState)
+	}
+	if statusSummary, err := contextRunStatus(runDir); err != nil {
+		return nil, err
+	} else if statusSummary != nil {
+		index.RunStatus = statusSummary
+	}
+	if acceptanceSummary, err := contextAcceptance(runDir); err != nil {
+		return nil, err
+	} else if acceptanceSummary != nil {
+		index.Acceptance = acceptanceSummary
+	}
+	if closeoutSummary, err := contextCloseout(runDir); err != nil {
+		return nil, err
+	} else if closeoutSummary != nil {
+		index.Closeout = closeoutSummary
 	}
 	if integrity, err := BuildObjectiveIntegritySummary(runDir); err != nil {
 		return nil, err
@@ -393,6 +435,64 @@ func contextObjectiveIntegrity(summary ObjectiveIntegritySummary) *ContextObject
 		IntegrityReady:             summary.ReadyForNoShrinkEnforcement(),
 		IntegrityOK:                summary.IntegrityOK(),
 	}
+}
+
+func contextRunStatus(runDir string) (*ContextRunStatus, error) {
+	comparison, err := BuildRunStatusComparison(runDir)
+	if err != nil || comparison == nil || comparison.StatusRequiredRemaining == nil {
+		return nil, err
+	}
+	out := &ContextRunStatus{
+		Phase:             comparison.Phase,
+		RequiredRemaining: *comparison.StatusRequiredRemaining,
+		StatusMatchesGoal: comparison.StatusMatchesGoal,
+		LastVerifiedAt:    comparison.LastVerifiedAt,
+	}
+	if comparison.GoalRequiredRemaining != nil {
+		out.GoalRequiredRemaining = *comparison.GoalRequiredRemaining
+	}
+	if len(comparison.GoalRemainingRequiredIDs) > 0 {
+		out.GoalRemainingRequiredIDs = append([]string(nil), comparison.GoalRemainingRequiredIDs...)
+	}
+	return out, nil
+}
+
+func contextAcceptance(runDir string) (*ContextAcceptance, error) {
+	state, err := LoadAcceptanceState(AcceptanceStatePath(runDir))
+	if err != nil || state == nil {
+		return nil, err
+	}
+	activeChecks := 0
+	for _, check := range state.Checks {
+		if normalizeAcceptanceCheckState(check.State) == acceptanceCheckStateActive {
+			activeChecks++
+		}
+	}
+	return &ContextAcceptance{
+		ActiveCheckCount: activeChecks,
+		LastCheckedAt:    strings.TrimSpace(state.LastResult.CheckedAt),
+		LastExitCode:     state.LastResult.ExitCode,
+		EvidencePath:     strings.TrimSpace(state.LastResult.EvidencePath),
+	}, nil
+}
+
+func contextCloseout(runDir string) (*ContextCloseout, error) {
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	if status == nil && !fileExists(SummaryPath(runDir)) && !fileExists(CompletionStatePath(runDir)) {
+		return nil, nil
+	}
+	facts, err := BuildRunCloseoutFacts(runDir)
+	if err != nil {
+		return nil, err
+	}
+	return &ContextCloseout{
+		SummaryExists:         facts.SummaryExists,
+		CompletionProofExists: facts.CompletionExists,
+		ReadyToFinalize:       facts.ReadyToFinalize(),
+	}, nil
 }
 
 func contextMaster(cfg *goalx.Config, selectionSnapshot *SelectionSnapshot, engines map[string]goalx.EngineConfig, runDir string) ContextMaster {

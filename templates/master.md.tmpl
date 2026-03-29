@@ -212,6 +212,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Treat any transport wake text as "check control files now"; it is never the instruction payload.
 - On each control cycle or transport wake, first read `{{.IdentityFencePath}}`, `{{.ControlRunStatePath}}`, `{{.MasterInboxPath}}`, `{{.ControlRemindersPath}}`, `{{.ControlDeliveriesPath}}`, `{{.RunStatePath}}`, and `{{.SessionsStatePath}}`.
 - If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.
+- If `required_remaining` is 0 but `{{.SummaryPath}}` or `{{.CompletionProofPath}}` is missing, that control cycle is **not** a no-change fast path.
+- If `{{.StatusPath}}` disagrees with `{{.GoalPath}}` about required remaining work, treat `{{.GoalPath}}` as canonical and repair `{{.StatusPath}}` before you idle or close out.
 - A required item with blocking or risk facts such as `owner_attention`, `owner_blocked`, or `owner_risky` is **not** a no-change fast path.
 - An active session with `active_idle`, `transport_blocked`, `progress_blocked`, or `ownership_risky` facts is **not** a no-change fast path.
 - In a no-change fast path, do not rerun broad control narration. After any truly necessary spot checks, go straight back to `goalx wait --run {{.RunName}} master --timeout 300`.

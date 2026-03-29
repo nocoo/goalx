@@ -436,6 +436,44 @@ func TestObserveWarnsAboutEvolveManagementGapsAndMissingCloseoutArtifacts(t *tes
 	}
 }
 
+func TestObserveWarnsAboutRunStatusGoalDrift(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship feature",
+				Source: goalItemSourceUser,
+				Role:   goalItemRoleOutcome,
+				State:  goalItemStateOpen,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":0,"updated_at":"2026-03-28T10:10:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"### advisories",
+		"Status drift:",
+		"status_required_remaining=0",
+		"goal_required_remaining=1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestObserveShowsEvolveSummaryOnlyForEvolveRuns(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

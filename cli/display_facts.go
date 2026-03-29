@@ -92,6 +92,13 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	statusComparison, err := BuildRunStatusComparison(rc.RunDir)
+	if err != nil {
+		return nil, err
+	}
+	if statusComparison != nil && statusComparison.StatusRequiredRemaining != nil && statusComparison.GoalRequiredRemaining != nil && !statusComparison.StatusMatchesGoal {
+		advisories = append(advisories, fmt.Sprintf("Status drift: status_required_remaining=%d goal_required_remaining=%d goal_remaining_ids=%s", *statusComparison.StatusRequiredRemaining, *statusComparison.GoalRequiredRemaining, strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
+	}
 	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
 		if closeoutFacts.ObjectiveContractPresent && (!closeoutFacts.ObjectiveContractLocked || !closeoutFacts.ObjectiveIntegrityOK) {
 			advisories = append(advisories, "Objective integrity pending: "+objective)

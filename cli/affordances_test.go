@@ -26,10 +26,42 @@ func TestBuildAffordancesIncludesRunScopedCommands(t *testing.T) {
 		"goalx observe --run guidance-run",
 		"goalx context --run guidance-run",
 		"goalx afford --run guidance-run",
+		"goalx verify --run guidance-run",
 		"goalx schema status",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("affordance commands missing %q:\n%s", want, joined)
+		}
+	}
+}
+
+func TestBuildAffordancesIncludesCloseoutAndAcceptancePaths(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	var closeoutItem *AffordanceItem
+	for i := range doc.Items {
+		if doc.Items[i].ID == "closeout" {
+			closeoutItem = &doc.Items[i]
+			break
+		}
+	}
+	if closeoutItem == nil {
+		t.Fatal("closeout affordance missing")
+	}
+	joinedPaths := strings.Join(closeoutItem.Paths, "\n")
+	for _, want := range []string{
+		AcceptanceStatePath(runDir),
+		RunStatusPath(runDir),
+		SummaryPath(runDir),
+		CompletionStatePath(runDir),
+	} {
+		if !strings.Contains(joinedPaths, want) {
+			t.Fatalf("closeout affordance missing path %q:\n%s", want, joinedPaths)
 		}
 	}
 }
