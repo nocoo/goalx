@@ -194,7 +194,67 @@ func ensureClaudeProjectLocalHooks(path string) error {
 	if err := writeFilePreserveMode(settingsPath, out, 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", settingsPath, err)
 	}
+	if err := verifyClaudeProjectLocalHooks(path); err != nil {
+		return err
+	}
 	return nil
+}
+
+func verifyClaudeProjectLocalHooks(path string) error {
+	goalxBin, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve goalx executable for claude hook verification: %w", err)
+	}
+	settingsPath := filepath.Join(path, ".claude", "settings.local.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return fmt.Errorf("read %s for hook verification: %w", settingsPath, err)
+	}
+	doc := map[string]any{}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("parse %s for hook verification: %w", settingsPath, err)
+	}
+	hooks := coerceObject(doc["hooks"])
+	permissionCommand := shellQuote(goalxBin) + " claude-hook permission-request"
+	elicitationCommand := shellQuote(goalxBin) + " claude-hook elicitation"
+	notificationCommand := shellQuote(goalxBin) + " claude-hook notification"
+	required := []struct {
+		name    string
+		entries []any
+		matcher string
+		command string
+	}{
+		{name: "PermissionRequest", entries: coerceArray(hooks["PermissionRequest"]), matcher: claudeMCPPermissionHookMatcher, command: permissionCommand},
+		{name: "Elicitation", entries: coerceArray(hooks["Elicitation"]), matcher: claudeMCPElicitationHookMatcher, command: elicitationCommand},
+		{name: "Notification(permission_prompt)", entries: coerceArray(hooks["Notification"]), matcher: claudePermissionNotificationMatcher, command: notificationCommand},
+		{name: "Notification(elicitation_dialog)", entries: coerceArray(hooks["Notification"]), matcher: claudeElicitationNotificationMatcher, command: notificationCommand},
+	}
+	for _, item := range required {
+		if claudeHookMatcherHasExactCommand(item.entries, item.matcher, item.command) {
+			continue
+		}
+		return fmt.Errorf("verify %s: missing %s hook matcher %q command %q", settingsPath, item.name, item.matcher, item.command)
+	}
+	return nil
+}
+
+func claudeHookMatcherHasExactCommand(entries []any, matcher, command string) bool {
+	for _, raw := range entries {
+		entry := coerceObject(raw)
+		if strings.TrimSpace(toString(entry["matcher"])) != matcher {
+			continue
+		}
+		for _, hookRaw := range coerceArray(entry["hooks"]) {
+			hook := coerceObject(hookRaw)
+			if strings.TrimSpace(toString(hook["type"])) != "command" {
+				continue
+			}
+			if strings.TrimSpace(toString(hook["command"])) == command {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func claudeSourceProjectEntry(path string, projects map[string]any) map[string]any {

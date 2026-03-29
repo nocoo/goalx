@@ -2148,6 +2148,66 @@ func TestRunSidecarTickElevatesCapacityPickerDialogToUrgentMasterFact(t *testing
 	}
 }
 
+func TestRunSidecarTickImmediatelyNudgesMasterOnceForProviderDialog(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	sessionCapture := filepath.Join(t.TempDir(), "session-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	if err := os.WriteFile(sessionCapture, []byte("Needs your permission\nYes, don't ask again\n"), 0o644); err != nil {
+		t.Fatalf("write session capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
+	installGuidanceFakeTmux(t, []string{"session-1"})
+
+	orig := sendAgentNudgeDetailed
+	defer func() { sendAgentNudgeDetailed = orig }()
+	var nudges []string
+	sendAgentNudgeDetailed = func(target, engine string) (TransportDeliveryOutcome, error) {
+		nudges = append(nudges, target+"|"+engine)
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+	}
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick first: %v", err)
+	}
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick second: %v", err)
+	}
+
+	deliveries, err := LoadControlDeliveries(ControlDeliveriesPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlDeliveries: %v", err)
+	}
+	count := 0
+	wantTarget := goalx.TmuxSessionName(repo, cfg.Name) + ":master"
+	for _, item := range deliveries.Items {
+		if strings.HasPrefix(item.DedupeKey, "provider-dialog:session-1:") {
+			count++
+			if item.Target != wantTarget {
+				t.Fatalf("provider dialog nudge target = %q, want %q", item.Target, wantTarget)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("provider dialog immediate nudge count = %d, want 1; deliveries=%+v", count, deliveries.Items)
+	}
+	found := false
+	for _, nudge := range nudges {
+		if nudge == wantTarget+"|codex" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected immediate master nudge to %q, got %v", wantTarget, nudges)
+	}
+}
+
 func bootstrapSidecarIdentityFixture(t *testing.T, runDir, repo string, cfg *goalx.Config, meta *RunMetadata) {
 	t.Helper()
 

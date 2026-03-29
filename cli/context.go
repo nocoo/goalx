@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -120,6 +121,14 @@ func renderContextIndex(index *ContextIndex) string {
 			writeContextLine("Develop role", identity.RoleContracts.DevelopSubagent.Mandate)
 		}
 	}
+	if index.GoalBoundary != nil {
+		b.WriteString("\n## Goal Boundary\n\n")
+		writeContextLine("Required items", fmt.Sprintf("%d", index.GoalBoundary.RequiredCount))
+		writeContextLine("Optional items", fmt.Sprintf("%d", index.GoalBoundary.OptionalCount))
+		writeContextLine("Required by source", formatContextCountMap(index.GoalBoundary.RequiredBySource))
+		writeContextLine("Required by role", formatContextCountMap(index.GoalBoundary.RequiredByRole))
+		writeContextLine("Required by state", formatContextCountMap(index.GoalBoundary.RequiredByState))
+	}
 	if len(index.ProviderFacts) > 0 {
 		b.WriteString("\n## Provider Facts\n\n")
 		for _, fact := range index.ProviderFacts {
@@ -139,6 +148,18 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Engine", index.Master.Engine)
 	writeContextLine("Model", index.Master.Model)
 	writeContextLine("Mode", index.Master.Mode)
+	writeContextLine("Requested effort", string(index.Master.RequestedEffort))
+	writeContextLine("Effective effort", index.Master.EffectiveEffort)
+	writeContextLine("Surface", index.Master.SurfaceKind)
+	writeContextLine("Worktree kind", index.Master.WorktreeKind)
+	writeContextLine("Mergeable output surface", fmt.Sprintf("%t", index.Master.MergeableOutputSurface))
+	if index.Master.ProviderBootstrap != nil {
+		writeContextLine("Permission mode", index.Master.ProviderBootstrap.PermissionMode)
+		writeContextLine("Provider bootstrap verified", fmt.Sprintf("%t", index.Master.ProviderBootstrap.BootstrapVerified))
+		writeContextLine("permission_request_hook_bootstrapped", fmt.Sprintf("%t", index.Master.ProviderBootstrap.PermissionRequestHookBootstrapped))
+		writeContextLine("elicitation_hook_bootstrapped", fmt.Sprintf("%t", index.Master.ProviderBootstrap.ElicitationHookBootstrapped))
+		writeContextLine("notification_hook_bootstrapped", fmt.Sprintf("%t", index.Master.ProviderBootstrap.NotificationHookBootstrapped))
+	}
 	if index.Selection != nil {
 		b.WriteString("\n## Selection\n\n")
 		if len(index.Selection.MasterCandidates) > 0 {
@@ -181,6 +202,21 @@ func renderContextIndex(index *ContextIndex) string {
 				b.WriteString(fmt.Sprintf(" (%s)", sess.Mode))
 			}
 			b.WriteString("\n")
+			writeIndentedContextLine(&b, "role", sess.RoleKind)
+			writeIndentedContextLine(&b, "engine", sess.Engine)
+			writeIndentedContextLine(&b, "model", sess.Model)
+			writeIndentedContextLine(&b, "requested effort", string(sess.RequestedEffort))
+			writeIndentedContextLine(&b, "effective effort", sess.EffectiveEffort)
+			writeIndentedContextLine(&b, "surface", sess.SurfaceKind)
+			writeIndentedContextLine(&b, "worktree kind", sess.WorktreeKind)
+			writeIndentedContextLine(&b, "mergeable output", fmt.Sprintf("%t", sess.MergeableOutputSurface))
+			if sess.ProviderBootstrap != nil {
+				writeIndentedContextLine(&b, "permission mode", sess.ProviderBootstrap.PermissionMode)
+				writeIndentedContextLine(&b, "provider bootstrap verified", fmt.Sprintf("%t", sess.ProviderBootstrap.BootstrapVerified))
+				writeIndentedContextLine(&b, "permission_request_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.PermissionRequestHookBootstrapped))
+				writeIndentedContextLine(&b, "elicitation_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.ElicitationHookBootstrapped))
+				writeIndentedContextLine(&b, "notification_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.NotificationHookBootstrapped))
+			}
 			writeIndentedContextLine(&b, "window", sess.WindowName)
 			writeIndentedContextLine(&b, "worktree", sess.WorktreePath)
 			writeIndentedContextLine(&b, "branch", sess.Branch)
@@ -199,4 +235,20 @@ func writeIndentedContextLine(b *strings.Builder, label, value string) {
 		return
 	}
 	b.WriteString(fmt.Sprintf("  - %s: `%s`\n", label, value))
+}
+
+func formatContextCountMap(counts map[string]int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
+	}
+	return strings.Join(parts, ", ")
 }

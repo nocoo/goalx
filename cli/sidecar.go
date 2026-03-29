@@ -267,7 +267,7 @@ func refreshTransportFactsForSidecar(runDir, tmuxSession, masterEngine string, w
 	if err := SaveTransportFacts(runDir, facts); err != nil {
 		return err
 	}
-	return reconcileProviderDialogAlerts(runDir, controlState, facts)
+	return reconcileProviderDialogAlerts(runDir, tmuxSession, masterEngine, controlState, facts)
 }
 
 func runSidecarMaintenanceCycle(projectRoot, runName, runDir, tmuxSession string, cfg *goalx.Config, interval time.Duration, presence map[string]TargetPresenceFacts, watcher *TmuxControlWatcher, controlState *ControlRunState) error {
@@ -320,7 +320,7 @@ func refreshSidecarTransportFacts(runDir, tmuxSession, masterEngine string, watc
 	return refreshTransportFactsForSidecar(runDir, tmuxSession, masterEngine, nil, controlState)
 }
 
-func reconcileProviderDialogAlerts(runDir string, controlState *ControlRunState, facts *TransportFacts) error {
+func reconcileProviderDialogAlerts(runDir, tmuxSession, masterEngine string, controlState *ControlRunState, facts *TransportFacts) error {
 	if controlState == nil {
 		return fmt.Errorf("control run state is nil")
 	}
@@ -336,6 +336,10 @@ func reconcileProviderDialogAlerts(runDir string, controlState *ControlRunState,
 			}
 			body := fmt.Sprintf("Provider dialog visible in unattended GoalX run; target=%s engine=%s kind=%s hint=%s", blankAsUnknown(target), blankAsUnknown(targetFacts.Engine), blankAsUnknown(targetFacts.ProviderDialogKind), blankAsUnknown(targetFacts.ProviderDialogHint))
 			if _, err := appendControlInboxMessage(runDir, "master", "provider-dialog-visible", "goalx sidecar", body, true); err != nil {
+				return err
+			}
+			dedupeKey := fmt.Sprintf("provider-dialog:%s:%s", target, current[target])
+			if _, err := deliverControlNudge(runDir, dedupeKey, dedupeKey, tmuxSession+":master", masterEngine, false, sendAgentNudgeDetailed); err != nil {
 				return err
 			}
 		}

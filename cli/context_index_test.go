@@ -134,6 +134,184 @@ func TestBuildContextIndexIncludesSelectionSnapshotFacts(t *testing.T) {
 	}
 }
 
+func TestBuildContextIndexIncludesGoalBoundarySummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	state := &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{ID: "req-1", Text: "deliver live capability", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "add missing backend support", Source: goalItemSourceMaster, Role: goalItemRoleEnabler, State: goalItemStateClaimed},
+			{ID: "req-3", Text: "prove user journey", Source: goalItemSourceUser, Role: goalItemRoleProof, State: goalItemStateWaived, UserApproved: true},
+		},
+		Optional: []GoalItem{
+			{ID: "opt-1", Text: "nice to have polish", Source: goalItemSourceMaster, Role: goalItemRoleGuardrail, State: goalItemStateOpen},
+		},
+	}
+	if err := SaveGoalState(GoalPath(runDir), state); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.GoalBoundary == nil {
+		t.Fatal("goal boundary summary missing")
+	}
+	if index.GoalBoundary.RequiredCount != 3 {
+		t.Fatalf("required_count = %d, want 3", index.GoalBoundary.RequiredCount)
+	}
+	if index.GoalBoundary.OptionalCount != 1 {
+		t.Fatalf("optional_count = %d, want 1", index.GoalBoundary.OptionalCount)
+	}
+	if got := index.GoalBoundary.RequiredBySource[goalItemSourceUser]; got != 2 {
+		t.Fatalf("required_by_source[user] = %d, want 2", got)
+	}
+	if got := index.GoalBoundary.RequiredBySource[goalItemSourceMaster]; got != 1 {
+		t.Fatalf("required_by_source[master] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByRole[goalItemRoleOutcome]; got != 1 {
+		t.Fatalf("required_by_role[outcome] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByRole[goalItemRoleEnabler]; got != 1 {
+		t.Fatalf("required_by_role[enabler] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByRole[goalItemRoleProof]; got != 1 {
+		t.Fatalf("required_by_role[proof] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByState[goalItemStateOpen]; got != 1 {
+		t.Fatalf("required_by_state[open] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByState[goalItemStateClaimed]; got != 1 {
+		t.Fatalf("required_by_state[claimed] = %d, want 1", got)
+	}
+	if got := index.GoalBoundary.RequiredByState[goalItemStateWaived]; got != 1 {
+		t.Fatalf("required_by_state[waived] = %d, want 1", got)
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"## Goal Boundary",
+		"Required items: `3`",
+		"Optional items: `1`",
+		"Required by source: `master=1, user=2`",
+		"Required by role: `enabler=1, outcome=1, proof=1`",
+		"Required by state: `claimed=1, open=1, waived=1`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestBuildContextIndexOmitsProviderBootstrapForCodexMaster(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.Master.Engine != "codex" {
+		t.Fatalf("master engine = %q, want codex", index.Master.Engine)
+	}
+	if index.Master.ProviderBootstrap != nil {
+		t.Fatalf("master provider bootstrap = %+v, want nil for codex", index.Master.ProviderBootstrap)
+	}
+}
+
+func TestBuildContextIndexIncludesExecutionSurfaceFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Master.Effort = goalx.EffortHigh
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	writeSelectionSnapshotFixture(t, runDir, testSelectionSnapshot{
+		Version: 1,
+		Policy: goalx.EffectiveSelectionPolicy{
+			MasterEffort: goalx.EffortHigh,
+		},
+		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
+	})
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-1"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-1 identity missing")
+	}
+	identity.RequestedEffort = goalx.EffortHigh
+	identity.EffectiveEffort = "xhigh"
+	if err := os.Remove(SessionIdentityPath(runDir, "session-1")); err != nil {
+		t.Fatalf("remove session identity for rewrite: %v", err)
+	}
+	if err := SaveSessionIdentity(SessionIdentityPath(runDir, "session-1"), identity); err != nil {
+		t.Fatalf("SaveSessionIdentity rewrite: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.Master.SurfaceKind != "root_master" {
+		t.Fatalf("master surface_kind = %q, want root_master", index.Master.SurfaceKind)
+	}
+	if index.Master.WorktreeKind != "run_root_shared" {
+		t.Fatalf("master worktree_kind = %q, want run_root_shared", index.Master.WorktreeKind)
+	}
+	if index.Master.MergeableOutputSurface {
+		t.Fatalf("master mergeable_output_surface = true, want false")
+	}
+	if index.Master.RequestedEffort != goalx.EffortHigh {
+		t.Fatalf("master requested_effort = %q, want high", index.Master.RequestedEffort)
+	}
+	if index.Master.EffectiveEffort != "high" {
+		t.Fatalf("master effective_effort = %q, want high", index.Master.EffectiveEffort)
+	}
+	if len(index.Sessions) != 1 {
+		t.Fatalf("sessions len = %d, want 1", len(index.Sessions))
+	}
+	session := index.Sessions[0]
+	if session.RoleKind != "develop" {
+		t.Fatalf("session role_kind = %q, want develop", session.RoleKind)
+	}
+	if session.Engine != "codex" || session.Model != "gpt-5.4-mini" {
+		t.Fatalf("session engine/model = %s/%s, want codex/gpt-5.4-mini", session.Engine, session.Model)
+	}
+	if session.RequestedEffort != goalx.EffortHigh {
+		t.Fatalf("session requested_effort = %q, want high", session.RequestedEffort)
+	}
+	if session.EffectiveEffort != "xhigh" {
+		t.Fatalf("session effective_effort = %q, want xhigh", session.EffectiveEffort)
+	}
+	if session.SurfaceKind != "durable_session" {
+		t.Fatalf("session surface_kind = %q, want durable_session", session.SurfaceKind)
+	}
+	if session.WorktreeKind != "dedicated" {
+		t.Fatalf("session worktree_kind = %q, want dedicated", session.WorktreeKind)
+	}
+	if !session.MergeableOutputSurface {
+		t.Fatalf("session mergeable_output_surface = false, want true")
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"Surface: `root_master`",
+		"Worktree kind: `run_root_shared`",
+		"Mergeable output surface: `false`",
+		"Requested effort: `high`",
+		"Effective effort: `high`",
+		"role: `develop`",
+		"surface: `durable_session`",
+		"worktree kind: `dedicated`",
+		"mergeable output: `true`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
 func TestContextIndexIncludesSessionRoster(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	seedGuidanceSessionFixture(t, runDir, cfg)
@@ -204,6 +382,7 @@ func TestProviderFactsIncludeTUICapabilityFactsWithoutRoutingAdvice(t *testing.T
 		"tmux + interactive TUI",
 		"skills, plugins, and MCP servers",
 		"cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions",
+		"does not change GoalX durable ownership boundaries",
 	} {
 		if !strings.Contains(claudeText, want) {
 			t.Fatalf("claude provider facts missing %q:\n%s", want, claudeText)
@@ -223,6 +402,7 @@ func TestProviderFactsIncludeTUICapabilityFactsWithoutRoutingAdvice(t *testing.T
 	for _, want := range []string{
 		"tmux + interactive TUI",
 		"skills and configured MCP servers",
+		"does not change GoalX durable ownership boundaries",
 	} {
 		if !strings.Contains(codexText, want) {
 			t.Fatalf("codex provider facts missing %q:\n%s", want, codexText)
@@ -231,6 +411,57 @@ func TestProviderFactsIncludeTUICapabilityFactsWithoutRoutingAdvice(t *testing.T
 	for _, unwanted := range []string{"route", "routing", "dispatch", "prefer"} {
 		if strings.Contains(strings.ToLower(codexText), unwanted) {
 			t.Fatalf("codex provider facts should not encode %q:\n%s", unwanted, codexText)
+		}
+	}
+}
+
+func TestBuildContextIndexIncludesClaudeBootstrapFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Master.Engine = "claude-code"
+	cfg.Master.Model = "opus"
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	if err := os.MkdirAll(RunWorktreePath(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir run worktree: %v", err)
+	}
+	if err := EnsureEngineTrusted("claude-code", RunWorktreePath(runDir)); err != nil {
+		t.Fatalf("EnsureEngineTrusted: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.Master.ProviderBootstrap == nil {
+		t.Fatal("master provider bootstrap missing")
+	}
+	if index.Master.ProviderBootstrap.PermissionMode != "auto" {
+		t.Fatalf("master permission_mode = %q, want auto", index.Master.ProviderBootstrap.PermissionMode)
+	}
+	if !index.Master.ProviderBootstrap.PermissionRequestHookBootstrapped {
+		t.Fatalf("master permission_request_hook_bootstrapped = false, want true")
+	}
+	if !index.Master.ProviderBootstrap.ElicitationHookBootstrapped {
+		t.Fatalf("master elicitation_hook_bootstrapped = false, want true")
+	}
+	if !index.Master.ProviderBootstrap.NotificationHookBootstrapped {
+		t.Fatalf("master notification_hook_bootstrapped = false, want true")
+	}
+	if !index.Master.ProviderBootstrap.BootstrapVerified {
+		t.Fatalf("master bootstrap_verified = false, want true")
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"Permission mode: `auto`",
+		"Provider bootstrap verified: `true`",
+		"permission_request_hook_bootstrapped: `true`",
+		"elicitation_hook_bootstrapped: `true`",
+		"notification_hook_bootstrapped: `true`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
 		}
 	}
 }

@@ -203,6 +203,75 @@ func TestEnsureEngineTrustedClaudeWritesLocalMCPPermissionHook(t *testing.T) {
 	}
 }
 
+func TestVerifyClaudeProjectLocalHooksPassesAfterTrustBootstrap(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	worktree := filepath.Join(t.TempDir(), "wt")
+	if err := EnsureEngineTrusted("claude-code", worktree); err != nil {
+		t.Fatalf("EnsureEngineTrusted: %v", err)
+	}
+	if err := verifyClaudeProjectLocalHooks(worktree); err != nil {
+		t.Fatalf("verifyClaudeProjectLocalHooks: %v", err)
+	}
+}
+
+func TestVerifyClaudeProjectLocalHooksRejectsMissingNotificationBackstop(t *testing.T) {
+	worktree := filepath.Join(t.TempDir(), "wt")
+	settingsDir := filepath.Join(worktree, ".claude")
+	if err := os.MkdirAll(settingsDir, 0o755); err != nil {
+		t.Fatalf("mkdir settings dir: %v", err)
+	}
+	goalxBin, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	doc := map[string]any{
+		"hooks": map[string]any{
+			"PermissionRequest": []any{
+				map[string]any{
+					"matcher": claudeMCPPermissionHookMatcher,
+					"hooks": []any{map[string]any{
+						"type":    "command",
+						"command": shellQuote(goalxBin) + " claude-hook permission-request",
+					}},
+				},
+			},
+			"Elicitation": []any{
+				map[string]any{
+					"matcher": claudeMCPElicitationHookMatcher,
+					"hooks": []any{map[string]any{
+						"type":    "command",
+						"command": shellQuote(goalxBin) + " claude-hook elicitation",
+					}},
+				},
+			},
+			"Notification": []any{
+				map[string]any{
+					"matcher": claudePermissionNotificationMatcher,
+					"hooks": []any{map[string]any{
+						"type":    "command",
+						"command": shellQuote(goalxBin) + " claude-hook notification",
+					}},
+				},
+			},
+		},
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	settingsPath := filepath.Join(settingsDir, "settings.local.json")
+	if err := os.WriteFile(settingsPath, raw, 0o644); err != nil {
+		t.Fatalf("write settings: %v", err)
+	}
+
+	err = verifyClaudeProjectLocalHooks(worktree)
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "notification") {
+		t.Fatalf("verifyClaudeProjectLocalHooks error = %v, want notification bootstrap error", err)
+	}
+}
+
 func TestClaudePermissionRequestHookOutputPrefersLocalSettingsSuggestion(t *testing.T) {
 	input := []byte(`{
 	  "hook_event_name":"PermissionRequest",

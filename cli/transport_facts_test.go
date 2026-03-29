@@ -90,6 +90,25 @@ func TestInspectTransportTargetDetectsWorkspaceTrustPromptAsProviderDialog(t *te
 	}
 }
 
+func TestInspectTransportTargetDetectsClaudePermissionChoicePromptAsProviderDialog(t *testing.T) {
+	origCapture := captureAgentPane
+	defer func() { captureAgentPane = origCapture }()
+
+	captureAgentPane = func(target string) (string, error) {
+		return "Tool needs your permission\nAllow for this project\nYes, don't ask again\n", nil
+	}
+	got := inspectTransportTarget("gx-demo:master", "master", "master", "claude-code")
+	if !got.ProviderDialogVisible {
+		t.Fatalf("provider_dialog_visible = false: %+v", got)
+	}
+	if got.ProviderDialogKind != "permission_prompt" {
+		t.Fatalf("provider_dialog_kind = %q, want permission_prompt", got.ProviderDialogKind)
+	}
+	if got.TransportState != "provider_dialog" {
+		t.Fatalf("transport_state = %q, want provider_dialog", got.TransportState)
+	}
+}
+
 func TestInspectTransportTargetRejectsMixedWakeInputAsBuffered(t *testing.T) {
 	origCapture := captureAgentPane
 	defer func() { captureAgentPane = origCapture }()

@@ -160,14 +160,18 @@ Use the selection facts and these preferences together when choosing engines. Pr
 ### Native Helpers
 
 - {{.MasterCapabilities.ProviderLabel}} native subagents are available in this session.
+- Treat the root master session as the run's control authority, not its default execution surface.
 - Native subagents are transient helpers inside the current master session.
 - Use them for short parallel reading, review, doc/API checks, or adversarial cross-checks.
 - Do not give them durable ownership.
 - If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.
 - Summarize every native-helper result back into durable GoalX state before moving on.
 - The runtime truth is the provider-native interactive TUI.
-- Provider-native skills, plugins, and MCP tools are allowed when they materially help.
-- If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.
+- Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.
+- Capability visibility is not a selection rule.
+- Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.
+- Use root-master native actions only for short, reversible, low-volatility probes that improve routing or judgment.
+- If an action becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.
 - If the named capability is unavailable, report that immediately.
 - Do not treat skill presence as the selection standard.
 - Do not start a competing orchestration loop inside them.
@@ -231,7 +235,10 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - In a no-change fast path, do not rerun broad control narration. After any truly necessary spot checks, go straight back to `goalx wait --run {{.RunName}} master --timeout 300`.
 - Do not use `goalx status` as a default heartbeat.
 - Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.
-- If `status/observe` shows `provider_dialog_visible=true`, assume the pane is blocked. Prefer direct recovery (shell/tmux intervention, local fallback path, or relaunch) over waiting.
+- If `status/observe` shows `provider_dialog_visible=true`, assume the pane is blocked.
+- Treat provider dialogs and similar interruptions as path-failure or transport-incident facts.
+- Record them, recover, reroute, and continue.
+- Prefer reroute, delegation, replacement, or relaunch over waiting. Use direct shell/tmux intervention only as emergency transport work.
 - Read the inbox every control cycle before making decisions.
 - Process every inbox entry with `id > last_seen_id`, then update `{{.MasterCursorPath}}` after you have handled it.
 - Treat `status=sent` in `{{.ControlDeliveriesPath}}` as transport success: the input was submitted to the target engine.

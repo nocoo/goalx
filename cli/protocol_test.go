@@ -66,8 +66,8 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Inspect the current worktree state",
 		"Resume from the current files and latest durable state",
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
+		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 		"Do NOT invoke orchestration/meta slash commands or skills",
@@ -280,8 +280,8 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 		"short parallel reading, review, doc/API checks, or adversarial cross-checks",
 		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
+		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 		"Web search is available when local evidence is insufficient.",
@@ -328,8 +328,8 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 		"Do not give them durable ownership.",
 		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
+		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 		"re-check `/tmp/control/inbox/session-1.jsonl` before idling",
@@ -1836,12 +1836,14 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.",
 		"Improvement backlog",
 		"Native subagents are transient helpers inside the current master session.",
+		"Treat the root master session as the run's control authority, not its default execution surface.",
 		"Do not give them durable ownership.",
 		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
 		"Summarize every native-helper result back into durable GoalX state before moving on.",
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
+		"Capability visibility is not a selection rule.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 		"Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.",
@@ -2120,7 +2122,9 @@ func TestRenderMasterProtocolRequiresActionOnBlockedOwnerFacts(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"If a required item stays stuck, reassign it, split it, or take it over yourself.",
-		"Prefer direct recovery (shell/tmux intervention, local fallback path, or relaunch) over waiting.",
+		"Treat provider dialogs and similar interruptions as path-failure or transport-incident facts.",
+		"Record them, recover, reroute, and continue.",
+		"Prefer reroute, delegation, replacement, or relaunch over waiting. Use direct shell/tmux intervention only as emergency transport work.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -2232,11 +2236,13 @@ func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
+		"Capability visibility is not a selection rule.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 		"Claude Code native subagents are available in this session.",
+		"Treat the root master session as the run's control authority, not its default execution surface.",
 		"Native subagents are transient helpers inside the current master session.",
 		"Do not give them durable ownership.",
 		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
@@ -2247,6 +2253,133 @@ func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
 	}
 	if strings.Contains(text, "under 30 seconds") {
 		t.Fatalf("rendered master protocol should not keep time-threshold native-subagent wording:\n%s", text)
+	}
+}
+
+func TestRenderMasterProtocolDefinesRootMasterAsControlPlane(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat the root master session as the run's control authority, not its default execution surface.",
+		"Capability visibility is not a selection rule.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
+		"If an action becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolDropsCapabilityFirstRoutingHint(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	unwanted := "If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow."
+	if strings.Contains(text, unwanted) {
+		t.Fatalf("rendered master protocol should omit capability-first routing hint %q:\n%s", unwanted, text)
+	}
+}
+
+func TestRenderMasterProtocolTreatsProviderDialogsAsIncidents(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Treat provider dialogs and similar interruptions as path-failure or transport-incident facts.",
+		"Record them, recover, reroute, and continue.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderSubagentProtocolAlignsProviderNativeUsageToOwnedSurface(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:           "demo",
+		Objective:         "ship it",
+		Mode:              goalx.ModeDevelop,
+		Engine:            "claude-code",
+		ProjectRoot:       "/tmp/project",
+		SessionName:       "session-1",
+		JournalPath:       "/tmp/journal.jsonl",
+		SessionInboxPath:  "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
+		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered session protocol missing %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -2310,8 +2443,9 @@ func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(
 		"**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.",
 		"This engine only starts native subagents when you explicitly invoke them.",
 		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are allowed when they materially help.",
-		"If the user or master explicitly names a provider-native capability and it is visible, use it before the default flow.",
+		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
+		"Capability visibility is not a selection rule.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 	} {

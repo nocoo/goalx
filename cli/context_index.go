@@ -13,41 +13,42 @@ import (
 )
 
 type ContextIndex struct {
-	Version               int                `json:"version"`
-	CheckedAt             string             `json:"checked_at,omitempty"`
-	ProjectRoot           string             `json:"project_root,omitempty"`
-	RunDir                string             `json:"run_dir,omitempty"`
-	RunName               string             `json:"run_name,omitempty"`
-	RunWorktree           string             `json:"run_worktree,omitempty"`
-	RunIdentity           ContextRunIdentity `json:"run_identity"`
-	ReportsDir            string             `json:"reports_dir,omitempty"`
-	CharterPath           string             `json:"charter_path,omitempty"`
-	GoalPath              string             `json:"goal_path,omitempty"`
-	ExperimentsLogPath    string             `json:"experiments_log_path,omitempty"`
-	IntegrationStatePath  string             `json:"integration_state_path,omitempty"`
-	AcceptanceStatePath   string             `json:"acceptance_state_path,omitempty"`
-	CompletionProofPath   string             `json:"completion_proof_path,omitempty"`
-	CoordinationPath      string             `json:"coordination_path,omitempty"`
-	SummaryPath           string             `json:"summary_path,omitempty"`
-	ControlDir            string             `json:"control_dir,omitempty"`
-	ActivityPath          string             `json:"activity_path,omitempty"`
-	WorktreeSnapshotPath  string             `json:"worktree_snapshot_path,omitempty"`
-	SelectionSnapshotPath string             `json:"selection_snapshot_path,omitempty"`
-	TransportFactsPath    string             `json:"transport_facts_path,omitempty"`
-	MemoryQueryPath       string             `json:"memory_query_path,omitempty"`
-	MemoryContextPath     string             `json:"memory_context_path,omitempty"`
-	AffordancesJSONPath   string             `json:"affordances_json_path,omitempty"`
-	AffordancesMarkdown   string             `json:"affordances_markdown_path,omitempty"`
-	ContextIndexPath      string             `json:"context_index_path,omitempty"`
-	DimensionsPath        string             `json:"dimensions_path,omitempty"`
-	Master                ContextMaster      `json:"master"`
-	Selection             *ContextSelection  `json:"selection,omitempty"`
-	Sessions              []ContextSession   `json:"sessions,omitempty"`
-	ProviderFacts         []ProviderFact     `json:"provider_facts,omitempty"`
-	ClaudeCodeAvailable   bool               `json:"claude_code_available,omitempty"`
-	CodexAvailable        bool               `json:"codex_available,omitempty"`
-	GitAvailable          bool               `json:"git_available,omitempty"`
-	TmuxAvailable         bool               `json:"tmux_available,omitempty"`
+	Version               int                  `json:"version"`
+	CheckedAt             string               `json:"checked_at,omitempty"`
+	ProjectRoot           string               `json:"project_root,omitempty"`
+	RunDir                string               `json:"run_dir,omitempty"`
+	RunName               string               `json:"run_name,omitempty"`
+	RunWorktree           string               `json:"run_worktree,omitempty"`
+	RunIdentity           ContextRunIdentity   `json:"run_identity"`
+	ReportsDir            string               `json:"reports_dir,omitempty"`
+	CharterPath           string               `json:"charter_path,omitempty"`
+	GoalPath              string               `json:"goal_path,omitempty"`
+	ExperimentsLogPath    string               `json:"experiments_log_path,omitempty"`
+	IntegrationStatePath  string               `json:"integration_state_path,omitempty"`
+	AcceptanceStatePath   string               `json:"acceptance_state_path,omitempty"`
+	CompletionProofPath   string               `json:"completion_proof_path,omitempty"`
+	CoordinationPath      string               `json:"coordination_path,omitempty"`
+	SummaryPath           string               `json:"summary_path,omitempty"`
+	ControlDir            string               `json:"control_dir,omitempty"`
+	ActivityPath          string               `json:"activity_path,omitempty"`
+	WorktreeSnapshotPath  string               `json:"worktree_snapshot_path,omitempty"`
+	SelectionSnapshotPath string               `json:"selection_snapshot_path,omitempty"`
+	TransportFactsPath    string               `json:"transport_facts_path,omitempty"`
+	MemoryQueryPath       string               `json:"memory_query_path,omitempty"`
+	MemoryContextPath     string               `json:"memory_context_path,omitempty"`
+	AffordancesJSONPath   string               `json:"affordances_json_path,omitempty"`
+	AffordancesMarkdown   string               `json:"affordances_markdown_path,omitempty"`
+	ContextIndexPath      string               `json:"context_index_path,omitempty"`
+	DimensionsPath        string               `json:"dimensions_path,omitempty"`
+	Master                ContextMaster        `json:"master"`
+	GoalBoundary          *ContextGoalBoundary `json:"goal_boundary,omitempty"`
+	Selection             *ContextSelection    `json:"selection,omitempty"`
+	Sessions              []ContextSession     `json:"sessions,omitempty"`
+	ProviderFacts         []ProviderFact       `json:"provider_facts,omitempty"`
+	ClaudeCodeAvailable   bool                 `json:"claude_code_available,omitempty"`
+	CodexAvailable        bool                 `json:"codex_available,omitempty"`
+	GitAvailable          bool                 `json:"git_available,omitempty"`
+	TmuxAvailable         bool                 `json:"tmux_available,omitempty"`
 }
 
 type ContextRunIdentity struct {
@@ -62,9 +63,31 @@ type ContextRunIdentity struct {
 }
 
 type ContextMaster struct {
-	Engine string `json:"engine,omitempty"`
-	Model  string `json:"model,omitempty"`
-	Mode   string `json:"mode,omitempty"`
+	Engine                 string                    `json:"engine,omitempty"`
+	Model                  string                    `json:"model,omitempty"`
+	Mode                   string                    `json:"mode,omitempty"`
+	RequestedEffort        goalx.EffortLevel         `json:"requested_effort,omitempty"`
+	EffectiveEffort        string                    `json:"effective_effort,omitempty"`
+	SurfaceKind            string                    `json:"surface_kind,omitempty"`
+	WorktreeKind           string                    `json:"worktree_kind,omitempty"`
+	MergeableOutputSurface bool                      `json:"mergeable_output_surface"`
+	ProviderBootstrap      *ContextProviderBootstrap `json:"provider_bootstrap,omitempty"`
+}
+
+type ContextGoalBoundary struct {
+	RequiredCount    int            `json:"required_count,omitempty"`
+	OptionalCount    int            `json:"optional_count,omitempty"`
+	RequiredBySource map[string]int `json:"required_by_source,omitempty"`
+	RequiredByRole   map[string]int `json:"required_by_role,omitempty"`
+	RequiredByState  map[string]int `json:"required_by_state,omitempty"`
+}
+
+type ContextProviderBootstrap struct {
+	PermissionMode                    string `json:"permission_mode,omitempty"`
+	PermissionRequestHookBootstrapped bool   `json:"permission_request_hook_bootstrapped"`
+	ElicitationHookBootstrapped       bool   `json:"elicitation_hook_bootstrapped"`
+	NotificationHookBootstrapped      bool   `json:"notification_hook_bootstrapped"`
+	BootstrapVerified                 bool   `json:"bootstrap_verified"`
 }
 
 type ContextSelection struct {
@@ -80,16 +103,25 @@ type ContextSelection struct {
 }
 
 type ContextSession struct {
-	Name               string `json:"name,omitempty"`
-	Mode               string `json:"mode,omitempty"`
-	WindowName         string `json:"window_name,omitempty"`
-	WorktreePath       string `json:"worktree_path,omitempty"`
-	JournalPath        string `json:"journal_path,omitempty"`
-	InboxPath          string `json:"inbox_path,omitempty"`
-	CursorPath         string `json:"cursor_path,omitempty"`
-	Branch             string `json:"branch,omitempty"`
-	BaseBranchSelector string `json:"base_branch_selector,omitempty"`
-	BaseBranch         string `json:"base_branch,omitempty"`
+	Name                   string                    `json:"name,omitempty"`
+	RoleKind               string                    `json:"role_kind,omitempty"`
+	Mode                   string                    `json:"mode,omitempty"`
+	Engine                 string                    `json:"engine,omitempty"`
+	Model                  string                    `json:"model,omitempty"`
+	RequestedEffort        goalx.EffortLevel         `json:"requested_effort,omitempty"`
+	EffectiveEffort        string                    `json:"effective_effort,omitempty"`
+	SurfaceKind            string                    `json:"surface_kind,omitempty"`
+	WorktreeKind           string                    `json:"worktree_kind,omitempty"`
+	MergeableOutputSurface bool                      `json:"mergeable_output_surface"`
+	ProviderBootstrap      *ContextProviderBootstrap `json:"provider_bootstrap,omitempty"`
+	WindowName             string                    `json:"window_name,omitempty"`
+	WorktreePath           string                    `json:"worktree_path,omitempty"`
+	JournalPath            string                    `json:"journal_path,omitempty"`
+	InboxPath              string                    `json:"inbox_path,omitempty"`
+	CursorPath             string                    `json:"cursor_path,omitempty"`
+	Branch                 string                    `json:"branch,omitempty"`
+	BaseBranchSelector     string                    `json:"base_branch_selector,omitempty"`
+	BaseBranch             string                    `json:"base_branch,omitempty"`
 }
 
 type ProviderFact struct {
@@ -142,6 +174,10 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 	if err != nil {
 		return nil, err
 	}
+	engines, err := loadEngineCatalog(projectRoot)
+	if err != nil {
+		return nil, err
+	}
 	charter, err := RequireRunCharter(runDir)
 	if err != nil {
 		return nil, err
@@ -177,15 +213,15 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		AffordancesMarkdown:  AffordancesMarkdownPath(runDir),
 		ContextIndexPath:     ContextIndexPath(runDir),
 		DimensionsPath:       ControlDimensionsPath(runDir),
-		Master: ContextMaster{
-			Engine: cfg.Master.Engine,
-			Model:  cfg.Master.Model,
-			Mode:   string(cfg.Mode),
-		},
-		ClaudeCodeAvailable: toolAvailable("claude"),
-		CodexAvailable:      toolAvailable("codex"),
-		GitAvailable:        toolAvailable("git"),
-		TmuxAvailable:       toolAvailable("tmux"),
+		ClaudeCodeAvailable:  toolAvailable("claude"),
+		CodexAvailable:       toolAvailable("codex"),
+		GitAvailable:         toolAvailable("git"),
+		TmuxAvailable:        toolAvailable("tmux"),
+	}
+	if goalState, err := LoadGoalState(GoalPath(runDir)); err != nil {
+		return nil, err
+	} else if goalState != nil {
+		index.GoalBoundary = contextGoalBoundary(goalState)
 	}
 	selectionSnapshot, err := LoadSelectionSnapshot(SelectionSnapshotPath(runDir))
 	if err != nil {
@@ -205,6 +241,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 			DevelopEffort:      selectionSnapshot.Policy.DevelopEffort,
 		}
 	}
+	index.Master = contextMaster(cfg, selectionSnapshot, engines, runDir)
 	index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine("master", cfg.Master.Engine)...)
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
@@ -222,6 +259,11 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		}
 		if identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, name)); err == nil && identity != nil {
 			session.Mode = identity.Mode
+			session.RoleKind = identity.RoleKind
+			session.Engine = identity.Engine
+			session.Model = identity.Model
+			session.RequestedEffort = identity.RequestedEffort
+			session.EffectiveEffort = identity.EffectiveEffort
 			session.BaseBranchSelector = identity.BaseBranchSelector
 			session.BaseBranch = identity.BaseBranch
 			index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine(name, identity.Engine)...)
@@ -244,11 +286,165 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 				}
 			}
 		}
+		session.SurfaceKind = "durable_session"
+		session.WorktreeKind = contextWorktreeKind(runDir, session.WorktreePath)
+		session.MergeableOutputSurface = session.WorktreeKind == "dedicated"
+		session.ProviderBootstrap = contextProviderBootstrap(identityEngine(session), session.WorktreePath, contextPermissionMode(engines, identityEngine(session), identityModel(session), session.RequestedEffort))
 		index.Sessions = append(index.Sessions, session)
 	}
 	sort.Slice(index.Sessions, func(i, j int) bool { return index.Sessions[i].Name < index.Sessions[j].Name })
 	index.ProviderFacts = dedupeProviderFacts(index.ProviderFacts)
 	return index, nil
+}
+
+func contextGoalBoundary(state *GoalState) *ContextGoalBoundary {
+	if state == nil {
+		return nil
+	}
+	normalizeGoalState(state)
+	summary := &ContextGoalBoundary{
+		OptionalCount:    len(state.Optional),
+		RequiredBySource: map[string]int{},
+		RequiredByRole:   map[string]int{},
+		RequiredByState:  map[string]int{},
+	}
+	for _, item := range state.Required {
+		summary.RequiredCount++
+		summary.RequiredBySource[item.Source]++
+		summary.RequiredByRole[item.Role]++
+		summary.RequiredByState[item.State]++
+	}
+	if len(summary.RequiredBySource) == 0 {
+		summary.RequiredBySource = nil
+	}
+	if len(summary.RequiredByRole) == 0 {
+		summary.RequiredByRole = nil
+	}
+	if len(summary.RequiredByState) == 0 {
+		summary.RequiredByState = nil
+	}
+	return summary
+}
+
+func contextMaster(cfg *goalx.Config, selectionSnapshot *SelectionSnapshot, engines map[string]goalx.EngineConfig, runDir string) ContextMaster {
+	requestedEffort := cfg.Master.Effort
+	if selectionSnapshot != nil && selectionSnapshot.Master.Effort != "" {
+		requestedEffort = selectionSnapshot.Master.Effort
+	}
+	effectiveEffort := ""
+	if spec, ok := resolveContextLaunchSpec(engines, cfg.Master.Engine, cfg.Master.Model, requestedEffort); ok {
+		effectiveEffort = spec.EffectiveEffort
+	}
+	return ContextMaster{
+		Engine:                 cfg.Master.Engine,
+		Model:                  cfg.Master.Model,
+		Mode:                   string(cfg.Mode),
+		RequestedEffort:        requestedEffort,
+		EffectiveEffort:        effectiveEffort,
+		SurfaceKind:            "root_master",
+		WorktreeKind:           "run_root_shared",
+		MergeableOutputSurface: false,
+		ProviderBootstrap:      contextProviderBootstrap(cfg.Master.Engine, RunWorktreePath(runDir), contextPermissionMode(engines, cfg.Master.Engine, cfg.Master.Model, requestedEffort)),
+	}
+}
+
+func resolveContextLaunchSpec(engines map[string]goalx.EngineConfig, engine, model string, effort goalx.EffortLevel) (goalx.LaunchSpec, bool) {
+	if len(engines) == 0 || strings.TrimSpace(engine) == "" || strings.TrimSpace(model) == "" {
+		return goalx.LaunchSpec{}, false
+	}
+	spec, err := goalx.ResolveLaunchSpec(engines, goalx.LaunchRequest{
+		Engine: engine,
+		Model:  model,
+		Effort: effort,
+	})
+	if err != nil {
+		return goalx.LaunchSpec{}, false
+	}
+	return spec, true
+}
+
+func contextPermissionMode(engines map[string]goalx.EngineConfig, engine, model string, effort goalx.EffortLevel) string {
+	spec, ok := resolveContextLaunchSpec(engines, engine, model, effort)
+	if !ok {
+		return ""
+	}
+	fields := strings.Fields(spec.Command)
+	for i, field := range fields {
+		if strings.HasPrefix(field, "--permission-mode=") {
+			return strings.TrimSpace(strings.TrimPrefix(field, "--permission-mode="))
+		}
+		if field == "--permission-mode" && i+1 < len(fields) {
+			return strings.TrimSpace(fields[i+1])
+		}
+	}
+	return ""
+}
+
+func contextWorktreeKind(runDir, worktreePath string) string {
+	if strings.TrimSpace(worktreePath) == "" {
+		return ""
+	}
+	if filepath.Clean(worktreePath) == filepath.Clean(RunWorktreePath(runDir)) {
+		return "run_root_shared"
+	}
+	return "dedicated"
+}
+
+func contextProviderBootstrap(engine, worktreePath, permissionMode string) *ContextProviderBootstrap {
+	if strings.TrimSpace(engine) != "claude-code" || strings.TrimSpace(worktreePath) == "" {
+		return nil
+	}
+	bootstrap := readClaudeProviderBootstrap(worktreePath)
+	bootstrap.PermissionMode = permissionMode
+	bootstrap.BootstrapVerified = bootstrap.PermissionRequestHookBootstrapped &&
+		bootstrap.ElicitationHookBootstrapped &&
+		bootstrap.NotificationHookBootstrapped
+	return bootstrap
+}
+
+func readClaudeProviderBootstrap(worktreePath string) *ContextProviderBootstrap {
+	settingsPath := filepath.Join(worktreePath, ".claude", "settings.local.json")
+	data, err := os.ReadFile(settingsPath)
+	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
+		return &ContextProviderBootstrap{}
+	}
+	doc := map[string]any{}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return &ContextProviderBootstrap{}
+	}
+	hooks := coerceObject(doc["hooks"])
+	return &ContextProviderBootstrap{
+		PermissionRequestHookBootstrapped: claudeHookMatcherContainsCommand(coerceArray(hooks["PermissionRequest"]), claudeMCPPermissionHookMatcher, "claude-hook permission-request"),
+		ElicitationHookBootstrapped:       claudeHookMatcherContainsCommand(coerceArray(hooks["Elicitation"]), claudeMCPElicitationHookMatcher, "claude-hook elicitation"),
+		NotificationHookBootstrapped:      claudeHookMatcherContainsCommand(coerceArray(hooks["Notification"]), claudePermissionNotificationMatcher, "claude-hook notification") && claudeHookMatcherContainsCommand(coerceArray(hooks["Notification"]), claudeElicitationNotificationMatcher, "claude-hook notification"),
+	}
+}
+
+func claudeHookMatcherContainsCommand(entries []any, matcher, commandPart string) bool {
+	for _, raw := range entries {
+		entry := coerceObject(raw)
+		if strings.TrimSpace(toString(entry["matcher"])) != matcher {
+			continue
+		}
+		for _, hookRaw := range coerceArray(entry["hooks"]) {
+			hook := coerceObject(hookRaw)
+			if strings.TrimSpace(toString(hook["type"])) != "command" {
+				continue
+			}
+			if strings.Contains(strings.TrimSpace(toString(hook["command"])), commandPart) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func identityEngine(session ContextSession) string {
+	return strings.TrimSpace(session.Engine)
+}
+
+func identityModel(session ContextSession) string {
+	return strings.TrimSpace(session.Model)
 }
 
 func resolvedSessionContextWorktree(runDir, runName, sessionName string) string {
@@ -295,6 +491,7 @@ func providerFactsForEngine(target, engine string) []ProviderFact {
 			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
 			{Target: target, Engine: engine, Fact: capability.nativeFact("Claude")},
 			{Target: target, Engine: engine, Fact: capability.limitFact("Claude")},
+			{Target: target, Engine: engine, Fact: "Provider-native capability availability does not change GoalX durable ownership boundaries."},
 			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local PermissionRequest hook so unattended Claude MCP permission dialogs can be auto-allowed."},
 			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local Elicitation hook so unattended Claude MCP user-input or browser-auth requests are cancelled instead of hanging forever."},
 			{Target: target, Engine: engine, Fact: "If a Claude permission or elicitation dialog still surfaces, GoalX writes an urgent master-inbox fact through a Notification hook so the run can recover."},
@@ -305,6 +502,7 @@ func providerFactsForEngine(target, engine string) []ProviderFact {
 		return []ProviderFact{
 			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
 			{Target: target, Engine: engine, Fact: capability.nativeFact("Codex")},
+			{Target: target, Engine: engine, Fact: "Provider-native capability availability does not change GoalX durable ownership boundaries."},
 			{Target: target, Engine: engine, Fact: "Configured MCP servers are usable without an extra GoalX approval layer in this environment."},
 			{Target: target, Engine: engine, Fact: "Native subagents require explicit invocation."},
 		}
