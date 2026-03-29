@@ -10,11 +10,11 @@ goalx run "this product is a working investor-ready demo someone can open and im
 # wake up to progress, reports, and mergeable work
 ```
 
-Master analyzes the objective, decomposes it into requirements, and dispatches parallel sessions:
+Master decomposes the objective into typed requirements and dispatches parallel sessions:
 
-![goalx auto](guides/goalx-auto.png)
+![goalx run](guides/goalx-auto.png)
 
-Runs accumulate across projects. Each run tracks sessions, status, and mode:
+Runs accumulate across projects:
 
 ![goalx list](guides/goalx-list.png)
 
