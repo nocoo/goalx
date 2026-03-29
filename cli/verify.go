@@ -1,16 +1,16 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 )
 
-// Verify executes the run's acceptance command and records the result.
+// Verify executes the run's acceptance checks and records the result.
 // It does not detect completion, validate proof, or update state —
 // the master agent reads the recorded result and decides what it means.
 func Verify(projectRoot string, args []string) error {
@@ -42,52 +42,78 @@ func Verify(projectRoot string, args []string) error {
 		return fmt.Errorf("load acceptance state: %w", err)
 	}
 
-	command := strings.TrimSpace(state.EffectiveCommand)
-	if command == "" {
-		return fmt.Errorf("no acceptance command configured")
+	activeChecks := make([]AcceptanceCheck, 0, len(state.Checks))
+	for _, check := range state.Checks {
+		if normalizeAcceptanceCheckState(check.State) == acceptanceCheckStateActive {
+			activeChecks = append(activeChecks, check)
+		}
+	}
+	if len(activeChecks) == 0 {
+		return fmt.Errorf("no acceptance checks configured")
 	}
 
 	timeout := rc.Config.Acceptance.Timeout
-
-	ctx := context.Background()
-	cancel := func() {}
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-	}
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "bash", "-lc", command)
-	cmd.Dir = RunWorktreePath(rc.RunDir)
-	if info, err := os.Stat(cmd.Dir); err != nil || !info.IsDir() {
-		cmd.Dir = rc.ProjectRoot
-	}
-	output, runErr := cmd.CombinedOutput()
-
-	evidencePath := AcceptanceEvidencePath(rc.RunDir)
-	if err := os.WriteFile(evidencePath, output, 0o644); err != nil {
-		return fmt.Errorf("write acceptance evidence: %w", err)
-	}
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	exitCode := 0
-	switch {
-	case runErr == nil:
-		// exit code 0
-	case errors.Is(runErr, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded:
-		exitCode = 124
-	case runErr != nil:
-		var exitErr *exec.ExitError
-		if errors.As(runErr, &exitErr) {
-			exitCode = exitErr.ExitCode()
-		} else {
-			exitCode = 1
+	var aggregate bytes.Buffer
+	results := make([]AcceptanceCheckResult, 0, len(activeChecks))
+	for _, check := range activeChecks {
+		ctx := context.Background()
+		cancel := func() {}
+		if timeout > 0 {
+			ctx, cancel = context.WithTimeout(ctx, timeout)
 		}
+		cmd := exec.CommandContext(ctx, "bash", "-lc", check.Command)
+		cmd.Dir = RunWorktreePath(rc.RunDir)
+		if info, err := os.Stat(cmd.Dir); err != nil || !info.IsDir() {
+			cmd.Dir = rc.ProjectRoot
+		}
+		output, runErr := cmd.CombinedOutput()
+		cancel()
+
+		checkExitCode := 0
+		switch {
+		case runErr == nil:
+		case errors.Is(runErr, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded:
+			checkExitCode = 124
+		default:
+			var exitErr *exec.ExitError
+			if errors.As(runErr, &exitErr) {
+				checkExitCode = exitErr.ExitCode()
+			} else {
+				checkExitCode = 1
+			}
+		}
+		if exitCode == 0 && checkExitCode != 0 {
+			exitCode = checkExitCode
+		}
+		evidencePath := AcceptanceCheckEvidencePath(rc.RunDir, check.ID)
+		if err := os.WriteFile(evidencePath, output, 0o644); err != nil {
+			return fmt.Errorf("write acceptance evidence for %s: %w", check.ID, err)
+		}
+		results = append(results, AcceptanceCheckResult{
+			ID:           check.ID,
+			Command:      check.Command,
+			ExitCode:     intPtr(checkExitCode),
+			EvidencePath: evidencePath,
+		})
+		if aggregate.Len() > 0 {
+			aggregate.WriteString("\n")
+		}
+		aggregate.WriteString("=== ")
+		aggregate.WriteString(check.ID)
+		aggregate.WriteString(" ===\n")
+		aggregate.Write(output)
+	}
+	evidencePath := AcceptanceEvidencePath(rc.RunDir)
+	if err := os.WriteFile(evidencePath, aggregate.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("write acceptance evidence: %w", err)
 	}
 	state.LastResult = AcceptanceResult{
 		CheckedAt:    now,
-		Command:      command,
-		ExitCode:     &exitCode,
+		ExitCode:     intPtr(exitCode),
 		EvidencePath: evidencePath,
+		CheckResults: results,
 	}
 	if err := SaveAcceptanceState(AcceptanceStatePath(rc.RunDir), state); err != nil {
 		return fmt.Errorf("save acceptance state: %w", err)
@@ -96,12 +122,16 @@ func Verify(projectRoot string, args []string) error {
 		return fmt.Errorf("append memory seed from verify result: %w", err)
 	}
 
-	if runErr != nil {
-		return fmt.Errorf("acceptance command failed (%d): %w", exitCode, runErr)
+	if exitCode != 0 {
+		return fmt.Errorf("acceptance checks failed (%d)", exitCode)
 	}
 
 	fmt.Printf("Acceptance passed for run '%s'\n", rc.Name)
-	fmt.Printf("  command: %s\n", command)
+	fmt.Printf("  checks: %d\n", len(activeChecks))
 	fmt.Printf("  evidence: %s\n", evidencePath)
 	return nil
+}
+
+func intPtr(v int) *int {
+	return &v
 }

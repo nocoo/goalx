@@ -15,12 +15,22 @@ func TestRunCloseoutFactsReadyToFinalize(t *testing.T) {
 		},
 		{
 			name:  "complete closeout with no unread inbox is ready",
-			facts: RunCloseoutFacts{Complete: true, MasterUnread: 0},
+			facts: RunCloseoutFacts{Complete: true, MasterUnread: 0, ObjectiveIntegrityOK: true},
 			want:  true,
 		},
 		{
 			name:  "complete closeout with unread inbox stays open",
-			facts: RunCloseoutFacts{Complete: true, MasterUnread: 1},
+			facts: RunCloseoutFacts{Complete: true, MasterUnread: 1, ObjectiveIntegrityOK: true},
+			want:  false,
+		},
+		{
+			name:  "complete closeout with unlocked objective contract stays open",
+			facts: RunCloseoutFacts{Complete: true, MasterUnread: 0, ObjectiveContractPresent: true, ObjectiveContractLocked: false, ObjectiveIntegrityOK: false},
+			want:  false,
+		},
+		{
+			name:  "complete closeout with missing objective coverage stays open",
+			facts: RunCloseoutFacts{Complete: true, MasterUnread: 0, ObjectiveContractPresent: true, ObjectiveContractLocked: true, ObjectiveIntegrityOK: false},
 			want:  false,
 		},
 	}
@@ -49,19 +59,25 @@ func TestRunCloseoutFactsMaintenanceAction(t *testing.T) {
 		},
 		{
 			name:   "ready closeout finalizes even with live master",
-			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 0},
+			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 0, ObjectiveIntegrityOK: true},
 			master: TargetPresenceFacts{State: TargetPresencePresent},
 			want:   RunCloseoutMaintenanceActionFinalize,
 		},
 		{
 			name:   "unread inbox with live master stays open",
-			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 1},
+			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 1, ObjectiveIntegrityOK: true},
 			master: TargetPresenceFacts{State: TargetPresencePresent},
 			want:   RunCloseoutMaintenanceActionNone,
 		},
 		{
 			name:   "unread inbox with missing master requests recovery",
-			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 1},
+			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 1, ObjectiveIntegrityOK: true},
+			master: TargetPresenceFacts{State: TargetPresenceWindowMissing},
+			want:   RunCloseoutMaintenanceActionRecoverMaster,
+		},
+		{
+			name:   "objective integrity gap with missing master requests recovery",
+			facts:  RunCloseoutFacts{Complete: true, MasterUnread: 0, ObjectiveContractPresent: true, ObjectiveContractLocked: true, ObjectiveIntegrityOK: false},
 			master: TargetPresenceFacts{State: TargetPresenceWindowMissing},
 			want:   RunCloseoutMaintenanceActionRecoverMaster,
 		},

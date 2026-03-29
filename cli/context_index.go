@@ -13,42 +13,44 @@ import (
 )
 
 type ContextIndex struct {
-	Version               int                  `json:"version"`
-	CheckedAt             string               `json:"checked_at,omitempty"`
-	ProjectRoot           string               `json:"project_root,omitempty"`
-	RunDir                string               `json:"run_dir,omitempty"`
-	RunName               string               `json:"run_name,omitempty"`
-	RunWorktree           string               `json:"run_worktree,omitempty"`
-	RunIdentity           ContextRunIdentity   `json:"run_identity"`
-	ReportsDir            string               `json:"reports_dir,omitempty"`
-	CharterPath           string               `json:"charter_path,omitempty"`
-	GoalPath              string               `json:"goal_path,omitempty"`
-	ExperimentsLogPath    string               `json:"experiments_log_path,omitempty"`
-	IntegrationStatePath  string               `json:"integration_state_path,omitempty"`
-	AcceptanceStatePath   string               `json:"acceptance_state_path,omitempty"`
-	CompletionProofPath   string               `json:"completion_proof_path,omitempty"`
-	CoordinationPath      string               `json:"coordination_path,omitempty"`
-	SummaryPath           string               `json:"summary_path,omitempty"`
-	ControlDir            string               `json:"control_dir,omitempty"`
-	ActivityPath          string               `json:"activity_path,omitempty"`
-	WorktreeSnapshotPath  string               `json:"worktree_snapshot_path,omitempty"`
-	SelectionSnapshotPath string               `json:"selection_snapshot_path,omitempty"`
-	TransportFactsPath    string               `json:"transport_facts_path,omitempty"`
-	MemoryQueryPath       string               `json:"memory_query_path,omitempty"`
-	MemoryContextPath     string               `json:"memory_context_path,omitempty"`
-	AffordancesJSONPath   string               `json:"affordances_json_path,omitempty"`
-	AffordancesMarkdown   string               `json:"affordances_markdown_path,omitempty"`
-	ContextIndexPath      string               `json:"context_index_path,omitempty"`
-	DimensionsPath        string               `json:"dimensions_path,omitempty"`
-	Master                ContextMaster        `json:"master"`
-	GoalBoundary          *ContextGoalBoundary `json:"goal_boundary,omitempty"`
-	Selection             *ContextSelection    `json:"selection,omitempty"`
-	Sessions              []ContextSession     `json:"sessions,omitempty"`
-	ProviderFacts         []ProviderFact       `json:"provider_facts,omitempty"`
-	ClaudeCodeAvailable   bool                 `json:"claude_code_available,omitempty"`
-	CodexAvailable        bool                 `json:"codex_available,omitempty"`
-	GitAvailable          bool                 `json:"git_available,omitempty"`
-	TmuxAvailable         bool                 `json:"tmux_available,omitempty"`
+	Version               int                        `json:"version"`
+	CheckedAt             string                     `json:"checked_at,omitempty"`
+	ProjectRoot           string                     `json:"project_root,omitempty"`
+	RunDir                string                     `json:"run_dir,omitempty"`
+	RunName               string                     `json:"run_name,omitempty"`
+	RunWorktree           string                     `json:"run_worktree,omitempty"`
+	RunIdentity           ContextRunIdentity         `json:"run_identity"`
+	ReportsDir            string                     `json:"reports_dir,omitempty"`
+	CharterPath           string                     `json:"charter_path,omitempty"`
+	ObjectiveContractPath string                     `json:"objective_contract_path,omitempty"`
+	GoalPath              string                     `json:"goal_path,omitempty"`
+	ExperimentsLogPath    string                     `json:"experiments_log_path,omitempty"`
+	IntegrationStatePath  string                     `json:"integration_state_path,omitempty"`
+	AcceptanceStatePath   string                     `json:"acceptance_state_path,omitempty"`
+	CompletionProofPath   string                     `json:"completion_proof_path,omitempty"`
+	CoordinationPath      string                     `json:"coordination_path,omitempty"`
+	SummaryPath           string                     `json:"summary_path,omitempty"`
+	ControlDir            string                     `json:"control_dir,omitempty"`
+	ActivityPath          string                     `json:"activity_path,omitempty"`
+	WorktreeSnapshotPath  string                     `json:"worktree_snapshot_path,omitempty"`
+	SelectionSnapshotPath string                     `json:"selection_snapshot_path,omitempty"`
+	TransportFactsPath    string                     `json:"transport_facts_path,omitempty"`
+	MemoryQueryPath       string                     `json:"memory_query_path,omitempty"`
+	MemoryContextPath     string                     `json:"memory_context_path,omitempty"`
+	AffordancesJSONPath   string                     `json:"affordances_json_path,omitempty"`
+	AffordancesMarkdown   string                     `json:"affordances_markdown_path,omitempty"`
+	ContextIndexPath      string                     `json:"context_index_path,omitempty"`
+	DimensionsPath        string                     `json:"dimensions_path,omitempty"`
+	Master                ContextMaster              `json:"master"`
+	ObjectiveIntegrity    *ContextObjectiveIntegrity `json:"objective_integrity,omitempty"`
+	GoalBoundary          *ContextGoalBoundary       `json:"goal_boundary,omitempty"`
+	Selection             *ContextSelection          `json:"selection,omitempty"`
+	Sessions              []ContextSession           `json:"sessions,omitempty"`
+	ProviderFacts         []ProviderFact             `json:"provider_facts,omitempty"`
+	ClaudeCodeAvailable   bool                       `json:"claude_code_available,omitempty"`
+	CodexAvailable        bool                       `json:"codex_available,omitempty"`
+	GitAvailable          bool                       `json:"git_available,omitempty"`
+	TmuxAvailable         bool                       `json:"tmux_available,omitempty"`
 }
 
 type ContextRunIdentity struct {
@@ -80,6 +82,20 @@ type ContextGoalBoundary struct {
 	RequiredBySource map[string]int `json:"required_by_source,omitempty"`
 	RequiredByRole   map[string]int `json:"required_by_role,omitempty"`
 	RequiredByState  map[string]int `json:"required_by_state,omitempty"`
+}
+
+type ContextObjectiveIntegrity struct {
+	ContractState              string   `json:"contract_state,omitempty"`
+	ContractLocked             bool     `json:"contract_locked,omitempty"`
+	ClauseCount                int      `json:"clause_count,omitempty"`
+	GoalClauseCount            int      `json:"goal_clause_count,omitempty"`
+	AcceptanceClauseCount      int      `json:"acceptance_clause_count,omitempty"`
+	GoalCoveredCount           int      `json:"goal_covered_count,omitempty"`
+	AcceptanceCoveredCount     int      `json:"acceptance_covered_count,omitempty"`
+	MissingGoalClauseIDs       []string `json:"missing_goal_clause_ids,omitempty"`
+	MissingAcceptanceClauseIDs []string `json:"missing_acceptance_clause_ids,omitempty"`
+	IntegrityReady             bool     `json:"integrity_ready,omitempty"`
+	IntegrityOK                bool     `json:"integrity_ok,omitempty"`
 }
 
 type ContextProviderBootstrap struct {
@@ -187,41 +203,47 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		return nil, err
 	}
 	index := &ContextIndex{
-		Version:              1,
-		CheckedAt:            time.Now().UTC().Format(time.RFC3339),
-		ProjectRoot:          projectRoot,
-		RunDir:               runDir,
-		RunName:              runName,
-		RunWorktree:          RunWorktreePath(runDir),
-		RunIdentity:          contextRunIdentity(charter, meta),
-		ReportsDir:           ReportsDir(runDir),
-		CharterPath:          RunCharterPath(runDir),
-		GoalPath:             GoalPath(runDir),
-		ExperimentsLogPath:   ExperimentsLogPath(runDir),
-		IntegrationStatePath: IntegrationStatePath(runDir),
-		AcceptanceStatePath:  AcceptanceStatePath(runDir),
-		CompletionProofPath:  CompletionStatePath(runDir),
-		CoordinationPath:     CoordinationPath(runDir),
-		SummaryPath:          SummaryPath(runDir),
-		ControlDir:           ControlDir(runDir),
-		ActivityPath:         ActivityPath(runDir),
-		WorktreeSnapshotPath: WorktreeSnapshotPath(runDir),
-		TransportFactsPath:   TransportFactsPath(runDir),
-		MemoryQueryPath:      MemoryQueryPath(runDir),
-		MemoryContextPath:    MemoryContextPath(runDir),
-		AffordancesJSONPath:  AffordancesJSONPath(runDir),
-		AffordancesMarkdown:  AffordancesMarkdownPath(runDir),
-		ContextIndexPath:     ContextIndexPath(runDir),
-		DimensionsPath:       ControlDimensionsPath(runDir),
-		ClaudeCodeAvailable:  toolAvailable("claude"),
-		CodexAvailable:       toolAvailable("codex"),
-		GitAvailable:         toolAvailable("git"),
-		TmuxAvailable:        toolAvailable("tmux"),
+		Version:               1,
+		CheckedAt:             time.Now().UTC().Format(time.RFC3339),
+		ProjectRoot:           projectRoot,
+		RunDir:                runDir,
+		RunName:               runName,
+		RunWorktree:           RunWorktreePath(runDir),
+		RunIdentity:           contextRunIdentity(charter, meta),
+		ReportsDir:            ReportsDir(runDir),
+		CharterPath:           RunCharterPath(runDir),
+		ObjectiveContractPath: ObjectiveContractPath(runDir),
+		GoalPath:              GoalPath(runDir),
+		ExperimentsLogPath:    ExperimentsLogPath(runDir),
+		IntegrationStatePath:  IntegrationStatePath(runDir),
+		AcceptanceStatePath:   AcceptanceStatePath(runDir),
+		CompletionProofPath:   CompletionStatePath(runDir),
+		CoordinationPath:      CoordinationPath(runDir),
+		SummaryPath:           SummaryPath(runDir),
+		ControlDir:            ControlDir(runDir),
+		ActivityPath:          ActivityPath(runDir),
+		WorktreeSnapshotPath:  WorktreeSnapshotPath(runDir),
+		TransportFactsPath:    TransportFactsPath(runDir),
+		MemoryQueryPath:       MemoryQueryPath(runDir),
+		MemoryContextPath:     MemoryContextPath(runDir),
+		AffordancesJSONPath:   AffordancesJSONPath(runDir),
+		AffordancesMarkdown:   AffordancesMarkdownPath(runDir),
+		ContextIndexPath:      ContextIndexPath(runDir),
+		DimensionsPath:        ControlDimensionsPath(runDir),
+		ClaudeCodeAvailable:   toolAvailable("claude"),
+		CodexAvailable:        toolAvailable("codex"),
+		GitAvailable:          toolAvailable("git"),
+		TmuxAvailable:         toolAvailable("tmux"),
 	}
 	if goalState, err := LoadGoalState(GoalPath(runDir)); err != nil {
 		return nil, err
 	} else if goalState != nil {
 		index.GoalBoundary = contextGoalBoundary(goalState)
+	}
+	if integrity, err := BuildObjectiveIntegritySummary(runDir); err != nil {
+		return nil, err
+	} else if integrity.ContractPresent {
+		index.ObjectiveIntegrity = contextObjectiveIntegrity(integrity)
 	}
 	selectionSnapshot, err := LoadSelectionSnapshot(SelectionSnapshotPath(runDir))
 	if err != nil {
@@ -324,6 +346,25 @@ func contextGoalBoundary(state *GoalState) *ContextGoalBoundary {
 		summary.RequiredByState = nil
 	}
 	return summary
+}
+
+func contextObjectiveIntegrity(summary ObjectiveIntegritySummary) *ContextObjectiveIntegrity {
+	if !summary.ContractPresent {
+		return nil
+	}
+	return &ContextObjectiveIntegrity{
+		ContractState:              summary.ContractState,
+		ContractLocked:             summary.ContractLocked,
+		ClauseCount:                summary.ClauseCount,
+		GoalClauseCount:            summary.GoalClauseCount,
+		AcceptanceClauseCount:      summary.AcceptanceClauseCount,
+		GoalCoveredCount:           summary.GoalCoveredCount,
+		AcceptanceCoveredCount:     summary.AcceptanceCoveredCount,
+		MissingGoalClauseIDs:       append([]string(nil), summary.MissingGoalClauseIDs...),
+		MissingAcceptanceClauseIDs: append([]string(nil), summary.MissingAcceptanceClauseIDs...),
+		IntegrityReady:             summary.ReadyForNoShrinkEnforcement(),
+		IntegrityOK:                summary.IntegrityOK(),
+	}
 }
 
 func contextMaster(cfg *goalx.Config, selectionSnapshot *SelectionSnapshot, engines map[string]goalx.EngineConfig, runDir string) ContextMaster {

@@ -220,6 +220,7 @@ func Resume(projectRoot string, args []string) error {
 		SessionInboxPath:          ControlInboxPath(rc.RunDir, sessionName),
 		SessionCursorPath:         SessionCursorPath(rc.RunDir, sessionName),
 		WorktreePath:              wtPath,
+		ObjectiveContractPath:     ObjectiveContractPath(rc.RunDir),
 		GoalPath:                  GoalPath(rc.RunDir),
 		GoalLogPath:               GoalLogPath(rc.RunDir),
 		IdentityFencePath:         IdentityFencePath(rc.RunDir),

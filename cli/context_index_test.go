@@ -141,7 +141,7 @@ func TestBuildContextIndexIncludesGoalBoundarySummary(t *testing.T) {
 		Required: []GoalItem{
 			{ID: "req-1", Text: "deliver live capability", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 			{ID: "req-2", Text: "add missing backend support", Source: goalItemSourceMaster, Role: goalItemRoleEnabler, State: goalItemStateClaimed},
-			{ID: "req-3", Text: "prove user journey", Source: goalItemSourceUser, Role: goalItemRoleProof, State: goalItemStateWaived, UserApproved: true},
+			{ID: "req-3", Text: "prove user journey", Source: goalItemSourceUser, Role: goalItemRoleProof, State: goalItemStateWaived, ApprovalRef: "master-inbox:1"},
 		},
 		Optional: []GoalItem{
 			{ID: "opt-1", Text: "nice to have polish", Source: goalItemSourceMaster, Role: goalItemRoleGuardrail, State: goalItemStateOpen},
@@ -197,6 +197,90 @@ func TestBuildContextIndexIncludesGoalBoundarySummary(t *testing.T) {
 		"Required by source: `master=1, user=2`",
 		"Required by role: `enabler=1, outcome=1, proof=1`",
 		"Required by state: `claimed=1, open=1, waived=1`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestBuildContextIndexIncludesObjectiveIntegritySummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), &ObjectiveContract{
+		Version:       1,
+		ObjectiveHash: "sha256:demo",
+		State:         objectiveContractStateLocked,
+		Clauses: []ObjectiveClause{
+			{
+				ID:                      "ucl-1",
+				Text:                    "ship the live experience",
+				Kind:                    objectiveClauseKindDelivery,
+				SourceExcerpt:           "ship the live experience",
+				RequiredSurfaces:        []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
+				ApprovalRequiredForDrop: true,
+			},
+			{
+				ID:               "ucl-2",
+				Text:             "verify the live path",
+				Kind:             objectiveClauseKindVerification,
+				SourceExcerpt:    "verify the live path",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceAcceptance},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveObjectiveContract: %v", err)
+	}
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship the live experience",
+				Source: goalItemSourceUser,
+				Role:   goalItemRoleOutcome,
+				Covers: []string{"ucl-1"},
+				State:  goalItemStateOpen,
+				Note:   "boundary only",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+		Version:     2,
+		GoalVersion: 1,
+		Checks: []AcceptanceCheck{
+			{ID: "chk-1", Label: "live verification", Command: "printf ok", Covers: []string{"ucl-2"}, State: acceptanceCheckStateActive},
+		},
+	}); err != nil {
+		t.Fatalf("SaveAcceptanceState: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.ObjectiveContractPath != ObjectiveContractPath(runDir) {
+		t.Fatalf("objective_contract_path = %q, want %q", index.ObjectiveContractPath, ObjectiveContractPath(runDir))
+	}
+	if index.ObjectiveIntegrity == nil {
+		t.Fatal("objective integrity summary missing")
+	}
+	if !index.ObjectiveIntegrity.ContractLocked || !index.ObjectiveIntegrity.IntegrityReady || !index.ObjectiveIntegrity.IntegrityOK {
+		t.Fatalf("objective integrity = %+v, want locked/ready/ok", index.ObjectiveIntegrity)
+	}
+	if index.ObjectiveIntegrity.GoalCoveredCount != 1 || index.ObjectiveIntegrity.AcceptanceCoveredCount != 1 {
+		t.Fatalf("objective coverage = %+v, want 1/1", index.ObjectiveIntegrity)
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"Objective contract",
+		"## Objective Contract",
+		"State: `locked`",
+		"Goal clause coverage: `1/1`",
+		"Acceptance clause coverage: `1/1`",
+		"Integrity OK: `true`",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered context missing %q:\n%s", want, rendered)

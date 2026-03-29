@@ -1001,6 +1001,7 @@ func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testin
 		Mode:                goalx.ModeDevelop,
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
+		ObjectiveContractPath: "/tmp/objective-contract.json",
 		AcceptanceStatePath: "/tmp/acceptance.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		GoalPath:            "/tmp/goal.json",
@@ -1019,7 +1020,43 @@ func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testin
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Before the first `goalx add` or `goalx tell`, finish the initial boundary design: replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.",
+		"Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolRequiresObjectiveContractIntegrity(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:              "ship it",
+		RunName:                "demo",
+		Mode:                   goalx.ModeDevelop,
+		TmuxSession:            "ar-demo",
+		SummaryPath:            "/tmp/summary.md",
+		ObjectiveContractPath:  "/tmp/objective-contract.json",
+		AcceptanceStatePath:    "/tmp/acceptance.json",
+		GoalPath:               "/tmp/goal.json",
+		GoalLogPath:            "/tmp/goal-log.jsonl",
+		CoordinationPath:       "/tmp/coordination.json",
+		EngineCommand:          "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"`/tmp/objective-contract.json`",
+		"`objective-contract.json` is the immutable extracted user-clause contract for this run.",
+		"After `objective-contract` is locked, user-originated clauses may not be narrowed, downgraded to optional-only coverage, or removed from acceptance coverage without explicit user approval.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)

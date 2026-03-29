@@ -89,6 +89,11 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	} else if err != nil {
 		return nil, err
 	}
+	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
+		if closeoutFacts.ObjectiveContractPresent && (!closeoutFacts.ObjectiveContractLocked || !closeoutFacts.ObjectiveIntegrityOK) {
+			advisories = append(advisories, "Objective integrity pending: "+objective)
+		}
+	}
 	activity, err := LoadActivitySnapshot(ActivityPath(rc.RunDir))
 	if err != nil {
 		return nil, err

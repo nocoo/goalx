@@ -25,13 +25,17 @@ func TestAppendMemorySeedFromVerifyResult(t *testing.T) {
 	}
 	exitCode := 0
 	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
-		Version:          1,
-		EffectiveCommand: "printf 'gate ok\\n'",
+		Version: 2,
+		Checks: []AcceptanceCheck{
+			{ID: "chk-1", Command: "printf 'gate ok\\n'", State: acceptanceCheckStateActive},
+		},
 		LastResult: AcceptanceResult{
 			CheckedAt:    "2026-03-27T08:00:00Z",
-			Command:      "printf 'gate ok\\n'",
 			ExitCode:     &exitCode,
 			EvidencePath: AcceptanceEvidencePath(runDir),
+			CheckResults: []AcceptanceCheckResult{
+				{ID: "chk-1", Command: "printf 'gate ok\\n'", ExitCode: &exitCode, EvidencePath: AcceptanceEvidencePath(runDir)},
+			},
 		},
 	}); err != nil {
 		t.Fatalf("SaveAcceptanceState: %v", err)

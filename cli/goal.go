@@ -37,10 +37,11 @@ type GoalItem struct {
 	Text          string   `json:"text"`
 	Source        string   `json:"source"`
 	Role          string   `json:"role"`
+	Covers        []string `json:"covers,omitempty"`
 	State         string   `json:"state,omitempty"`
 	EvidencePaths []string `json:"evidence_paths,omitempty"`
 	Note          string   `json:"note,omitempty"`
-	UserApproved  bool     `json:"user_approved,omitempty"`
+	ApprovalRef   string   `json:"approval_ref,omitempty"`
 }
 
 type GoalSummary struct {
@@ -82,6 +83,9 @@ func SaveGoalState(path string, state *GoalState) error {
 		return err
 	}
 	normalizeGoalState(state)
+	if err := validateGoalStateIntegrity(filepath.Dir(path), state); err != nil {
+		return err
+	}
 	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
@@ -143,7 +147,7 @@ func SummarizeGoalState(state *GoalState) GoalSummary {
 		case goalItemStateClaimed:
 			summary.RequiredSatisfied++
 		case goalItemStateWaived:
-			if item.UserApproved {
+			if strings.TrimSpace(item.ApprovalRef) != "" {
 				summary.RequiredSatisfied++
 			} else {
 				summary.RequiredRemaining++
@@ -182,8 +186,8 @@ func ValidateGoalStateForVerification(state *GoalState) (GoalSummary, error) {
 				return summary, fmt.Errorf("goal item %s is claimed but has no evidence_paths", item.ID)
 			}
 		case goalItemStateWaived:
-			if !item.UserApproved {
-				return summary, fmt.Errorf("goal item %s is waived without explicit user approval", item.ID)
+			if strings.TrimSpace(item.ApprovalRef) == "" {
+				return summary, fmt.Errorf("goal item %s is waived without explicit approval_ref", item.ID)
 			}
 		default:
 			return summary, fmt.Errorf("goal item %s remains open", item.ID)
@@ -217,8 +221,10 @@ func normalizeGoalItem(item *GoalItem) {
 	}
 	item.Source = normalizeGoalItemSource(item.Source)
 	item.Role = normalizeGoalItemRole(item.Role)
+	item.Covers = trimmedGoalCovers(item.Covers)
 	item.State = normalizeGoalItemState(item.State)
 	item.EvidencePaths = trimmedGoalEvidencePaths(item.EvidencePaths)
+	item.ApprovalRef = strings.TrimSpace(item.ApprovalRef)
 }
 
 func validateGoalStateInput(state *GoalState) error {
@@ -233,6 +239,11 @@ func validateGoalStateInput(state *GoalState) error {
 	for _, item := range state.Optional {
 		if err := validateGoalItemInput(item); err != nil {
 			return err
+		}
+	}
+	for _, item := range append(append([]GoalItem(nil), state.Required...), state.Optional...) {
+		if normalizeGoalItemState(item.State) == goalItemStateWaived && strings.TrimSpace(item.ApprovalRef) == "" {
+			return fmt.Errorf("goal item %s is waived without explicit approval_ref", item.ID)
 		}
 	}
 	return nil
@@ -338,6 +349,19 @@ func trimmedGoalEvidencePaths(paths []string) []string {
 	out := make([]string, 0, len(paths))
 	for _, path := range paths {
 		if trimmed := strings.TrimSpace(path); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func trimmedGoalCovers(covers []string) []string {
+	if len(covers) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(covers))
+	for _, cover := range covers {
+		if trimmed := strings.TrimSpace(cover); trimmed != "" {
 			out = append(out, trimmed)
 		}
 	}

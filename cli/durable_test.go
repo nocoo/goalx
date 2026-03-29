@@ -74,7 +74,7 @@ func TestDurableCommandRejectsWrongSurfaceMode(t *testing.T) {
 		Objective: "ship it",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
-	_ = writeRunSpecFixture(t, repo, cfg)
+	writeRunSpecFixture(t, repo, cfg)
 	payloadPath := filepath.Join(t.TempDir(), "summary.md")
 	if err := os.WriteFile(payloadPath, []byte("# summary\n"), 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
@@ -126,5 +126,73 @@ func TestDurableHelpPointsToSchemaAuthority(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("durable help missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestDurableReplaceGoalRespectsLockedObjectiveContractIntegrity(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	repo := initNamedGitRepo(t, "durable-goal-integrity")
+	cfg := &goalx.Config{
+		Name:      "demo",
+		Objective: "ship it",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+	}
+	runDir := writeRunSpecFixture(t, repo, cfg)
+	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), &ObjectiveContract{
+		Version:       1,
+		ObjectiveHash: "sha256:demo",
+		State:         objectiveContractStateLocked,
+		Clauses: []ObjectiveClause{
+			{
+				ID:               "ucl-1",
+				Text:             "ship feature",
+				Kind:             objectiveClauseKindDelivery,
+				SourceExcerpt:    "ship feature",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveObjectiveContract: %v", err)
+	}
+	payloadPath := filepath.Join(t.TempDir(), "goal.json")
+	if err := os.WriteFile(payloadPath, []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","role":"outcome","state":"open"}],"optional":[]}`), 0o644); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+
+	err := Durable(repo, []string{"replace", "goal", "--run", cfg.Name, "--file", payloadPath})
+	if err == nil {
+		t.Fatal("Durable replace should reject goal payload that bypasses locked contract coverage")
+	}
+	if !strings.Contains(err.Error(), "missing covers") {
+		t.Fatalf("Durable replace error = %v, want missing covers", err)
+	}
+}
+
+func TestDurableReplaceObjectiveContractRejectsLockedRewrite(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	repo := initNamedGitRepo(t, "durable-objective-contract")
+	cfg := &goalx.Config{
+		Name:      "demo",
+		Objective: "ship it",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+	}
+	writeRunSpecFixture(t, repo, cfg)
+	payloadPath := filepath.Join(t.TempDir(), "objective-contract.json")
+	payload := []byte(`{"version":1,"objective_hash":"sha256:demo","state":"locked","clauses":[{"id":"ucl-1","text":"ship feature","kind":"delivery","source_excerpt":"ship feature","required_surfaces":["goal"]}]}`)
+	if err := os.WriteFile(payloadPath, payload, 0o644); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+
+	if err := Durable(repo, []string{"replace", "objective-contract", "--run", cfg.Name, "--file", payloadPath}); err != nil {
+		t.Fatalf("first Durable replace: %v", err)
+	}
+	err := Durable(repo, []string{"replace", "objective-contract", "--run", cfg.Name, "--file", payloadPath})
+	if err == nil {
+		t.Fatal("second Durable replace should reject locked contract rewrite")
+	}
+	if !strings.Contains(err.Error(), "locked") {
+		t.Fatalf("Durable replace error = %v, want locked contract failure", err)
 	}
 }

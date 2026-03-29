@@ -249,6 +249,9 @@ func printStatusControlSummary(rc *RunContext) {
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)
 	}
+	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
+		fmt.Printf("Objective: %s\n", objective)
+	}
 	fmt.Println()
 }
 
@@ -272,6 +275,31 @@ func targetLossSummary(rc *RunContext) string {
 		parts = append(parts, "sidecar missing ("+sidecar.State+")")
 	}
 	return strings.Join(parts, " | ")
+}
+
+func formatObjectiveIntegritySummary(runDir string) string {
+	summary, err := BuildObjectiveIntegritySummary(runDir)
+	if err != nil {
+		return ""
+	}
+	if !summary.ContractPresent {
+		return ""
+	}
+	parts := []string{
+		"contract_state=" + summary.ContractState,
+		fmt.Sprintf("clauses=%d", summary.ClauseCount),
+		fmt.Sprintf("goal_coverage=%d/%d", summary.GoalCoveredCount, summary.GoalClauseCount),
+		fmt.Sprintf("acceptance_coverage=%d/%d", summary.AcceptanceCoveredCount, summary.AcceptanceClauseCount),
+		fmt.Sprintf("integrity_ready=%t", summary.ReadyForNoShrinkEnforcement()),
+		fmt.Sprintf("integrity_ok=%t", summary.IntegrityOK()),
+	}
+	if len(summary.MissingGoalClauseIDs) > 0 {
+		parts = append(parts, "missing_goal="+strings.Join(summary.MissingGoalClauseIDs, ","))
+	}
+	if len(summary.MissingAcceptanceClauseIDs) > 0 {
+		parts = append(parts, "missing_acceptance="+strings.Join(summary.MissingAcceptanceClauseIDs, ","))
+	}
+	return strings.Join(parts, " ")
 }
 
 func splitNonEmptyLines(s string) []string {

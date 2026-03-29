@@ -9,7 +9,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-func TestVerifyUsesAcceptanceCommandAndWritesState(t *testing.T) {
+func TestVerifyUsesAcceptanceChecksAndWritesState(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -75,10 +75,11 @@ acceptance:
 	}
 	stateText := string(stateData)
 	for _, want := range []string{
-		`"default_command": "printf 'e2e ok\n'"`,
-		`"effective_command": "printf 'e2e ok\n'"`,
 		`"goal_version": 1`,
+		`"checks": [`,
+		`"id": "chk-1"`,
 		`"command": "printf 'e2e ok\n'"`,
+		`"check_results": [`,
 		`"exit_code": 0`,
 	} {
 		if !strings.Contains(stateText, want) {
@@ -140,7 +141,7 @@ acceptance:
 	}
 }
 
-func TestVerifyRequiresExplicitAcceptanceCommand(t *testing.T) {
+func TestVerifyRequiresAcceptanceChecks(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -195,8 +196,8 @@ local_validation:
 	if err == nil {
 		t.Fatal("expected Verify to fail")
 	}
-	if !strings.Contains(err.Error(), "no acceptance command configured") {
-		t.Fatalf("Verify error = %v, want missing acceptance command", err)
+	if !strings.Contains(err.Error(), "no acceptance checks configured") {
+		t.Fatalf("Verify error = %v, want missing acceptance checks", err)
 	}
 
 	stateData, readErr := os.ReadFile(filepath.Join(runDir, "acceptance.json"))
@@ -205,8 +206,7 @@ local_validation:
 	}
 	stateText := string(stateData)
 	for _, unwanted := range []string{
-		`"default_command": "test -f DOES-NOT-EXIST"`,
-		`"effective_command": "test -f DOES-NOT-EXIST"`,
+		`"command": "test -f DOES-NOT-EXIST"`,
 		`"exit_code"`,
 	} {
 		if strings.Contains(stateText, unwanted) {
