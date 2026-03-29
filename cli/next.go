@@ -39,9 +39,13 @@ func Next(projectRoot string, args []string) error {
 		return nil
 	}
 	if len(activeRuns) == 0 && len(degradedRuns) == 1 {
-		fmt.Printf("Degraded run: %s\n", degradedRuns[0])
-		fmt.Printf("  → goalx observe --run %s\n", degradedRuns[0])
-		fmt.Printf("  → goalx status --run %s\n", degradedRuns[0])
+		name := degradedRuns[0]
+		fmt.Printf("Degraded run: %s\n", name)
+		if state, ok := stateByName[name]; ok && state.Status == "stranded" && !state.HasTmuxSession {
+			fmt.Printf("  → goalx recover --run %s\n", name)
+		}
+		fmt.Printf("  → goalx observe --run %s\n", name)
+		fmt.Printf("  → goalx status --run %s\n", name)
 		return nil
 	}
 	if len(activeRuns)+len(degradedRuns) > 1 {

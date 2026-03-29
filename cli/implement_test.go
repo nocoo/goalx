@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
@@ -347,6 +348,44 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("context.files = %#v, want %q from artifacts manifest", cfg.Context.Files, reportPath)
+	}
+}
+
+func TestImplementUsesDistinctNameForLongSourceRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	sourceRun := "design-the-next-generation-backend-architecture-for-synapse"
+	writeSavedRunFixture(t, projectRoot, sourceRun, goalx.Config{
+		Name:      sourceRun,
+		Mode:      goalx.ModeResearch,
+		Objective: "consensus fixes",
+		Parallel:  1,
+		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		Roles: goalx.RoleDefaultsConfig{
+			Develop: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+		},
+		Target:          goalx.TargetConfig{Files: []string{"cli/"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},
+	}, map[string]string{
+		"summary.md":          "# summary\n",
+		"session-1-report.md": "# report\n",
+	})
+
+	if err := Implement(projectRoot, []string{"--from", sourceRun, "--write-config"}, nil); err != nil {
+		t.Fatalf("Implement: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if cfg.Name == sourceRun {
+		t.Fatalf("implement cfg name = %q, want distinct phase name", cfg.Name)
+	}
+	if !strings.HasSuffix(cfg.Name, "-implement") {
+		t.Fatalf("implement cfg name = %q, want -implement suffix", cfg.Name)
 	}
 }
 

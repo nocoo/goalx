@@ -98,6 +98,36 @@ func TestNextSuggestsObserveForSingleDegradedRun(t *testing.T) {
 	}
 }
 
+func TestNextSuggestsRecoverForSingleStrandedRunWithoutTmuxSession(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(projectRoot, 0o755); err != nil {
+		t.Fatalf("mkdir project root: %v", err)
+	}
+
+	runDir := goalx.RunDir(projectRoot, "alpha")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: alpha\nmode: develop\nobjective: ship alpha\n"), 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Next(projectRoot, nil); err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+	})
+	if !strings.Contains(out, "goalx recover --run alpha") {
+		t.Fatalf("next output missing recover guidance for stranded run:\n%s", out)
+	}
+}
+
 func TestNextUsesDerivedActiveRunWithoutRegistry(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

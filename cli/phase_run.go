@@ -77,9 +77,28 @@ func derivePhaseRunName(sourceRun, phaseKind string, explicit string) string {
 		return explicit
 	}
 	if sourceRun == "" {
-		return phaseKind
+		return goalx.Slugify(phaseKind)
 	}
-	return goalx.Slugify(sourceRun + "-" + phaseKind)
+	base := goalx.Slugify(sourceRun)
+	suffix := goalx.Slugify(phaseKind)
+	if base == "" {
+		return suffix
+	}
+	if suffix == "" {
+		return base
+	}
+	const maxSlugLen = 60
+	maxBaseLen := maxSlugLen - len(suffix) - 1
+	if maxBaseLen <= 0 {
+		return suffix
+	}
+	if len(base) > maxBaseLen {
+		base = strings.TrimRight(base[:maxBaseLen], "-")
+	}
+	if base == "" {
+		return suffix
+	}
+	return base + "-" + suffix
 }
 
 func phaseSourceKind(source *savedPhaseSource) string {

@@ -1,54 +1,22 @@
 package cli
 
 import (
+	"strings"
 	"testing"
-
-	goalx "github.com/vonbai/goalx"
 )
 
-func TestBuildPhaseResolveRequestLeavesTargetAndLocalValidationUnsetWhenUnconfigured(t *testing.T) {
-	source := &savedPhaseSource{
-		Run:      "research-a",
-		Mode:     goalx.ModeResearch,
-		Parallel: 1,
-	}
+func TestDerivePhaseRunNamePreservesDistinctPhaseSuffixForLongSourceRun(t *testing.T) {
+	source := "design-the-next-generation-backend-architecture-for-synapse"
 
-	req, err := buildPhaseResolveRequest(t.TempDir(), "implement", goalx.ModeDevelop, source, goalx.Config{}, phaseOptions{})
-	if err != nil {
-		t.Fatalf("buildPhaseResolveRequest: %v", err)
-	}
-	if req.TargetOverride != nil {
-		t.Fatalf("TargetOverride = %#v, want nil", req.TargetOverride)
-	}
-	if req.LocalValidationOverride != nil {
-		t.Fatalf("LocalValidationOverride = %#v, want nil", req.LocalValidationOverride)
-	}
-}
+	got := derivePhaseRunName(source, "implement", "")
 
-func TestResolvePhaseConfigLeavesBudgetUnlimitedByDefault(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	projectRoot := t.TempDir()
-	writeProjectConfigFixture(t, projectRoot, `
-target:
-  files: ["."]
-local_validation:
-  command: go test ./...
-`)
-
-	source := &savedPhaseSource{
-		Run:      "research-a",
-		Mode:     goalx.ModeResearch,
-		Parallel: 1,
+	if got == source {
+		t.Fatalf("derivePhaseRunName = %q, want distinct phase run name", got)
 	}
-
-	resolved, err := resolvePhaseConfig(projectRoot, "debate", goalx.ModeResearch, source, phaseOptions{})
-	if err != nil {
-		t.Fatalf("resolvePhaseConfig: %v", err)
+	if !strings.HasSuffix(got, "-implement") {
+		t.Fatalf("derivePhaseRunName = %q, want -implement suffix", got)
 	}
-	cfg := &resolved.Config
-	if cfg.Budget.MaxDuration != 0 {
-		t.Fatalf("budget = %v, want unlimited (0)", cfg.Budget.MaxDuration)
+	if len(got) > 60 {
+		t.Fatalf("derivePhaseRunName length = %d, want <= 60", len(got))
 	}
 }

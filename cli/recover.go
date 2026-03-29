@@ -1,0 +1,116 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"time"
+)
+
+// Recover relaunches an existing run in place after tmux/master loss or an explicit stop.
+func Recover(projectRoot string, args []string) error {
+	if printUsageIfHelp(args, "usage: goalx recover [--run NAME]") {
+		return nil
+	}
+	runName, rest, err := extractRunFlag(args)
+	if err != nil {
+		return err
+	}
+	if runName == "" && len(rest) == 1 {
+		runName = rest[0]
+		rest = nil
+	}
+	if len(rest) > 0 {
+		return fmt.Errorf("usage: goalx recover [--run NAME]")
+	}
+
+	rc, err := ResolveRun(projectRoot, runName)
+	if err != nil {
+		return err
+	}
+	if SessionExists(rc.TmuxSession) {
+		return fmt.Errorf("run '%s' is already active (tmux session %s exists)", rc.Name, rc.TmuxSession)
+	}
+	if err := requireRunBudgetAvailable(rc.RunDir, rc.Config); err != nil {
+		return err
+	}
+	if stopped, lifecycle := waitRunStopped(rc.RunDir); stopped && lifecycle == "completed" {
+		return fmt.Errorf("run %q is completed; start a next phase instead of recovering it", rc.Name)
+	}
+	if err := EnsureMasterControl(rc.RunDir); err != nil {
+		return fmt.Errorf("init master control: %w", err)
+	}
+	if err := stopRunSidecar(rc.RunDir); err != nil {
+		return err
+	}
+	killRunPaneProcessTrees(rc.RunDir, rc.TmuxSession)
+	killAllLeasedProcesses(rc.RunDir)
+
+	if err := relaunchMaster(rc.ProjectRoot, rc.RunDir, rc.TmuxSession, rc.Config); err != nil {
+		return err
+	}
+	if err := PersistPanePIDsFromTmux(rc.RunDir, "master", rc.TmuxSession+":master"); err != nil {
+		return fmt.Errorf("persist master pane pid: %w", err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir))
+	if err != nil {
+		return err
+	}
+	if runtimeState == nil {
+		runtimeState = &RunRuntimeState{
+			Version:   1,
+			Run:       rc.Name,
+			Mode:      string(rc.Config.Mode),
+			StartedAt: now,
+		}
+	}
+	runtimeState.Run = rc.Name
+	if runtimeState.Mode == "" {
+		runtimeState.Mode = string(rc.Config.Mode)
+	}
+	if runtimeState.StartedAt == "" {
+		runtimeState.StartedAt = now
+	}
+	runtimeState.Active = true
+	runtimeState.StoppedAt = ""
+	runtimeState.UpdatedAt = now
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(rc.RunDir), runtimeState); err != nil {
+		return err
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(rc.RunDir))
+	if err != nil {
+		return err
+	}
+	if controlState == nil {
+		controlState = &ControlRunState{Version: 1}
+	}
+	controlState.LifecycleState = "active"
+	controlState.UpdatedAt = now
+	if err := SaveControlRunState(ControlRunStatePath(rc.RunDir), controlState); err != nil {
+		return err
+	}
+
+	if err := RegisterActiveRun(rc.ProjectRoot, rc.Config); err != nil {
+		return fmt.Errorf("register active run: %w", err)
+	}
+	if err := setFocusedRun(rc.ProjectRoot, rc.Name); err != nil {
+		return fmt.Errorf("focus active run: %w", err)
+	}
+
+	checkSec, _ := normalizeSidecarInterval(rc.Config.Master.CheckInterval)
+	if err := launchRunSidecar(rc.ProjectRoot, rc.Name, time.Duration(checkSec)*time.Second); err != nil {
+		return fmt.Errorf("launch sidecar: %w", err)
+	}
+	if err := RefreshRunGuidance(rc.ProjectRoot, rc.Name, rc.RunDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)
+	}
+
+	fmt.Printf("✓ Run '%s' recovered\n", rc.Name)
+	fmt.Printf("  tmux session: %s\n", rc.TmuxSession)
+	fmt.Printf("  master: %s/%s\n", rc.Config.Master.Engine, rc.Config.Master.Model)
+	fmt.Printf("  run dir: %s\n", rc.RunDir)
+	fmt.Printf("  attach: goalx attach [--run %s] [master|session-N]\n", rc.Name)
+	return nil
+}

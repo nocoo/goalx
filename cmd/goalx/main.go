@@ -25,6 +25,7 @@ Usage:
   goalx afford  [--run RUN] [target] [--json] Show run-scoped command affordances
   goalx attach  [--run RUN] [window]  Attach to tmux session (default: master)
   goalx stop    [--run RUN]           Graceful shutdown
+  goalx recover [--run RUN]           Recover and relaunch an existing run in place
   goalx review  [--run RUN]           Compare all sessions
   goalx diff    [--run RUN] <a> [b]   Diff session code/reports
   goalx keep    [--run NAME] <session> Merge/preserve session
@@ -64,6 +65,7 @@ var (
 	mainStart            = cli.Start
 	mainRun              = func(projectRoot string, args []string) error { return cli.Run(projectRoot, args, nil) }
 	mainStop             = cli.Stop
+	mainRecover          = cli.Recover
 	mainWait             = cli.Wait
 	mainSidecar          = cli.Sidecar
 	mainLeaseLoop        = cli.LeaseLoop
@@ -135,6 +137,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Attach(cwd, args)
 	case "stop":
 		return cli.Stop(cwd, args)
+	case "recover":
+		return mainRecover(cwd, args)
 	case "review":
 		return cli.Review(cwd, args)
 	case "diff":
