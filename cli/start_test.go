@@ -134,6 +134,72 @@ esac
 	}
 }
 
+func TestStartPreservesExistingRunOnPreflightFailure(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+
+	runName := "demo"
+	runDir := goalx.RunDir(repo, runName)
+	if err := os.MkdirAll(filepath.Join(runDir, "worktrees"), 0o755); err != nil {
+		t.Fatalf("mkdir worktrees: %v", err)
+	}
+
+	existing := goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeResearch,
+		Objective: "existing run",
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "gpt-5.4",
+		},
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+	}
+	data, err := yaml.Marshal(&existing)
+	if err != nil {
+		t.Fatalf("marshal existing config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write existing run spec: %v", err)
+	}
+
+	runBranch := "goalx/demo/root"
+	runWorktree := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWorktree, runBranch); err != nil {
+		t.Fatalf("CreateWorktree existing root: %v", err)
+	}
+
+	startCfg := &goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeResearch,
+		Objective: "new run should fail preflight",
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "gpt-5.4",
+		},
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+	}
+
+	err = startWithConfig(repo, startCfg, goalx.BuiltinEngines, nil, nil, false)
+	if err == nil || !strings.Contains(err.Error(), "run directory already exists") {
+		t.Fatalf("startWithConfig error = %v, want existing run dir failure", err)
+	}
+
+	if _, statErr := os.Stat(RunSpecPath(runDir)); statErr != nil {
+		t.Fatalf("existing run spec should remain after preflight failure: %v", statErr)
+	}
+	if _, statErr := os.Stat(runWorktree); statErr != nil {
+		t.Fatalf("existing run worktree should remain after preflight failure: %v", statErr)
+	}
+	if err := exec.Command("git", "-C", repo, "rev-parse", "--verify", runBranch).Run(); err != nil {
+		t.Fatalf("existing branch %s should remain after preflight failure: %v", runBranch, err)
+	}
+}
+
 func TestStartLaunchesOnlyMaster(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

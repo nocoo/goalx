@@ -70,6 +70,7 @@ type startRunState struct {
 	absProjectRoot     string
 	runWorktree        string
 	runBranch          string
+	runDirCreated      bool
 	tmuxCreated        bool
 	runWorktreeCreated bool
 }
@@ -108,13 +109,17 @@ func (s *startRunState) cleanup(errp *error) {
 			fmt.Fprintf(os.Stderr, "warning: cleanup run worktree %s: %v\n", s.runWorktree, rmErr)
 		}
 	}
-	if exists, branchErr := branchExists(s.absProjectRoot, s.runBranch); branchErr == nil && exists {
-		if delErr := DeleteBranch(s.absProjectRoot, s.runBranch); delErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: cleanup run branch %s: %v\n", s.runBranch, delErr)
+	if s.runWorktreeCreated {
+		if exists, branchErr := branchExists(s.absProjectRoot, s.runBranch); branchErr == nil && exists {
+			if delErr := DeleteBranch(s.absProjectRoot, s.runBranch); delErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: cleanup run branch %s: %v\n", s.runBranch, delErr)
+			}
 		}
 	}
-	if rmErr := os.RemoveAll(s.runDir); rmErr != nil && !os.IsNotExist(rmErr) {
-		fmt.Fprintf(os.Stderr, "warning: cleanup run dir %s: %v\n", s.runDir, rmErr)
+	if s.runDirCreated {
+		if rmErr := os.RemoveAll(s.runDir); rmErr != nil && !os.IsNotExist(rmErr) {
+			fmt.Fprintf(os.Stderr, "warning: cleanup run dir %s: %v\n", s.runDir, rmErr)
+		}
 	}
 }
 
@@ -167,8 +172,11 @@ func ensureStartAvailable(state *startRunState) error {
 }
 
 func bootstrapStartWorkspace(state *startRunState, cfg *goalx.Config, selectionSnapshot *SelectionSnapshot, metaPatch *RunMetadata) error {
+	if err := os.MkdirAll(state.runDir, 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", state.runDir, err)
+	}
+	state.runDirCreated = true
 	dirs := []string{
-		state.runDir,
 		filepath.Join(state.runDir, "journals"),
 		ReportsDir(state.runDir),
 		filepath.Join(state.runDir, "worktrees"),
