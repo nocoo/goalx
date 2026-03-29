@@ -34,12 +34,41 @@ type ExperimentIntegratedBody struct {
 	RecordedAt         string   `json:"recorded_at"`
 }
 
+type ExperimentClosedBody struct {
+	ExperimentID          string `json:"experiment_id"`
+	Disposition           string `json:"disposition"`
+	Reason                string `json:"reason"`
+	ClosedAt              string `json:"closed_at"`
+	ReplacementExperimentID string `json:"replacement_experiment_id,omitempty"`
+}
+
+type EvolveStoppedBody struct {
+	ReasonCode      string `json:"reason_code"`
+	Reason          string `json:"reason"`
+	BestExperimentID string `json:"best_experiment_id,omitempty"`
+	StoppedAt       string `json:"stopped_at"`
+}
+
 var allowedIntegrationMethods = map[string]struct{}{
 	"keep":          {},
 	"manual_merge":  {},
 	"partial_adopt": {},
 	"cherry_pick":   {},
 	"consolidate":   {},
+}
+
+var allowedExperimentDispositions = map[string]struct{}{
+	"rejected":   {},
+	"abandoned":  {},
+	"superseded": {},
+}
+
+var allowedEvolveStopReasonCodes = map[string]struct{}{
+	"budget_exhausted":   {},
+	"user_redirected":    {},
+	"external_blocker":   {},
+	"diminishing_returns": {},
+	"risk_boundary":      {},
 }
 
 func newExperimentID() string {
@@ -166,6 +195,39 @@ func validateExperimentLogBody(kind string, body json.RawMessage) error {
 		}
 		if strings.TrimSpace(record.RecordedAt) == "" {
 			return fmt.Errorf("experiment.integrated requires recorded_at")
+		}
+		return nil
+	case "experiment.closed":
+		var record ExperimentClosedBody
+		if err := decodeStrictJSON(body, &record); err != nil {
+			return err
+		}
+		if strings.TrimSpace(record.ExperimentID) == "" {
+			return fmt.Errorf("experiment.closed requires experiment_id")
+		}
+		if _, ok := allowedExperimentDispositions[strings.TrimSpace(record.Disposition)]; !ok {
+			return fmt.Errorf("experiment.closed requires supported disposition")
+		}
+		if strings.TrimSpace(record.Reason) == "" {
+			return fmt.Errorf("experiment.closed requires reason")
+		}
+		if strings.TrimSpace(record.ClosedAt) == "" {
+			return fmt.Errorf("experiment.closed requires closed_at")
+		}
+		return nil
+	case "evolve.stopped":
+		var record EvolveStoppedBody
+		if err := decodeStrictJSON(body, &record); err != nil {
+			return err
+		}
+		if _, ok := allowedEvolveStopReasonCodes[strings.TrimSpace(record.ReasonCode)]; !ok {
+			return fmt.Errorf("evolve.stopped requires reason_code")
+		}
+		if strings.TrimSpace(record.Reason) == "" {
+			return fmt.Errorf("evolve.stopped requires reason")
+		}
+		if strings.TrimSpace(record.StoppedAt) == "" {
+			return fmt.Errorf("evolve.stopped requires stopped_at")
 		}
 		return nil
 	default:

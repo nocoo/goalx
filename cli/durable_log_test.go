@@ -40,6 +40,42 @@ func TestDurableLogRejectsNonObjectBody(t *testing.T) {
 	}
 }
 
+func TestDurableLogAcceptsExperimentClosed(t *testing.T) {
+	payload := []byte(`{"version":1,"kind":"experiment.closed","at":"2026-03-29T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","disposition":"rejected","reason":"loses on latency","closed_at":"2026-03-29T10:00:00Z"}}`)
+	events, err := parseDurableLogBuffer(payload, DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("parseDurableLogBuffer: %v", err)
+	}
+	if len(events) != 1 || events[0].Kind != "experiment.closed" {
+		t.Fatalf("events = %#v, want experiment.closed", events)
+	}
+}
+
+func TestDurableLogRejectsExperimentClosedWithoutExperimentID(t *testing.T) {
+	_, err := parseDurableLogBuffer([]byte(`{"version":1,"kind":"experiment.closed","at":"2026-03-29T10:00:00Z","actor":"master","body":{"disposition":"rejected","reason":"loses on latency","closed_at":"2026-03-29T10:00:00Z"}}`), DurableSurfaceExperiments)
+	if err == nil || !strings.Contains(err.Error(), "experiment.closed requires experiment_id") {
+		t.Fatalf("parseDurableLogBuffer error = %v, want missing experiment_id", err)
+	}
+}
+
+func TestDurableLogAcceptsEvolveStopped(t *testing.T) {
+	payload := []byte(`{"version":1,"kind":"evolve.stopped","at":"2026-03-29T10:00:00Z","actor":"master","body":{"reason_code":"diminishing_returns","reason":"no meaningful upside remains","stopped_at":"2026-03-29T10:00:00Z"}}`)
+	events, err := parseDurableLogBuffer(payload, DurableSurfaceExperiments)
+	if err != nil {
+		t.Fatalf("parseDurableLogBuffer: %v", err)
+	}
+	if len(events) != 1 || events[0].Kind != "evolve.stopped" {
+		t.Fatalf("events = %#v, want evolve.stopped", events)
+	}
+}
+
+func TestDurableLogRejectsEvolveStoppedWithoutReasonCode(t *testing.T) {
+	_, err := parseDurableLogBuffer([]byte(`{"version":1,"kind":"evolve.stopped","at":"2026-03-29T10:00:00Z","actor":"master","body":{"reason":"no meaningful upside remains","stopped_at":"2026-03-29T10:00:00Z"}}`), DurableSurfaceExperiments)
+	if err == nil || !strings.Contains(err.Error(), "evolve.stopped requires reason_code") {
+		t.Fatalf("parseDurableLogBuffer error = %v, want missing reason_code", err)
+	}
+}
+
 func TestAppendDurableLogConcurrentWritersPreserveAllEvents(t *testing.T) {
 	runDir := t.TempDir()
 	path := ExperimentsLogPath(runDir)

@@ -30,6 +30,8 @@ var durableLogKinds = map[DurableSurfaceName]map[string]struct{}{
 	DurableSurfaceExperiments: {
 		"experiment.created":    {},
 		"experiment.integrated": {},
+		"experiment.closed":     {},
+		"evolve.stopped":        {},
 	},
 }
 
