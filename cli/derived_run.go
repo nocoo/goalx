@@ -36,6 +36,10 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 	if name == "" {
 		name = filepath.Base(runDir)
 	}
+	tmuxSession := goalx.TmuxSessionName(projectRoot, name)
+	if err := repairCompletedRunFinalizationForRun(projectRoot, name, runDir, tmuxSession); err != nil {
+		return nil, err
+	}
 
 	state := &DerivedRunState{
 		Name:           name,
@@ -44,9 +48,8 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 		RunDir:         runDir,
 		Selector:       goalx.ProjectID(projectRoot) + "/" + name,
 		HasLease:       controlLeaseActive(runDir, "sidecar") || controlLeaseActive(runDir, "master"),
-		HasTmuxSession: SessionExists(goalx.TmuxSessionName(projectRoot, name)),
+		HasTmuxSession: SessionExists(tmuxSession),
 	}
-	tmuxSession := goalx.TmuxSessionName(projectRoot, name)
 	state.RunID, state.Epoch, state.Charter, state.Objective = deriveRunIdentitySurface(runDir, cfg.Objective)
 
 	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))

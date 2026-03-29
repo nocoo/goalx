@@ -33,7 +33,9 @@ func Recover(projectRoot string, args []string) error {
 	if err := requireRunBudgetAvailable(rc.RunDir, rc.Config); err != nil {
 		return err
 	}
-	if stopped, lifecycle := waitRunStopped(rc.RunDir); stopped && lifecycle == "completed" {
+	if stopped, lifecycle, err := waitRunStopped(rc.RunDir); err != nil {
+		return err
+	} else if stopped && lifecycle == "completed" {
 		return fmt.Errorf("run %q is completed; start a next phase instead of recovering it", rc.Name)
 	}
 	if err := EnsureMasterControl(rc.RunDir); err != nil {

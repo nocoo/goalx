@@ -117,7 +117,9 @@ func waitForInboxEvent(runDir, runName, targetName, inboxPath, cursorPath string
 	if unread := unreadControlInboxCount(inboxPath, cursorPath); unread > 0 {
 		return fmt.Sprintf("wait: inbox pending for %s (%d unread)", targetName, unread), nil
 	}
-	if stopped, lifecycle := waitRunStopped(runDir); stopped {
+	if stopped, lifecycle, err := waitRunStopped(runDir); err != nil {
+		return "", err
+	} else if stopped {
 		return "", fmt.Errorf("run %q is stopped (%s)", runName, lifecycle)
 	}
 
@@ -141,7 +143,9 @@ func waitForInboxEvent(runDir, runName, targetName, inboxPath, cursorPath string
 			if unread := unreadControlInboxCount(inboxPath, cursorPath); unread > 0 {
 				return fmt.Sprintf("wait: inbox pending for %s (%d unread)", targetName, unread), nil
 			}
-			if stopped, lifecycle := waitRunStopped(runDir); stopped {
+			if stopped, lifecycle, err := waitRunStopped(runDir); err != nil {
+				return "", err
+			} else if stopped {
 				return "", fmt.Errorf("run %q is stopped (%s)", runName, lifecycle)
 			}
 		case <-timeoutC:
@@ -163,12 +167,15 @@ func parseDurationOrSeconds(s string) (time.Duration, error) {
 	return 0, err
 }
 
-func waitRunStopped(runDir string) (bool, string) {
+func waitRunStopped(runDir string) (bool, string, error) {
+	if err := repairCompletedRunFinalizationByRunDir(runDir); err != nil {
+		return false, "", err
+	}
 	if state, err := LoadControlRunState(ControlRunStatePath(runDir)); err == nil && state != nil {
 		switch state.LifecycleState {
 		case "", "active":
 		default:
-			return true, state.LifecycleState
+			return true, state.LifecycleState, nil
 		}
 	}
 	if state, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir)); err == nil && state != nil && !state.Active {
@@ -176,7 +183,7 @@ func waitRunStopped(runDir string) (bool, string) {
 		if state.Phase != "" {
 			lifecycle = state.Phase
 		}
-		return true, lifecycle
+		return true, lifecycle, nil
 	}
-	return false, ""
+	return false, "", nil
 }

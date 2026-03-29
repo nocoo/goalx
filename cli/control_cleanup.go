@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	goalx "github.com/vonbai/goalx"
 )
 
 type finalizeControlRunOptions struct {
@@ -26,35 +29,56 @@ func stopLifecycleForRun(runDir string) string {
 }
 
 func repairCompletedRunFinalization(rc *RunContext) error {
-	if rc == nil || SessionExists(rc.TmuxSession) || !completedCloseoutReady(rc.RunDir) {
+	if rc == nil {
 		return nil
 	}
-	controlState, err := LoadControlRunState(ControlRunStatePath(rc.RunDir))
+	return repairCompletedRunFinalizationForRun(rc.ProjectRoot, rc.Name, rc.RunDir, rc.TmuxSession)
+}
+
+func repairCompletedRunFinalizationByRunDir(runDir string) error {
+	if strings.TrimSpace(runDir) == "" || !completedCloseoutReady(runDir) {
+		return nil
+	}
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		return err
+	}
+	projectRoot := ""
+	if meta != nil {
+		projectRoot = strings.TrimSpace(meta.ProjectRoot)
+	}
+	if projectRoot == "" {
+		return fmt.Errorf("completed run repair requires run metadata project_root at %s", RunMetadataPath(runDir))
+	}
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		return err
+	}
+	runName := strings.TrimSpace(cfg.Name)
+	if runName == "" {
+		runName = filepath.Base(runDir)
+	}
+	return repairCompletedRunFinalizationForRun(projectRoot, runName, runDir, goalx.TmuxSessionName(projectRoot, runName))
+}
+
+func repairCompletedRunFinalizationForRun(projectRoot, runName, runDir, tmuxSession string) error {
+	if strings.TrimSpace(runDir) == "" || !completedCloseoutReady(runDir) {
+		return nil
+	}
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
 	if err == nil && controlState != nil && controlState.LifecycleState == "completed" {
 		return nil
 	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	if state, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir)); err == nil && state != nil {
-		state.Active = false
-		state.Phase = "complete"
-		if state.StoppedAt == "" {
-			state.StoppedAt = now
-		}
-		state.UpdatedAt = now
-		if err := UpsertRunRuntimeState(rc.RunDir, *state); err != nil {
-			return err
-		}
+	if strings.TrimSpace(projectRoot) == "" {
+		return fmt.Errorf("completed run repair requires project root for %s", runDir)
 	}
-
-	killRunPaneProcessTrees(rc.RunDir, rc.TmuxSession)
-	if err := KillSessionIfExists(rc.TmuxSession); err != nil {
-		return err
+	if strings.TrimSpace(runName) == "" {
+		runName = filepath.Base(runDir)
 	}
-	if err := MarkRunInactive(rc.ProjectRoot, rc.Name); err != nil {
-		return err
+	if strings.TrimSpace(tmuxSession) == "" {
+		tmuxSession = goalx.TmuxSessionName(projectRoot, runName)
 	}
-	return FinalizeControlRun(rc.RunDir, "completed")
+	return finalizeCompletedRun(projectRoot, runName, runDir, tmuxSession, finalizeControlRunOptions{killLeasedProcesses: true})
 }
 
 func FinalizeControlRun(runDir, lifecycle string) error {
@@ -153,6 +177,14 @@ func expireControlLeases(runDir string, skipHolders map[string]bool) error {
 }
 
 func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession string) error {
+	return finalizeCompletedRun(projectRoot, runName, runDir, tmuxSession, finalizeControlRunOptions{
+		killLeasedProcesses: true,
+		skipKillHolders:     map[string]bool{"sidecar": true},
+		skipExpireHolders:   map[string]bool{"sidecar": true},
+	})
+}
+
+func finalizeCompletedRun(projectRoot, runName, runDir, tmuxSession string, opts finalizeControlRunOptions) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
@@ -162,6 +194,9 @@ func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession s
 	if runState != nil {
 		runState.Active = false
 		runState.Phase = "complete"
+		if runState.StoppedAt == "" {
+			runState.StoppedAt = now
+		}
 		runState.UpdatedAt = now
 		if err := UpsertRunRuntimeState(runDir, *runState); err != nil {
 			return err
@@ -177,11 +212,7 @@ func finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession s
 		return err
 	}
 
-	return finalizeControlRun(runDir, "completed", finalizeControlRunOptions{
-		killLeasedProcesses: true,
-		skipKillHolders:     map[string]bool{"sidecar": true},
-		skipExpireHolders:   map[string]bool{"sidecar": true},
-	})
+	return finalizeControlRun(runDir, "completed", opts)
 }
 
 func shouldSkipControlHolder(skipHolders map[string]bool, holder string) bool {

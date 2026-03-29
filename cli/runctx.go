@@ -111,13 +111,17 @@ func buildRunContext(projectRoot, runDir, runName string) (*RunContext, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load run spec: %w", err)
 	}
-	return &RunContext{
+	rc := &RunContext{
 		Name:        runName,
 		RunDir:      runDir,
 		TmuxSession: goalx.TmuxSessionName(projectRoot, runName),
 		ProjectRoot: projectRoot,
 		Config:      snapshot,
-	}, nil
+	}
+	if err := repairCompletedRunFinalization(rc); err != nil {
+		return nil, err
+	}
+	return rc, nil
 }
 
 func isNotFoundRunError(err error) bool {
