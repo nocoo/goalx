@@ -9,7 +9,7 @@ func TestBuildRequiredCoverageTreatsMissingOwnersAsUnknown(t *testing.T) {
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "ship feature", State: goalItemStateOpen},
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -37,9 +37,9 @@ func TestBuildRequiredCoverageOnlyCountsOpenRequiredItems(t *testing.T) {
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "open item", State: goalItemStateOpen},
-			{ID: "req-2", Text: "claimed item", State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}},
-			{ID: "req-3", Text: "waived item", State: goalItemStateWaived, UserApproved: true},
+			{ID: "req-1", Text: "open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "claimed item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}},
+			{ID: "req-3", Text: "waived item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateWaived, UserApproved: true},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -74,7 +74,7 @@ func TestBuildRequiredCoverageDetectsMissingSessionOwner(t *testing.T) {
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "ship feature", State: goalItemStateOpen},
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -104,7 +104,7 @@ func TestBuildRequiredCoverageTreatsOpaqueOwnerTokenAsExplicitCoverage(t *testin
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "ship feature", State: goalItemStateOpen},
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -134,7 +134,7 @@ func TestBuildRequiredCoverageIgnoresStaleCoordinationSessionRoster(t *testing.T
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "ship feature", State: goalItemStateOpen},
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -170,7 +170,7 @@ func TestBuildRequiredCoverageDoesNotReuseOpenOwnerSessions(t *testing.T) {
 	_, runDir, _, _ := writeGuidanceRunFixture(t)
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "owned item", State: goalItemStateOpen},
+			{ID: "req-1", Text: "owned item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)

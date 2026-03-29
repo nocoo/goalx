@@ -877,6 +877,44 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 	}
 }
 
+func TestRenderSubagentProtocolEscalatesProofOnlyAssignmentsAgainstMissingOutcome(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:             "demo",
+		Objective:           "ship it",
+		Mode:                goalx.ModeDevelop,
+		Engine:              "codex",
+		ProjectRoot:         "/tmp/project",
+		SessionName:         "session-1",
+		Target:              goalx.TargetConfig{Files: []string{"main.go"}},
+		JournalPath:         "/tmp/journal.jsonl",
+		SessionInboxPath:    "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath:   "/tmp/control/session-1-cursor.json",
+		GoalPath:            "/tmp/goal.json",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		Sessions: []SessionData{
+			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeDevelop},
+		},
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If your assignment is only gathering proof while the underlying outcome or enabler still appears unmet, record that risk in the journal or dispatchable_slices for the master.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
@@ -951,6 +989,98 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 	} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered master protocol should not contain legacy boundary/proof wording %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "ship it",
+		RunName:             "demo",
+		Mode:                goalx.ModeDevelop,
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		GoalPath:            "/tmp/goal.json",
+		GoalLogPath:         "/tmp/goal-log.jsonl",
+		MasterCursorPath:    "/tmp/master-cursor.json",
+		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Before the first `goalx add` or `goalx tell`, finish the initial boundary design: replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolRequiresBoundaryShapeComparisonBeforeDispatch(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Before first dispatch on a non-trivial goal, compare at least a shallow user-restatement boundary and an obligation-grammar boundary, then record the choice in `goal-log`.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolForbidsProofOnlyBoundaryCollapse(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Do not write `goal.json` as a proof plan. In mixed delivery runs, `proof` obligations support `outcome` and `enabler` obligations; they do not replace them.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
 }

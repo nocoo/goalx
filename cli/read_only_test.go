@@ -263,7 +263,7 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	if err := os.WriteFile(RunStatusPath(runDir), statusBefore, 0o644); err != nil {
 		t.Fatalf("write run status record: %v", err)
 	}
-	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","role":"outcome","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
 		t.Fatalf("write goal state: %v", err)
 	}
 	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{Version: 1, Objective: "ship feature", BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD"))}); err != nil {

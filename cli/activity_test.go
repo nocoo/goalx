@@ -275,9 +275,9 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "first open item", State: goalItemStateOpen},
-			{ID: "req-2", Text: "second open item", State: goalItemStateOpen},
-			{ID: "req-3", Text: "claimed item", State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}},
+			{ID: "req-1", Text: "first open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "second open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-3", Text: "claimed item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -426,7 +426,7 @@ func TestBuildActivitySnapshotSerializesCoverageUnknownExplicitly(t *testing.T) 
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "ship feature", State: goalItemStateOpen},
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)

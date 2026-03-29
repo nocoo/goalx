@@ -27,6 +27,25 @@ func TestSchemaPrintsStructuredSurfaceContract(t *testing.T) {
 	}
 }
 
+func TestSchemaPrintsGoalContractWithObligationGrammar(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Schema(t.TempDir(), []string{"goal"}); err != nil {
+			t.Fatalf("Schema: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"# GoalX Schema: goal",
+		`"role": "outcome"`,
+		`"source": "master"`,
+		"goalx durable replace goal --run NAME --file /abs/path.json",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("schema output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestSchemaPrintsCoordinationContract(t *testing.T) {
 	out := captureStdout(t, func() {
 		if err := Schema(t.TempDir(), []string{"coordination"}); err != nil {

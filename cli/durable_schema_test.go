@@ -49,7 +49,10 @@ func TestLookupDurableContractSupportsEventLogs(t *testing.T) {
 	if contract.WriteMode != DurableSurfaceWriteModeAppend {
 		t.Fatalf("contract.WriteMode = %s, want %s", contract.WriteMode, DurableSurfaceWriteModeAppend)
 	}
-	if !strings.Contains(contract.Example, `"kind": "update"`) {
+	if !strings.Contains(contract.Example, `"kind": "decision"`) {
+		t.Fatalf("contract.Example missing decision envelope:\n%s", contract.Example)
+	}
+	if !strings.Contains(contract.Example, `"boundary_shapes_compared"`) {
 		t.Fatalf("contract.Example missing goal-log envelope:\n%s", contract.Example)
 	}
 }

@@ -445,8 +445,8 @@ func TestObserveShowsExplicitCoverageFacts(t *testing.T) {
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "first open item", State: goalItemStateOpen},
-			{ID: "req-2", Text: "second open item", State: goalItemStateOpen},
+			{ID: "req-1", Text: "first open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "second open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -507,7 +507,7 @@ func TestObserveShowsBlockedTargetAttentionAdvisory(t *testing.T) {
 	}
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
-		Required: []GoalItem{{ID: "req-1", Text: "blocked item", State: goalItemStateOpen}},
+		Required: []GoalItem{{ID: "req-1", Text: "blocked item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
@@ -611,7 +611,7 @@ func TestObserveShowsBlockedOwnerAttentionAdvisory(t *testing.T) {
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
-		Required: []GoalItem{{ID: "req-1", Text: "ship UI polish", State: goalItemStateOpen}},
+		Required: []GoalItem{{ID: "req-1", Text: "ship UI polish", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
 	}

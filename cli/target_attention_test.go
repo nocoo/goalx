@@ -393,8 +393,8 @@ func TestBuildRequiredCoverageMarksBlockedAndRiskyOwners(t *testing.T) {
 
 	if err := SaveGoalState(GoalPath(runDir), &GoalState{
 		Required: []GoalItem{
-			{ID: "req-1", Text: "blocked owner", State: goalItemStateOpen},
-			{ID: "req-2", Text: "risky owner", State: goalItemStateOpen},
+			{ID: "req-1", Text: "blocked owner", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "risky owner", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)

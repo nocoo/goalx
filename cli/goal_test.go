@@ -58,6 +58,7 @@ func TestLoadGoalStateRejectsInvalidItemState(t *testing.T) {
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "done"
     }
   ],
@@ -76,6 +77,92 @@ func TestLoadGoalStateRejectsInvalidItemState(t *testing.T) {
 	}
 }
 
+func TestLoadGoalStateRejectsMissingItemSource(t *testing.T) {
+	path := t.TempDir() + "/goal.json"
+	payload := []byte(`{
+  "version": 1,
+  "required": [
+    {
+      "id": "req-1",
+      "text": "ship feature",
+      "role": "outcome",
+      "state": "open"
+    }
+  ],
+  "optional": []
+}`)
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		t.Fatalf("write goal state: %v", err)
+	}
+
+	_, err := LoadGoalState(path)
+	if err == nil {
+		t.Fatal("expected LoadGoalState to fail")
+	}
+	for _, want := range []string{"goal item source is required", "goalx schema goal"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("LoadGoalState error = %v, want %q", err, want)
+		}
+	}
+}
+
+func TestLoadGoalStateRejectsMissingItemRole(t *testing.T) {
+	path := t.TempDir() + "/goal.json"
+	payload := []byte(`{
+  "version": 1,
+  "required": [
+    {
+      "id": "req-1",
+      "text": "ship feature",
+      "source": "user",
+      "state": "open"
+    }
+  ],
+  "optional": []
+}`)
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		t.Fatalf("write goal state: %v", err)
+	}
+
+	_, err := LoadGoalState(path)
+	if err == nil {
+		t.Fatal("expected LoadGoalState to fail")
+	}
+	for _, want := range []string{"goal item role is required", "goalx schema goal"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("LoadGoalState error = %v, want %q", err, want)
+		}
+	}
+}
+
+func TestLoadGoalStateRejectsInvalidItemRole(t *testing.T) {
+	path := t.TempDir() + "/goal.json"
+	payload := []byte(`{
+  "version": 1,
+  "required": [
+    {
+      "id": "req-1",
+      "text": "ship feature",
+      "source": "user",
+      "role": "task",
+      "state": "open"
+    }
+  ],
+  "optional": []
+}`)
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		t.Fatalf("write goal state: %v", err)
+	}
+
+	_, err := LoadGoalState(path)
+	if err == nil {
+		t.Fatal("expected LoadGoalState to fail")
+	}
+	if !strings.Contains(err.Error(), `invalid goal item role "task"`) {
+		t.Fatalf("LoadGoalState error = %v, want invalid-role error", err)
+	}
+}
+
 func TestEnsureGoalStateDoesNotRewriteExistingGoal(t *testing.T) {
 	runDir := t.TempDir()
 	goalBefore := []byte(`{
@@ -86,6 +173,7 @@ func TestEnsureGoalStateDoesNotRewriteExistingGoal(t *testing.T) {
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "claimed",
       "evidence_paths": ["/tmp/e2e.txt"]
     }
@@ -105,4 +193,43 @@ func TestEnsureGoalStateDoesNotRewriteExistingGoal(t *testing.T) {
 	}
 
 	assertFileUnchanged(t, GoalPath(runDir), goalBefore)
+}
+
+func TestSaveGoalStateWritesExplicitSourceAndRole(t *testing.T) {
+	path := t.TempDir() + "/goal.json"
+	state := &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship feature",
+				Source: "user",
+				Role:   "outcome",
+				State:  "open",
+			},
+		},
+		Optional: []GoalItem{
+			{
+				ID:     "opt-1",
+				Text:   "improve latency",
+				Source: "master",
+				Role:   "guardrail",
+				State:  "open",
+			},
+		},
+	}
+
+	if err := SaveGoalState(path, state); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read goal state: %v", err)
+	}
+	for _, want := range []string{`"source": "user"`, `"role": "outcome"`, `"source": "master"`, `"role": "guardrail"`} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("saved goal state missing %q:\n%s", want, string(data))
+		}
+	}
 }

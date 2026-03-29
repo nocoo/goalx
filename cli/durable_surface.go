@@ -44,9 +44,13 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			Format:  DurableSurfaceSchemaFormatJSON,
 			Summary: "Current mutable goal boundary with required outcomes and optional improvements.",
-			Example: `{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","state":"open"}],"optional":[{"id":"opt-1","text":"improve latency","source":"master","state":"open"}],"updated_at":"2026-03-28T10:00:00Z"}`,
+			Example: `{"version":1,"required":[{"id":"req-1","text":"Live trading works end to end on the live service with operator-visible state transitions.","source":"user","role":"outcome","state":"open"},{"id":"req-2","text":"Live trading has durable API and browser evidence on the live service.","source":"master","role":"proof","state":"open"}],"optional":[{"id":"opt-1","text":"Improve latency on the live trading dashboard.","source":"master","role":"guardrail","state":"open"}],"updated_at":"2026-03-28T10:00:00Z"}`,
 			FieldNotes: []string{
 				"`required` is the canonical current-goal boundary.",
+				"Every goal item must include explicit `source` and `role` fields.",
+				"`role` must stay within outcome|enabler|proof|guardrail.",
+				"Describe what must be true, not just how proof will be gathered.",
+				"`proof` obligations do not replace missing `outcome` or `enabler` obligations.",
 				"`state` must stay within open|claimed|waived.",
 				"`waived` only counts with explicit user approval on the item.",
 			},
@@ -116,7 +120,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			Format:  DurableSurfaceSchemaFormatJSONL,
 			Summary: "Append-only goal boundary and coverage change events using canonical durable-log envelope.",
-			Example: `{"version":1,"kind":"update","at":"2026-03-28T10:00:00Z","actor":"master","body":{"goal_version":2,"reason":"tighten required outcomes"}}`,
+			Example: `{"version":1,"kind":"decision","at":"2026-03-28T10:00:00Z","actor":"master","body":{"goal_version":2,"decision":"initial_boundary_shape_selection","boundary_shapes_compared":["user_restated_boundary","obligation_grammar_boundary","verification_only_boundary"],"chosen_shape":"obligation_grammar_boundary","reason":"The goal requires delivered product outcomes plus proof and guardrails, so a proof-only boundary would shrink the run incorrectly."}}`,
 			FieldNotes: []string{
 				"Each line must be one valid JSON object.",
 				"Envelope fields are required: version, kind, at, actor, body.",

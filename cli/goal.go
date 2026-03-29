@@ -18,6 +18,11 @@ const (
 
 	goalItemSourceUser   = "user"
 	goalItemSourceMaster = "master"
+
+	goalItemRoleOutcome   = "outcome"
+	goalItemRoleEnabler   = "enabler"
+	goalItemRoleProof     = "proof"
+	goalItemRoleGuardrail = "guardrail"
 )
 
 type GoalState struct {
@@ -30,7 +35,8 @@ type GoalState struct {
 type GoalItem struct {
 	ID            string   `json:"id"`
 	Text          string   `json:"text"`
-	Source        string   `json:"source,omitempty"`
+	Source        string   `json:"source"`
+	Role          string   `json:"role"`
 	State         string   `json:"state,omitempty"`
 	EvidencePaths []string `json:"evidence_paths,omitempty"`
 	Note          string   `json:"note,omitempty"`
@@ -198,18 +204,19 @@ func normalizeGoalState(state *GoalState) {
 		state.Optional = []GoalItem{}
 	}
 	for i := range state.Required {
-		normalizeGoalItem(&state.Required[i], goalItemSourceUser)
+		normalizeGoalItem(&state.Required[i])
 	}
 	for i := range state.Optional {
-		normalizeGoalItem(&state.Optional[i], goalItemSourceMaster)
+		normalizeGoalItem(&state.Optional[i])
 	}
 }
 
-func normalizeGoalItem(item *GoalItem, defaultSource string) {
+func normalizeGoalItem(item *GoalItem) {
 	if item == nil {
 		return
 	}
-	item.Source = normalizeGoalItemSource(item.Source, defaultSource)
+	item.Source = normalizeGoalItemSource(item.Source)
+	item.Role = normalizeGoalItemRole(item.Role)
 	item.State = normalizeGoalItemState(item.State)
 	item.EvidencePaths = trimmedGoalEvidencePaths(item.EvidencePaths)
 }
@@ -232,12 +239,19 @@ func validateGoalStateInput(state *GoalState) error {
 }
 
 func validateGoalItemInput(item GoalItem) error {
-	if source := strings.TrimSpace(item.Source); source != "" {
-		switch source {
-		case goalItemSourceUser, goalItemSourceMaster:
-		default:
-			return fmt.Errorf("invalid goal item source %q", item.Source)
-		}
+	switch source := strings.TrimSpace(item.Source); source {
+	case "":
+		return fmt.Errorf("goal item source is required")
+	case goalItemSourceUser, goalItemSourceMaster:
+	default:
+		return fmt.Errorf("invalid goal item source %q", item.Source)
+	}
+	switch role := strings.TrimSpace(item.Role); role {
+	case "":
+		return fmt.Errorf("goal item role is required")
+	case goalItemRoleOutcome, goalItemRoleEnabler, goalItemRoleProof, goalItemRoleGuardrail:
+	default:
+		return fmt.Errorf("invalid goal item role %q", item.Role)
 	}
 	if state := strings.TrimSpace(item.State); state != "" {
 		switch state {
@@ -280,14 +294,29 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 	return fmt.Errorf("unexpected trailing JSON content")
 }
 
-func normalizeGoalItemSource(source, defaultSource string) string {
+func normalizeGoalItemSource(source string) string {
 	switch strings.TrimSpace(source) {
 	case goalItemSourceUser:
 		return goalItemSourceUser
 	case goalItemSourceMaster:
 		return goalItemSourceMaster
 	default:
-		return defaultSource
+		return strings.TrimSpace(source)
+	}
+}
+
+func normalizeGoalItemRole(role string) string {
+	switch strings.TrimSpace(role) {
+	case goalItemRoleOutcome:
+		return goalItemRoleOutcome
+	case goalItemRoleEnabler:
+		return goalItemRoleEnabler
+	case goalItemRoleProof:
+		return goalItemRoleProof
+	case goalItemRoleGuardrail:
+		return goalItemRoleGuardrail
+	default:
+		return strings.TrimSpace(role)
 	}
 }
 

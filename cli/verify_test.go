@@ -46,6 +46,7 @@ acceptance:
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "claimed",
       "evidence_paths": ["/tmp/e2e.txt"]
     }
@@ -122,7 +123,7 @@ acceptance:
 		t.Fatalf("write run metadata: %v", err)
 	}
 	seedRunCharterForTests(t, runDir, runName, repo)
-	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
+	if err := os.WriteFile(GoalPath(runDir), []byte(`{"version":1,"required":[{"id":"req-1","text":"ship feature","source":"user","role":"outcome","state":"claimed","evidence_paths":["/tmp/e2e.txt"]}],"optional":[]}`), 0o644); err != nil {
 		t.Fatalf("write goal state: %v", err)
 	}
 
@@ -171,6 +172,7 @@ local_validation:
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "claimed",
       "evidence_paths": ["/tmp/e2e.txt"]
     }
@@ -247,6 +249,7 @@ acceptance:
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "claimed",
       "evidence_paths": ["/tmp/e2e.txt"]
     }
@@ -306,6 +309,7 @@ acceptance:
       "id": "req-1",
       "text": "ship feature",
       "source": "user",
+      "role": "outcome",
       "state": "claimed",
       "evidence_paths": ["/tmp/e2e.txt"],
       "note": "ready for verification"

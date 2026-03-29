@@ -36,7 +36,7 @@ func TestIdentityFencePathAndDerivation(t *testing.T) {
 		t.Fatalf("SaveRunCharter: %v", err)
 	}
 	goal := NewGoalState()
-	goal.Required = []GoalItem{{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}}}
+	goal.Required = []GoalItem{{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateClaimed, EvidencePaths: []string{"/tmp/evidence.txt"}}}
 	if err := SaveGoalState(GoalPath(runDir), goal); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestRefreshIdentityFenceDetectsChangedGoalContent(t *testing.T) {
 		t.Fatalf("SaveIdentityFence initial: %v", err)
 	}
 
-	goal.Required = append(goal.Required, GoalItem{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, State: goalItemStateOpen})
+	goal.Required = append(goal.Required, GoalItem{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen})
 	goal.Version++
 	if err := SaveGoalState(GoalPath(runDir), goal); err != nil {
 		t.Fatalf("SaveGoalState updated: %v", err)

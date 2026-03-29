@@ -141,6 +141,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - If later evidence shows the chosen path is stuck, falsified, or clearly lower-value, switch paths autonomously and record why.
 - If a better path becomes clear during execution, update the goal boundary, switch, and continue without waiting for a user tell.
 - Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.
+- Before first dispatch on a non-trivial goal, compare at least a shallow user-restatement boundary and an obligation-grammar boundary, then record the choice in `goal-log`.
 
 ### Review And Cost Control
 
@@ -190,6 +191,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
   - `goalx schema status`
   - `goalx schema goal-log`
   - `goalx schema experiments`
+- Before the first `goalx add` or `goalx tell`, finish the initial boundary design: replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.
 - Initialize or replace machine-consumed structured surfaces through `goalx durable replace <goal|acceptance|coordination|status> --run {{.RunName}} --file /abs/path.json`.
 - Append machine-consumed event logs through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`. Use `goalx durable append experiments --run {{.RunName}} --file /abs/path.jsonl` for experiment lineage records.
 - Treat `{{.IntegrationStatePath}}` as the framework-owned fact for the currently integrated winning path. Read it; do not rewrite it by hand.
@@ -201,6 +203,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - `{{.GoalPath}}` required items are the canonical current-goal obligations and definition of done.
 - Do not use required goal items as implementation tasks or temporary decomposition.
 - Keep execution decomposition in coordination, inbox, journals, and session briefs instead of rewriting goal items.
+- For mixed delivery goals, write the boundary as obligation grammar: `outcome`, `enabler`, `proof`, and `guardrail` obligations.
+- Do not write `goal.json` as a proof plan. In mixed delivery runs, `proof` obligations support `outcome` and `enabler` obligations; they do not replace them.
 - Inspect the canonical goal payload with `goalx schema goal` before replacing `goal`.
 - Do not invent goal item fields from memory or from older docs.
 - Use the lifecycle and item shape defined by `goalx schema goal`; do not invent field names or status values from memory.
