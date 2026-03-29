@@ -132,29 +132,56 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 			advisories = append(advisories, ownerAttention)
 		}
 	}
-	meta, err := LoadRunMetadata(RunMetadataPath(rc.RunDir))
-	if err != nil || meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
-		return advisories, nil
-	}
-	if status == nil || strings.TrimSpace(status.Phase) != "review" || (summaryExists && completionExists) {
-		return advisories, nil
-	}
-	experimentEntries, lastExperimentAt, err := experimentsLogFacts(ExperimentsLogPath(rc.RunDir))
+	evolveFacts, err := LoadCurrentEvolveFacts(rc.RunDir)
 	if err != nil {
 		return nil, err
 	}
-	parts := []string{
-		"phase=review",
-		fmt.Sprintf("active_sessions=%d", len(status.ActiveSessions)),
-		fmt.Sprintf("experiment_entries=%d", experimentEntries),
-		fmt.Sprintf("summary_exists=%t", summaryExists),
-		fmt.Sprintf("completion_proof_exists=%t", completionExists),
+	if advisory := formatEvolveManagementAdvisory(evolveFacts, status); advisory != "" {
+		advisories = append(advisories, advisory)
 	}
-	if lastExperimentAt != "" {
-		parts = append(parts, "last_experiment_record_at="+lastExperimentAt)
-	}
-	advisories = append(advisories, "Potential evolve stall: "+strings.Join(parts, " "))
 	return advisories, nil
+}
+
+func formatEvolveManagementAdvisory(facts *EvolveFacts, status *RunStatusRecord) string {
+	if facts == nil || strings.TrimSpace(facts.ManagementGap) == "" {
+		return ""
+	}
+	activeSessions := 0
+	phase := ""
+	if status != nil {
+		activeSessions = activeRunStatusSessionCount(status.ActiveSessions)
+		phase = strings.TrimSpace(status.Phase)
+	}
+	parts := make([]string, 0, 6)
+	switch facts.ManagementGap {
+	case EvolveManagementGapMissingStopOrDispatch:
+		parts = append(parts,
+			"frontier_state="+blankAsUnknown(facts.FrontierState),
+			fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
+			fmt.Sprintf("active_sessions=%d", activeSessions),
+		)
+		if facts.LastManagementEventAt != "" {
+			parts = append(parts, "last_management_event_at="+facts.LastManagementEventAt)
+		}
+	case EvolveManagementGapReviewWithoutManagedStop:
+		parts = append(parts,
+			"frontier_state="+blankAsUnknown(facts.FrontierState),
+			fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
+			"phase="+blankAsUnknown(phase),
+			fmt.Sprintf("active_sessions=%d", activeSessions),
+		)
+	case EvolveManagementGapUnclosedAbandonedCandidate:
+		parts = append(parts, "frontier_state="+blankAsUnknown(facts.FrontierState))
+		if facts.BestExperimentID != "" {
+			parts = append(parts, "best_experiment_id="+facts.BestExperimentID)
+		}
+		if len(facts.OpenCandidateIDs) > 0 {
+			parts = append(parts, "open_candidate_ids="+strings.Join(facts.OpenCandidateIDs, ","))
+		}
+	default:
+		return ""
+	}
+	return facts.ManagementGap + ": " + strings.Join(parts, " ")
 }
 
 func formatCoverageSummary(coverage RequiredCoverage) string {

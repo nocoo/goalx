@@ -10,8 +10,11 @@ import (
 )
 
 const (
-	EvolveFrontierActive  = "active"
-	EvolveFrontierStopped = "stopped"
+	EvolveFrontierActive                          = "active"
+	EvolveFrontierStopped                         = "stopped"
+	EvolveManagementGapMissingStopOrDispatch      = "missing_stop_or_dispatch"
+	EvolveManagementGapReviewWithoutManagedStop   = "review_without_managed_stop"
+	EvolveManagementGapUnclosedAbandonedCandidate = "unclosed_abandoned_candidate"
 )
 
 type EvolveFacts struct {
@@ -80,6 +83,13 @@ func BuildEvolveFacts(runDir string) (*EvolveFacts, error) {
 				latestOpenAt = at
 			}
 		case "experiment.integrated":
+			var body ExperimentIntegratedBody
+			if err := json.Unmarshal(event.Body, &body); err != nil {
+				return nil, err
+			}
+			if facts.BestExperimentID == "" {
+				facts.BestExperimentID = strings.TrimSpace(body.ResultExperimentID)
+			}
 			if at.After(latestOpenAt) {
 				latestOpenAt = at
 			}
@@ -102,6 +112,9 @@ func BuildEvolveFacts(runDir string) (*EvolveFacts, error) {
 				latestStopAt = at
 				facts.LastStopReasonCode = strings.TrimSpace(body.ReasonCode)
 				facts.LastStopAt = strings.TrimSpace(body.StoppedAt)
+				if facts.BestExperimentID == "" {
+					facts.BestExperimentID = strings.TrimSpace(body.BestExperimentID)
+				}
 			}
 		}
 	}
@@ -127,6 +140,11 @@ func BuildEvolveFacts(runDir string) (*EvolveFacts, error) {
 	if !latestMgmtAt.IsZero() {
 		facts.LastManagementEventAt = latestMgmtAt.UTC().Format(time.RFC3339)
 	}
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	facts.ManagementGap = detectEvolveManagementGap(facts, status)
 	facts.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	return facts, nil
 }
@@ -174,4 +192,86 @@ func RefreshEvolveFacts(runDir string) error {
 		return nil
 	}
 	return SaveEvolveFacts(runDir, facts)
+}
+
+func LoadCurrentEvolveFacts(runDir string) (*EvolveFacts, error) {
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	if meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
+		return nil, nil
+	}
+	facts, err := LoadEvolveFacts(EvolveFactsPath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	if facts != nil {
+		return facts, nil
+	}
+	return BuildEvolveFacts(runDir)
+}
+
+func detectEvolveManagementGap(facts *EvolveFacts, status *RunStatusRecord) string {
+	if facts == nil || status == nil {
+		return ""
+	}
+	if hasUnclosedAbandonedCandidate(facts, status) {
+		return EvolveManagementGapUnclosedAbandonedCandidate
+	}
+	if strings.TrimSpace(status.Phase) == runStatusPhaseReview && activeRunStatusSessionCount(status.ActiveSessions) == 0 && facts.FrontierState != EvolveFrontierStopped {
+		return EvolveManagementGapReviewWithoutManagedStop
+	}
+	if facts.FrontierState != EvolveFrontierActive || activeRunStatusSessionCount(status.ActiveSessions) > 0 {
+		return ""
+	}
+	statusUpdatedAt, statusOK := parseRFC3339Time(status.UpdatedAt)
+	managementAt, managementOK := parseRFC3339Time(facts.LastManagementEventAt)
+	switch {
+	case statusOK && managementOK && statusUpdatedAt.After(managementAt):
+		return EvolveManagementGapMissingStopOrDispatch
+	case statusOK && !managementOK:
+		return EvolveManagementGapMissingStopOrDispatch
+	default:
+		return ""
+	}
+}
+
+func hasUnclosedAbandonedCandidate(facts *EvolveFacts, status *RunStatusRecord) bool {
+	bestExperimentID := strings.TrimSpace(facts.BestExperimentID)
+	if bestExperimentID == "" {
+		return false
+	}
+	phase := strings.TrimSpace(status.Phase)
+	if facts.FrontierState != EvolveFrontierStopped && phase != runStatusPhaseReview {
+		return false
+	}
+	for _, id := range facts.OpenCandidateIDs {
+		if strings.TrimSpace(id) != "" && strings.TrimSpace(id) != bestExperimentID {
+			return true
+		}
+	}
+	return false
+}
+
+func activeRunStatusSessionCount(names []string) int {
+	count := 0
+	for _, name := range names {
+		if strings.TrimSpace(name) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func parseRFC3339Time(value string) (time.Time, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
 }

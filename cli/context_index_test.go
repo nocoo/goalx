@@ -84,6 +84,68 @@ func TestBuildContextIndexIncludesImmutableRunIdentity(t *testing.T) {
 	}
 }
 
+func TestBuildContextIndexIncludesEvolveFactsOnlyForEvolveRuns(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`)
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-1",
+		CurrentBranch:       "goalx/guidance-run/root",
+		CurrentCommit:       "abc123",
+		UpdatedAt:           "2026-03-28T10:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
+	}
+	if err := RefreshEvolveFacts(runDir); err != nil {
+		t.Fatalf("RefreshEvolveFacts: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.EvolveFactsPath != EvolveFactsPath(runDir) {
+		t.Fatalf("evolve_facts_path = %q, want %q", index.EvolveFactsPath, EvolveFactsPath(runDir))
+	}
+	if index.Evolve == nil {
+		t.Fatal("evolve summary missing")
+	}
+	if index.Evolve.FrontierState != EvolveFrontierActive {
+		t.Fatalf("evolve frontier_state = %q, want %q", index.Evolve.FrontierState, EvolveFrontierActive)
+	}
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"## Evolve",
+		"Evolve facts",
+		"Frontier state: `active`",
+		"Best experiment: `exp-1`",
+		"Open candidate count: `1`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+
+	repo2, runDir2, cfg2, _ := writeGuidanceRunFixture(t)
+	index2, err := BuildContextIndex(repo2, cfg2.Name, runDir2)
+	if err != nil {
+		t.Fatalf("BuildContextIndex non-evolve: %v", err)
+	}
+	if index2.EvolveFactsPath != "" {
+		t.Fatalf("non-evolve evolve_facts_path = %q, want empty", index2.EvolveFactsPath)
+	}
+	if index2.Evolve != nil {
+		t.Fatalf("non-evolve evolve summary = %+v, want nil", index2.Evolve)
+	}
+	if strings.Contains(renderContextIndex(index2), "## Evolve") {
+		t.Fatalf("rendered context unexpectedly exposed evolve section:\n%s", renderContextIndex(index2))
+	}
+}
+
 func TestBuildContextIndexIncludesSelectionSnapshotFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	writeSelectionSnapshotFixture(t, runDir, testSelectionSnapshot{

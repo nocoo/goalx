@@ -47,6 +47,7 @@ func Observe(projectRoot string, args []string) error {
 	if err := printRunAdvisories(rc); err != nil {
 		return err
 	}
+	printObserveEvolveSection(rc.RunDir)
 
 	if !SessionExists(rc.TmuxSession) {
 		fmt.Println("### transport")
@@ -136,6 +137,35 @@ func printObserveStatusSection(title, path string) {
 	}
 	fmt.Println(title)
 	fmt.Println(strings.TrimSpace(string(data)))
+	fmt.Println()
+}
+
+func printObserveEvolveSection(runDir string) {
+	facts, err := LoadCurrentEvolveFacts(runDir)
+	if err != nil || facts == nil {
+		return
+	}
+	parts := []string{
+		"frontier_state=" + blankAsUnknown(facts.FrontierState),
+		fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
+	}
+	if facts.BestExperimentID != "" {
+		parts = append(parts, "best_experiment_id="+facts.BestExperimentID)
+	}
+	if len(facts.OpenCandidateIDs) > 0 {
+		parts = append(parts, "open_candidate_ids="+strings.Join(facts.OpenCandidateIDs, ","))
+	}
+	if facts.LastStopReasonCode != "" {
+		parts = append(parts, "last_stop_reason_code="+facts.LastStopReasonCode)
+	}
+	if facts.LastManagementEventAt != "" {
+		parts = append(parts, "last_management_event_at="+facts.LastManagementEventAt)
+	}
+	if facts.ManagementGap != "" {
+		parts = append(parts, "management_gap="+facts.ManagementGap)
+	}
+	fmt.Println("### Evolve")
+	fmt.Println(strings.Join(parts, " "))
 	fmt.Println()
 }
 

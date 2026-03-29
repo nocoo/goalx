@@ -397,18 +397,16 @@ func TestObserveShowsMemoryContextPresenceFact(t *testing.T) {
 	}
 }
 
-func TestObserveWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *testing.T) {
+func TestObserveWarnsAboutEvolveManagementGapsAndMissingCloseoutArtifacts(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve
 	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
 		t.Fatalf("SaveRunMetadata: %v", err)
 	}
-	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-28T10:10:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := os.WriteFile(ExperimentsLogPath(runDir), []byte("{\"version\":1,\"kind\":\"experiment.created\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"master\",\"body\":{\"experiment_id\":\"exp-1\",\"created_at\":\"2026-03-28T10:00:00Z\"}}\n"), 0o644); err != nil {
-		t.Fatalf("write evolution log: %v", err)
-	}
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`)
 
 	out := captureStdout(t, func() {
 		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
@@ -418,18 +416,65 @@ func TestObserveWarnsAboutPotentialEvolveStallAndMissingCloseoutArtifacts(t *tes
 
 	for _, want := range []string{
 		"### advisories",
-		"Potential evolve stall:",
-		"phase=review",
-		"active_sessions=0",
-		"experiment_entries=1",
-		"summary_exists=false",
-		"completion_proof_exists=false",
+		"review_without_managed_stop:",
+		"frontier_state=active",
+		"open_candidate_count=1",
 		"Closeout artifacts missing:",
 		"required_remaining=0",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "Potential evolve stall:") {
+		t.Fatalf("observe output should not use legacy evolve stall advisory:\n%s", out)
+	}
+}
+
+func TestObserveShowsEvolveSummaryOnlyForEvolveRuns(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`)
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:02:00Z","actor":"master","body":{"experiment_id":"exp-2","created_at":"2026-03-28T10:02:00Z"}}`)
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-1",
+		CurrentBranch:       "goalx/guidance-run/root",
+		CurrentCommit:       "abc123",
+		UpdatedAt:           "2026-03-28T10:02:00Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"### Evolve",
+		"frontier_state=active",
+		"best_experiment_id=exp-1",
+		"open_candidate_count=2",
+		"open_candidate_ids=exp-1,exp-2",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+
+	repo2, _, cfg2, _ := writeGuidanceRunFixture(t)
+	out2 := captureStdout(t, func() {
+		if err := Observe(repo2, []string{"--run", cfg2.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+	if strings.Contains(out2, "### Evolve") {
+		t.Fatalf("observe output unexpectedly exposed evolve section outside evolve:\n%s", out2)
 	}
 }
 

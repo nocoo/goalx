@@ -246,10 +246,34 @@ func printStatusControlSummary(rc *RunContext) {
 	if experiments := formatExperimentSurfaceSummary(rc.RunDir); experiments != "" {
 		fmt.Printf("Experiments: %s\n", experiments)
 	}
+	if evolve := formatEvolveStatusSummary(rc.RunDir); evolve != "" {
+		fmt.Printf("Evolve: %s\n", evolve)
+	}
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)
 	}
 	fmt.Println()
+}
+
+func formatEvolveStatusSummary(runDir string) string {
+	facts, err := LoadCurrentEvolveFacts(runDir)
+	if err != nil || facts == nil {
+		return ""
+	}
+	parts := []string{
+		"frontier_state=" + blankAsUnknown(facts.FrontierState),
+		fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
+	}
+	if facts.BestExperimentID != "" {
+		parts = append(parts, "best_experiment_id="+facts.BestExperimentID)
+	}
+	if facts.LastStopReasonCode != "" {
+		parts = append(parts, "last_stop_reason_code="+facts.LastStopReasonCode)
+	}
+	if facts.LastManagementEventAt != "" {
+		parts = append(parts, "last_management_event_at="+facts.LastManagementEventAt)
+	}
+	return strings.Join(parts, " ")
 }
 
 func targetLossSummary(rc *RunContext) string {

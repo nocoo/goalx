@@ -244,6 +244,9 @@ func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("SaveIntegrationState: %v", err)
 	}
+	if err := RefreshEvolveFacts(runDir); err != nil {
+		t.Fatalf("RefreshEvolveFacts: %v", err)
+	}
 
 	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
 	if err != nil {
@@ -252,14 +255,18 @@ func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) 
 
 	commands := make([]string, 0, len(doc.Items))
 	facts := make([]string, 0, len(doc.Items))
+	paths := make([]string, 0, len(doc.Items))
 	for _, item := range doc.Items {
 		commands = append(commands, item.Command)
 		facts = append(facts, strings.Join(item.Facts, "\n"))
+		paths = append(paths, strings.Join(item.Paths, "\n"))
 	}
 	joinedCommands := strings.Join(commands, "\n")
 	for _, want := range []string{
 		"goalx diff --run guidance-run session-1 session-2",
 		`goalx add --run guidance-run --mode develop --worktree --base-branch session-N "follow-on direction"`,
+		"goalx durable append experiments --run guidance-run --file /abs/path.experiment-closed.jsonl",
+		"goalx durable append experiments --run guidance-run --file /abs/path.evolve-stopped.jsonl",
 	} {
 		if !strings.Contains(joinedCommands, want) {
 			t.Fatalf("affordance commands missing %q:\n%s", want, joinedCommands)
@@ -272,10 +279,44 @@ func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) 
 		"Last experiment record: `2026-03-28T10:05:00Z`.",
 		"Last integration method: `keep`.",
 		"Last integration sources: `exp-1`.",
+		"Frontier state: `active`.",
+		"Best experiment: `exp-2`.",
+		"Open candidate count: `1`.",
 	} {
 		if !strings.Contains(joinedFacts, want) {
 			t.Fatalf("affordance facts missing %q:\n%s", want, joinedFacts)
 		}
+	}
+	if !strings.Contains(strings.Join(paths, "\n"), EvolveFactsPath(runDir)) {
+		t.Fatalf("affordance paths missing evolve facts path:\n%s", strings.Join(paths, "\n"))
+	}
+}
+
+func TestBuildAffordancesOmitsEvolveManagementItemsOutsideEvolve(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	commands := make([]string, 0, len(doc.Items))
+	paths := make([]string, 0, len(doc.Items))
+	for _, item := range doc.Items {
+		commands = append(commands, item.Command)
+		paths = append(paths, strings.Join(item.Paths, "\n"))
+	}
+	joinedCommands := strings.Join(commands, "\n")
+	for _, blocked := range []string{
+		"goalx durable append experiments --run guidance-run --file /abs/path.experiment-closed.jsonl",
+		"goalx durable append experiments --run guidance-run --file /abs/path.evolve-stopped.jsonl",
+	} {
+		if strings.Contains(joinedCommands, blocked) {
+			t.Fatalf("affordances unexpectedly exposed evolve command %q:\n%s", blocked, joinedCommands)
+		}
+	}
+	if strings.Contains(strings.Join(paths, "\n"), EvolveFactsPath(runDir)) {
+		t.Fatalf("affordances unexpectedly exposed evolve facts path outside evolve:\n%s", strings.Join(paths, "\n"))
 	}
 }
 

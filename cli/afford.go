@@ -20,6 +20,9 @@ func Afford(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := RefreshEvolveFacts(rc.RunDir); err != nil {
+		return err
+	}
 
 	doc, err := BuildAffordances(projectRoot, rc.Name, rc.RunDir, target)
 	if err != nil {

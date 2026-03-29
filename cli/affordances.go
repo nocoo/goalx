@@ -207,6 +207,20 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 				Summary: "Fork a follow-on dedicated worktree from an existing session branch to continue or compete on a concrete direction.",
 				Command: fmt.Sprintf(`goalx add --run %s --mode develop --worktree --base-branch session-N "follow-on direction"`, runName),
 			},
+			AffordanceItem{
+				ID:      "record-experiment-closed",
+				Kind:    "control",
+				Summary: "Append an `experiment.closed` event after master explicitly rejects, abandons, or supersedes a path.",
+				Command: fmt.Sprintf("goalx durable append experiments --run %s --file /abs/path.experiment-closed.jsonl", runName),
+				Paths:   []string{ExperimentsLogPath(runDir)},
+			},
+			AffordanceItem{
+				ID:      "record-evolve-stop",
+				Kind:    "control",
+				Summary: "Append an `evolve.stopped` event when master intentionally closes the current frontier.",
+				Command: fmt.Sprintf("goalx durable append experiments --run %s --file /abs/path.evolve-stopped.jsonl", runName),
+				Paths:   []string{ExperimentsLogPath(runDir)},
+			},
 		)
 	}
 	if index != nil {
@@ -222,6 +236,9 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			})
 		}
 		if item := buildSelectionFactsAffordance(index); item != nil {
+			doc.Items = append(doc.Items, *item)
+		}
+		if item := buildEvolveFactsAffordance(index); item != nil {
 			doc.Items = append(doc.Items, *item)
 		}
 		if item := buildWorktreeBoundaryAffordance(index, normalizedTarget); item != nil {
@@ -241,10 +258,42 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "path",
 			Summary: "Absolute run paths for durable state and reports.",
 			Command: "",
-			Paths:   []string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.ExperimentsLogPath, index.IntegrationStatePath},
+			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
 		})
 	}
 	return doc, nil
+}
+
+func buildEvolveFactsAffordance(index *ContextIndex) *AffordanceItem {
+	if index == nil || strings.TrimSpace(index.EvolveFactsPath) == "" {
+		return nil
+	}
+	item := &AffordanceItem{
+		ID:      "evolve-facts",
+		Kind:    "fact",
+		Summary: "Derived evolve management facts for the current frontier.",
+		Paths:   []string{index.EvolveFactsPath},
+	}
+	if index.Evolve == nil {
+		return item
+	}
+	if index.Evolve.FrontierState != "" {
+		item.Facts = append(item.Facts, fmt.Sprintf("Frontier state: `%s`.", index.Evolve.FrontierState))
+	}
+	if index.Evolve.BestExperimentID != "" {
+		item.Facts = append(item.Facts, fmt.Sprintf("Best experiment: `%s`.", index.Evolve.BestExperimentID))
+	}
+	item.Facts = append(item.Facts, fmt.Sprintf("Open candidate count: `%d`.", index.Evolve.OpenCandidateCount))
+	if len(index.Evolve.OpenCandidateIDs) > 0 {
+		item.Facts = append(item.Facts, fmt.Sprintf("Open candidate IDs: `%s`.", strings.Join(index.Evolve.OpenCandidateIDs, ", ")))
+	}
+	if index.Evolve.LastStopReasonCode != "" {
+		item.Facts = append(item.Facts, fmt.Sprintf("Last stop reason: `%s`.", index.Evolve.LastStopReasonCode))
+	}
+	if index.Evolve.LastManagementEventAt != "" {
+		item.Facts = append(item.Facts, fmt.Sprintf("Last management event: `%s`.", index.Evolve.LastManagementEventAt))
+	}
+	return item
 }
 
 func buildSelectionFactsAffordance(index *ContextIndex) *AffordanceItem {
@@ -403,6 +452,9 @@ func RefreshRunGuidance(projectRoot, runName, runDir string) error {
 		return err
 	}
 	if err := RefreshRunMemoryContext(runDir); err != nil {
+		return err
+	}
+	if err := RefreshEvolveFacts(runDir); err != nil {
 		return err
 	}
 	activity, err := BuildActivitySnapshot(projectRoot, runName, runDir)

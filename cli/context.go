@@ -25,6 +25,9 @@ func Context(projectRoot string, args []string) error {
 	if err := RefreshRunMemoryContext(rc.RunDir); err != nil {
 		return err
 	}
+	if err := RefreshEvolveFacts(rc.RunDir); err != nil {
+		return err
+	}
 
 	index, err := BuildContextIndex(projectRoot, rc.Name, rc.RunDir)
 	if err != nil {
@@ -91,6 +94,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Goal", index.GoalPath)
 	writeContextLine("Experiment ledger", index.ExperimentsLogPath)
 	writeContextLine("Integration state", index.IntegrationStatePath)
+	writeContextLine("Evolve facts", index.EvolveFactsPath)
 	writeContextLine("Acceptance", index.AcceptanceStatePath)
 	writeContextLine("Closeout/evidence surface", index.CompletionProofPath)
 	writeContextLine("Coordination", index.CoordinationPath)
@@ -128,6 +132,18 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Required by source", formatContextCountMap(index.GoalBoundary.RequiredBySource))
 		writeContextLine("Required by role", formatContextCountMap(index.GoalBoundary.RequiredByRole))
 		writeContextLine("Required by state", formatContextCountMap(index.GoalBoundary.RequiredByState))
+	}
+	if index.EvolveFactsPath != "" || index.Evolve != nil {
+		b.WriteString("\n## Evolve\n\n")
+		writeContextLine("Evolve facts", index.EvolveFactsPath)
+		if index.Evolve != nil {
+			writeContextLine("Frontier state", index.Evolve.FrontierState)
+			writeContextLine("Best experiment", index.Evolve.BestExperimentID)
+			writeContextLine("Open candidate count", fmt.Sprintf("%d", index.Evolve.OpenCandidateCount))
+			writeContextLine("Open candidate IDs", strings.Join(index.Evolve.OpenCandidateIDs, ", "))
+			writeContextLine("Last stop reason", index.Evolve.LastStopReasonCode)
+			writeContextLine("Last management event", index.Evolve.LastManagementEventAt)
+		}
 	}
 	if len(index.ProviderFacts) > 0 {
 		b.WriteString("\n## Provider Facts\n\n")

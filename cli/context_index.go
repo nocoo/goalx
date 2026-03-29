@@ -36,11 +36,13 @@ type ContextIndex struct {
 	TransportFactsPath    string               `json:"transport_facts_path,omitempty"`
 	MemoryQueryPath       string               `json:"memory_query_path,omitempty"`
 	MemoryContextPath     string               `json:"memory_context_path,omitempty"`
+	EvolveFactsPath       string               `json:"evolve_facts_path,omitempty"`
 	AffordancesJSONPath   string               `json:"affordances_json_path,omitempty"`
 	AffordancesMarkdown   string               `json:"affordances_markdown_path,omitempty"`
 	ContextIndexPath      string               `json:"context_index_path,omitempty"`
 	DimensionsPath        string               `json:"dimensions_path,omitempty"`
 	Master                ContextMaster        `json:"master"`
+	Evolve                *ContextEvolve       `json:"evolve,omitempty"`
 	GoalBoundary          *ContextGoalBoundary `json:"goal_boundary,omitempty"`
 	Selection             *ContextSelection    `json:"selection,omitempty"`
 	Sessions              []ContextSession     `json:"sessions,omitempty"`
@@ -80,6 +82,15 @@ type ContextGoalBoundary struct {
 	RequiredBySource map[string]int `json:"required_by_source,omitempty"`
 	RequiredByRole   map[string]int `json:"required_by_role,omitempty"`
 	RequiredByState  map[string]int `json:"required_by_state,omitempty"`
+}
+
+type ContextEvolve struct {
+	FrontierState         string   `json:"frontier_state,omitempty"`
+	BestExperimentID      string   `json:"best_experiment_id,omitempty"`
+	OpenCandidateCount    int      `json:"open_candidate_count,omitempty"`
+	OpenCandidateIDs      []string `json:"open_candidate_ids,omitempty"`
+	LastStopReasonCode    string   `json:"last_stop_reason_code,omitempty"`
+	LastManagementEventAt string   `json:"last_management_event_at,omitempty"`
 }
 
 type ContextProviderBootstrap struct {
@@ -239,6 +250,23 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 			MasterEffort:       selectionSnapshot.Policy.MasterEffort,
 			ResearchEffort:     selectionSnapshot.Policy.ResearchEffort,
 			DevelopEffort:      selectionSnapshot.Policy.DevelopEffort,
+		}
+	}
+	if strings.TrimSpace(index.RunIdentity.Intent) == runIntentEvolve {
+		index.EvolveFactsPath = EvolveFactsPath(runDir)
+		facts, err := BuildEvolveFacts(runDir)
+		if err != nil {
+			return nil, err
+		}
+		if facts != nil {
+			index.Evolve = &ContextEvolve{
+				FrontierState:         facts.FrontierState,
+				BestExperimentID:      facts.BestExperimentID,
+				OpenCandidateCount:    facts.OpenCandidateCount,
+				OpenCandidateIDs:      append([]string(nil), facts.OpenCandidateIDs...),
+				LastStopReasonCode:    facts.LastStopReasonCode,
+				LastManagementEventAt: facts.LastManagementEventAt,
+			}
 		}
 	}
 	index.Master = contextMaster(cfg, selectionSnapshot, engines, runDir)
