@@ -22,12 +22,10 @@ type ProtocolData struct {
 	ExperimentsLogPath     string
 	Mode                   goalx.Mode
 	Engine                 string
-	SessionCapabilities    ProviderCapabilities
 	Engines                map[string]goalx.EngineConfig
 	Sessions               []SessionData
 	Master                 goalx.MasterConfig
 	Roles                  goalx.RoleDefaultsConfig
-	MasterCapabilities     ProviderCapabilities
 	LocalValidationCommand string
 	Budget                 goalx.BudgetConfig
 	Target                 goalx.TargetConfig
@@ -103,16 +101,6 @@ type SessionData struct {
 	Prompt            string
 }
 
-type ProviderCapabilities struct {
-	ProviderLabel                     string
-	NativeSubagentsAvailable          bool
-	NativeSubagentsRequireExplicitAsk bool
-	StopHookSafetyNet                 bool
-	WebSearchAvailable                bool
-	ActionExecutionReminder           bool
-	AutonomyPersistenceReminder       bool
-}
-
 // RenderMasterProtocol renders master.md.tmpl to the run directory.
 func RenderMasterProtocol(data ProtocolData, runDir string) error {
 	data = normalizeProtocolData(data, runDir)
@@ -127,12 +115,6 @@ func RenderSubagentProtocol(data ProtocolData, runDir string, sessionIdx int) er
 }
 
 func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
-	if isZeroProviderCapabilities(data.MasterCapabilities) && data.Master.Engine != "" {
-		data.MasterCapabilities = providerCapabilities(data.Master.Engine)
-	}
-	if isZeroProviderCapabilities(data.SessionCapabilities) && data.Engine != "" {
-		data.SessionCapabilities = providerCapabilities(data.Engine)
-	}
 	if data.GoalLogPath == "" && data.GoalPath != "" {
 		data.GoalLogPath = filepath.Join(filepath.Dir(data.GoalPath), "goal-log.jsonl")
 	}
@@ -173,38 +155,6 @@ func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 		data.AffordancesPath = AffordancesMarkdownPath(runDir)
 	}
 	return data
-}
-
-func providerCapabilities(engine string) ProviderCapabilities {
-	switch strings.TrimSpace(engine) {
-	case "claude-code":
-		return ProviderCapabilities{
-			ProviderLabel:               "Claude Code",
-			NativeSubagentsAvailable:    true,
-			StopHookSafetyNet:           true,
-			WebSearchAvailable:          true,
-			AutonomyPersistenceReminder: true,
-		}
-	case "codex":
-		return ProviderCapabilities{
-			ProviderLabel:                     "Codex CLI",
-			NativeSubagentsAvailable:          true,
-			NativeSubagentsRequireExplicitAsk: true,
-			ActionExecutionReminder:           true,
-		}
-	default:
-		return ProviderCapabilities{}
-	}
-}
-
-func isZeroProviderCapabilities(c ProviderCapabilities) bool {
-	return c.ProviderLabel == "" &&
-		!c.NativeSubagentsAvailable &&
-		!c.NativeSubagentsRequireExplicitAsk &&
-		!c.StopHookSafetyNet &&
-		!c.WebSearchAvailable &&
-		!c.ActionExecutionReminder &&
-		!c.AutonomyPersistenceReminder
 }
 
 func existingProtocolPath(path string) string {

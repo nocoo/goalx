@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,9 @@ func TestVerifyUsesAcceptanceChecksAndWritesState(t *testing.T) {
 	runDir := goalx.RunDir(repo, runName)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.MkdirAll(ReportsDir(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir reports dir: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir project .goalx: %v", err)
@@ -273,6 +277,210 @@ acceptance:
 	}
 
 	assertFileUnchanged(t, GoalPath(runDir), goalBefore)
+}
+
+func TestVerifyResearchRequiresReportEvidenceManifest(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+
+	runName := "verify-research-manifest-missing"
+	runDir := seedResearchVerifyRun(t, repo, runName)
+
+	if err := os.WriteFile(filepath.Join(ReportsDir(runDir), "architecture-options-comparison.md"), []byte("report\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+
+	err := Verify(repo, []string{"--run", runName})
+	if err == nil {
+		t.Fatal("expected Verify to fail")
+	}
+	if !strings.Contains(err.Error(), "evidence manifest") {
+		t.Fatalf("Verify error = %v, want evidence manifest failure", err)
+	}
+}
+
+func TestVerifyResearchRejectsMalformedReportEvidenceManifest(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+
+	runName := "verify-research-manifest-invalid"
+	runDir := seedResearchVerifyRun(t, repo, runName)
+
+	reportPath := filepath.Join(ReportsDir(runDir), "architecture-options-comparison.md")
+	if err := os.WriteFile(reportPath, []byte("report\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := os.WriteFile(ReportEvidenceManifestPath(reportPath), []byte(fmt.Sprintf(`{
+  "version": 1,
+  "report_path": %q,
+  "covers": ["ucl-research"],
+  "repo_evidence_paths": [],
+  "external_refs": [],
+  "unexpected": true
+}`, reportPath)), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := Verify(repo, []string{"--run", runName})
+	if err == nil {
+		t.Fatal("expected Verify to fail")
+	}
+	if !strings.Contains(err.Error(), "unknown field") && !strings.Contains(err.Error(), "unexpected") {
+		t.Fatalf("Verify error = %v, want manifest parse failure", err)
+	}
+}
+
+func TestVerifyResearchRequiresExternalRefsForComparisonClause(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+
+	runName := "verify-research-external-refs-missing"
+	runDir := seedResearchVerifyRun(t, repo, runName)
+
+	reportPath := filepath.Join(ReportsDir(runDir), "architecture-options-comparison.md")
+	evidencePath := filepath.Join(runDir, "source.txt")
+	if err := os.WriteFile(reportPath, []byte("report\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := os.WriteFile(evidencePath, []byte("evidence\n"), 0o644); err != nil {
+		t.Fatalf("write evidence: %v", err)
+	}
+	if err := os.WriteFile(ReportEvidenceManifestPath(reportPath), []byte(fmt.Sprintf(`{
+  "version": 1,
+  "report_path": %q,
+  "covers": ["ucl-research"],
+  "repo_evidence_paths": [%q],
+  "external_refs": []
+}`, reportPath, evidencePath)), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	err := Verify(repo, []string{"--run", runName})
+	if err == nil {
+		t.Fatal("expected Verify to fail")
+	}
+	if !strings.Contains(err.Error(), "external_refs") {
+		t.Fatalf("Verify error = %v, want external refs failure", err)
+	}
+}
+
+func TestVerifyResearchPassesWithStructuredEvidence(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	ensureSharedProofEvidence(t)
+
+	runName := "verify-research-structured"
+	runDir := seedResearchVerifyRun(t, repo, runName)
+
+	reportPath := filepath.Join(ReportsDir(runDir), "architecture-options-comparison.md")
+	evidencePath := filepath.Join(runDir, "source.txt")
+	if err := os.WriteFile(reportPath, []byte("report\n"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+	if err := os.WriteFile(evidencePath, []byte("evidence\n"), 0o644); err != nil {
+		t.Fatalf("write evidence: %v", err)
+	}
+	if err := os.WriteFile(ReportEvidenceManifestPath(reportPath), []byte(fmt.Sprintf(`{
+  "version": 1,
+  "report_path": %q,
+  "covers": ["ucl-research"],
+  "repo_evidence_paths": [%q],
+  "external_refs": ["https://example.com/reference"]
+}`, reportPath, evidencePath)), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	if err := Verify(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+}
+
+func seedResearchVerifyRun(t *testing.T, repo, runName string) string {
+	t.Helper()
+
+	runDir := goalx.RunDir(repo, runName)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.MkdirAll(ReportsDir(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir reports dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir project .goalx: %v", err)
+	}
+
+	snapshot := []byte(`name: ` + runName + `
+mode: research
+objective: compare external reference architectures
+acceptance:
+  command: "printf 'research e2e ok\n'"
+`)
+	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	contract := &ObjectiveContract{
+		Version:       1,
+		ObjectiveHash: "sha256:research",
+		State:         objectiveContractStateLocked,
+		Clauses: []ObjectiveClause{
+			{
+				ID:               "ucl-research",
+				Text:             "compare external reference architectures",
+				Kind:             objectiveClauseKindVerification,
+				SourceExcerpt:    "compare external reference architectures",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
+			},
+		},
+	}
+	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), contract); err != nil {
+		t.Fatalf("SaveObjectiveContract: %v", err)
+	}
+	goal := &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:            "req-1",
+				Text:          "compare external reference architectures",
+				Source:        goalItemSourceUser,
+				Role:          goalItemRoleOutcome,
+				State:         goalItemStateClaimed,
+				Covers:        []string{"ucl-research"},
+				EvidencePaths: []string{ensureSharedProofEvidence(t)},
+			},
+		},
+		Optional: []GoalItem{},
+	}
+	if err := SaveGoalState(GoalPath(runDir), goal); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := SaveRunMetadata(RunMetadataPath(runDir), &RunMetadata{
+		Version:      1,
+		Objective:    "compare external reference architectures",
+		BaseRevision: strings.TrimSpace(gitOutput(t, repo, "rev-parse", "HEAD")),
+	}); err != nil {
+		t.Fatalf("write run metadata: %v", err)
+	}
+	seedRunCharterForTests(t, runDir, runName, repo)
+
+	return runDir
 }
 
 func TestVerifyRecordsAcceptanceWhenRunChangedCode(t *testing.T) {

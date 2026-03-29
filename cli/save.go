@@ -201,7 +201,7 @@ func Save(projectRoot string, args []string) error {
 				destName = fmt.Sprintf("%s-report.md", sName)
 			}
 			destPath := filepath.Join(saveDir, destName)
-			if err := copyFileIfExists(reportSource, destPath); err != nil {
+			if err := copyReportWithEvidence(reportSource, destPath); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: could not copy %s report: %v\n", sName, err)
 			} else {
 				savedSession := ensureSessionArtifactsEntry(savedManifest, sName, sessionMode)
@@ -331,8 +331,17 @@ func copyReportsDirIfExists(srcRunDir, dstRunDir string) error {
 		if entry.IsDir() {
 			continue
 		}
+		if strings.HasSuffix(entry.Name(), ".evidence.json") {
+			continue
+		}
 		src := filepath.Join(ReportsDir(srcRunDir), entry.Name())
 		dst := filepath.Join(ReportsDir(dstRunDir), entry.Name())
+		if strings.HasSuffix(entry.Name(), ".md") {
+			if err := copyReportWithEvidence(src, dst); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := copyFileIfExists(src, dst); err != nil {
 			return err
 		}

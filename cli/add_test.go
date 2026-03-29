@@ -372,8 +372,14 @@ local_validation:
 	if err != nil {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
-	if !strings.Contains(string(out), "You are running in Codex CLI.") {
-		t.Fatalf("rendered protocol missing codex engine guidance:\n%s", string(out))
+	text := string(out)
+	for _, want := range []string{
+		"## Execution Discipline",
+		"## Autonomy Persistence",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
 	}
 }
 
@@ -1132,8 +1138,8 @@ local_validation:
 	for _, want := range []string{
 		"## Mode: Research",
 		"Research mode typically focuses on producing reports; code modification controlled by target config.",
-		"## Native Helpers",
-		"You are running in Claude Code.",
+		"## Execution Discipline",
+		"## Autonomy Persistence",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
@@ -1672,8 +1678,14 @@ local_validation:
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	if !strings.Contains(text, "You are running in Claude Code.") {
-		t.Fatalf("rendered protocol missing claude research engine guidance:\n%s", text)
+	for _, want := range []string{
+		"## Mode: Research",
+		"## Execution Discipline",
+		"## Autonomy Persistence",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered protocol missing %q:\n%s", want, text)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(runWT, ".claude", "hooks.json")); err != nil {
 		t.Fatalf("expected claude adapter hook for session-2: %v", err)

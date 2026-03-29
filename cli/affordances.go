@@ -244,12 +244,12 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		if item := buildWorktreeBoundaryAffordance(index, normalizedTarget); item != nil {
 			doc.Items = append(doc.Items, *item)
 		}
-		if facts := providerFactsForTarget(index.ProviderFacts, normalizedTarget); len(facts) > 0 {
+		if facts := providerRuntimeFactsForTarget(index.ProviderRuntimeFacts, normalizedTarget); len(facts) > 0 {
 			doc.Items = append(doc.Items, AffordanceItem{
-				ID:      "provider-facts",
+				ID:      "provider-runtime",
 				Kind:    "fact",
-				Summary: providerFactsSummary(normalizedTarget, facts),
-				Facts:   renderProviderFactLines(normalizedTarget, facts),
+				Summary: providerRuntimeFactsSummary(normalizedTarget, facts),
+				Facts:   renderProviderRuntimeFactLines(normalizedTarget, facts),
 				Paths:   []string{ContextIndexPath(runDir)},
 			})
 		}
@@ -514,14 +514,14 @@ func buildAttachCommand(runName, target string) string {
 	return strings.Join(args, " ")
 }
 
-func providerFactsForTarget(facts []ProviderFact, target string) []ProviderFact {
+func providerRuntimeFactsForTarget(facts []ProviderRuntimeFact, target string) []ProviderRuntimeFact {
 	if len(facts) == 0 {
 		return nil
 	}
 	if strings.TrimSpace(target) == "" {
 		return facts
 	}
-	filtered := make([]ProviderFact, 0, len(facts))
+	filtered := make([]ProviderRuntimeFact, 0, len(facts))
 	for _, fact := range facts {
 		if fact.Target == target {
 			filtered = append(filtered, fact)
@@ -530,21 +530,21 @@ func providerFactsForTarget(facts []ProviderFact, target string) []ProviderFact 
 	return filtered
 }
 
-func providerFactsSummary(target string, facts []ProviderFact) string {
+func providerRuntimeFactsSummary(target string, facts []ProviderRuntimeFact) string {
 	if len(facts) == 0 {
 		return ""
 	}
 	if strings.TrimSpace(target) == "" {
-		return "Provider-native capability facts for this run."
+		return "Provider runtime and bootstrap facts for this run."
 	}
 	engine := facts[0].Engine
 	if strings.TrimSpace(engine) == "" {
-		return fmt.Sprintf("Provider-native capability facts for `%s`.", target)
+		return fmt.Sprintf("Provider runtime and bootstrap facts for `%s`.", target)
 	}
-	return fmt.Sprintf("Provider-native capability facts for `%s` (`%s`).", target, engine)
+	return fmt.Sprintf("Provider runtime and bootstrap facts for `%s` (`%s`).", target, engine)
 }
 
-func renderProviderFactLines(target string, facts []ProviderFact) []string {
+func renderProviderRuntimeFactLines(target string, facts []ProviderRuntimeFact) []string {
 	lines := make([]string, 0, len(facts))
 	for _, fact := range facts {
 		line := fact.Fact

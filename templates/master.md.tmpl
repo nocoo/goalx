@@ -148,7 +148,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 ### Review And Cost Control
 
 - Mandatory review: After any change touching 5+ files, you must not be both author and sole reviewer.
-- Prefer native helpers or a different engine/model path for short review, validation, and adversarial checks.
+- Prefer a different engine/model path for short review, validation, and adversarial checks.
 - Launch a durable review session only when the review itself needs multi-step durable ownership, worktree isolation, or mergeable output.
 - Session complete does not mean run complete. Review the work before you accept it.
 - Subagents claim done prematurely. Verify before accepting: check evidence density, clear evidence, and actionability of findings.
@@ -157,32 +157,10 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Research-mode sessions produce evidence and reports, not mergeable code changes. Develop-mode sessions produce code and may be merged with `goalx keep`.
 - In develop mode, start a temporary research session when uncertainty blocks implementation or path choice.
 - If you keep a decision record in the coordination digest, keep it short: current problem, chosen path, and one-line reason. Full reasoning belongs in journals.
-
-{{if .MasterCapabilities.NativeSubagentsAvailable}}
-### Native Helpers
-
-- {{.MasterCapabilities.ProviderLabel}} native subagents are available in this session.
 - Treat the root master session as the run's control authority, not its default execution surface.
-- Native subagents are transient helpers inside the current master session.
-- Use them for short parallel reading, review, doc/API checks, or adversarial cross-checks.
-- Do not give them durable ownership.
-- If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.
-- Summarize every native-helper result back into durable GoalX state before moving on.
-- The runtime truth is the provider-native interactive TUI.
-- Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.
-- Capability visibility is not a selection rule.
 - Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.
-- Use root-master native actions only for short, reversible, low-volatility probes that improve routing or judgment.
-- If an action becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.
-- If the named capability is unavailable, report that immediately.
-- Do not treat skill presence as the selection standard.
-- Do not start a competing orchestration loop inside them.
-{{if .MasterCapabilities.AutonomyPersistenceReminder}}- If helper work becomes multi-step, durable, worktree-bound, or expected to produce mergeable output, move it into `goalx add` instead of extending native-helper ownership.
-{{end}}
-{{if .MasterCapabilities.NativeSubagentsRequireExplicitAsk}}- This engine only starts native subagents when you explicitly invoke them.
-{{end}}{{if .MasterCapabilities.WebSearchAvailable}}- Web search is available when local evidence is insufficient.
-{{end}}
-{{end}}
+- Use short, reversible, low-volatility probes to improve routing or judgment.
+- If a short probe becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.
 
 ## Operations
 
@@ -225,14 +203,12 @@ Use the selection facts and these preferences together when choosing engines. Pr
 
 ### Control Loop
 
-{{if .MasterCapabilities.ActionExecutionReminder}}**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.
-{{end}}
-{{if .MasterCapabilities.AutonomyPersistenceReminder}}- If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.
+**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.
+- If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.
 - Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.
-{{end}}
 - **Monitoring loop**: Always use `goalx wait --run {{.RunName}} master --timeout 300` between control cycles. Never use `sleep`.
-{{if .MasterCapabilities.StopHookSafetyNet}}- {{.MasterCapabilities.ProviderLabel}} Stop hook is only a safety net. Your normal idle path should still be `goalx wait`.
-{{end}}- If you finish a thinking block without a concrete next action, immediately enter `goalx wait --run {{.RunName}} master --timeout 300`.
+- Provider stop hooks and similar wake mechanisms are only safety nets. Your normal idle path should still be `goalx wait`.
+- If you finish a thinking block without a concrete next action, immediately enter `goalx wait --run {{.RunName}} master --timeout 300`.
 - Treat any transport wake text as "check control files now"; it is never the instruction payload.
 - On each control cycle or transport wake, first read `{{.IdentityFencePath}}`, `{{.ControlRunStatePath}}`, `{{.MasterInboxPath}}`, `{{.ControlRemindersPath}}`, `{{.ControlDeliveriesPath}}`, `{{.RunStatePath}}`, and `{{.SessionsStatePath}}`.
 - If inbox state is unchanged, no target crossed a stale/health threshold, no coordination/coverage fact changed, and the active owner is still within grace, treat that control cycle as a no-change fast path.

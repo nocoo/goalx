@@ -63,9 +63,9 @@ func TestContextCommandPrintsRunIndex(t *testing.T) {
 		"Context index:",
 		"Memory query:",
 		"Memory context:",
-		"## Provider Facts",
+		"## Provider Runtime",
 		"GoalX canonical provider runtime is tmux + interactive TUI.",
-		"Interactive Codex sessions can use installed skills and configured MCP servers from the native TUI.",
+		"GoalX provider runtime does not change durable ownership boundaries.",
 		"session-1",
 		"base selector",
 		"run-root",
@@ -90,7 +90,7 @@ func TestAffordCommandPrintsMarkdownAffordances(t *testing.T) {
 		"# GoalX Affordances",
 		"goalx context --run " + cfg.Name,
 		"goalx afford --run " + cfg.Name + " master",
-		"## provider-facts",
+		"## provider-runtime",
 		"## tell",
 		"only merges committed session branch history",
 	} {
@@ -242,11 +242,11 @@ func TestAffordCommandPrintsProviderFactsForClaudeSession(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"## provider-facts",
+		"## provider-runtime",
 		"claude-code",
-		"Provider-native capability facts for `session-1` (`claude-code`).",
+		"Provider runtime and bootstrap facts for `session-1` (`claude-code`).",
 		"GoalX canonical provider runtime is tmux + interactive TUI.",
-		"Interactive Claude sessions can use installed skills, plugins, and MCP servers from the native TUI.",
+		"GoalX provider runtime does not change durable ownership boundaries.",
 		"Claude root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions.",
 	} {
 		if !strings.Contains(out, want) {

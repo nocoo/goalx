@@ -55,7 +55,7 @@ func Observe(projectRoot string, args []string) error {
 		fmt.Println()
 
 		fmt.Println("### master")
-		printObserveMasterQueue(rc.RunDir, rc.Config.Master.Engine)
+		printObserveMasterQueue(rc.RunDir)
 		if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
 			fmt.Println(label)
 		}
@@ -69,7 +69,7 @@ func Observe(projectRoot string, args []string) error {
 		sessionState, _ := EnsureSessionsRuntimeState(rc.RunDir)
 		for _, num := range sessionIndexes {
 			fmt.Printf("### %s\n", SessionName(num))
-			printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState, rc.Config.Master.Engine)
+			printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState)
 			if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 				fmt.Println(label)
 			}
@@ -80,7 +80,7 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	fmt.Println("### master")
-	printObserveMasterQueue(rc.RunDir, rc.Config.Master.Engine)
+	printObserveMasterQueue(rc.RunDir)
 	if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
 		fmt.Println(label)
 	} else {
@@ -97,7 +97,7 @@ func Observe(projectRoot string, args []string) error {
 	for _, num := range sessionIndexes {
 		windowName := sessionWindowName(rc.Config.Name, num)
 		fmt.Printf("### %s\n", SessionName(num))
-		printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState, rc.Config.Master.Engine)
+		printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState)
 		if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 			fmt.Println(label)
 		} else {
@@ -169,15 +169,12 @@ func printObserveEvolveSection(runDir string) {
 	fmt.Println()
 }
 
-func printObserveSessionQueue(runDir, runName, sessionName string, sessionState *SessionsRuntimeState, masterEngine string) {
+func printObserveSessionQueue(runDir, runName, sessionName string, sessionState *SessionsRuntimeState) {
 	state := readControlInboxState(ControlInboxPath(runDir, sessionName), SessionCursorPath(runDir, sessionName))
 	transport := loadTransportTargetFacts(runDir, sessionName)
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
 	if hasTransportFacts(transport) {
 		fmt.Print(formatTransportQueueFacts(transport))
-	}
-	if capability := targetProviderCapabilitySummary(runDir, sessionName, masterEngine); capability != "" {
-		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
 	if worktree := sessionWorktreeSurfaceSummary(runDir, runName, sessionName, sessionState); worktree != "" {
@@ -189,15 +186,12 @@ func printObserveSessionQueue(runDir, runName, sessionName string, sessionState 
 	printObserveTransportFacts(transport)
 }
 
-func printObserveMasterQueue(runDir, masterEngine string) {
+func printObserveMasterQueue(runDir string) {
 	state := readControlInboxState(MasterInboxPath(runDir), MasterCursorPath(runDir))
 	transport := loadTransportTargetFacts(runDir, "master")
 	fmt.Printf("Queue: unread=%d cursor=%d/%d", state.Unread, state.LastSeenID, state.LastID)
 	if hasTransportFacts(transport) {
 		fmt.Print(formatTransportQueueFacts(transport))
-	}
-	if capability := targetProviderCapabilitySummary(runDir, "master", masterEngine); capability != "" {
-		fmt.Printf(" %s", capability)
 	}
 	fmt.Println()
 	if lineage := rootWorktreeLineageSummary(runDir); lineage != "" {

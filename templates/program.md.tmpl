@@ -130,33 +130,13 @@ Use these references for background (files: `cat`, URLs: fetch, text: read as-is
 {{end}}
 {{end}}
 
-{{if .SessionCapabilities.NativeSubagentsAvailable}}
-## Native Helpers
-
-You are running in {{.SessionCapabilities.ProviderLabel}}.
-- Native subagents are transient helpers inside this session.
-- Use them for short parallel reading, review, doc/API checks, or adversarial cross-checks.
-- Do not give them durable ownership. If work needs a worktree, pause/resume, replace, keep, or mergeable output, keep ownership in this GoalX session and report the durable follow-up to the master.
-- Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.
-- The runtime truth is the provider-native interactive TUI.
-- Provider-native tools are allowed inside your owned execution surface when they materially help.
-- If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.
-- If the named capability is unavailable, report that immediately.
-- Do not treat skill presence as the selection standard.
-- Do not invoke orchestration/meta slash commands or skills that start competing autonomous runs, hide durable ownership, or mutate GoalX control state.
-{{if .SessionCapabilities.NativeSubagentsRequireExplicitAsk}}- This engine only starts native subagents when you explicitly invoke them.
-{{end}}{{if .SessionCapabilities.WebSearchAvailable}}- Web search is available when local evidence is insufficient.
-{{end}}
-{{end}}
-
-{{if .SessionCapabilities.ActionExecutionReminder}}## Execution Discipline
+## Execution Discipline
 
 - When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.
 - Do not end a turn after saying you will do something next. Execute the next tool call now.
 - Do not guess file or inbox contents from memory. Read the file or run the command.
 - After one meaningful step, continue until you are blocked, validated, or actually waiting on `goalx wait`.
 
-{{end}}
 ## Journal
 
 Append entries to `{{.JournalPath}}`:
@@ -177,13 +157,12 @@ The extra blocker fields are optional unless you are stuck. If you are blocked, 
 {{if .Budget.MaxRounds}}- Max rounds: {{.Budget.MaxRounds}}{{end}}
 {{if .Budget.MaxDuration}}- Max duration: {{.Budget.MaxDuration}}{{end}}
 
-{{if .SessionCapabilities.AutonomyPersistenceReminder}}## Autonomy Persistence
+## Autonomy Persistence
 
 - If a concrete next step exists inside your current assignment, execute it before idling.
 - Do not ask master to confirm local method choices inside assigned scope. Act, record, continue.
 - Context compaction is routine. Recover from inbox, journal, and current files instead of stopping early.
 
-{{end}}
 ## Session Inbox
 
 Session inbox is the latest assignment state, not a long conversation log. Check it when resuming, after a meaningful step, after running local validation, and before declaring idle:

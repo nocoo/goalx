@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
+
+	goalx "github.com/vonbai/goalx"
 )
 
 // Verify executes the run's acceptance checks and records the result.
@@ -56,6 +59,7 @@ func Verify(projectRoot string, args []string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	exitCode := 0
 	var aggregate bytes.Buffer
+	var researchValidationErr error
 	results := make([]AcceptanceCheckResult, 0, len(activeChecks))
 	for _, check := range activeChecks {
 		ctx := context.Background()
@@ -105,6 +109,42 @@ func Verify(projectRoot string, args []string) error {
 		aggregate.WriteString(" ===\n")
 		aggregate.Write(output)
 	}
+
+	if rc.Config.Mode == goalx.ModeResearch {
+		researchEvidencePath := AcceptanceCheckEvidencePath(rc.RunDir, "research-structure")
+		researchOutput, err := validateResearchAcceptance(rc.RunDir)
+		researchValidationErr = err
+		if err := os.WriteFile(researchEvidencePath, []byte(researchOutput), 0o644); err != nil {
+			return fmt.Errorf("write research acceptance evidence: %w", err)
+		}
+		if aggregate.Len() > 0 {
+			aggregate.WriteString("\n")
+		}
+		aggregate.WriteString("=== research-structure ===\n")
+		aggregate.WriteString(researchOutput)
+		if researchValidationErr != nil {
+			if !strings.HasSuffix(researchOutput, "\n") {
+				aggregate.WriteString("\n")
+			}
+			aggregate.WriteString("research-structure error: ")
+			aggregate.WriteString(researchValidationErr.Error())
+			aggregate.WriteString("\n")
+		}
+		researchExitCode := 0
+		if researchValidationErr != nil {
+			researchExitCode = 1
+			if exitCode == 0 {
+				exitCode = researchExitCode
+			}
+		}
+		results = append(results, AcceptanceCheckResult{
+			ID:           "research-structure",
+			Command:      "structural research acceptance",
+			ExitCode:     intPtr(researchExitCode),
+			EvidencePath: researchEvidencePath,
+		})
+	}
+
 	evidencePath := AcceptanceEvidencePath(rc.RunDir)
 	if err := os.WriteFile(evidencePath, aggregate.Bytes(), 0o644); err != nil {
 		return fmt.Errorf("write acceptance evidence: %w", err)
@@ -123,6 +163,9 @@ func Verify(projectRoot string, args []string) error {
 	}
 
 	if exitCode != 0 {
+		if researchValidationErr != nil {
+			return fmt.Errorf("acceptance checks failed (%d): %w", exitCode, researchValidationErr)
+		}
 		return fmt.Errorf("acceptance checks failed (%d)", exitCode)
 	}
 

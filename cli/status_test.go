@@ -559,10 +559,6 @@ func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"provider_capability=tui",
-		"provider_native=skills,plugins,mcp",
-		"provider_limit=claude_root_no_bypass",
-		"provider_native=skills,mcp",
 		"dialog=permission_prompt",
 		`dialog_hint="Needs your permission"`,
 		"dialog=auth_prompt",
@@ -570,6 +566,15 @@ func TestStatusShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{
+		"provider_capability=",
+		"provider_native=",
+		"provider_limit=",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("status output should omit %q:\n%s", unwanted, out)
 		}
 	}
 }

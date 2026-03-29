@@ -681,6 +681,87 @@ func TestSaveCopiesRunScopedReportsDir(t *testing.T) {
 	}
 }
 
+func TestSaveCopiesSessionReportEvidenceManifest(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runName := "demo"
+	runDir := goalx.RunDir(projectRoot, runName)
+	wtPath := WorktreePath(runDir, runName, 1)
+	if err := os.MkdirAll(wtPath, 0o755); err != nil {
+		t.Fatalf("mkdir worktree: %v", err)
+	}
+
+	cfg := goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeResearch,
+		Objective: "inspect",
+		Target: goalx.TargetConfig{
+			Files: []string{"notes.md"},
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run snapshot: %v", err)
+	}
+	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
+
+	reportPath := filepath.Join(wtPath, "notes.md")
+	if err := os.WriteFile(reportPath, []byte("saved report\n"), 0o644); err != nil {
+		t.Fatalf("write notes.md: %v", err)
+	}
+	manifest := ReportEvidenceManifest{
+		Version:           1,
+		ReportPath:        reportPath,
+		Covers:            []string{"ucl-1"},
+		RepoEvidencePaths: []string{filepath.Join(wtPath, "source.txt")},
+		ExternalRefs:      []string{"https://example.com/ref"},
+	}
+	if err := os.WriteFile(filepath.Join(wtPath, "source.txt"), []byte("evidence\n"), 0o644); err != nil {
+		t.Fatalf("write source evidence: %v", err)
+	}
+	manifestData, err := json.MarshalIndent(&manifest, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(ReportEvidenceManifestPath(reportPath), manifestData, 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	if err := Save(projectRoot, []string{"--run", runName}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	savedReportPath := filepath.Join(SavedRunDir(projectRoot, runName), "session-1-report.md")
+	got, err := os.ReadFile(savedReportPath)
+	if err != nil {
+		t.Fatalf("read saved report: %v", err)
+	}
+	if string(got) != "saved report\n" {
+		t.Fatalf("saved report = %q, want %q", string(got), "saved report\n")
+	}
+
+	savedManifestPath := ReportEvidenceManifestPath(savedReportPath)
+	savedManifest, err := LoadReportEvidenceManifest(savedReportPath)
+	if err != nil {
+		t.Fatalf("LoadReportEvidenceManifest(saved): %v", err)
+	}
+	if savedManifest.ReportPath != savedReportPath {
+		t.Fatalf("saved manifest report_path = %q, want %q", savedManifest.ReportPath, savedReportPath)
+	}
+	if len(savedManifest.ExternalRefs) != 1 || savedManifest.ExternalRefs[0] != "https://example.com/ref" {
+		t.Fatalf("saved manifest external refs = %#v, want one ref", savedManifest.ExternalRefs)
+	}
+	if _, err := os.Stat(savedManifestPath); err != nil {
+		t.Fatalf("saved manifest missing: %v", err)
+	}
+}
+
 func seedSaveRunProvenance(t *testing.T, projectRoot, runDir, runName, objective string) {
 	t.Helper()
 

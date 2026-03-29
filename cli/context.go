@@ -162,9 +162,9 @@ func renderContextIndex(index *ContextIndex) string {
 			writeContextLine("Last management event", index.Evolve.LastManagementEventAt)
 		}
 	}
-	if len(index.ProviderFacts) > 0 {
-		b.WriteString("\n## Provider Facts\n\n")
-		for _, fact := range index.ProviderFacts {
+	if len(index.ProviderRuntimeFacts) > 0 {
+		b.WriteString("\n## Provider Runtime\n\n")
+		for _, fact := range index.ProviderRuntimeFacts {
 			target := fact.Target
 			if strings.TrimSpace(target) == "" {
 				target = "run"

@@ -518,43 +518,44 @@ func TestContextIndexIncludesSessionWorktreeLineage(t *testing.T) {
 	}
 }
 
-func TestProviderFactsIncludeTUICapabilityFactsWithoutRoutingAdvice(t *testing.T) {
-	claudeFacts := providerFactsForEngine("master", "claude-code")
+func TestProviderRuntimeFactsIncludeOnlyFrameworkOwnedRuntimeFacts(t *testing.T) {
+	claudeFacts := providerRuntimeFactsForEngine("master", "claude-code")
 	if len(claudeFacts) == 0 {
 		t.Fatalf("claude provider facts missing")
 	}
 	claudeText := joinProviderFactText(claudeFacts)
 	for _, want := range []string{
 		"tmux + interactive TUI",
-		"skills, plugins, and MCP servers",
+		"GoalX provider runtime does not change durable ownership boundaries",
+		"PermissionRequest hook",
+		"Elicitation hook",
+		"urgent master-inbox fact through a Notification hook",
 		"cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions",
-		"does not change GoalX durable ownership boundaries",
 	} {
 		if !strings.Contains(claudeText, want) {
 			t.Fatalf("claude provider facts missing %q:\n%s", want, claudeText)
 		}
 	}
-	for _, unwanted := range []string{"route", "routing", "dispatch", "prefer"} {
+	for _, unwanted := range []string{"skills", "plugins", "mcp", "route", "routing", "dispatch", "prefer"} {
 		if strings.Contains(strings.ToLower(claudeText), unwanted) {
 			t.Fatalf("claude provider facts should not encode %q:\n%s", unwanted, claudeText)
 		}
 	}
 
-	codexFacts := providerFactsForEngine("master", "codex")
+	codexFacts := providerRuntimeFactsForEngine("master", "codex")
 	if len(codexFacts) == 0 {
 		t.Fatalf("codex provider facts missing")
 	}
 	codexText := joinProviderFactText(codexFacts)
 	for _, want := range []string{
 		"tmux + interactive TUI",
-		"skills and configured MCP servers",
-		"does not change GoalX durable ownership boundaries",
+		"GoalX provider runtime does not change durable ownership boundaries",
 	} {
 		if !strings.Contains(codexText, want) {
 			t.Fatalf("codex provider facts missing %q:\n%s", want, codexText)
 		}
 	}
-	for _, unwanted := range []string{"route", "routing", "dispatch", "prefer"} {
+	for _, unwanted := range []string{"skills", "plugins", "mcp", "route", "routing", "dispatch", "prefer"} {
 		if strings.Contains(strings.ToLower(codexText), unwanted) {
 			t.Fatalf("codex provider facts should not encode %q:\n%s", unwanted, codexText)
 		}
@@ -652,7 +653,7 @@ func TestContextIndexUsesRunWorktreeForSharedSession(t *testing.T) {
 	}
 }
 
-func joinProviderFactText(facts []ProviderFact) string {
+func joinProviderFactText(facts []ProviderRuntimeFact) string {
 	parts := make([]string, 0, len(facts))
 	for _, fact := range facts {
 		parts = append(parts, fact.Fact)

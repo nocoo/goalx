@@ -48,7 +48,7 @@ type ContextIndex struct {
 	GoalBoundary          *ContextGoalBoundary       `json:"goal_boundary,omitempty"`
 	Selection             *ContextSelection          `json:"selection,omitempty"`
 	Sessions              []ContextSession           `json:"sessions,omitempty"`
-	ProviderFacts         []ProviderFact             `json:"provider_facts,omitempty"`
+	ProviderRuntimeFacts  []ProviderRuntimeFact      `json:"provider_runtime_facts,omitempty"`
 	ClaudeCodeAvailable   bool                       `json:"claude_code_available,omitempty"`
 	CodexAvailable        bool                       `json:"codex_available,omitempty"`
 	GitAvailable          bool                       `json:"git_available,omitempty"`
@@ -151,7 +151,7 @@ type ContextSession struct {
 	BaseBranch             string                    `json:"base_branch,omitempty"`
 }
 
-type ProviderFact struct {
+type ProviderRuntimeFact struct {
 	Target string `json:"target,omitempty"`
 	Engine string `json:"engine,omitempty"`
 	Fact   string `json:"fact,omitempty"`
@@ -292,7 +292,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		}
 	}
 	index.Master = contextMaster(cfg, selectionSnapshot, engines, runDir)
-	index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine("master", cfg.Master.Engine)...)
+	index.ProviderRuntimeFacts = append(index.ProviderRuntimeFacts, providerRuntimeFactsForEngine("master", cfg.Master.Engine)...)
 	indexes, err := existingSessionIndexes(runDir)
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 			session.EffectiveEffort = identity.EffectiveEffort
 			session.BaseBranchSelector = identity.BaseBranchSelector
 			session.BaseBranch = identity.BaseBranch
-			index.ProviderFacts = append(index.ProviderFacts, providerFactsForEngine(name, identity.Engine)...)
+			index.ProviderRuntimeFacts = append(index.ProviderRuntimeFacts, providerRuntimeFactsForEngine(name, identity.Engine)...)
 		}
 		if sessionsState, err := EnsureSessionsRuntimeState(runDir); err == nil {
 			if current, ok := sessionsState.Sessions[name]; ok {
@@ -343,7 +343,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		index.Sessions = append(index.Sessions, session)
 	}
 	sort.Slice(index.Sessions, func(i, j int) bool { return index.Sessions[i].Name < index.Sessions[j].Name })
-	index.ProviderFacts = dedupeProviderFacts(index.ProviderFacts)
+	index.ProviderRuntimeFacts = dedupeProviderRuntimeFacts(index.ProviderRuntimeFacts)
 	return index, nil
 }
 
@@ -552,40 +552,43 @@ func contextRunIdentity(charter *RunCharter, meta *RunMetadata) ContextRunIdenti
 	return identity
 }
 
-func providerFactsForEngine(target, engine string) []ProviderFact {
-	capability := providerCapabilityDescriptor(engine)
+func providerRuntimeFactsForEngine(target, engine string) []ProviderRuntimeFact {
+	runtimeFact := ProviderRuntimeFact{
+		Target: target,
+		Engine: engine,
+		Fact:   "GoalX canonical provider runtime is tmux + interactive TUI.",
+	}
+	ownershipBoundaryFact := ProviderRuntimeFact{
+		Target: target,
+		Engine: engine,
+		Fact:   "GoalX provider runtime does not change durable ownership boundaries.",
+	}
 	switch strings.TrimSpace(engine) {
 	case "claude-code":
-		return []ProviderFact{
-			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
-			{Target: target, Engine: engine, Fact: capability.nativeFact("Claude")},
-			{Target: target, Engine: engine, Fact: capability.limitFact("Claude")},
-			{Target: target, Engine: engine, Fact: "Provider-native capability availability does not change GoalX durable ownership boundaries."},
-			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local PermissionRequest hook so unattended Claude MCP permission dialogs can be auto-allowed."},
-			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local Elicitation hook so unattended Claude MCP user-input or browser-auth requests are cancelled instead of hanging forever."},
+		return []ProviderRuntimeFact{
+			runtimeFact,
+			ownershipBoundaryFact,
+			{Target: target, Engine: engine, Fact: "Claude root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions."},
+			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local PermissionRequest hook so unattended Claude permission dialogs can be auto-allowed."},
+			{Target: target, Engine: engine, Fact: "GoalX bootstraps a project-local Elicitation hook so unattended Claude user-input or browser-auth requests are cancelled instead of hanging forever."},
 			{Target: target, Engine: engine, Fact: "If a Claude permission or elicitation dialog still surfaces, GoalX writes an urgent master-inbox fact through a Notification hook so the run can recover."},
-			{Target: target, Engine: engine, Fact: "Write/Edit requires prior read of the target file."},
-			{Target: target, Engine: engine, Fact: "Direct large-file edits can fail when the provider read window is exceeded."},
 		}
 	case "codex":
-		return []ProviderFact{
-			{Target: target, Engine: engine, Fact: capability.runtimeFact()},
-			{Target: target, Engine: engine, Fact: capability.nativeFact("Codex")},
-			{Target: target, Engine: engine, Fact: "Provider-native capability availability does not change GoalX durable ownership boundaries."},
-			{Target: target, Engine: engine, Fact: "Configured MCP servers are usable without an extra GoalX approval layer in this environment."},
-			{Target: target, Engine: engine, Fact: "Native subagents require explicit invocation."},
+		return []ProviderRuntimeFact{
+			runtimeFact,
+			ownershipBoundaryFact,
 		}
 	default:
 		return nil
 	}
 }
 
-func dedupeProviderFacts(facts []ProviderFact) []ProviderFact {
+func dedupeProviderRuntimeFacts(facts []ProviderRuntimeFact) []ProviderRuntimeFact {
 	if len(facts) == 0 {
 		return nil
 	}
 	seen := map[string]struct{}{}
-	out := make([]ProviderFact, 0, len(facts))
+	out := make([]ProviderRuntimeFact, 0, len(facts))
 	for _, fact := range facts {
 		key := fact.Target + "\x00" + fact.Engine + "\x00" + fact.Fact
 		if _, ok := seen[key]; ok {
@@ -595,63 +598,4 @@ func dedupeProviderFacts(facts []ProviderFact) []ProviderFact {
 		out = append(out, fact)
 	}
 	return out
-}
-
-type providerCapabilityDescriptorState struct {
-	native string
-	limit  string
-}
-
-func providerCapabilityDescriptor(engine string) providerCapabilityDescriptorState {
-	switch strings.TrimSpace(engine) {
-	case "claude-code":
-		return providerCapabilityDescriptorState{
-			native: "skills,plugins,mcp",
-			limit:  "claude_root_no_bypass",
-		}
-	case "codex":
-		return providerCapabilityDescriptorState{
-			native: "skills,mcp",
-		}
-	default:
-		return providerCapabilityDescriptorState{}
-	}
-}
-
-func (d providerCapabilityDescriptorState) summary() string {
-	parts := []string{"provider_capability=tui"}
-	if strings.TrimSpace(d.native) != "" {
-		parts = append(parts, "provider_native="+d.native)
-	}
-	if strings.TrimSpace(d.limit) != "" {
-		parts = append(parts, "provider_limit="+d.limit)
-	}
-	if len(parts) == 1 && strings.TrimSpace(d.native) == "" && strings.TrimSpace(d.limit) == "" {
-		return ""
-	}
-	return strings.Join(parts, " ")
-}
-
-func (d providerCapabilityDescriptorState) runtimeFact() string {
-	return "GoalX canonical provider runtime is tmux + interactive TUI."
-}
-
-func (d providerCapabilityDescriptorState) nativeFact(provider string) string {
-	switch strings.TrimSpace(d.native) {
-	case "skills,plugins,mcp":
-		return "Interactive " + provider + " sessions can use installed skills, plugins, and MCP servers from the native TUI."
-	case "skills,mcp":
-		return "Interactive " + provider + " sessions can use installed skills and configured MCP servers from the native TUI."
-	default:
-		return ""
-	}
-}
-
-func (d providerCapabilityDescriptorState) limitFact(provider string) string {
-	switch strings.TrimSpace(d.limit) {
-	case "claude_root_no_bypass":
-		return provider + " root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions."
-	default:
-		return ""
-	}
 }

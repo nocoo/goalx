@@ -338,20 +338,25 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 
 	for _, want := range []string{
 		"### master",
-		"provider_capability=tui",
-		"provider_native=skills,plugins,mcp",
-		"provider_limit=claude_root_no_bypass",
 		"Queue: unread=0 cursor=0/0 transport=provider_dialog dialog=permission_prompt",
 		`dialog_hint="Needs your permission"`,
 		"provider_dialog_visible=true provider_dialog_kind=permission_prompt",
 		"### session-1",
-		"provider_native=skills,mcp",
 		"Queue: unread=0 cursor=0/0 transport=provider_dialog dialog=auth_prompt",
 		`dialog_hint="Please authenticate in browser"`,
 		"provider_dialog_visible=true provider_dialog_kind=auth_prompt",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{
+		"provider_capability=",
+		"provider_native=",
+		"provider_limit=",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("observe output should omit %q:\n%s", unwanted, out)
 		}
 	}
 }

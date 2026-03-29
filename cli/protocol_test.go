@@ -65,15 +65,21 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		"Read unread session inbox entries",
 		"Inspect the current worktree state",
 		"Resume from the current files and latest durable state",
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
-		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
-		"If the named capability is unavailable, report that immediately.",
-		"Do not treat skill presence as the selection standard.",
+		"## Execution Discipline",
+		"## Autonomy Persistence",
 		"Do NOT invoke orchestration/meta slash commands or skills",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{
+		"## Native Helpers",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 	if strings.Contains(text, "reconstruct context") {
@@ -225,31 +231,7 @@ func TestRenderSubagentProtocolTightensWakeLoopInboxHandling(t *testing.T) {
 	}
 }
 
-func TestProviderCapabilitiesMarksOnlyCodexForActionExecutionReminder(t *testing.T) {
-	codexCaps := providerCapabilities("codex")
-	if !codexCaps.ActionExecutionReminder {
-		t.Fatalf("codex capabilities should enable action execution reminder: %+v", codexCaps)
-	}
-
-	claudeCaps := providerCapabilities("claude-code")
-	if claudeCaps.ActionExecutionReminder {
-		t.Fatalf("claude capabilities should not enable action execution reminder: %+v", claudeCaps)
-	}
-}
-
-func TestProviderCapabilitiesMarksOnlyClaudeForAutonomyPersistenceReminder(t *testing.T) {
-	claudeCaps := providerCapabilities("claude-code")
-	if !claudeCaps.AutonomyPersistenceReminder {
-		t.Fatalf("claude capabilities should enable autonomy persistence reminder: %+v", claudeCaps)
-	}
-
-	codexCaps := providerCapabilities("codex")
-	if codexCaps.AutonomyPersistenceReminder {
-		t.Fatalf("codex capabilities should not enable autonomy persistence reminder: %+v", codexCaps)
-	}
-}
-
-func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
+func TestRenderSubagentProtocolOmitsProviderNativeCapabilityGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
@@ -274,25 +256,29 @@ func TestRenderSubagentProtocolIncludesEngineSpecificGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Native Helpers",
-		"You are running in Claude Code.",
-		"Native subagents are transient helpers inside this session.",
-		"short parallel reading, review, doc/API checks, or adversarial cross-checks",
-		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
-		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
-		"If the named capability is unavailable, report that immediately.",
-		"Do not treat skill presence as the selection standard.",
-		"Web search is available when local evidence is insufficient.",
+		"## Execution Discipline",
+		"## Autonomy Persistence",
+		"When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.",
+		"If a concrete next step exists inside your current assignment, execute it before idling.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered protocol missing %q", want)
 		}
 	}
+	for _, unwanted := range []string{
+		"## Native Helpers",
+		"You are running in Claude Code.",
+		"Native subagents are transient helpers inside this session.",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered protocol should omit %q:\n%s", unwanted, text)
+		}
+	}
 }
 
-func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
+func TestRenderSubagentProtocolIncludesGenericExecutionGuidanceForCodex(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
@@ -318,20 +304,11 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Native Helpers",
-		"You are running in Codex CLI.",
-		"Native subagents are transient helpers inside this session.",
-		"This engine only starts native subagents when you explicitly invoke them.",
 		"## Execution Discipline",
+		"## Autonomy Persistence",
 		"When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.",
 		"Do not end a turn after saying you will do something next. Execute the next tool call now.",
-		"Do not give them durable ownership.",
-		"Summarize every native-helper result back into this session's journal, report, or `dispatchable_slices` before you continue.",
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
-		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
-		"If the named capability is unavailable, report that immediately.",
-		"Do not treat skill presence as the selection standard.",
+		"If a concrete next step exists inside your current assignment, execute it before idling.",
 		"re-check `/tmp/control/inbox/session-1.jsonl` before idling",
 	} {
 		if !strings.Contains(text, want) {
@@ -339,16 +316,19 @@ func TestRenderSubagentProtocolIncludesCodexGuidance(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
-		"Agent tool",
-		"WebSearch/WebFetch",
+		"## Native Helpers",
+		"You are running in Codex CLI.",
+		"This engine only starts native subagents when you explicitly invoke them.",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
 	} {
 		if strings.Contains(text, unwanted) {
-			t.Fatalf("rendered codex protocol should not inherit claude-only agent guidance %q", unwanted)
+			t.Fatalf("rendered codex protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 }
 
-func TestRenderSubagentProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
+func TestRenderSubagentProtocolIncludesExecutionDisciplineForClaude(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
@@ -372,13 +352,13 @@ func TestRenderSubagentProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	for _, unwanted := range []string{
+	for _, want := range []string{
 		"## Execution Discipline",
 		"When this protocol tells you to read a file, run a command, append a journal entry, acknowledge inbox, verify, commit, or wait, perform the corresponding tool action in this turn.",
 		"Do not end a turn after saying you will do something next. Execute the next tool call now.",
 	} {
-		if strings.Contains(text, unwanted) {
-			t.Fatalf("rendered claude protocol should omit %q:\n%s", unwanted, text)
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered claude protocol missing %q:\n%s", want, text)
 		}
 	}
 }
@@ -419,7 +399,7 @@ func TestRenderSubagentProtocolIncludesClaudeAutonomyPersistenceGuidance(t *test
 	}
 }
 
-func TestRenderSubagentProtocolOmitsClaudeAutonomyPersistenceGuidanceForCodex(t *testing.T) {
+func TestRenderSubagentProtocolIncludesAutonomyPersistenceGuidanceForCodex(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
@@ -444,14 +424,14 @@ func TestRenderSubagentProtocolOmitsClaudeAutonomyPersistenceGuidanceForCodex(t 
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	for _, unwanted := range []string{
+	for _, want := range []string{
 		"## Autonomy Persistence",
 		"If a concrete next step exists inside your current assignment, execute it before idling.",
 		"Do not ask master to confirm local method choices inside assigned scope. Act, record, continue.",
 		"Context compaction is routine. Recover from inbox, journal, and current files instead of stopping early.",
 	} {
-		if strings.Contains(text, unwanted) {
-			t.Fatalf("rendered codex protocol should omit %q:\n%s", unwanted, text)
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered codex protocol missing %q:\n%s", want, text)
 		}
 	}
 }
@@ -668,7 +648,7 @@ func TestRenderMasterProtocolRefinesReviewRoutingAndDepthCap(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Prefer native helpers or a different engine/model path for short review, validation, and adversarial checks.",
+		"Prefer a different engine/model path for short review, validation, and adversarial checks.",
 		"Launch a durable review session only when the review itself needs multi-step durable ownership, worktree isolation, or mergeable output.",
 		"Default to one independent review round per implementation path.",
 		"If a review finds new decisive evidence, redirect or take over; otherwise arbitrate instead of spinning review/fix/re-review loops.",
@@ -996,18 +976,18 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:           "ship it",
-		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
-		TmuxSession:         "ar-demo",
-		SummaryPath:         "/tmp/summary.md",
+		Objective:             "ship it",
+		RunName:               "demo",
+		Mode:                  goalx.ModeDevelop,
+		TmuxSession:           "ar-demo",
+		SummaryPath:           "/tmp/summary.md",
 		ObjectiveContractPath: "/tmp/objective-contract.json",
-		AcceptanceStatePath: "/tmp/acceptance.json",
-		CoordinationPath:    "/tmp/coordination.json",
-		GoalPath:            "/tmp/goal.json",
-		GoalLogPath:         "/tmp/goal-log.jsonl",
-		MasterCursorPath:    "/tmp/master-cursor.json",
-		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+		AcceptanceStatePath:   "/tmp/acceptance.json",
+		CoordinationPath:      "/tmp/coordination.json",
+		GoalPath:              "/tmp/goal.json",
+		GoalLogPath:           "/tmp/goal-log.jsonl",
+		MasterCursorPath:      "/tmp/master-cursor.json",
+		EngineCommand:         "claude --model claude-opus-4-6 --permission-mode auto",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1031,17 +1011,17 @@ func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testin
 func TestRenderMasterProtocolRequiresObjectiveContractIntegrity(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:              "ship it",
-		RunName:                "demo",
-		Mode:                   goalx.ModeDevelop,
-		TmuxSession:            "ar-demo",
-		SummaryPath:            "/tmp/summary.md",
-		ObjectiveContractPath:  "/tmp/objective-contract.json",
-		AcceptanceStatePath:    "/tmp/acceptance.json",
-		GoalPath:               "/tmp/goal.json",
-		GoalLogPath:            "/tmp/goal-log.jsonl",
-		CoordinationPath:       "/tmp/coordination.json",
-		EngineCommand:          "claude --model claude-opus-4-6 --permission-mode auto",
+		Objective:             "ship it",
+		RunName:               "demo",
+		Mode:                  goalx.ModeDevelop,
+		TmuxSession:           "ar-demo",
+		SummaryPath:           "/tmp/summary.md",
+		ObjectiveContractPath: "/tmp/objective-contract.json",
+		AcceptanceStatePath:   "/tmp/acceptance.json",
+		GoalPath:              "/tmp/goal.json",
+		GoalLogPath:           "/tmp/goal-log.jsonl",
+		CoordinationPath:      "/tmp/coordination.json",
+		EngineCommand:         "claude --model claude-opus-4-6 --permission-mode auto",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1777,7 +1757,7 @@ func TestRenderMasterProtocolOmitsDuplicatedColdTablesButKeepsDispatchGuidance(t
 	}
 }
 
-func TestRenderMasterProtocolIncludesClaudeWaitSafetyNetGuidance(t *testing.T) {
+func TestRenderMasterProtocolIncludesWaitSafetyNetGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:     "ship it",
@@ -1799,8 +1779,8 @@ func TestRenderMasterProtocolIncludesClaudeWaitSafetyNetGuidance(t *testing.T) {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	if !strings.Contains(text, "Claude Code Stop hook is only a safety net") {
-		t.Fatalf("rendered master protocol missing Claude wait safety-net guidance:\n%s", text)
+	if !strings.Contains(text, "Provider stop hooks and similar wake mechanisms are only safety nets. Your normal idle path should still be `goalx wait`.") {
+		t.Fatalf("rendered master protocol missing wait safety-net guidance:\n%s", text)
 	}
 }
 
@@ -1872,17 +1852,10 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"Do not wait on one session if other independent required work can proceed.",
 		"Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.",
 		"Improvement backlog",
-		"Native subagents are transient helpers inside the current master session.",
 		"Treat the root master session as the run's control authority, not its default execution surface.",
-		"Do not give them durable ownership.",
-		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
-		"Summarize every native-helper result back into durable GoalX state before moving on.",
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
-		"Capability visibility is not a selection rule.",
 		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
-		"If the named capability is unavailable, report that immediately.",
-		"Do not treat skill presence as the selection standard.",
+		"Use short, reversible, low-volatility probes to improve routing or judgment.",
+		"If a short probe becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.",
 		"Treat narrowed causes as hypotheses until a failing regression test or decisive evidence confirms them.",
 		"If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.",
 		"Keep detailed hypotheses, traces, and path comparisons in journals, not the coordination digest.",
@@ -1895,6 +1868,16 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{
+		"### Native Helpers",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
+		"This engine only starts native subagents when you explicitly invoke them.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered master protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 	if strings.Contains(text, "events.jsonl") {
@@ -2259,7 +2242,7 @@ func TestRenderMasterProtocolIncludesExplicitCoverageOwnershipGuidance(t *testin
 	}
 }
 
-func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
+func TestRenderMasterProtocolOmitsProviderNativeCapabilityGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:     "ship it",
@@ -2282,24 +2265,23 @@ func TestRenderMasterProtocolTightensClaudeNativeSubagentUsage(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
-		"Capability visibility is not a selection rule.",
-		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
-		"If the named capability is unavailable, report that immediately.",
-		"Do not treat skill presence as the selection standard.",
-		"Claude Code native subagents are available in this session.",
 		"Treat the root master session as the run's control authority, not its default execution surface.",
-		"Native subagents are transient helpers inside the current master session.",
-		"Do not give them durable ownership.",
-		"If a slice needs worktree ownership, pause/resume, replace, keep, or mergeable output, use `goalx add`.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
+		"Use short, reversible, low-volatility probes to improve routing or judgment.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
 		}
 	}
-	if strings.Contains(text, "under 30 seconds") {
-		t.Fatalf("rendered master protocol should not keep time-threshold native-subagent wording:\n%s", text)
+	for _, unwanted := range []string{
+		"### Native Helpers",
+		"Claude Code native subagents are available in this session.",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered master protocol should omit %q:\n%s", unwanted, text)
+		}
 	}
 }
 
@@ -2327,9 +2309,8 @@ func TestRenderMasterProtocolDefinesRootMasterAsControlPlane(t *testing.T) {
 	text := string(out)
 	for _, want := range []string{
 		"Treat the root master session as the run's control authority, not its default execution surface.",
-		"Capability visibility is not a selection rule.",
 		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
-		"If an action becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.",
+		"If a short probe becomes attention-binding, interaction-heavy, externally gated, or difficult to recover from, move ownership off the root master.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -2397,7 +2378,7 @@ func TestRenderMasterProtocolTreatsProviderDialogsAsIncidents(t *testing.T) {
 	}
 }
 
-func TestRenderSubagentProtocolAlignsProviderNativeUsageToOwnedSurface(t *testing.T) {
+func TestRenderSubagentProtocolOmitsProviderNativeOwnedSurfaceLanguage(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
@@ -2420,122 +2401,19 @@ func TestRenderSubagentProtocolAlignsProviderNativeUsageToOwnedSurface(t *testin
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	for _, want := range []string{
+	for _, unwanted := range []string{
 		"Provider-native tools are allowed inside your owned execution surface when they materially help.",
 		"If provider-gated or volatile execution blocks progress, surface it quickly through the journal or `dispatchable_slices` instead of waiting silently.",
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("rendered session protocol missing %q:\n%s", want, text)
-		}
-	}
-}
-
-func TestRenderMasterProtocolIncludesClaudeAutonomyPersistenceGuidance(t *testing.T) {
-	runDir := t.TempDir()
-	data := ProtocolData{
-		Objective:     "ship it",
-		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
-		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
-		TmuxSession:   "ar-demo",
-		SummaryPath:   "/tmp/summary.md",
-		StatusPath:    "/tmp/status.json",
-		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
-	}
-
-	if err := RenderMasterProtocol(data, runDir); err != nil {
-		t.Fatalf("RenderMasterProtocol: %v", err)
-	}
-
-	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
-	if err != nil {
-		t.Fatalf("read rendered protocol: %v", err)
-	}
-	text := string(out)
-	for _, want := range []string{
-		"If helper work becomes multi-step, durable, worktree-bound, or expected to produce mergeable output, move it into `goalx add` instead of extending native-helper ownership.",
-		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
-		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
-		}
-	}
-}
-
-func TestRenderMasterProtocolMakesCodexNativeSubagentExplicitAskBoundaryVisible(t *testing.T) {
-	runDir := t.TempDir()
-	data := ProtocolData{
-		Objective:     "ship it",
-		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
-		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		TmuxSession:   "ar-demo",
-		SummaryPath:   "/tmp/summary.md",
-		StatusPath:    "/tmp/status.json",
-		EngineCommand: "codex exec",
-	}
-
-	if err := RenderMasterProtocol(data, runDir); err != nil {
-		t.Fatalf("RenderMasterProtocol: %v", err)
-	}
-
-	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
-	if err != nil {
-		t.Fatalf("read rendered protocol: %v", err)
-	}
-	text := string(out)
-	for _, want := range []string{
-		"Codex CLI native subagents are available in this session.",
-		"**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.",
-		"This engine only starts native subagents when you explicitly invoke them.",
-		"The runtime truth is the provider-native interactive TUI.",
-		"Provider-native skills, plugins, and MCP tools are available tools, not a selection rule.",
-		"Capability visibility is not a selection rule.",
-		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
 		"If the named capability is unavailable, report that immediately.",
 		"Do not treat skill presence as the selection standard.",
 	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
-		}
-	}
-}
-
-func TestRenderMasterProtocolOmitsClaudeAutonomyPersistenceGuidanceForCodex(t *testing.T) {
-	runDir := t.TempDir()
-	data := ProtocolData{
-		Objective:     "ship it",
-		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
-		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		TmuxSession:   "ar-demo",
-		SummaryPath:   "/tmp/summary.md",
-		StatusPath:    "/tmp/status.json",
-		EngineCommand: "codex exec",
-	}
-
-	if err := RenderMasterProtocol(data, runDir); err != nil {
-		t.Fatalf("RenderMasterProtocol: %v", err)
-	}
-
-	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
-	if err != nil {
-		t.Fatalf("read rendered protocol: %v", err)
-	}
-	text := string(out)
-	for _, unwanted := range []string{
-		"If helper work becomes multi-step, durable, worktree-bound, or expected to produce mergeable output, move it into `goalx add` instead of extending native-helper ownership.",
-		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
-		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
-	} {
 		if strings.Contains(text, unwanted) {
-			t.Fatalf("rendered codex master protocol should omit %q:\n%s", unwanted, text)
+			t.Fatalf("rendered session protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 }
 
-func TestRenderMasterProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
+func TestRenderMasterProtocolIncludesAutonomyPersistenceGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:     "ship it",
@@ -2557,9 +2435,117 @@ func TestRenderMasterProtocolOmitsExecutionDisciplineForClaude(t *testing.T) {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	unwanted := "**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action."
-	if strings.Contains(text, unwanted) {
-		t.Fatalf("rendered claude master protocol should omit %q:\n%s", unwanted, text)
+	for _, want := range []string{
+		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
+		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesGenericExecutionGuidanceForCodex(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "codex exec",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action.",
+		"Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.",
+		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+	for _, unwanted := range []string{
+		"### Native Helpers",
+		"Codex CLI native subagents are available in this session.",
+		"This engine only starts native subagents when you explicitly invoke them.",
+		"Provider-native",
+		"Web search is available when local evidence is insufficient.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered master protocol should omit %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesAutonomyPersistenceGuidanceForCodex(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "codex exec",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"If the goal boundary is clear and a concrete next action exists, continue acting. Method uncertainty is not intent uncertainty.",
+		"Context compaction is normal. Recover from durable state and continue; do not hand off or close out early because context was trimmed.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered codex master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesExecutionDisciplineForClaude(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeDevelop,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	want := "**Execution rule**: Treat action verbs in this protocol as instructions to execute the corresponding tool action in this control cycle. Stating intent is not action."
+	if !strings.Contains(text, want) {
+		t.Fatalf("rendered claude master protocol missing %q:\n%s", want, text)
 	}
 }
 

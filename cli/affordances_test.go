@@ -320,7 +320,7 @@ func TestBuildAffordancesOmitsEvolveManagementItemsOutsideEvolve(t *testing.T) {
 	}
 }
 
-func TestBuildAffordancesIncludesProviderFactsForClaudeTargets(t *testing.T) {
+func TestBuildAffordancesIncludesProviderRuntimeFactsForClaudeTargets(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	sessionName := "session-1"
 	if err := EnsureSessionControl(runDir, sessionName); err != nil {
@@ -347,20 +347,20 @@ func TestBuildAffordancesIncludesProviderFactsForClaudeTargets(t *testing.T) {
 
 	found := false
 	for _, item := range doc.Items {
-		if item.ID != "provider-facts" {
+		if item.ID != "provider-runtime" {
 			continue
 		}
-		summaryOK := strings.Contains(item.Summary, "Provider-native capability facts for `session-1` (`claude-code`).")
+		summaryOK := strings.Contains(item.Summary, "Provider runtime and bootstrap facts for `session-1` (`claude-code`).")
 		runtimeOK := false
-		claudeCapabilityOK := false
+		boundaryOK := false
 		rootGuardOK := false
 		pathOK := false
 		for _, fact := range item.Facts {
 			if strings.Contains(fact, "GoalX canonical provider runtime is tmux + interactive TUI.") {
 				runtimeOK = true
 			}
-			if strings.Contains(fact, "Interactive Claude sessions can use installed skills, plugins, and MCP servers from the native TUI.") {
-				claudeCapabilityOK = true
+			if strings.Contains(fact, "GoalX provider runtime does not change durable ownership boundaries.") {
+				boundaryOK = true
 			}
 			if strings.Contains(fact, "Claude root sessions cannot use --dangerously-skip-permissions or --permission-mode bypassPermissions.") {
 				rootGuardOK = true
@@ -372,7 +372,7 @@ func TestBuildAffordancesIncludesProviderFactsForClaudeTargets(t *testing.T) {
 				break
 			}
 		}
-		found = summaryOK && runtimeOK && claudeCapabilityOK && rootGuardOK && pathOK
+		found = summaryOK && runtimeOK && boundaryOK && rootGuardOK && pathOK
 	}
 	if !found {
 		t.Fatalf("provider facts affordance missing for claude target: %+v", doc.Items)
