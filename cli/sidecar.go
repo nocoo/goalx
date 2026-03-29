@@ -204,19 +204,19 @@ func runSidecarTickWithWatcher(projectRoot, runName, runDir, runID string, epoch
 	if err != nil {
 		return err
 	}
-	if closeoutFacts.Complete && targetPresenceMissing(presence["master"]) {
-		if closeoutFacts.MasterUnread > 0 {
-			if !presence["master"].SessionExists {
-				if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
-					return err
-				}
-			} else {
-				if err := relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession, cfg); err != nil {
-					return err
-				}
+	switch closeoutFacts.MaintenanceAction(presence["master"]) {
+	case RunCloseoutMaintenanceActionRecoverMaster:
+		if !presence["master"].SessionExists {
+			if err := relaunchMaster(projectRoot, runDir, tmuxSession, cfg); err != nil {
+				return err
 			}
-			return nil
+		} else {
+			if err := relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession, cfg); err != nil {
+				return err
+			}
 		}
+		return nil
+	case RunCloseoutMaintenanceActionFinalize:
 		if err := finalizeCompletedRunFromSidecar(projectRoot, runName, runDir, tmuxSession); err != nil {
 			return err
 		}

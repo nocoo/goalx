@@ -10,6 +10,14 @@ type RunCloseoutFacts struct {
 	Complete         bool   `json:"complete,omitempty"`
 }
 
+type RunCloseoutMaintenanceAction string
+
+const (
+	RunCloseoutMaintenanceActionNone          RunCloseoutMaintenanceAction = ""
+	RunCloseoutMaintenanceActionRecoverMaster RunCloseoutMaintenanceAction = "recover_master"
+	RunCloseoutMaintenanceActionFinalize      RunCloseoutMaintenanceAction = "finalize"
+)
+
 func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
 	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
 	if err != nil {
@@ -25,4 +33,18 @@ func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
 	}
 	facts.Complete = facts.StatusPhase == "complete" && facts.SummaryExists && facts.CompletionExists
 	return facts, nil
+}
+
+func (facts RunCloseoutFacts) ReadyToFinalize() bool {
+	return facts.Complete && facts.MasterUnread == 0
+}
+
+func (facts RunCloseoutFacts) MaintenanceAction(master TargetPresenceFacts) RunCloseoutMaintenanceAction {
+	if facts.ReadyToFinalize() {
+		return RunCloseoutMaintenanceActionFinalize
+	}
+	if facts.Complete && facts.MasterUnread > 0 && targetPresenceMissing(master) {
+		return RunCloseoutMaintenanceActionRecoverMaster
+	}
+	return RunCloseoutMaintenanceActionNone
 }

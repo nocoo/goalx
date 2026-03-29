@@ -15,7 +15,7 @@ type finalizeControlRunOptions struct {
 
 func completedCloseoutReady(runDir string) bool {
 	facts, err := BuildRunCloseoutFacts(runDir)
-	return err == nil && facts.Complete && facts.MasterUnread == 0
+	return err == nil && facts.ReadyToFinalize()
 }
 
 func stopLifecycleForRun(runDir string) string {
