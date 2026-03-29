@@ -81,6 +81,9 @@ func Save(projectRoot string, args []string) error {
 		return fmt.Errorf("copy run status: %w", err)
 	}
 
+	if err := copyFileIfExists(ObjectiveContractPath(rc.RunDir), filepath.Join(saveDir, "objective-contract.json")); err != nil {
+		return fmt.Errorf("copy objective contract: %w", err)
+	}
 	if err := copyFileIfExists(GoalPath(rc.RunDir), filepath.Join(saveDir, "goal.json")); err != nil {
 		return fmt.Errorf("copy goal state: %w", err)
 	}
@@ -114,6 +117,20 @@ func Save(projectRoot string, args []string) error {
 	acceptEvidencePath := AcceptanceEvidencePath(rc.RunDir)
 	if err := copyFileIfExists(acceptEvidencePath, filepath.Join(saveDir, "acceptance-last.txt")); err != nil {
 		return fmt.Errorf("copy acceptance evidence: %w", err)
+	}
+	if acceptState, err := LoadAcceptanceState(acceptStatePath); err != nil {
+		return fmt.Errorf("load acceptance state: %w", err)
+	} else if acceptState != nil {
+		for _, result := range acceptState.LastResult.CheckResults {
+			source := strings.TrimSpace(result.EvidencePath)
+			if source == "" {
+				continue
+			}
+			destName := filepath.Base(source)
+			if err := copyFileIfExists(source, filepath.Join(saveDir, destName)); err != nil {
+				return fmt.Errorf("copy acceptance check evidence %s: %w", result.ID, err)
+			}
+		}
 	}
 
 	savedManifest := &ArtifactsManifest{

@@ -267,6 +267,66 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 	}
 }
 
+func TestStatusPrintsObjectiveIntegritySummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), &ObjectiveContract{
+		Version:       1,
+		ObjectiveHash: "sha256:demo",
+		State:         objectiveContractStateLocked,
+		Clauses: []ObjectiveClause{
+			{
+				ID:               "ucl-goal",
+				Text:             "ship the outcome",
+				Kind:             objectiveClauseKindDelivery,
+				SourceExcerpt:    "ship the outcome",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
+			},
+			{
+				ID:               "ucl-accept",
+				Text:             "verify the outcome",
+				Kind:             objectiveClauseKindVerification,
+				SourceExcerpt:    "verify the outcome",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceAcceptance},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveObjectiveContract: %v", err)
+	}
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{ID: "req-1", Text: "ship the outcome", Source: goalItemSourceUser, Role: goalItemRoleOutcome, Covers: []string{"ucl-goal"}, State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+		Version:     2,
+		GoalVersion: 1,
+		Checks: []AcceptanceCheck{
+			{ID: "chk-1", Label: "verify", Command: "printf ok", Covers: []string{"ucl-accept"}, State: acceptanceCheckStateActive},
+		},
+	}); err != nil {
+		t.Fatalf("SaveAcceptanceState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"Objective: contract_state=locked",
+		"goal_coverage=1/1",
+		"acceptance_coverage=1/1",
+		"integrity_ok=true",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusShowsMemoryContextPresenceFact(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	if err := EnsureMemoryStore(); err != nil {

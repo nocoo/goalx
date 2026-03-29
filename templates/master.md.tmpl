@@ -191,19 +191,23 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Read `goalx context --run {{.RunName}}` first. It is the canonical run-identity and path surface for this run.
 - Read the current run guidance surfaces before planning the first control cycle.
 - Inspect canonical durable surface contracts with:
+  - `goalx schema objective-contract`
   - `goalx schema goal`
   - `goalx schema acceptance`
   - `goalx schema coordination`
   - `goalx schema status`
   - `goalx schema goal-log`
   - `goalx schema experiments`
-- Before the first `goalx add` or `goalx tell`, finish the initial boundary design: replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.
-- Initialize or replace machine-consumed structured surfaces through `goalx durable replace <goal|acceptance|coordination|status> --run {{.RunName}} --file /abs/path.json`.
+- Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, and write `coordination`.
+- Initialize or replace machine-consumed structured surfaces through `goalx durable replace <objective-contract|goal|acceptance|coordination|status> --run {{.RunName}} --file /abs/path.json`.
 - Append machine-consumed event logs through `goalx durable append goal-log --run {{.RunName}} --file /abs/path.jsonl`. Use `goalx durable append experiments --run {{.RunName}} --file /abs/path.jsonl` for experiment lineage records.
 - Treat `{{.IntegrationStatePath}}` as the framework-owned fact for the currently integrated winning path. Read it; do not rewrite it by hand.
-- Initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
-- Do not hand-edit `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.CoordinationPath}}`, `{{.StatusPath}}`, `{{.GoalLogPath}}`, `{{.ExperimentsLogPath}}`, or `{{.IntegrationStatePath}}` in place.
+- Initialize `{{.ObjectiveContractPath}}`, lock it after the initial extraction review, initialize the current goal boundary in `{{.GoalPath}}`, append the first path-comparison decision to `{{.GoalLogPath}}`, keep `{{.AcceptanceStatePath}}` synchronized with the current acceptance command, {{if .CoordinationPath}}write a current coordination digest to `{{.CoordinationPath}}`, {{end}}initialize `{{.MasterCursorPath}}` if needed, then log to `{{.MasterJournalPath}}`.
+- Do not hand-edit `{{.ObjectiveContractPath}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.CoordinationPath}}`, `{{.StatusPath}}`, `{{.GoalLogPath}}`, `{{.ExperimentsLogPath}}`, or `{{.IntegrationStatePath}}` in place.
 - `goalx context --run {{.RunName}}` exposes the immutable run identity and current durable paths. `{{.CharterPath}}` remains the recovery source for relaunch/debug.
+- `objective-contract.json` is the immutable extracted user-clause contract for this run.
+- `{{.ObjectiveContractPath}}` is the immutable extracted user-clause contract for this run.
+- After `objective-contract` is locked, user-originated clauses may not be narrowed, downgraded to optional-only coverage, or removed from acceptance coverage without explicit user approval.
 - `{{.GoalPath}}` is the only mutable completion boundary. `{{.AcceptanceStatePath}}` is verification-only; it never authorizes shrinking the goal.
 - Goal boundary: `{{.GoalPath}}` defines required current-goal outcomes and optional improvements.
 - `{{.GoalPath}}` required items are the canonical current-goal obligations and definition of done.

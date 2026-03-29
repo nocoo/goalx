@@ -14,14 +14,15 @@ const (
 	DurableSurfaceWriteModeReplace DurableSurfaceWriteMode = "replace"
 	DurableSurfaceWriteModeAppend  DurableSurfaceWriteMode = "append"
 
-	DurableSurfaceGoal            DurableSurfaceName = "goal"
-	DurableSurfaceAcceptance      DurableSurfaceName = "acceptance"
-	DurableSurfaceCoordination    DurableSurfaceName = "coordination"
-	DurableSurfaceStatus          DurableSurfaceName = "status"
-	DurableSurfaceGoalLog         DurableSurfaceName = "goal-log"
-	DurableSurfaceExperiments     DurableSurfaceName = "experiments"
-	DurableSurfaceSummary         DurableSurfaceName = "summary"
-	DurableSurfaceCompletionProof DurableSurfaceName = "completion-proof"
+	DurableSurfaceObjectiveContract DurableSurfaceName = "objective-contract"
+	DurableSurfaceGoal              DurableSurfaceName = "goal"
+	DurableSurfaceAcceptance        DurableSurfaceName = "acceptance"
+	DurableSurfaceCoordination      DurableSurfaceName = "coordination"
+	DurableSurfaceStatus            DurableSurfaceName = "status"
+	DurableSurfaceGoalLog           DurableSurfaceName = "goal-log"
+	DurableSurfaceExperiments       DurableSurfaceName = "experiments"
+	DurableSurfaceSummary           DurableSurfaceName = "summary"
+	DurableSurfaceCompletionProof   DurableSurfaceName = "completion-proof"
 )
 
 type DurableSurfaceSpec struct {
@@ -35,6 +36,26 @@ type DurableSurfaceSpec struct {
 }
 
 var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
+	DurableSurfaceObjectiveContract: {
+		Name:               DurableSurfaceObjectiveContract,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			Format:  DurableSurfaceSchemaFormatJSON,
+			Summary: "Immutable extracted user-clause contract for this run.",
+			Example: `{"version":1,"objective_hash":"sha256:demo","state":"locked","created_at":"2026-03-29T10:00:00Z","locked_at":"2026-03-29T10:05:00Z","clauses":[{"id":"ucl-1","text":"Live trading works end to end on the live service.","kind":"delivery","source_excerpt":"所有功能端到端真实可用","required_surfaces":["goal"],"approval_required_for_drop":true},{"id":"ucl-2","text":"Playwright user journey passes on the live service.","kind":"verification","source_excerpt":"Playwright 用户旅程测试全部通过（真实服务）","required_surfaces":["goal","acceptance"],"approval_required_for_drop":true}]}`,
+			FieldNotes: []string{
+				"`objective-contract` is immutable once `state` becomes `locked`.",
+				"Each clause must keep a stable `id`, `text`, and `source_excerpt`.",
+				"`kind` must stay within delivery|quality_bar|verification|guardrail|operating_rule.",
+				"`required_surfaces` must stay within goal|acceptance.",
+				"The framework enforces coverage integrity, not semantic satisfaction.",
+			},
+		},
+		Path: ObjectiveContractPath,
+	},
 	DurableSurfaceGoal: {
 		Name:               DurableSurfaceGoal,
 		Class:              DurableSurfaceClassStructuredState,
@@ -65,12 +86,14 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		FrameworkReadsBody: true,
 		Schema: DurableSurfaceSchemaSpec{
 			Format:  DurableSurfaceSchemaFormatJSON,
-			Summary: "Verification command surface and latest raw acceptance result.",
-			Example: `{"version":1,"goal_version":1,"default_command":"go test ./...","effective_command":"go test ./...","last_result":{"checked_at":"2026-03-28T10:00:00Z","command":"go test ./...","exit_code":0,"evidence_path":"/abs/run/acceptance-last.txt"},"updated_at":"2026-03-28T10:00:00Z"}`,
+			Summary: "Verification check surface and latest raw acceptance results.",
+			Example: `{"version":2,"goal_version":1,"checks":[{"id":"chk-build","label":"Go build and test","command":"go build ./... && go test ./... && go vet ./...","covers":["ucl-guardrail"],"state":"active"},{"id":"chk-playwright","label":"Live service user journey","command":"pnpm exec playwright test","covers":["ucl-verify"],"state":"active"}],"last_result":{"checked_at":"2026-03-28T10:00:00Z","exit_code":0,"evidence_path":"/abs/run/acceptance-last.txt","check_results":[{"id":"chk-build","command":"go build ./... && go test ./... && go vet ./...","exit_code":0,"evidence_path":"/abs/run/acceptance-chk-build.txt"}]},"updated_at":"2026-03-28T10:00:00Z"}`,
 			FieldNotes: []string{
-				"`default_command` is the launch baseline command.",
-				"`effective_command` is the current command used by verify.",
-				"`last_result` records facts only; no completion judgment fields.",
+				"`checks` is the current verification contract for `goalx verify`.",
+				"Each check must have stable `id` and `state` fields.",
+				"`state` must stay within active|waived.",
+				"`waived` checks require explicit `approval_ref`.",
+				"`last_result` records raw results only; no completion judgment fields.",
 			},
 		},
 		Path: AcceptanceStatePath,

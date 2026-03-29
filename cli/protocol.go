@@ -37,6 +37,7 @@ type ProtocolData struct {
 	ProjectRoot            string
 	RunWorktreePath        string
 	SummaryPath            string
+	ObjectiveContractPath  string
 	GoalPath               string
 	GoalLogPath            string
 	IntegrationStatePath   string
@@ -134,6 +135,9 @@ func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 	}
 	if data.GoalLogPath == "" && data.GoalPath != "" {
 		data.GoalLogPath = filepath.Join(filepath.Dir(data.GoalPath), "goal-log.jsonl")
+	}
+	if data.ObjectiveContractPath == "" && runDir != "" {
+		data.ObjectiveContractPath = ObjectiveContractPath(runDir)
 	}
 	if data.IntegrationStatePath == "" && runDir != "" {
 		data.IntegrationStatePath = IntegrationStatePath(runDir)

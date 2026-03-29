@@ -239,6 +239,9 @@ func bootstrapStartDurables(projectRoot string, state *startRunState, cfg *goalx
 	if err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("init goal state: %w", err)
 	}
+	if _, err := EnsureObjectiveContract(state.runDir, cfg.Objective); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init objective contract: %w", err)
+	}
 	if err := EnsureGoalLog(state.runDir); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("init goal log: %w", err)
 	}
@@ -475,6 +478,7 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 		ProjectRoot:            RunWorktreePath(runDir),
 		SummaryPath:            SummaryPath(runDir),
 		CharterPath:            RunCharterPath(runDir),
+		ObjectiveContractPath:  ObjectiveContractPath(runDir),
 		GoalPath:               GoalPath(runDir),
 		GoalLogPath:            GoalLogPath(runDir),
 		IntegrationStatePath:   IntegrationStatePath(runDir),

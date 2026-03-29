@@ -91,6 +91,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Control dir", index.ControlDir)
 	writeContextLine("Reports dir", index.ReportsDir)
 	writeContextLine("Charter", index.CharterPath)
+	writeContextLine("Objective contract", index.ObjectiveContractPath)
 	writeContextLine("Goal", index.GoalPath)
 	writeContextLine("Experiment ledger", index.ExperimentsLogPath)
 	writeContextLine("Integration state", index.IntegrationStatePath)
@@ -132,6 +133,22 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Required by source", formatContextCountMap(index.GoalBoundary.RequiredBySource))
 		writeContextLine("Required by role", formatContextCountMap(index.GoalBoundary.RequiredByRole))
 		writeContextLine("Required by state", formatContextCountMap(index.GoalBoundary.RequiredByState))
+	}
+	if index.ObjectiveIntegrity != nil {
+		b.WriteString("\n## Objective Contract\n\n")
+		writeContextLine("State", index.ObjectiveIntegrity.ContractState)
+		writeContextLine("Locked", fmt.Sprintf("%t", index.ObjectiveIntegrity.ContractLocked))
+		writeContextLine("Clauses", fmt.Sprintf("%d", index.ObjectiveIntegrity.ClauseCount))
+		writeContextLine("Goal clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.GoalCoveredCount, index.ObjectiveIntegrity.GoalClauseCount))
+		writeContextLine("Acceptance clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.AcceptanceCoveredCount, index.ObjectiveIntegrity.AcceptanceClauseCount))
+		writeContextLine("Integrity ready", fmt.Sprintf("%t", index.ObjectiveIntegrity.IntegrityReady))
+		writeContextLine("Integrity OK", fmt.Sprintf("%t", index.ObjectiveIntegrity.IntegrityOK))
+		if len(index.ObjectiveIntegrity.MissingGoalClauseIDs) > 0 {
+			writeContextLine("Missing goal clauses", strings.Join(index.ObjectiveIntegrity.MissingGoalClauseIDs, ", "))
+		}
+		if len(index.ObjectiveIntegrity.MissingAcceptanceClauseIDs) > 0 {
+			writeContextLine("Missing acceptance clauses", strings.Join(index.ObjectiveIntegrity.MissingAcceptanceClauseIDs, ", "))
+		}
 	}
 	if index.EvolveFactsPath != "" || index.Evolve != nil {
 		b.WriteString("\n## Evolve\n\n")

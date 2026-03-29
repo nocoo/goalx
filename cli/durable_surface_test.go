@@ -13,6 +13,7 @@ func TestDurableSurfaceRegistryResolvesKnownSurfaces(t *testing.T) {
 		strict    bool
 		wantPath  string
 	}{
+		{name: "objective-contract", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ObjectiveContractPath(runDir)},
 		{name: "goal", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: GoalPath(runDir)},
 		{name: "acceptance", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: AcceptanceStatePath(runDir)},
 		{name: "coordination", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: CoordinationPath(runDir)},

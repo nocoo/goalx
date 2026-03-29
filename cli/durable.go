@@ -56,10 +56,7 @@ func durableReplace(runDir string, spec DurableSurfaceSpec, data []byte) error {
 	if spec.Class != DurableSurfaceClassStructuredState {
 		return fmt.Errorf("surface %q is not a structured state surface", spec.Name)
 	}
-	if err := validateDurableStructuredPayload(spec.Name, data); err != nil {
-		return err
-	}
-	return writeFileAtomic(spec.Path(runDir), data, 0o644)
+	return replaceDurableStructuredSurface(runDir, spec.Name, data)
 }
 
 func durableAppend(runDir string, spec DurableSurfaceSpec, data []byte) error {
@@ -74,6 +71,9 @@ func durableAppend(runDir string, spec DurableSurfaceSpec, data []byte) error {
 
 func validateDurableStructuredPayload(surface DurableSurfaceName, data []byte) error {
 	switch surface {
+	case DurableSurfaceObjectiveContract:
+		_, err := parseObjectiveContract(data)
+		return err
 	case DurableSurfaceGoal:
 		_, err := parseGoalState(data)
 		return err
@@ -86,6 +86,43 @@ func validateDurableStructuredPayload(surface DurableSurfaceName, data []byte) e
 	case DurableSurfaceStatus:
 		_, err := parseRunStatusRecord(data)
 		return err
+	default:
+		return fmt.Errorf("surface %q is not a structured state surface", surface)
+	}
+}
+
+func replaceDurableStructuredSurface(runDir string, surface DurableSurfaceName, data []byte) error {
+	switch surface {
+	case DurableSurfaceObjectiveContract:
+		contract, err := parseObjectiveContract(data)
+		if err != nil {
+			return err
+		}
+		return SaveObjectiveContract(ObjectiveContractPath(runDir), contract)
+	case DurableSurfaceGoal:
+		state, err := parseGoalState(data)
+		if err != nil {
+			return err
+		}
+		return SaveGoalState(GoalPath(runDir), state)
+	case DurableSurfaceAcceptance:
+		state, err := parseAcceptanceState(data)
+		if err != nil {
+			return err
+		}
+		return SaveAcceptanceState(AcceptanceStatePath(runDir), state)
+	case DurableSurfaceCoordination:
+		state, err := parseCoordinationState(data)
+		if err != nil {
+			return err
+		}
+		return SaveCoordinationState(CoordinationPath(runDir), state)
+	case DurableSurfaceStatus:
+		record, err := parseRunStatusRecord(data)
+		if err != nil {
+			return err
+		}
+		return SaveRunStatusRecord(RunStatusPath(runDir), record)
 	default:
 		return fmt.Errorf("surface %q is not a structured state surface", surface)
 	}
