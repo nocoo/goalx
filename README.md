@@ -10,6 +10,14 @@ goalx run "this product is a working investor-ready demo someone can open and im
 # wake up to progress, reports, and mergeable work
 ```
 
+Master analyzes the objective, decomposes it into requirements, and dispatches parallel sessions:
+
+![goalx auto](guides/goalx-auto.png)
+
+Runs accumulate across projects. Each run tracks sessions, status, and mode:
+
+![goalx list](guides/goalx-list.png)
+
 ## Why GoalX
 
 - **Autonomous research and development**: one master agent reads the codebase, chooses the path, dispatches durable sessions, reviews results, and keeps moving.
