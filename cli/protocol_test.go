@@ -1987,18 +1987,28 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		"`version`, `kind`, `at`, `actor`, `body`",
 		"`required_remaining == 0` only means the current required baseline is covered.",
 		"Do not enter review or idle just because required items are covered.",
-		"Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.",
+		"Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or append `evolve.stopped`.",
 		"Run an explicit iteration frontier: choose the highest-value next experiment or frontier, execute one or more independent experiments when warranted, review evidence, record the result, then continue, pivot, or consolidate.",
 		"A frontier may contain one experiment or multiple independent experiments when paths are worktree-safe and separately verifiable.",
 		"Record a factual blocker that is truly outside your current permissions, credentials, or reachable environment.",
-		"Record why the current path no longer justifies more budget or risk.",
+		"Close rejected, abandoned, or superseded paths with `experiment.closed`.",
+		"Append `evolve.stopped` when you intentionally close the current frontier.",
+		"If you need the current frontier snapshot after relaunch, read `goalx context --run demo` or `goalx afford --run demo` instead of inventing a second agent-written ledger.",
 		"`goalx add --run demo --worktree --base-branch session-N`",
-		"Stop the iteration frontier when budget is exhausted",
-		"the user redirects or stops the run",
-		"recent experiments show diminishing returns",
+		"Valid stop reasons include budget exhaustion",
+		"user redirection",
+		"diminishing returns relative to cost, risk, and remaining upside",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+	for _, unwanted := range []string{
+		"record a factual stop reason in the experiment ledger",
+		"Record why the current path no longer justifies more budget or risk.",
+	} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered master protocol should omit legacy evolve wording %q:\n%s", unwanted, text)
 		}
 	}
 }

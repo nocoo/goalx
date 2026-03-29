@@ -55,16 +55,18 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 - A frontier may contain one experiment or multiple independent experiments when paths are worktree-safe and separately verifiable.
 - `required_remaining == 0` only means the current required baseline is covered. It does not mean the run should stop.
 - Do not enter review or idle just because required items are covered.
-- Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or record a factual stop reason in the experiment ledger.
+- Before you enter review or idle in `evolve`, either dispatch the next experiment, integrate a winning path, or append `evolve.stopped`.
 - Record a factual blocker that is truly outside your current permissions, credentials, or reachable environment.
-- Record why the current path no longer justifies more budget or risk.
+- Close rejected, abandoned, or superseded paths with `experiment.closed`.
+- Append `evolve.stopped` when you intentionally close the current frontier.
+- Valid stop reasons include budget exhaustion, user redirection, decisive external blockers, or diminishing returns relative to cost, risk, and remaining upside.
+- If you need the current frontier snapshot after relaunch, read `goalx context --run {{.RunName}}` or `goalx afford --run {{.RunName}}` instead of inventing a second agent-written ledger.
 - Bias toward producing meaningful code or system improvements, not stopping at diagnosis alone.
 - When exploring divergent paths, use isolated worktrees and explicit base branches instead of mutating one branch blindly.
 - Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
 - Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..." --mode develop` when a trial should fork from an existing session result.
-- Keep the current best path visible in durable state, and record why weaker trials were rejected.
-- Stop the iteration frontier when budget is exhausted, the user redirects or stops the run, or recent experiments show diminishing returns relative to cost, risk, and remaining upside.
-- Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned experiments.
+- Keep the current best path visible in durable state, and close weaker trials with `experiment.closed` instead of leaving them implicitly abandoned.
+- Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned or rejected experiments for humans in the final writeup.
 {{end}}
 
 ## Resources
