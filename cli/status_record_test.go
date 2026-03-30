@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -128,5 +129,84 @@ func TestBuildRunStatusComparisonIncludesRuntimeActiveSessionDrift(t *testing.T)
 	}
 	if got := strings.Join(comparison.RuntimeActiveSessions, ","); got != "session-1" {
 		t.Fatalf("RuntimeActiveSessions = %q, want session-1", got)
+	}
+}
+
+func TestBuildRunStatusComparisonDoesNotTreatMissingActiveSessionsAsDrift(t *testing.T) {
+	runDir := t.TempDir()
+	requiredRemaining := 1
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseWorking,
+		RequiredRemaining: &requiredRemaining,
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "active", Mode: string(goalx.ModeWorker)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-1: %v", err)
+	}
+
+	comparison, err := BuildRunStatusComparison(runDir)
+	if err != nil {
+		t.Fatalf("BuildRunStatusComparison: %v", err)
+	}
+	if comparison == nil {
+		t.Fatal("BuildRunStatusComparison returned nil")
+	}
+	if comparison.StatusActiveSessionsRecorded {
+		t.Fatalf("StatusActiveSessionsRecorded = true, want false: %+v", comparison)
+	}
+	if !comparison.ActiveSessionsMatch {
+		t.Fatalf("ActiveSessionsMatch = false, want true when status omits active_sessions: %+v", comparison)
+	}
+}
+
+func TestBuildRunStatusComparisonDetectsOpenRequiredIDDriftEvenWhenCountsMatch(t *testing.T) {
+	runDir := t.TempDir()
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship feature",
+				Source: goalItemSourceUser,
+				Role:   goalItemRoleOutcome,
+				State:  goalItemStateOpen,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{
+  "version": 1,
+  "phase": "working",
+  "required_remaining": 1,
+  "open_required_ids": ["req-2"],
+  "updated_at": "2026-03-28T10:10:00Z"
+}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+
+	comparison, err := BuildRunStatusComparison(runDir)
+	if err != nil {
+		t.Fatalf("BuildRunStatusComparison: %v", err)
+	}
+	if comparison == nil {
+		t.Fatal("BuildRunStatusComparison returned nil")
+	}
+	if !comparison.RequiredRemainingMatch {
+		t.Fatalf("RequiredRemainingMatch = false, want true when counts align: %+v", comparison)
+	}
+	if !comparison.StatusOpenRequiredIDsRecorded {
+		t.Fatalf("StatusOpenRequiredIDsRecorded = false, want true: %+v", comparison)
+	}
+	if comparison.OpenRequiredIDsMatch {
+		t.Fatalf("OpenRequiredIDsMatch = true, want false when IDs drift: %+v", comparison)
+	}
+	if got := strings.Join(comparison.StatusOpenRequiredIDs, ","); got != "req-2" {
+		t.Fatalf("StatusOpenRequiredIDs = %q, want req-2", got)
+	}
+	if got := strings.Join(comparison.GoalRemainingRequiredIDs, ","); got != "req-1" {
+		t.Fatalf("GoalRemainingRequiredIDs = %q, want req-1", got)
 	}
 }

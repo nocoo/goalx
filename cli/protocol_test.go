@@ -617,6 +617,43 @@ func TestRenderSubagentProtocolDeclaresReadonlyBoundary(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolDeclaresReadonlyBoundaryToMaster(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:         "demo",
+		Objective:       "investigate auth",
+		Mode:            goalx.ModeWorker,
+		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Target:          goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
+		TmuxSession:     "ar-demo",
+		SummaryPath:     "/tmp/summary.md",
+		StatusPath:      "/tmp/status.json",
+		GoalPath:        "/tmp/goal.json",
+		ReportsDir:      "/tmp/run/reports",
+		EngineCommand:   "codex exec",
+		RunWorktreePath: "/tmp/run-root",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Declared target files/paths: `report.md`",
+		"Declared readonly paths: `.`",
+		"Treat the readonly boundary as a run-level execution contract for dispatch, reuse, and takeover.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderSubagentProtocolKeepsWorkerMethodologyConciseForCodeSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{

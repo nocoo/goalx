@@ -27,15 +27,19 @@ type RunStatusRecord struct {
 }
 
 type RunStatusComparison struct {
-	Phase                    string   `json:"phase,omitempty"`
-	StatusRequiredRemaining  *int     `json:"status_required_remaining,omitempty"`
-	GoalRequiredRemaining    *int     `json:"goal_required_remaining,omitempty"`
-	GoalRemainingRequiredIDs []string `json:"goal_remaining_required_ids,omitempty"`
-	StatusActiveSessions     []string `json:"status_active_sessions,omitempty"`
-	RuntimeActiveSessions    []string `json:"runtime_active_sessions,omitempty"`
-	StatusMatchesGoal        bool     `json:"status_matches_goal,omitempty"`
-	ActiveSessionsMatch      bool     `json:"active_sessions_match,omitempty"`
-	LastVerifiedAt           string   `json:"last_verified_at,omitempty"`
+	Phase                         string   `json:"phase,omitempty"`
+	StatusRequiredRemaining       *int     `json:"status_required_remaining,omitempty"`
+	GoalRequiredRemaining         *int     `json:"goal_required_remaining,omitempty"`
+	StatusOpenRequiredIDs         []string `json:"status_open_required_ids,omitempty"`
+	GoalRemainingRequiredIDs      []string `json:"goal_remaining_required_ids,omitempty"`
+	StatusOpenRequiredIDsRecorded bool     `json:"status_open_required_ids_recorded,omitempty"`
+	StatusActiveSessions          []string `json:"status_active_sessions,omitempty"`
+	RuntimeActiveSessions         []string `json:"runtime_active_sessions,omitempty"`
+	StatusActiveSessionsRecorded  bool     `json:"status_active_sessions_recorded,omitempty"`
+	RequiredRemainingMatch        bool     `json:"required_remaining_match,omitempty"`
+	OpenRequiredIDsMatch          bool     `json:"open_required_ids_match,omitempty"`
+	ActiveSessionsMatch           bool     `json:"active_sessions_match,omitempty"`
+	LastVerifiedAt                string   `json:"last_verified_at,omitempty"`
 }
 
 func LoadRunStatusRecord(path string) (*RunStatusRecord, error) {
@@ -137,6 +141,10 @@ func BuildRunStatusComparison(runDir string) (*RunStatusComparison, error) {
 	if status != nil {
 		comparison.Phase = strings.TrimSpace(status.Phase)
 		comparison.StatusRequiredRemaining = status.RequiredRemaining
+		comparison.StatusOpenRequiredIDsRecorded = status.OpenRequiredIDs != nil
+		comparison.StatusOpenRequiredIDs = append([]string(nil), status.OpenRequiredIDs...)
+		slices.Sort(comparison.StatusOpenRequiredIDs)
+		comparison.StatusActiveSessionsRecorded = status.ActiveSessions != nil
 		comparison.StatusActiveSessions = append([]string(nil), status.ActiveSessions...)
 		slices.Sort(comparison.StatusActiveSessions)
 		comparison.LastVerifiedAt = strings.TrimSpace(status.LastVerifiedAt)
@@ -152,9 +160,10 @@ func BuildRunStatusComparison(runDir string) (*RunStatusComparison, error) {
 	}
 	comparison.RuntimeActiveSessions = runtimeActiveSessionNames(sessionState)
 	if comparison.StatusRequiredRemaining != nil && comparison.GoalRequiredRemaining != nil {
-		comparison.StatusMatchesGoal = *comparison.StatusRequiredRemaining == *comparison.GoalRequiredRemaining
+		comparison.RequiredRemainingMatch = *comparison.StatusRequiredRemaining == *comparison.GoalRequiredRemaining
 	}
-	comparison.ActiveSessionsMatch = status == nil || slices.Equal(comparison.StatusActiveSessions, comparison.RuntimeActiveSessions)
+	comparison.OpenRequiredIDsMatch = !comparison.StatusOpenRequiredIDsRecorded || slices.Equal(comparison.StatusOpenRequiredIDs, comparison.GoalRemainingRequiredIDs)
+	comparison.ActiveSessionsMatch = !comparison.StatusActiveSessionsRecorded || slices.Equal(comparison.StatusActiveSessions, comparison.RuntimeActiveSessions)
 	return comparison, nil
 }
 

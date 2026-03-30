@@ -93,12 +93,15 @@ type ContextGoalBoundary struct {
 }
 
 type ContextRunStatus struct {
-	Phase                    string   `json:"phase,omitempty"`
-	RequiredRemaining        int      `json:"required_remaining"`
-	GoalRequiredRemaining    int      `json:"goal_required_remaining"`
-	GoalRemainingRequiredIDs []string `json:"goal_remaining_required_ids,omitempty"`
-	StatusMatchesGoal        bool     `json:"status_matches_goal"`
-	LastVerifiedAt           string   `json:"last_verified_at,omitempty"`
+	Phase                         string   `json:"phase,omitempty"`
+	RequiredRemaining             int      `json:"required_remaining"`
+	GoalRequiredRemaining         int      `json:"goal_required_remaining"`
+	StatusOpenRequiredIDs         []string `json:"status_open_required_ids,omitempty"`
+	GoalRemainingRequiredIDs      []string `json:"goal_remaining_required_ids,omitempty"`
+	StatusOpenRequiredIDsRecorded bool     `json:"status_open_required_ids_recorded,omitempty"`
+	RequiredRemainingMatch        bool     `json:"required_remaining_match"`
+	OpenRequiredIDsMatch          bool     `json:"open_required_ids_match,omitempty"`
+	LastVerifiedAt                string   `json:"last_verified_at,omitempty"`
 }
 
 type ContextAcceptance struct {
@@ -447,13 +450,18 @@ func contextRunStatus(runDir string) (*ContextRunStatus, error) {
 		return nil, err
 	}
 	out := &ContextRunStatus{
-		Phase:             comparison.Phase,
-		RequiredRemaining: *comparison.StatusRequiredRemaining,
-		StatusMatchesGoal: comparison.StatusMatchesGoal,
-		LastVerifiedAt:    comparison.LastVerifiedAt,
+		Phase:                         comparison.Phase,
+		RequiredRemaining:             *comparison.StatusRequiredRemaining,
+		StatusOpenRequiredIDsRecorded: comparison.StatusOpenRequiredIDsRecorded,
+		RequiredRemainingMatch:        comparison.RequiredRemainingMatch,
+		OpenRequiredIDsMatch:          comparison.OpenRequiredIDsMatch,
+		LastVerifiedAt:                comparison.LastVerifiedAt,
 	}
 	if comparison.GoalRequiredRemaining != nil {
 		out.GoalRequiredRemaining = *comparison.GoalRequiredRemaining
+	}
+	if comparison.StatusOpenRequiredIDsRecorded {
+		out.StatusOpenRequiredIDs = append([]string(nil), comparison.StatusOpenRequiredIDs...)
 	}
 	if len(comparison.GoalRemainingRequiredIDs) > 0 {
 		out.GoalRemainingRequiredIDs = append([]string(nil), comparison.GoalRemainingRequiredIDs...)

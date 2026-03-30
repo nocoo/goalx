@@ -40,6 +40,9 @@ No explicit intent was provided. Choose the best execution path yourself.
 {{end}}{{if .RunStartedAt}}- Run started at (UTC): {{.RunStartedAt}}
 {{end}}{{if .Intent}}- Intent: {{.Intent}}
 {{end}}
+{{if .Target.Files}}- Declared target files/paths: {{range $i, $path := .Target.Files}}{{if $i}}, {{end}}`{{$path}}`{{end}}
+{{end}}{{if .Target.Readonly}}- Declared readonly paths: {{range $i, $path := .Target.Readonly}}{{if $i}}, {{end}}`{{$path}}`{{end}}. Treat the readonly boundary as a run-level execution contract for dispatch, reuse, and takeover.
+{{end}}
 
 {{if eq .Intent "evolve"}}
 ### Evolve Intent

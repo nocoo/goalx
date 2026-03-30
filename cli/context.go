@@ -146,8 +146,13 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Phase", index.RunStatus.Phase)
 		writeContextLine("Required remaining (status)", fmt.Sprintf("%d", index.RunStatus.RequiredRemaining))
 		writeContextLine("Required remaining (goal)", fmt.Sprintf("%d", index.RunStatus.GoalRequiredRemaining))
+		writeContextLine("Required remaining match", fmt.Sprintf("%t", index.RunStatus.RequiredRemainingMatch))
+		writeContextLine("Status open required IDs recorded", fmt.Sprintf("%t", index.RunStatus.StatusOpenRequiredIDsRecorded))
+		if index.RunStatus.StatusOpenRequiredIDsRecorded {
+			writeContextLine("Status open required IDs", strings.Join(index.RunStatus.StatusOpenRequiredIDs, ", "))
+			writeContextLine("Open required IDs match", fmt.Sprintf("%t", index.RunStatus.OpenRequiredIDsMatch))
+		}
 		writeContextLine("Goal remaining IDs", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ", "))
-		writeContextLine("Status matches goal", fmt.Sprintf("%t", index.RunStatus.StatusMatchesGoal))
 		writeContextLine("Last verified at", index.RunStatus.LastVerifiedAt)
 	}
 	if index.Acceptance != nil {

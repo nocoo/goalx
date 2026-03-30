@@ -172,6 +172,30 @@ func TestAffordCommandPrintsDeclaredReadonlyBoundaryFacts(t *testing.T) {
 	}
 }
 
+func TestAffordCommandPrintsRunReadonlyBoundaryFactsForMaster(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Target = goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}}
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Afford(repo, []string{"--run", cfg.Name, "master"}); err != nil {
+			t.Fatalf("Afford: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Declared target files/paths: `report.md`.",
+		"Declared readonly paths: `.`.",
+		"Treat the readonly boundary as a run-level execution contract when dispatching, reusing, or taking over work.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("afford output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestAffordCommandJsonAllowsFlagBeforeTarget(t *testing.T) {
 	repo, _, cfg, _ := writeGuidanceRunFixture(t)
 

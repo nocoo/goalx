@@ -819,6 +819,70 @@ func TestStatusWarnsAboutRunStatusGoalDrift(t *testing.T) {
 	}
 }
 
+func TestStatusDoesNotWarnAboutActiveSessionDriftWhenStatusOmitsActiveSessions(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	requiredRemaining := 0
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseWorking,
+		RequiredRemaining: &requiredRemaining,
+		UpdatedAt:         "2026-03-28T10:10:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "active", Mode: string(goalx.ModeWorker)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-1: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	if strings.Contains(out, "status_active_sessions=") {
+		t.Fatalf("status output should not warn about active session drift when status omitted active_sessions:\n%s", out)
+	}
+}
+
+func TestStatusWarnsAboutOpenRequiredIDDriftEvenWhenCountsMatch(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+		Version: 1,
+		Required: []GoalItem{
+			{
+				ID:     "req-1",
+				Text:   "ship feature",
+				Source: goalItemSourceUser,
+				Role:   goalItemRoleOutcome,
+				State:  goalItemStateOpen,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":1,"open_required_ids":["req-2"],"updated_at":"2026-03-28T10:10:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"### advisories",
+		"Status drift:",
+		"status_open_required_ids=req-2",
+		"goal_remaining_ids=req-1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusWarnsAboutMissingStopOrDispatchInEvolve(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

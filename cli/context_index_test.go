@@ -459,8 +459,11 @@ func TestBuildContextIndexIncludesRunStatusAcceptanceAndCloseoutSummary(t *testi
 	if index.RunStatus == nil {
 		t.Fatal("run status summary missing")
 	}
-	if index.RunStatus.RequiredRemaining != 0 || index.RunStatus.GoalRequiredRemaining != 0 || !index.RunStatus.StatusMatchesGoal {
+	if index.RunStatus.RequiredRemaining != 0 || index.RunStatus.GoalRequiredRemaining != 0 || !index.RunStatus.RequiredRemainingMatch {
 		t.Fatalf("run status summary = %+v, want aligned zero remaining", index.RunStatus)
+	}
+	if index.RunStatus.StatusOpenRequiredIDsRecorded {
+		t.Fatalf("StatusOpenRequiredIDsRecorded = true, want false when status omitted IDs: %+v", index.RunStatus)
 	}
 	if index.Acceptance == nil {
 		t.Fatal("acceptance summary missing")
@@ -480,7 +483,8 @@ func TestBuildContextIndexIncludesRunStatusAcceptanceAndCloseoutSummary(t *testi
 		"## Run Status",
 		"Required remaining (status): `0`",
 		"Required remaining (goal): `0`",
-		"Status matches goal: `true`",
+		"Required remaining match: `true`",
+		"Status open required IDs recorded: `false`",
 		"## Acceptance",
 		"Active checks: `1`",
 		"Last exit code: `0`",

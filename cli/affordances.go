@@ -282,8 +282,15 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 			fmt.Sprintf("status.phase=`%s`.", blankAsUnknown(index.RunStatus.Phase)),
 			fmt.Sprintf("status.required_remaining=`%d`.", index.RunStatus.RequiredRemaining),
 			fmt.Sprintf("goal.required_remaining=`%d`.", index.RunStatus.GoalRequiredRemaining),
-			fmt.Sprintf("status_matches_goal=`%t`.", index.RunStatus.StatusMatchesGoal),
+			fmt.Sprintf("required_remaining_match=`%t`.", index.RunStatus.RequiredRemainingMatch),
+			fmt.Sprintf("status_open_required_ids_recorded=`%t`.", index.RunStatus.StatusOpenRequiredIDsRecorded),
 		)
+		if index.RunStatus.StatusOpenRequiredIDsRecorded {
+			facts = append(facts,
+				fmt.Sprintf("status.remaining_ids=`%s`.", strings.Join(index.RunStatus.StatusOpenRequiredIDs, ",")),
+				fmt.Sprintf("open_required_ids_match=`%t`.", index.RunStatus.OpenRequiredIDsMatch),
+			)
+		}
 		if len(index.RunStatus.GoalRemainingRequiredIDs) > 0 {
 			facts = append(facts, fmt.Sprintf("goal.remaining_ids=`%s`.", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ",")))
 		}
@@ -386,6 +393,13 @@ func buildWorktreeBoundaryAffordance(index *ContextIndex, target string) *Afford
 		if index.RunWorktree != "" {
 			item.Facts = append(item.Facts, fmt.Sprintf("Run-root integration boundary: `%s`.", index.RunWorktree))
 			item.Paths = append(item.Paths, index.RunWorktree)
+		}
+		if len(index.TargetFiles) > 0 {
+			item.Facts = append(item.Facts, fmt.Sprintf("Declared target files/paths: `%s`.", strings.Join(index.TargetFiles, "`, `")))
+		}
+		if len(index.ReadonlyPaths) > 0 {
+			item.Facts = append(item.Facts, fmt.Sprintf("Declared readonly paths: `%s`.", strings.Join(index.ReadonlyPaths, "`, `")))
+			item.Facts = append(item.Facts, "Treat the readonly boundary as a run-level execution contract when dispatching, reusing, or taking over work.")
 		}
 		item.Facts = append(item.Facts, "`goalx keep session-N` merges committed session branch history into the run-root worktree only.")
 		item.Facts = append(item.Facts, "`goalx integrate` records the current run-root result after master manually merged, cherry-picked, or partially adopted work there.")
