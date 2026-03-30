@@ -136,6 +136,43 @@ func TestBuildContextIndexIncludesDeclaredReadonlyBoundary(t *testing.T) {
 	}
 }
 
+func TestBuildContextIndexIncludesDeclaredContextFilesAndRefs(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	externalContext := filepath.Join(t.TempDir(), "brief.md")
+	if err := os.WriteFile(externalContext, []byte("# brief\n"), 0o644); err != nil {
+		t.Fatalf("write external context: %v", err)
+	}
+	cfg.Context = goalx.ContextConfig{
+		Files: []string{externalContext},
+		Refs:  []string{"https://example.com/spec", "ticket-123"},
+	}
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+
+	if got, want := index.ContextFiles, []string{externalContext}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("context_files = %#v, want %#v", got, want)
+	}
+	if got, want := index.ContextRefs, []string{"https://example.com/spec", "ticket-123"}; len(got) != len(want) || strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("context_refs = %#v, want %#v", got, want)
+	}
+	rendered := renderContextIndex(index)
+	for _, want := range []string{
+		"## Declared Context",
+		"Context files: `" + externalContext + "`",
+		"Context refs: `https://example.com/spec`, `ticket-123`",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
 func TestBuildContextIndexIncludesEvolveFactsOnlyForEvolveRuns(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

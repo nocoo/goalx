@@ -195,6 +195,30 @@ target:
 	}
 }
 
+func TestBuildLaunchConfigSplitsContextFilesAndRefs(t *testing.T) {
+	projectRoot := t.TempDir()
+	readmePath := filepath.Join(projectRoot, "README.md")
+	if err := os.WriteFile(readmePath, []byte("# demo\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+
+	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
+		Objective:    "audit auth",
+		Mode:         goalx.ModeWorker,
+		ContextPaths: []string{"README.md", "https://example.com/spec", "ref:ticket-123", "note:follow the rejection path"},
+	})
+	if err != nil {
+		t.Fatalf("buildLaunchConfig: %v", err)
+	}
+
+	if len(cfg.Context.Files) != 1 || cfg.Context.Files[0] != readmePath {
+		t.Fatalf("context.files = %#v, want %#v", cfg.Context.Files, []string{readmePath})
+	}
+	if got, want := cfg.Context.Refs, []string{"https://example.com/spec", "ticket-123", "follow the rejection path"}; len(got) != len(want) || strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("context.refs = %#v, want %#v", got, want)
+	}
+}
+
 func TestBuildLaunchConfigPreviewLeavesTargetAndLocalValidationUnsetWhenUnconfigured(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

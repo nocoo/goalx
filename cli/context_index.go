@@ -19,6 +19,8 @@ type ContextIndex struct {
 	RunDir                string                     `json:"run_dir,omitempty"`
 	RunName               string                     `json:"run_name,omitempty"`
 	RunWorktree           string                     `json:"run_worktree,omitempty"`
+	ContextFiles          []string                   `json:"context_files,omitempty"`
+	ContextRefs           []string                   `json:"context_refs,omitempty"`
 	TargetFiles           []string                   `json:"target_files,omitempty"`
 	ReadonlyPaths         []string                   `json:"readonly_paths,omitempty"`
 	RunIdentity           ContextRunIdentity         `json:"run_identity"`
@@ -251,6 +253,8 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		RunDir:                runDir,
 		RunName:               runName,
 		RunWorktree:           RunWorktreePath(runDir),
+		ContextFiles:          append([]string(nil), cfg.Context.Files...),
+		ContextRefs:           append([]string(nil), cfg.Context.Refs...),
 		TargetFiles:           append([]string(nil), cfg.Target.Files...),
 		ReadonlyPaths:         append([]string(nil), cfg.Target.Readonly...),
 		RunIdentity:           contextRunIdentity(charter, meta),

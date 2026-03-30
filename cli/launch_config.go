@@ -26,11 +26,11 @@ func buildLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Config, e
 		return nil, err
 	}
 	if len(opts.ContextPaths) > 0 {
-		contextFiles, err := DiscoverContextFiles(opts.ContextPaths)
+		context, err := ResolveContextInputsFrom(projectRoot, opts.ContextPaths)
 		if err != nil {
-			return nil, fmt.Errorf("discover context: %w", err)
+			return nil, fmt.Errorf("resolve context: %w", err)
 		}
-		resolved.Config.Context = goalx.ContextConfig{Files: contextFiles}
+		resolved.Config.Context = MergeContextConfigs(resolved.Config.Context, context)
 	}
 	applyLaunchBudgetOverride(&resolved.Config, opts)
 	return &resolved.Config, nil
@@ -55,11 +55,11 @@ func resolveLaunchConfig(projectRoot string, opts launchOptions) (*goalx.Resolve
 		return nil, err
 	}
 	if len(opts.ContextPaths) > 0 {
-		contextFiles, err := DiscoverContextFiles(opts.ContextPaths)
+		context, err := ResolveContextInputsFrom(projectRoot, opts.ContextPaths)
 		if err != nil {
-			return nil, fmt.Errorf("discover context: %w", err)
+			return nil, fmt.Errorf("resolve context: %w", err)
 		}
-		resolved.Config.Context = goalx.ContextConfig{Files: contextFiles}
+		resolved.Config.Context = MergeContextConfigs(resolved.Config.Context, context)
 	}
 	applyLaunchBudgetOverride(&resolved.Config, opts)
 	return resolved, nil

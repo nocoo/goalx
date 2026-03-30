@@ -18,7 +18,7 @@ type savedPhaseSource struct {
 	Parallel     int
 	Metadata     *RunMetadata
 	Selection    *SelectionSnapshot
-	Context      []string
+	Context      goalx.ContextConfig
 	SessionNames []string
 }
 
@@ -51,7 +51,7 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	if parallel < len(cfg.Sessions) {
 		parallel = len(cfg.Sessions)
 	}
-	contextFiles, sessionNames, err := CollectSavedResearchContext(runDir)
+	context, sessionNames, err := CollectSavedPhaseContext(runDir, cfg.Context)
 	if err != nil {
 		return nil, fmt.Errorf("collect saved run context for %q: %w", runName, err)
 	}
@@ -67,7 +67,7 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 		Parallel:     parallel,
 		Metadata:     meta,
 		Selection:    selection,
-		Context:      contextFiles,
+		Context:      context,
 		SessionNames: sessionNames,
 	}, nil
 }
@@ -138,7 +138,7 @@ func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions)
 	if err != nil {
 		return err
 	}
-	if len(source.Context) == 0 {
+	if len(source.Context.Files) == 0 && len(source.Context.Refs) == 0 {
 		return fmt.Errorf(spec.NoContextErr, source.Dir)
 	}
 
@@ -147,7 +147,7 @@ func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions)
 		return err
 	}
 	cfg := &resolved.Config
-	contextFiles, err := phaseContextFiles(cfg, source, opts.ContextPaths)
+	context, err := phaseContext(projectRoot, cfg, source, opts.ContextPaths)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions)
 
 	applySessionHints(cfg, spec.DefaultHints(source))
 	applySessionDimensions(cfg, dimensions, opts)
-	cfg.Context = goalx.ContextConfig{Files: contextFiles, Refs: cfg.Context.Refs}
+	cfg.Context = context
 
 	if opts.WriteConfig {
 		if err := writePhaseConfig(projectRoot, cfg, fmt.Sprintf(spec.DraftHeader, source.Run)); err != nil {
@@ -260,37 +260,22 @@ func resolvePhaseObjective(phaseKind string, sourceRun string, explicit string) 
 	}
 }
 
-func phaseContextFiles(cfg *goalx.Config, source *savedPhaseSource, extra []string) ([]string, error) {
-	base := make([]string, 0)
+func phaseContext(projectRoot string, cfg *goalx.Config, source *savedPhaseSource, extra []string) (goalx.ContextConfig, error) {
+	merged := goalx.ContextConfig{}
 	if cfg != nil {
-		base = append(base, cfg.Context.Files...)
+		merged = MergeContextConfigs(merged, cfg.Context)
 	}
 	if source != nil {
-		base = append(base, source.Context...)
+		merged = MergeContextConfigs(merged, source.Context)
 	}
-	return mergePhaseContext(base, extra)
-}
-
-func mergePhaseContext(base []string, extra []string) ([]string, error) {
 	if len(extra) == 0 {
-		return append([]string(nil), base...), nil
+		return merged, nil
 	}
-	resolved, err := DiscoverContextFiles(extra)
+	resolved, err := ResolveContextInputsFrom(projectRoot, extra)
 	if err != nil {
-		return nil, fmt.Errorf("discover context: %w", err)
+		return goalx.ContextConfig{}, fmt.Errorf("resolve context: %w", err)
 	}
-	merged := append([]string(nil), base...)
-	seen := map[string]bool{}
-	for _, path := range merged {
-		seen[path] = true
-	}
-	for _, path := range resolved {
-		if !seen[path] {
-			merged = append(merged, path)
-			seen[path] = true
-		}
-	}
-	return merged, nil
+	return MergeContextConfigs(merged, resolved), nil
 }
 
 func applyPhaseDimensions(opts phaseOptions) ([]string, error) {

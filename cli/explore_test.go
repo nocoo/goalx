@@ -125,6 +125,100 @@ context:
 	}
 }
 
+func TestExploreWriteConfigPreservesSavedRunRefsAndBoundarySurfaces(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	sourceContextDir := t.TempDir()
+	sourceContextPath := filepath.Join(sourceContextDir, "source-context.md")
+	if err := os.WriteFile(sourceContextPath, []byte("# source context\n"), 0o644); err != nil {
+		t.Fatalf("write source context: %v", err)
+	}
+
+	writeProjectConfigFixture(t, projectRoot, `
+master:
+  engine: codex
+  model: gpt-5.4
+roles:
+  worker:
+    engine: codex
+    model: gpt-5.4
+target:
+  files: ["."]
+local_validation:
+  command: go test ./...
+context:
+  refs:
+    - project-wide-ref
+`)
+
+	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeWorker,
+		Objective: "audit auth flow",
+		Parallel:  2,
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "codex",
+		},
+		Context: goalx.ContextConfig{
+			Files: []string{sourceContextPath},
+			Refs:  []string{"ticket-123", "https://example.com/root-cause"},
+		},
+	}, map[string]string{
+		"summary.md":              "# summary\n",
+		"session-1-report.md":     "# report\n",
+		"objective-contract.json": "{\n  \"version\": 1,\n  \"state\": \"locked\",\n  \"clauses\": []\n}\n",
+		"goal.json":               "{\n  \"version\": 1,\n  \"required\": [],\n  \"optional\": []\n}\n",
+		"acceptance.json":         "{\n  \"version\": 2,\n  \"checks\": []\n}\n",
+		"status.json":             "{\n  \"version\": 1,\n  \"phase\": \"working\",\n  \"required_remaining\": 1\n}\n",
+		"coordination.json":       "{\n  \"version\": 1,\n  \"required\": {},\n  \"sessions\": {}\n}\n",
+		"experiments.jsonl":       "{\"version\":1,\"kind\":\"experiment.created\",\"at\":\"2026-03-28T10:00:00Z\",\"actor\":\"goalx\",\"body\":{\"experiment_id\":\"exp_source\",\"created_at\":\"2026-03-28T10:00:00Z\"}}\n",
+		"integration.json":        "{\n  \"version\": 1,\n  \"current_experiment_id\": \"exp_source\",\n  \"current_branch\": \"goalx/research-a/root\",\n  \"current_commit\": \"abc1234\",\n  \"updated_at\": \"2026-03-28T10:00:00Z\"\n}\n",
+		"run-metadata.json":       "{\n  \"version\": 1,\n  \"run_id\": \"run-source\",\n  \"intent\": \"deliver\"\n}\n",
+	})
+
+	if err := Explore(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
+		t.Fatalf("Explore: %v", err)
+	}
+
+	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+
+	for _, want := range []string{"project-wide-ref", "ticket-123", "https://example.com/root-cause"} {
+		if !containsString(cfg.Context.Refs, want) {
+			t.Fatalf("context.refs = %#v, want %q", cfg.Context.Refs, want)
+		}
+	}
+	for _, suffix := range []string{
+		sourceContextPath,
+		"summary.md",
+		"experiments.jsonl",
+		"integration.json",
+		"objective-contract.json",
+		"goal.json",
+		"acceptance.json",
+		"status.json",
+		"coordination.json",
+	} {
+		if !containsPathWithSuffix(cfg.Context.Files, suffix) {
+			t.Fatalf("context.files = %#v, want entry matching %q", cfg.Context.Files, suffix)
+		}
+	}
+}
+
+func containsPathWithSuffix(paths []string, want string) bool {
+	for _, path := range paths {
+		if path == want || strings.HasSuffix(path, want) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestExploreWriteConfigAppliesReadonlyTargetOverride(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

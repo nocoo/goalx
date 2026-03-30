@@ -2144,6 +2144,86 @@ func TestRenderMasterProtocolIncludesExploreIntentFacts(t *testing.T) {
 	}
 }
 
+func TestRenderMasterProtocolIncludesDebateIntentFacts(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "challenge prior audit findings and converge on a fix list",
+		RunName:             "demo",
+		Mode:                goalx.ModeAuto,
+		Intent:              runIntentDebate,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalPath:            "/tmp/goal.json",
+		StatusPath:          "/tmp/status.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		EngineCommand:       "codex --model gpt-5.4",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Intent: debate",
+		"This run was launched with explicit `debate` intent.",
+		"Treat this as an adversarial review of prior findings, not a fresh greenfield implementation run.",
+		"Start from the saved evidence and reports, identify the strongest disagreements, and drive them to an explicit consensus or decisive rejection.",
+		"Do not let `debate` collapse into parallel monologues.",
+		"Do not shift into implementation until the debated path, objection handling, and recommended next action are durable and explicit.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesImplementIntentFacts(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "implement the agreed remediation plan",
+		RunName:             "demo",
+		Mode:                goalx.ModeAuto,
+		Intent:              runIntentImplement,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalPath:            "/tmp/goal.json",
+		StatusPath:          "/tmp/status.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		EngineCommand:       "codex --model gpt-5.4",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Intent: implement",
+		"This run was launched with explicit `implement` intent.",
+		"Treat prior reports, debate output, and saved evidence as the input contract for implementation.",
+		"Default toward concrete implementation, validation, review, and integration slices instead of reopening broad exploration.",
+		"If the saved evidence conflicts with the current repo, runtime, or goal boundary, resolve the contradiction quickly and record it before continuing.",
+		"Do not treat prior recommendations as self-authenticating; verify they still hold in the current repo before you commit on them.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{

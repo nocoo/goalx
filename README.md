@@ -163,6 +163,18 @@ goalx run "we understand why ranking quality regressed and have an evidence-back
 - fresh `explore` tells the master to start with evidence expansion and path comparison; implementation should follow only when current-run evidence clearly justifies it.
 - `--readonly` declares a no-edit execution boundary in `target.readonly` and surfaces it to workers through GoalX protocol/context/affordances. It is a GoalX contract boundary, not an OS sandbox.
 
+### Extra Context
+
+Use `--context` when the run should start with extra evidence beyond the repo.
+
+```bash
+goalx run "audit auth flow" --intent explore --context README.md,docs/architecture,https://example.com/spec,ref:ticket-123,note:reproduce the rejection path
+```
+
+- existing files and directories go to `context.files`
+- URLs and explicit `ref:` / `note:` items go to `context.refs`
+- phase runs keep saved-run boundary/evidence surfaces and merge any extra `--context` items on top
+
 ### Evolve Workflow
 
 Use this when the right behavior is "keep improving until the budget says stop."

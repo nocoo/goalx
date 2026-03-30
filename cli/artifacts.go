@@ -265,32 +265,33 @@ func FindSessionArtifact(manifest *ArtifactsManifest, sessionName, kind string) 
 	return nil
 }
 
-func CollectSavedResearchContext(runDir string) ([]string, []string, error) {
+func CollectSavedPhaseContext(runDir string, base goalx.ContextConfig) (goalx.ContextConfig, []string, error) {
 	manifest, err := LoadArtifacts(filepath.Join(runDir, "artifacts.json"))
 	if err != nil {
-		return nil, nil, err
+		return goalx.ContextConfig{}, nil, err
 	}
 
-	var contextFiles []string
+	context := MergeContextConfigs(base)
 	var sessionNames []string
-	seen := map[string]bool{}
 	addPath := func(path string) {
-		if path == "" || seen[path] {
-			return
-		}
-		contextFiles = append(contextFiles, path)
-		seen[path] = true
+		context = MergeContextConfigs(context, goalx.ContextConfig{Files: []string{path}})
 	}
 
-	summaryPath := SummaryPath(runDir)
-	if info, err := os.Stat(summaryPath); err == nil && !info.IsDir() && info.Size() > 0 {
-		addPath(summaryPath)
-	}
-	if info, err := os.Stat(ExperimentsLogPath(runDir)); err == nil && !info.IsDir() && info.Size() > 0 {
-		addPath(ExperimentsLogPath(runDir))
-	}
-	if info, err := os.Stat(IntegrationStatePath(runDir)); err == nil && !info.IsDir() && info.Size() > 0 {
-		addPath(IntegrationStatePath(runDir))
+	for _, path := range []string{
+		SummaryPath(runDir),
+		ObjectiveContractPath(runDir),
+		GoalPath(runDir),
+		AcceptanceStatePath(runDir),
+		RunStatusPath(runDir),
+		CoordinationPath(runDir),
+		ExperimentsLogPath(runDir),
+		IntegrationStatePath(runDir),
+		filepath.Join(runDir, "proof", "completion.json"),
+		AcceptanceEvidencePath(runDir),
+	} {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() && info.Size() > 0 {
+			addPath(path)
+		}
 	}
 	if entries, err := os.ReadDir(ReportsDir(runDir)); err == nil {
 		for _, entry := range entries {
@@ -317,7 +318,7 @@ func CollectSavedResearchContext(runDir string) ([]string, []string, error) {
 			}
 		}
 	}
-	if len(contextFiles) == 0 {
+	if len(context.Files) == 0 {
 		absRunDir, _ := filepath.Abs(runDir)
 		entries, _ := os.ReadDir(runDir)
 		for _, e := range entries {
@@ -332,7 +333,7 @@ func CollectSavedResearchContext(runDir string) ([]string, []string, error) {
 	}
 
 	sort.Strings(sessionNames)
-	return contextFiles, compactSorted(sessionNames), nil
+	return context, compactSorted(sessionNames), nil
 }
 
 func ensureSessionArtifactsEntry(manifest *ArtifactsManifest, session, mode string) *SessionArtifacts {

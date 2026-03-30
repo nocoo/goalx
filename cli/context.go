@@ -133,6 +133,15 @@ func renderContextIndex(index *ContextIndex) string {
 			writeContextLine("Readonly paths", strings.Join(index.ReadonlyPaths, ", "))
 		}
 	}
+	if len(index.ContextFiles) > 0 || len(index.ContextRefs) > 0 {
+		b.WriteString("\n## Declared Context\n\n")
+		if len(index.ContextFiles) > 0 {
+			b.WriteString("- Context files: " + formatContextValues(index.ContextFiles) + "\n")
+		}
+		if len(index.ContextRefs) > 0 {
+			b.WriteString("- Context refs: " + formatContextValues(index.ContextRefs) + "\n")
+		}
+	}
 	if index.GoalBoundary != nil {
 		b.WriteString("\n## Goal Boundary\n\n")
 		writeContextLine("Required items", fmt.Sprintf("%d", index.GoalBoundary.RequiredCount))
@@ -296,6 +305,18 @@ func renderContextIndex(index *ContextIndex) string {
 		}
 	}
 	return b.String()
+}
+
+func formatContextValues(values []string) string {
+	wrapped := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		wrapped = append(wrapped, "`"+value+"`")
+	}
+	return strings.Join(wrapped, ", ")
 }
 
 func writeIndentedContextLine(b *strings.Builder, label, value string) {

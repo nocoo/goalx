@@ -28,10 +28,11 @@ type phaseOptions struct {
 }
 
 func phaseUsage(command string) string {
-	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--write-config]
+	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--write-config]
 
 notes:
   --from RUN is required and must reference a saved run.
+  --context accepts existing files/dirs, URLs, and explicit ref:/note: items.
   --parallel is optional initial fan-out for the new phase run.
   saved run selection snapshot stays in effect unless you request an explicit CLI selection override.
   direct start is the default; use --write-config only for advanced config-first control.`, command)

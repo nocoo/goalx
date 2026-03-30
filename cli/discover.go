@@ -1,20 +1,28 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	goalx "github.com/vonbai/goalx"
 )
 
-// DiscoverContextFiles expands paths into a list of relevant files.
-// Directories are scanned for key files; regular files are included directly.
-// All returned paths are absolute.
+// DiscoverContextFiles expands paths relative to the current working directory.
 func DiscoverContextFiles(paths []string) ([]string, error) {
+	return DiscoverContextFilesFrom("", paths)
+}
+
+// DiscoverContextFilesFrom expands paths relative to baseDir when they are not
+// already absolute. Directories are scanned for key files; regular files are
+// included directly. All returned paths are absolute.
+func DiscoverContextFilesFrom(baseDir string, paths []string) ([]string, error) {
 	var result []string
 	seen := make(map[string]bool)
 
 	for _, p := range paths {
-		absPath, err := filepath.Abs(p)
+		absPath, err := resolveContextPath(baseDir, p)
 		if err != nil {
 			return nil, err
 		}
@@ -43,6 +51,116 @@ func DiscoverContextFiles(paths []string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+// ResolveContextInputs converts mixed CLI context inputs into canonical
+// file and ref lists without silently guessing between the two.
+//
+// Accepted forms:
+//   - existing files or directories
+//   - URLs (stored as refs)
+//   - ref:<value> or note:<value> (stored as refs without the prefix)
+func ResolveContextInputs(inputs []string) (goalx.ContextConfig, error) {
+	return ResolveContextInputsFrom("", inputs)
+}
+
+func ResolveContextInputsFrom(baseDir string, inputs []string) (goalx.ContextConfig, error) {
+	var cfg goalx.ContextConfig
+	seenFiles := make(map[string]bool)
+	seenRefs := make(map[string]bool)
+
+	addFile := func(path string) {
+		path = strings.TrimSpace(path)
+		if path == "" || seenFiles[path] {
+			return
+		}
+		cfg.Files = append(cfg.Files, path)
+		seenFiles[path] = true
+	}
+	addRef := func(ref string) {
+		ref = strings.TrimSpace(ref)
+		if ref == "" || seenRefs[ref] {
+			return
+		}
+		cfg.Refs = append(cfg.Refs, ref)
+		seenRefs[ref] = true
+	}
+
+	for _, input := range inputs {
+		raw := strings.TrimSpace(input)
+		if raw == "" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(raw, "ref:"):
+			ref := strings.TrimSpace(strings.TrimPrefix(raw, "ref:"))
+			if ref == "" {
+				return goalx.ContextConfig{}, fmt.Errorf("invalid --context item %q: empty ref", input)
+			}
+			addRef(ref)
+			continue
+		case strings.HasPrefix(raw, "note:"):
+			ref := strings.TrimSpace(strings.TrimPrefix(raw, "note:"))
+			if ref == "" {
+				return goalx.ContextConfig{}, fmt.Errorf("invalid --context item %q: empty note", input)
+			}
+			addRef(ref)
+			continue
+		case looksLikeURL(raw):
+			addRef(raw)
+			continue
+		}
+
+		files, err := DiscoverContextFilesFrom(baseDir, []string{raw})
+		if err != nil {
+			return goalx.ContextConfig{}, fmt.Errorf("resolve --context item %q: %w", input, err)
+		}
+		for _, file := range files {
+			addFile(file)
+		}
+	}
+
+	return cfg, nil
+}
+
+func MergeContextConfigs(configs ...goalx.ContextConfig) goalx.ContextConfig {
+	var merged goalx.ContextConfig
+	seenFiles := make(map[string]bool)
+	seenRefs := make(map[string]bool)
+	for _, cfg := range configs {
+		for _, file := range cfg.Files {
+			file = strings.TrimSpace(file)
+			if file == "" || seenFiles[file] {
+				continue
+			}
+			merged.Files = append(merged.Files, file)
+			seenFiles[file] = true
+		}
+		for _, ref := range cfg.Refs {
+			ref = strings.TrimSpace(ref)
+			if ref == "" || seenRefs[ref] {
+				continue
+			}
+			merged.Refs = append(merged.Refs, ref)
+			seenRefs[ref] = true
+		}
+	}
+	return merged
+}
+
+func looksLikeURL(raw string) bool {
+	return strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")
+}
+
+func resolveContextPath(baseDir, raw string) (string, error) {
+	path := strings.TrimSpace(raw)
+	if filepath.IsAbs(path) {
+		return filepath.Abs(path)
+	}
+	if strings.TrimSpace(baseDir) != "" {
+		return filepath.Abs(filepath.Join(baseDir, path))
+	}
+	return filepath.Abs(path)
 }
 
 // discoverKeyFiles finds important files in a project directory.

@@ -82,6 +82,27 @@ No explicit intent was provided. Choose the best execution path yourself.
 - If you make code changes during `explore`, treat them as probes or evidence-building slices until the run has a documented implementation decision.
 - If the user's goal is investigation-first, do not close out with code alone; preserve findings, alternatives, and remaining decision points in the final summary.
 {{end}}
+{{if eq .Intent "debate"}}
+### Debate Intent
+
+- This run was launched with explicit `debate` intent.
+- Treat this as an adversarial review of prior findings, not a fresh greenfield implementation run.
+- Start from the saved evidence and reports, identify the strongest disagreements, and drive them to an explicit consensus or decisive rejection.
+- Do not let `debate` collapse into parallel monologues.
+- Force concrete comparison: what evidence stands, what fails, what changed, and what the next action should be.
+- If one side's evidence clearly wins, converge quickly and record why instead of preserving artificial symmetry.
+- Do not shift into implementation until the debated path, objection handling, and recommended next action are durable and explicit.
+{{end}}
+{{if eq .Intent "implement"}}
+### Implement Intent
+
+- This run was launched with explicit `implement` intent.
+- Treat prior reports, debate output, and saved evidence as the input contract for implementation.
+- Default toward concrete implementation, validation, review, and integration slices instead of reopening broad exploration.
+- If the saved evidence conflicts with the current repo, runtime, or goal boundary, resolve the contradiction quickly and record it before continuing.
+- Do not treat prior recommendations as self-authenticating; verify they still hold in the current repo before you commit on them.
+- When a prior plan is still valid, bias toward shipping the highest-value verified slice now instead of re-litigating the whole design space.
+{{end}}
 
 ## Resources
 

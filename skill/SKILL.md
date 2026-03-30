@@ -142,6 +142,13 @@ Boundary flag:
 
 - **--readonly**: declare a no-edit execution boundary in `target.readonly` for report-first or investigation-only runs; GoalX exposes it in protocol/context/affordances instead of pretending it is an OS sandbox
 
+Context injection:
+
+- use `--context` for extra evidence at launch or phase continuation
+- existing files/dirs are recorded in `context.files`
+- URLs and explicit `ref:` / `note:` items are recorded in `context.refs`
+- phase runs preserve saved-run boundary/evidence surfaces and merge any extra `--context` items on top
+
 ## Evolve
 
 `evolve` is not just "run again." It is GoalX's continuous improvement mode.
