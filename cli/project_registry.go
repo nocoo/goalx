@@ -14,7 +14,6 @@ import (
 
 type ProjectRunRef struct {
 	Name      string `json:"name"`
-	Mode      string `json:"mode,omitempty"`
 	Objective string `json:"objective,omitempty"`
 	State     string `json:"state,omitempty"`
 	UpdatedAt string `json:"updated_at,omitempty"`
@@ -161,7 +160,6 @@ func RegisterActiveRun(projectRoot string, cfg *goalx.Config) error {
 		now := time.Now().UTC().Format(time.RFC3339)
 		reg.ActiveRuns[cfg.Name] = ProjectRunRef{
 			Name:      cfg.Name,
-			Mode:      string(cfg.Mode),
 			State:     "active",
 			UpdatedAt: now,
 		}
@@ -210,7 +208,6 @@ func RegisterSavedRun(projectRoot string, cfg *goalx.Config) error {
 	if err := mutateProjectRegistry(projectRoot, func(reg *ProjectRegistry) error {
 		reg.SavedRuns[cfg.Name] = ProjectRunRef{
 			Name:      cfg.Name,
-			Mode:      string(cfg.Mode),
 			State:     "saved",
 			UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 		}

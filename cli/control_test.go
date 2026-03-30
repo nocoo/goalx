@@ -304,10 +304,10 @@ func TestPulseQueuesMasterWakeReminderWithoutLegacyHeartbeatState(t *testing.T) 
 		t.Fatalf("write fake tmux: %v", err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-run\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-run\nmode: worker\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"pulse-run","mode":"develop","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"pulse-run","mode":"worker","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
@@ -375,10 +375,10 @@ func TestPulseDedupesMasterWakeReminderAcrossRepeatedCycles(t *testing.T) {
 		t.Fatalf("write fake tmux: %v", err)
 	}
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-lag\nmode: develop\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: pulse-lag\nmode: worker\nobjective: ship it\nmaster:\n  engine: codex\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"pulse-lag","mode":"develop","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"pulse-lag","mode":"worker","objective":"ship it","active":false,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}

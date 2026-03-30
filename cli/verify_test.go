@@ -31,7 +31,7 @@ func TestVerifyUsesAcceptanceChecksAndWritesState(t *testing.T) {
 	}
 
 	snapshot := []byte(`name: verify-run
-mode: develop
+mode: worker
 objective: ship feature
 target:
   files: ["README.md"]
@@ -112,7 +112,7 @@ func TestVerifyRunsAcceptanceInsideRunWorktree(t *testing.T) {
 	}
 
 	snapshot := []byte(`name: verify-run
-mode: develop
+mode: worker
 objective: ship feature
 acceptance:
   command: "test -f run-worktree-only.txt"
@@ -160,7 +160,7 @@ func TestVerifyRequiresAcceptanceChecks(t *testing.T) {
 	}
 
 	snapshot := []byte(`name: verify-run
-mode: develop
+mode: worker
 objective: ship feature
 target:
   files: ["README.md"]
@@ -237,7 +237,7 @@ func TestVerifyDoesNotRewriteGoalState(t *testing.T) {
 	}
 
 	snapshot := []byte(`name: verify-goal-readonly
-mode: develop
+mode: worker
 objective: ship feature
 acceptance:
   command: "printf 'e2e ok\n'"
@@ -279,7 +279,7 @@ acceptance:
 	assertFileUnchanged(t, GoalPath(runDir), goalBefore)
 }
 
-func TestVerifyResearchRequiresReportEvidenceManifest(t *testing.T) {
+func TestVerifyDoesNotGateOnMissingReportEvidenceManifest(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -294,16 +294,12 @@ func TestVerifyResearchRequiresReportEvidenceManifest(t *testing.T) {
 		t.Fatalf("write report: %v", err)
 	}
 
-	err := Verify(repo, []string{"--run", runName})
-	if err == nil {
-		t.Fatal("expected Verify to fail")
-	}
-	if !strings.Contains(err.Error(), "evidence manifest") {
-		t.Fatalf("Verify error = %v, want evidence manifest failure", err)
+	if err := Verify(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Verify: %v", err)
 	}
 }
 
-func TestVerifyResearchRejectsMalformedReportEvidenceManifest(t *testing.T) {
+func TestVerifyDoesNotGateOnMalformedReportEvidenceManifest(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -329,16 +325,12 @@ func TestVerifyResearchRejectsMalformedReportEvidenceManifest(t *testing.T) {
 		t.Fatalf("write manifest: %v", err)
 	}
 
-	err := Verify(repo, []string{"--run", runName})
-	if err == nil {
-		t.Fatal("expected Verify to fail")
-	}
-	if !strings.Contains(err.Error(), "unknown field") && !strings.Contains(err.Error(), "unexpected") {
-		t.Fatalf("Verify error = %v, want manifest parse failure", err)
+	if err := Verify(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Verify: %v", err)
 	}
 }
 
-func TestVerifyResearchRequiresExternalRefsForComparisonClause(t *testing.T) {
+func TestVerifyDoesNotGateOnMissingExternalRefsInReportEvidenceManifest(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -367,12 +359,8 @@ func TestVerifyResearchRequiresExternalRefsForComparisonClause(t *testing.T) {
 		t.Fatalf("write manifest: %v", err)
 	}
 
-	err := Verify(repo, []string{"--run", runName})
-	if err == nil {
-		t.Fatal("expected Verify to fail")
-	}
-	if !strings.Contains(err.Error(), "external_refs") {
-		t.Fatalf("Verify error = %v, want external refs failure", err)
+	if err := Verify(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Verify: %v", err)
 	}
 }
 
@@ -425,7 +413,7 @@ func seedResearchVerifyRun(t *testing.T, repo, runName string) string {
 	}
 
 	snapshot := []byte(`name: ` + runName + `
-mode: research
+mode: worker
 objective: compare external reference architectures
 acceptance:
   command: "printf 'research e2e ok\n'"
@@ -502,7 +490,7 @@ func TestVerifyRecordsAcceptanceWhenRunChangedCode(t *testing.T) {
 	}
 
 	snapshot := []byte(`name: verify-code-changed
-mode: develop
+mode: worker
 objective: ship feature
 acceptance:
   command: "printf 'e2e ok\n'"

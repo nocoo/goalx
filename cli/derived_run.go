@@ -77,23 +77,28 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 			return nil, err
 		}
 		sessionMissing := false
+		sessionTruthAvailable := false
 		for target, facts := range presence {
 			if !strings.HasPrefix(target, "session-") {
 				continue
 			}
+			if strings.TrimSpace(facts.State) == TargetPresencePresent || strings.TrimSpace(facts.State) == TargetPresenceParked {
+				sessionTruthAvailable = true
+			}
 			if targetPresenceMissing(facts) {
 				sessionMissing = true
-				break
 			}
 		}
+		masterMissing := targetPresenceMissing(presence["master"])
+		sidecarMissing := targetPresenceMissing(presence["sidecar"])
 		switch {
-		case targetPresenceMissing(presence["master"]):
-			state.Status = "stranded"
-		case targetPresenceMissing(presence["sidecar"]):
-			state.Status = "stranded"
-		case sessionMissing:
+		case masterMissing || sidecarMissing || sessionMissing:
+			if !state.HasLease && !state.HasTmuxSession && !sessionTruthAvailable {
+				state.Status = "stranded"
+				break
+			}
 			state.Status = "degraded"
-		case state.HasLease:
+		case state.HasLease || state.HasTmuxSession || sessionTruthAvailable:
 			state.Status = "active"
 		default:
 			state.Status = "degraded"

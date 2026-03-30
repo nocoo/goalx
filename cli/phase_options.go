@@ -10,26 +10,24 @@ import (
 )
 
 type phaseOptions struct {
-	From           string
-	Name           string
-	Objective      string
-	Parallel       int
-	ContextPaths   []string
-	Dimensions     []string
-	Effort         goalx.EffortLevel
-	Master         string
-	ResearchRole   string
-	DevelopRole    string
-	MasterEffort   goalx.EffortLevel
-	ResearchEffort goalx.EffortLevel
-	DevelopEffort  goalx.EffortLevel
-	BudgetSet      bool
-	Budget         time.Duration
-	WriteConfig    bool
+	From         string
+	Name         string
+	Objective    string
+	Parallel     int
+	ContextPaths []string
+	Dimensions   []string
+	Effort       goalx.EffortLevel
+	Master       string
+	Worker       string
+	MasterEffort goalx.EffortLevel
+	WorkerEffort goalx.EffortLevel
+	BudgetSet    bool
+	Budget       time.Duration
+	WriteConfig  bool
 }
 
 func phaseUsage(command string) string {
-	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--write-config]
+	return fmt.Sprintf(`usage: goalx %s --from RUN [--name NAME] [--objective TEXT] [--parallel N] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--write-config]
 
 notes:
   --from RUN is required and must reference a saved run.
@@ -108,38 +106,22 @@ func parsePhaseOptions(command string, args []string) (phaseOptions, error) {
 				return opts, err
 			}
 			opts.MasterEffort = level
-		case "--research-role":
+		case "--worker":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --research-role")
+				return opts, fmt.Errorf("missing value for --worker")
 			}
 			i++
-			opts.ResearchRole = args[i]
-		case "--research-effort":
+			opts.Worker = args[i]
+		case "--worker-effort":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --research-effort")
-			}
-			i++
-			level, err := goalx.ParseEffortLevel(args[i])
-			if err != nil {
-				return opts, err
-			}
-			opts.ResearchEffort = level
-		case "--develop-role":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --develop-role")
-			}
-			i++
-			opts.DevelopRole = args[i]
-		case "--develop-effort":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --develop-effort")
+				return opts, fmt.Errorf("missing value for --worker-effort")
 			}
 			i++
 			level, err := goalx.ParseEffortLevel(args[i])
 			if err != nil {
 				return opts, err
 			}
-			opts.DevelopEffort = level
+			opts.WorkerEffort = level
 		case "--budget":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --budget")
@@ -154,7 +136,7 @@ func parsePhaseOptions(command string, args []string) (phaseOptions, error) {
 		case "--write-config":
 			opts.WriteConfig = true
 		case "--engine", "--model":
-			return opts, fmt.Errorf("%s is ambiguous; use --master, --research-role, or --develop-role", args[i])
+			return opts, fmt.Errorf("%s is ambiguous; use --master or --worker", args[i])
 		default:
 			return opts, fmt.Errorf("unknown flag %q", args[i])
 		}
@@ -163,24 +145,4 @@ func parsePhaseOptions(command string, args []string) (phaseOptions, error) {
 		return opts, fmt.Errorf("usage: goalx %s --from RUN [flags]", command)
 	}
 	return opts, nil
-}
-
-func mergeNextConfigIntoPhaseOptions(opts phaseOptions, nc *nextConfigJSON, phaseMode goalx.Mode) phaseOptions {
-	_ = phaseMode
-	if nc == nil {
-		return opts
-	}
-	if opts.Parallel == 0 && nc.Parallel > 0 {
-		opts.Parallel = nc.Parallel
-	}
-	if opts.Objective == "" && nc.Objective != "" {
-		opts.Objective = nc.Objective
-	}
-	if len(opts.ContextPaths) == 0 && len(nc.Context) > 0 {
-		opts.ContextPaths = append([]string(nil), nc.Context...)
-	}
-	if len(opts.Dimensions) == 0 && len(nc.Dimensions) > 0 {
-		opts.Dimensions = append([]string(nil), nc.Dimensions...)
-	}
-	return opts
 }

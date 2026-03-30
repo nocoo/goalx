@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -136,111 +135,6 @@ func copyReportWithEvidence(srcReportPath, dstReportPath string) error {
 		return nil
 	}
 	return SaveReportEvidenceManifest(dstReportPath, manifest)
-}
-
-func validateResearchAcceptance(runDir string) (string, error) {
-	var evidence strings.Builder
-	summaryPath := SummaryPath(runDir)
-	fmt.Fprintf(&evidence, "summary: %s\n", summaryPath)
-	if !fileExists(summaryPath) {
-		return evidence.String(), fmt.Errorf("summary missing at %s", summaryPath)
-	}
-
-	reportsDir := ReportsDir(runDir)
-	entries, err := os.ReadDir(reportsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return evidence.String(), fmt.Errorf("no research reports found in %s", reportsDir)
-		}
-		return evidence.String(), fmt.Errorf("read reports dir: %w", err)
-	}
-
-	reportPaths := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".evidence.json") {
-			continue
-		}
-		if filepath.Ext(name) != ".md" {
-			continue
-		}
-		reportPaths = append(reportPaths, filepath.Join(reportsDir, name))
-	}
-	sort.Strings(reportPaths)
-	fmt.Fprintf(&evidence, "reports: %d\n", len(reportPaths))
-	if len(reportPaths) == 0 {
-		return evidence.String(), fmt.Errorf("no research reports found in %s", reportsDir)
-	}
-
-	contract, err := RequireObjectiveContract(runDir)
-	if err != nil {
-		return evidence.String(), err
-	}
-	if strings.TrimSpace(contract.State) != objectiveContractStateLocked {
-		return evidence.String(), fmt.Errorf("objective contract must be locked")
-	}
-
-	goalClauses := objectiveClausesBySurface(contract, objectiveRequiredSurfaceGoal)
-	if len(goalClauses) == 0 {
-		return evidence.String(), fmt.Errorf("objective contract has no goal clauses")
-	}
-
-	coverageByClause := make(map[string]int, len(goalClauses))
-	externalCoverageByClause := make(map[string]bool, len(goalClauses))
-	for _, reportPath := range reportPaths {
-		manifest, err := LoadReportEvidenceManifest(reportPath)
-		if err != nil {
-			return evidence.String(), err
-		}
-		if manifest == nil {
-			return evidence.String(), fmt.Errorf("report evidence manifest missing for %s", reportPath)
-		}
-		fmt.Fprintf(&evidence, "- %s -> %s\n", reportPath, ReportEvidenceManifestPath(reportPath))
-		for _, clauseID := range manifest.Covers {
-			if _, ok := goalClauses[clauseID]; !ok {
-				return evidence.String(), fmt.Errorf("report evidence manifest %s references unknown objective clause %q", ReportEvidenceManifestPath(reportPath), clauseID)
-			}
-			coverageByClause[clauseID]++
-			if len(manifest.ExternalRefs) > 0 {
-				externalCoverageByClause[clauseID] = true
-			}
-		}
-	}
-
-	missingCoverage := make([]string, 0)
-	missingExternalRefs := make([]string, 0)
-	for clauseID, clause := range goalClauses {
-		if coverageByClause[clauseID] == 0 {
-			missingCoverage = append(missingCoverage, clauseID)
-			continue
-		}
-		if reportEvidenceRequiresExternalRefs(clause) && !externalCoverageByClause[clauseID] {
-			missingExternalRefs = append(missingExternalRefs, clauseID)
-		}
-	}
-	sort.Strings(missingCoverage)
-	sort.Strings(missingExternalRefs)
-	if len(missingCoverage) > 0 {
-		return evidence.String(), fmt.Errorf("objective clauses missing report evidence coverage: %s", strings.Join(missingCoverage, ", "))
-	}
-	if len(missingExternalRefs) > 0 {
-		return evidence.String(), fmt.Errorf("objective clauses require external_refs coverage: %s", strings.Join(missingExternalRefs, ", "))
-	}
-
-	fmt.Fprintf(&evidence, "coverage: %d clauses\n", len(goalClauses))
-	return evidence.String(), nil
-}
-
-func reportEvidenceRequiresExternalRefs(clause ObjectiveClause) bool {
-	switch strings.TrimSpace(clause.Kind) {
-	case objectiveClauseKindVerification, objectiveClauseKindQualityBar:
-		return true
-	default:
-		return false
-	}
 }
 
 func trimmedStrings(values []string) []string {

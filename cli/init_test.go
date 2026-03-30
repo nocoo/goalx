@@ -22,7 +22,7 @@ func TestInitDevelopUsesProjectConfigWhenAvailable(t *testing.T) {
 		t.Fatalf("write project config: %v", err)
 	}
 
-	if err := Init(projectRoot, []string{"ship it", "--develop", "--name", "demo"}); err != nil {
+	if err := Init(projectRoot, []string{"ship it", "--name", "demo"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -47,7 +47,7 @@ func TestInitDevelopLeavesLocalValidationAndTargetUnsetWithoutProjectConfig(t *t
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	if err := Init(projectRoot, []string{"ship it", "--develop", "--name", "demo"}); err != nil {
+	if err := Init(projectRoot, []string{"ship it", "--name", "demo"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -69,7 +69,7 @@ func TestInitAllowsDraftGenerationWithoutSupportedEngines(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
 	projectRoot := t.TempDir()
-	if err := Init(projectRoot, []string{"ship it", "--develop", "--name", "demo"}); err != nil {
+	if err := Init(projectRoot, []string{"ship it", "--name", "demo"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -90,12 +90,12 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir project config dir: %v", err)
 	}
-	projectCfg := []byte("master:\n  engine: claude-code\n  model: sonnet\nroles:\n  research:\n    engine: codex\n    model: gpt-5.4\n")
+	projectCfg := []byte("master:\n  engine: claude-code\n  model: sonnet\nroles:\n  worker:\n    engine: codex\n    model: gpt-5.4\n")
 	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), projectCfg, 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
 
-	if err := Init(projectRoot, []string{"investigate it", "--research", "--name", "demo"}); err != nil {
+	if err := Init(projectRoot, []string{"investigate it", "--name", "demo"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -103,8 +103,8 @@ func TestInitResearchUsesResearchPresetDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research role = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4" {
+		t.Fatalf("research role = %s/%s, want codex/gpt-5.4", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 }
 
@@ -120,9 +120,8 @@ func TestInitManualDraftOmitsUserScopedSelectionBlock(t *testing.T) {
 selection:
   master_candidates:
     - codex/gpt-5.4
-  research_candidates:
+  worker_candidates:
     - claude-code/opus
-  develop_candidates:
     - codex/gpt-5.4-mini
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
@@ -139,7 +138,7 @@ selection:
 	t.Setenv("PATH", pathDir)
 
 	projectRoot := t.TempDir()
-	if err := Init(projectRoot, []string{"ship it", "--develop", "--name", "demo"}); err != nil {
+	if err := Init(projectRoot, []string{"ship it", "--name", "demo"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 

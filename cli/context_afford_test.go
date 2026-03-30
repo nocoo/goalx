@@ -226,7 +226,7 @@ func TestAffordCommandPrintsProviderFactsForClaudeSession(t *testing.T) {
 		SessionName:     sessionName,
 		ExperimentID:    "exp_guidance_claude_session_1",
 		RoleKind:        "research",
-		Mode:            string(goalx.ModeResearch),
+		Mode:            string(goalx.ModeWorker),
 		Engine:          "claude-code",
 		Model:           "opus",
 		OriginCharterID: meta.CharterID,

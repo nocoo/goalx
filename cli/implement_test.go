@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +19,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -30,7 +29,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
 		Objective: "consensus fixes",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -40,7 +39,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  develop:
+  worker:
     engine: claude-code
     model: opus
 target:
@@ -49,7 +48,7 @@ local_validation:
   command: go test ./...
 `)
 
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -60,8 +59,8 @@ local_validation:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Develop.Engine != "claude-code" || cfg.Roles.Develop.Model != "opus" {
-		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "opus" {
+		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 }
 
@@ -75,7 +74,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  develop:
+  worker:
     engine: claude-code
     model: opus
 target:
@@ -85,7 +84,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
 		Objective: "consensus fixes",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -93,13 +92,11 @@ local_validation:
 	writeSelectionSnapshotFixture(t, SavedRunDir(projectRoot, "debate"), testSelectionSnapshot{
 		Version: 1,
 		Policy: goalx.EffectiveSelectionPolicy{
-			MasterCandidates:   []string{"codex/gpt-5.4"},
-			ResearchCandidates: []string{"claude-code/opus"},
-			DevelopCandidates:  []string{"codex/gpt-5.4-mini", "codex/gpt-5.4"},
+			MasterCandidates: []string{"codex/gpt-5.4"},
+			WorkerCandidates: []string{"codex/gpt-5.4-mini", "codex/gpt-5.4", "claude-code/opus"},
 		},
-		Master:   goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
+		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
 	})
 	writeProjectConfigFixture(t, projectRoot, `
 master:
@@ -111,7 +108,7 @@ local_validation:
   command: go test ./cli/...
 `)
 
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -122,8 +119,8 @@ local_validation:
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %s/%s, want saved snapshot codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "gpt-5.4-mini" {
-		t.Fatalf("develop role = %s/%s, want saved snapshot codex/gpt-5.4-mini", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4-mini" {
+		t.Fatalf("develop role = %s/%s, want saved snapshot codex/gpt-5.4-mini", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if cfg.Target.Files[0] != "config.go" {
 		t.Fatalf("target.files = %#v, want current shared config target", cfg.Target.Files)
@@ -133,7 +130,7 @@ local_validation:
 	}
 }
 
-func TestImplementIgnoresLegacyNextConfigSelectionOverrides(t *testing.T) {
+func TestImplementAppliesCanonicalPhaseOverridesFromCLI(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -143,7 +140,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  develop:
+  worker:
     engine: claude-code
     model: opus
 target:
@@ -153,34 +150,26 @@ local_validation:
 `)
 	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
 		Name:      "debate",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
 		Parallel:  2,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Develop: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	var nc nextConfigJSON
-	if err := json.Unmarshal([]byte(`{
-		"parallel": 4,
-		"objective": "custom implement objective",
-		"dimensions": ["depth", "adversarial", "evidence", "perfectionist"],
-		"engine": "codex",
-		"model": "fast",
-		"preset": "codex",
-		"mode": "develop",
-		"route_role": "develop",
-		"route_profile": "build_fast",
-		"effort": "high"
-	}`), &nc); err != nil {
-		t.Fatalf("unmarshal next_config: %v", err)
-	}
-	if err := Implement(projectRoot, []string{"--from", "debate", "--budget", "20m", "--write-config"}, &nc); err != nil {
+	if err := Implement(projectRoot, []string{
+		"--from", "debate",
+		"--parallel", "4",
+		"--objective", "custom implement objective",
+		"--dimension", "depth,adversarial,evidence,perfectionist",
+		"--budget", "20m",
+		"--write-config",
+	}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -191,8 +180,8 @@ local_validation:
 	if cfg.Parallel != 4 {
 		t.Fatalf("parallel = %d, want 4", cfg.Parallel)
 	}
-	if cfg.Roles.Develop.Engine != "claude-code" || cfg.Roles.Develop.Model != "opus" {
-		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "opus" {
+		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if cfg.Objective != "custom implement objective" {
 		t.Fatalf("objective = %q, want custom implement objective", cfg.Objective)
@@ -210,30 +199,31 @@ local_validation:
 	}
 }
 
-func TestImplementAttachesNextConfigDimensionsToSessions(t *testing.T) {
+func TestImplementAttachesCLIProvidedDimensionsToSessions(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
 		Name:      "debate",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
 		Parallel:  2,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Develop: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	nc := &nextConfigJSON{
-		Parallel:   3,
-		Dimensions: []string{"depth", "adversarial", "evidence"},
-	}
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nc); err != nil {
+	if err := Implement(projectRoot, []string{
+		"--from", "debate",
+		"--parallel", "3",
+		"--dimension", "depth,adversarial,evidence",
+		"--write-config",
+	}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -251,50 +241,6 @@ func TestImplementAttachesNextConfigDimensionsToSessions(t *testing.T) {
 	}
 }
 
-func TestImplementIgnoresLegacyNextConfigPresetForResolvedSavedRun(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	projectRoot := t.TempDir()
-	writeProjectConfigFixture(t, projectRoot, `
-master:
-  engine: codex
-  model: gpt-5.4
-roles:
-  develop:
-    engine: codex
-    model: gpt-5.4
-target:
-  files: [cli/]
-local_validation:
-  command: go test ./...
-`)
-	writeResolvedSavedRunFixture(t, projectRoot, "debate", launchOptions{
-		Objective: "consensus fixes",
-		Mode:      goalx.ModeResearch,
-	}, map[string]string{
-		"summary.md":          "# summary\n",
-		"session-1-report.md": "# report\n",
-	})
-
-	var nc nextConfigJSON
-	if err := json.Unmarshal([]byte(`{"preset":"claude-h"}`), &nc); err != nil {
-		t.Fatalf("unmarshal next_config: %v", err)
-	}
-
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, &nc); err != nil {
-		t.Fatalf("Implement: %v", err)
-	}
-
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
-	if err != nil {
-		t.Fatalf("load goalx.yaml: %v", err)
-	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "gpt-5.4" {
-		t.Fatalf("develop role = %s/%s, want codex/gpt-5.4", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
-	}
-}
-
 func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -302,12 +248,12 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "debate", goalx.Config{
 		Name:      "debate",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
 		Parallel:  1,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Develop: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 		},
 	}, nil)
 	runDir := SavedRunDir(projectRoot, "debate")
@@ -321,7 +267,7 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 		Sessions: []SessionArtifacts{
 			{
 				Name: "session-1",
-				Mode: string(goalx.ModeResearch),
+				Mode: string(goalx.ModeWorker),
 				Artifacts: []ArtifactMeta{
 					{Kind: "report", Path: reportPath, RelPath: "custom-findings.txt", DurableName: "session-1-report.md"},
 				},
@@ -331,7 +277,7 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 		t.Fatalf("SaveArtifacts: %v", err)
 	}
 
-	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate", "--write-config"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -359,12 +305,12 @@ func TestImplementUsesDistinctNameForLongSourceRun(t *testing.T) {
 	sourceRun := "design-the-next-generation-backend-architecture-for-synapse"
 	writeSavedRunFixture(t, projectRoot, sourceRun, goalx.Config{
 		Name:      sourceRun,
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
 		Parallel:  1,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Develop: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 		},
 		Target:          goalx.TargetConfig{Files: []string{"cli/"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},
@@ -373,7 +319,7 @@ func TestImplementUsesDistinctNameForLongSourceRun(t *testing.T) {
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Implement(projectRoot, []string{"--from", sourceRun, "--write-config"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", sourceRun, "--write-config"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 
@@ -399,7 +345,7 @@ func TestImplementStartCreatesFreshCharterWithPreservedRootLineage(t *testing.T)
 	installPhaseStartFakeTmux(t)
 	stubLaunchRunSidecar(t)
 
-	if err := Implement(projectRoot, []string{"--from", "debate"}, nil); err != nil {
+	if err := Implement(projectRoot, []string{"--from", "debate"}); err != nil {
 		t.Fatalf("Implement: %v", err)
 	}
 

@@ -92,7 +92,7 @@ func TestCollectRunMemorySeedsIncludesSavedArtifacts(t *testing.T) {
 
 	cfg := goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "inspect",
 		Target:    goalx.TargetConfig{Files: []string{"notes.md"}},
 	}
@@ -104,7 +104,7 @@ func TestCollectRunMemorySeedsIncludesSavedArtifacts(t *testing.T) {
 		t.Fatalf("write run spec: %v", err)
 	}
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "", cfg.Target, goalx.LocalValidationConfig{})
 	if err := os.WriteFile(SummaryPath(runDir), []byte("# summary\n"), 0o644); err != nil {
 		t.Fatalf("write summary: %v", err)
 	}

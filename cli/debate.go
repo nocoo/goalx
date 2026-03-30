@@ -8,27 +8,27 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-// Debate starts a research-mode debate run from an explicit saved run.
-func Debate(projectRoot string, args []string, nc *nextConfigJSON) error {
+// Debate starts a debate run from an explicit saved run.
+func Debate(projectRoot string, args []string) error {
 	if wantsHelp(args) {
 		fmt.Println(phaseUsage("debate"))
 		return nil
 	}
-	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentDebate), nc)
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentDebate))
 }
 
-func runDebate(projectRoot string, args []string, nc *nextConfigJSON) error {
+func runDebate(projectRoot string, args []string) error {
 	opts, err := parsePhaseOptions("debate", args)
 	if err != nil {
 		return err
 	}
-	return runPhaseAction(projectRoot, debatePhaseSpec(), opts, nc)
+	return runPhaseAction(projectRoot, debatePhaseSpec(), opts)
 }
 
 func debatePhaseSpec() phaseActionSpec {
 	return phaseActionSpec{
 		Kind:         "debate",
-		Mode:         goalx.ModeResearch,
+		Mode:         goalx.ModeWorker,
 		NoContextErr: "no reports found in %s",
 		DraftHeader:  "# goalx manual draft — debate round based on %s\n",
 		DefaultHints: debatePhaseHints,

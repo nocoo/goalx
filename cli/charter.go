@@ -44,9 +44,8 @@ type RunCharterPaths struct {
 }
 
 type RunCharterRoleContracts struct {
-	Master           *RoleContract `json:"master,omitempty"`
-	ResearchSubagent *RoleContract `json:"research_subagent,omitempty"`
-	DevelopSubagent  *RoleContract `json:"develop_subagent,omitempty"`
+	Master *RoleContract `json:"master,omitempty"`
+	Worker *RoleContract `json:"worker,omitempty"`
 }
 
 type RoleContract struct {
@@ -99,13 +98,9 @@ func NewRunCharter(runDir, runName, objective string, meta *RunMetadata) (*RunCh
 				Kind:    "master",
 				Mandate: "Drive the run, compare paths, and optimize for the user objective.",
 			},
-			ResearchSubagent: &RoleContract{
-				Kind:    "research",
-				Mandate: "Explore the problem space and return evidence-backed findings.",
-			},
-			DevelopSubagent: &RoleContract{
-				Kind:    "develop",
-				Mandate: "Implement the best path with durable state and tight feedback loops.",
+			Worker: &RoleContract{
+				Kind:    "worker",
+				Mandate: "Execute assigned slices, produce durable evidence, and return code or reports the master can compare and integrate.",
 			},
 		},
 		Paths: RunCharterPaths{
@@ -265,16 +260,10 @@ func normalizeRunCharter(charter *RunCharter) {
 			Mandate: "Drive the run, compare paths, and optimize for the user objective.",
 		}
 	}
-	if charter.RoleContracts.ResearchSubagent == nil {
-		charter.RoleContracts.ResearchSubagent = &RoleContract{
-			Kind:    "research",
-			Mandate: "Explore the problem space and return evidence-backed findings.",
-		}
-	}
-	if charter.RoleContracts.DevelopSubagent == nil {
-		charter.RoleContracts.DevelopSubagent = &RoleContract{
-			Kind:    "develop",
-			Mandate: "Implement the best path with durable state and tight feedback loops.",
+	if charter.RoleContracts.Worker == nil {
+		charter.RoleContracts.Worker = &RoleContract{
+			Kind:    "worker",
+			Mandate: "Execute assigned slices, produce durable evidence, and return code or reports the master can compare and integrate.",
 		}
 	}
 }

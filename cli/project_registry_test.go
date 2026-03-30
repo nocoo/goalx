@@ -18,7 +18,7 @@ func TestProjectRegistryFocusedRunFallsBackToRunScopedTruth(t *testing.T) {
 
 	activeCfg := &goalx.Config{
 		Name:      "alpha",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship alpha",
 	}
 	activeRun := writeRunSpecFixture(t, repo, activeCfg)
@@ -62,7 +62,7 @@ func TestRegisterActiveRunPreservesConcurrentEntries(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		configs = append(configs, &goalx.Config{
 			Name:      fmt.Sprintf("run-%d", i),
-			Mode:      goalx.ModeDevelop,
+			Mode:      goalx.ModeWorker,
 			Objective: fmt.Sprintf("ship run %d", i),
 		})
 	}

@@ -111,7 +111,7 @@ func TestBuildTargetPresenceFactsTreatsParkedSessionAsNotMissing(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "parked",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestRefreshActivityFactsPersistsSessionWindowMissingExplicitly(t *testing.T
 	}
 }
 
-func TestLoadDerivedRunStateMarksMasterMissingAsStranded(t *testing.T) {
+func TestLoadDerivedRunStateMarksMasterMissingAsDegraded(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -321,8 +321,8 @@ func TestLoadDerivedRunStateMarksMasterMissingAsStranded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadDerivedRunState: %v", err)
 	}
-	if state.Status != "stranded" {
-		t.Fatalf("derived status = %q, want stranded", state.Status)
+	if state.Status != "degraded" {
+		t.Fatalf("derived status = %q, want degraded", state.Status)
 	}
 	if state.LifecycleState != "active" {
 		t.Fatalf("lifecycle state = %q, want active", state.LifecycleState)
@@ -332,7 +332,7 @@ func TestLoadDerivedRunStateMarksMasterMissingAsStranded(t *testing.T) {
 	}
 }
 
-func TestLoadDerivedRunStateMarksSidecarMissingAsStranded(t *testing.T) {
+func TestLoadDerivedRunStateMarksSidecarMissingAsDegraded(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -349,8 +349,8 @@ func TestLoadDerivedRunStateMarksSidecarMissingAsStranded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadDerivedRunState: %v", err)
 	}
-	if state.Status != "stranded" {
-		t.Fatalf("derived status = %q, want stranded", state.Status)
+	if state.Status != "degraded" {
+		t.Fatalf("derived status = %q, want degraded", state.Status)
 	}
 }
 
@@ -376,7 +376,7 @@ func TestLoadDerivedRunStateMarksSessionMissingAsDegraded(t *testing.T) {
 	}
 }
 
-func TestStatusReportsStrandedRunAndMissingActors(t *testing.T) {
+func TestStatusReportsDegradedRunAndMissingActors(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -399,7 +399,7 @@ func TestStatusReportsStrandedRunAndMissingActors(t *testing.T) {
 			t.Fatalf("Status: %v", err)
 		}
 	})
-	for _, want := range []string{"run_status=stranded", "master window missing", "sidecar missing"} {
+	for _, want := range []string{"run_status=degraded", "master window missing", "sidecar missing"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
 		}
@@ -434,7 +434,44 @@ func TestObserveReportsSessionWindowMissingExplicitly(t *testing.T) {
 	}
 }
 
-func TestResolveDefaultRunNameTreatsStrandedRunAsOpen(t *testing.T) {
+func TestObserveReportsParkedSessionExplicitly(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeTargetPresenceFixture(t)
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
+		t.Fatalf("SaveControlRunState active: %v", err)
+	}
+	if err := RenewControlLease(runDir, "sidecar", meta.RunID, meta.Epoch, time.Minute, "process", os.Getpid()); err != nil {
+		t.Fatalf("RenewControlLease sidecar: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "parked", Mode: string(goalx.ModeWorker)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+	coord, err := EnsureCoordinationState(runDir, cfg.Objective)
+	if err != nil {
+		t.Fatalf("EnsureCoordinationState: %v", err)
+	}
+	coord.Sessions["session-1"] = CoordinationSession{State: "parked", Scope: "reusable slice"}
+	if err := SaveCoordinationState(CoordinationPath(runDir), coord); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	installFakePresenceTmux(t, true, "master", "%0\\tmaster\\n")
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+	if !strings.Contains(out, "session-1 parked") {
+		t.Fatalf("observe output missing parked session label:\n%s", out)
+	}
+	if strings.Contains(out, "(window not found)") {
+		t.Fatalf("observe output should not treat parked session as missing window:\n%s", out)
+	}
+}
+
+func TestResolveDefaultRunNameTreatsDegradedRunAsOpen(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -452,7 +489,7 @@ func TestResolveDefaultRunNameTreatsStrandedRunAsOpen(t *testing.T) {
 
 	otherCfg := &goalx.Config{
 		Name:      "inactive-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "do not pick me",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -466,7 +503,7 @@ func TestResolveDefaultRunNameTreatsStrandedRunAsOpen(t *testing.T) {
 		t.Fatalf("ResolveDefaultRunName: %v", err)
 	}
 	if got != cfg.Name {
-		t.Fatalf("ResolveDefaultRunName = %q, want stranded run %q", got, cfg.Name)
+		t.Fatalf("ResolveDefaultRunName = %q, want degraded run %q", got, cfg.Name)
 	}
 }
 
@@ -561,7 +598,7 @@ func writeTargetPresenceFixture(t *testing.T) (string, string, *goalx.Config, *R
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "presence-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -577,6 +614,6 @@ func writeTargetPresenceFixture(t *testing.T) (string, string, *goalx.Config, *R
 	if err := EnsureControlState(runDir); err != nil {
 		t.Fatalf("EnsureControlState: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 	return repo, runDir, cfg, meta
 }

@@ -31,7 +31,10 @@ type RunStatusComparison struct {
 	StatusRequiredRemaining  *int     `json:"status_required_remaining,omitempty"`
 	GoalRequiredRemaining    *int     `json:"goal_required_remaining,omitempty"`
 	GoalRemainingRequiredIDs []string `json:"goal_remaining_required_ids,omitempty"`
+	StatusActiveSessions     []string `json:"status_active_sessions,omitempty"`
+	RuntimeActiveSessions    []string `json:"runtime_active_sessions,omitempty"`
 	StatusMatchesGoal        bool     `json:"status_matches_goal,omitempty"`
+	ActiveSessionsMatch      bool     `json:"active_sessions_match,omitempty"`
 	LastVerifiedAt           string   `json:"last_verified_at,omitempty"`
 }
 
@@ -134,6 +137,8 @@ func BuildRunStatusComparison(runDir string) (*RunStatusComparison, error) {
 	if status != nil {
 		comparison.Phase = strings.TrimSpace(status.Phase)
 		comparison.StatusRequiredRemaining = status.RequiredRemaining
+		comparison.StatusActiveSessions = append([]string(nil), status.ActiveSessions...)
+		slices.Sort(comparison.StatusActiveSessions)
 		comparison.LastVerifiedAt = strings.TrimSpace(status.LastVerifiedAt)
 	}
 	if goalState != nil {
@@ -141,8 +146,29 @@ func BuildRunStatusComparison(runDir string) (*RunStatusComparison, error) {
 		comparison.GoalRequiredRemaining = intPtr(summary.RequiredRemaining)
 		comparison.GoalRemainingRequiredIDs = goalRemainingRequiredIDs(goalState)
 	}
+	sessionState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		return nil, err
+	}
+	comparison.RuntimeActiveSessions = runtimeActiveSessionNames(sessionState)
 	if comparison.StatusRequiredRemaining != nil && comparison.GoalRequiredRemaining != nil {
 		comparison.StatusMatchesGoal = *comparison.StatusRequiredRemaining == *comparison.GoalRequiredRemaining
 	}
+	comparison.ActiveSessionsMatch = status == nil || slices.Equal(comparison.StatusActiveSessions, comparison.RuntimeActiveSessions)
 	return comparison, nil
+}
+
+func runtimeActiveSessionNames(state *SessionsRuntimeState) []string {
+	if state == nil || state.Sessions == nil {
+		return nil
+	}
+	names := make([]string, 0, len(state.Sessions))
+	for name, session := range state.Sessions {
+		switch strings.TrimSpace(session.State) {
+		case "active", "progress", "working", "idle":
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
 }

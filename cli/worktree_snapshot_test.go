@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"testing"
@@ -58,13 +59,13 @@ func seedForkedWorktreeLineageFixture(t *testing.T, repo, runDir string, cfg *go
 		if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 			Name:         sess.name,
 			State:        "active",
-			Mode:         string(goalx.ModeDevelop),
+			Mode:         string(goalx.ModeWorker),
 			Branch:       sess.branch,
 			WorktreePath: sess.worktreePath,
 		}); err != nil {
 			t.Fatalf("UpsertSessionRuntimeState %s: %v", sess.name, err)
 		}
-		identity, err := NewSessionIdentity(runDir, sess.name, sessionRoleKind(goalx.ModeDevelop), goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", goalx.TargetConfig{})
+		identity, err := NewSessionIdentity(runDir, sess.name, sessionRoleKind(goalx.ModeWorker), goalx.ModeWorker, "codex", "gpt-5.4", "", "", "", goalx.TargetConfig{})
 		if err != nil {
 			t.Fatalf("NewSessionIdentity %s: %v", sess.name, err)
 		}
@@ -89,7 +90,7 @@ func TestSnapshotWorktreesReportsDirtyRootAndSessionStats(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "one\ntwo\n", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -151,7 +152,7 @@ func TestSnapshotWorktreesIncludesForkedLineageFacts(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -231,7 +232,7 @@ func TestRunSidecarTickWritesWorktreeSnapshot(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base\n", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -268,5 +269,20 @@ func TestRunSidecarTickWritesWorktreeSnapshot(t *testing.T) {
 	}
 	if snapshot == nil || snapshot.CheckedAt == "" {
 		t.Fatalf("expected worktree snapshot to be written, got %+v", snapshot)
+	}
+}
+
+func TestHashUntrackedPathHandlesDirectories(t *testing.T) {
+	worktreePath := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(worktreePath, ".review", "71495365"), 0o755); err != nil {
+		t.Fatalf("mkdir untracked dir: %v", err)
+	}
+
+	hasher := sha256.New()
+	if err := hashUntrackedPath(hasher, worktreePath, ".review/71495365"); err != nil {
+		t.Fatalf("hashUntrackedPath: %v", err)
+	}
+	if got := hasher.Sum(nil); len(got) == 0 {
+		t.Fatal("hashUntrackedPath wrote no fingerprint data")
 	}
 }

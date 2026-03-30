@@ -14,7 +14,7 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 	data := ProtocolData{
 		RunName:                   "demo",
 		Objective:                 "ship it",
-		Mode:                      goalx.ModeDevelop,
+		Mode:                      goalx.ModeWorker,
 		Engine:                    "codex",
 		ProjectRoot:               "/tmp/project",
 		Target:                    goalx.TargetConfig{Files: []string{"main.go"}},
@@ -95,7 +95,7 @@ func TestRenderSubagentProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "ship it",
-		Mode:              goalx.ModeDevelop,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -129,7 +129,7 @@ func TestRenderSubagentProtocolRequiresCommittedBoundaryBeforeKeepHandoff(t *tes
 	data := ProtocolData{
 		RunName:                   "demo",
 		Objective:                 "ship it",
-		Mode:                      goalx.ModeDevelop,
+		Mode:                      goalx.ModeWorker,
 		Engine:                    "codex",
 		ProjectRoot:               "/tmp/project",
 		SessionName:               "session-1",
@@ -169,7 +169,7 @@ func TestRenderSubagentProtocolForbidsDedicatedSessionEditingSourceRoot(t *testi
 	data := ProtocolData{
 		RunName:                   "demo",
 		Objective:                 "ship it",
-		Mode:                      goalx.ModeDevelop,
+		Mode:                      goalx.ModeWorker,
 		Engine:                    "codex",
 		ProjectRoot:               "/tmp/source-root",
 		SessionName:               "session-1",
@@ -207,7 +207,7 @@ func TestRenderSubagentProtocolTightensWakeLoopInboxHandling(t *testing.T) {
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "ship it",
-		Mode:              goalx.ModeDevelop,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -236,7 +236,7 @@ func TestRenderSubagentProtocolOmitsProviderNativeCapabilityGuidance(t *testing.
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -283,7 +283,7 @@ func TestRenderSubagentProtocolIncludesGenericExecutionGuidanceForCodex(t *testi
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -333,7 +333,7 @@ func TestRenderSubagentProtocolIncludesExecutionDisciplineForClaude(t *testing.T
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -368,7 +368,7 @@ func TestRenderSubagentProtocolIncludesClaudeAutonomyPersistenceGuidance(t *test
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -404,7 +404,7 @@ func TestRenderSubagentProtocolIncludesAutonomyPersistenceGuidanceForCodex(t *te
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -441,7 +441,7 @@ func TestRenderSubagentProtocolDropsRedundantResearchOnlyDoneLine(t *testing.T) 
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -466,12 +466,12 @@ func TestRenderSubagentProtocolDropsRedundantResearchOnlyDoneLine(t *testing.T) 
 	}
 }
 
-func TestRenderSubagentProtocolIncludesOptimizerDoctrineInDevelopMode(t *testing.T) {
+func TestRenderSubagentProtocolIncludesOptimizerDoctrineInWorkerCodeSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "optimize discovery pipeline",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -505,12 +505,12 @@ func TestRenderSubagentProtocolIncludesOptimizerDoctrineInDevelopMode(t *testing
 	}
 }
 
-func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
+func TestRenderSubagentProtocolKeepsWorkerMethodologyConciseForAnalysisSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -529,11 +529,11 @@ func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
-	modeSection := sectionBetween(string(out), "## Mode: Research", "## Context")
+	modeSection := sectionBetween(string(out), "## Worker Contract", "## Context")
 	for _, want := range []string{
-		"Produce evidence-backed findings until the master stops you",
+		"You are a worker session. The assignment may ask for code, reports, or a mixed slice.",
 		"Quantify what you can",
-		"Every major finding must include counter-evidence or failed alternative explanations.",
+		"If the slice is analysis-heavy, produce evidence-backed findings",
 		"## Key Findings",
 		"## Recommendation",
 		"## Priority Fix List (if applicable)",
@@ -541,20 +541,20 @@ func TestRenderSubagentProtocolKeepsResearchMethodologyConcise(t *testing.T) {
 		"directly adopt",
 	} {
 		if !strings.Contains(modeSection, want) {
-			t.Fatalf("research mode section missing %q:\n%s", want, modeSection)
+			t.Fatalf("worker contract section missing %q:\n%s", want, modeSection)
 		}
 	}
 	if got := nonEmptyLineCount(modeSection); got > 25 {
-		t.Fatalf("research mode section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
+		t.Fatalf("worker contract section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
 	}
 }
 
-func TestRenderSubagentProtocolResearchModeUsesGuidanceNotHardBan(t *testing.T) {
+func TestRenderSubagentProtocolUsesGenericWorkerGuidanceNotHardBans(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -574,19 +574,19 @@ func TestRenderSubagentProtocolResearchModeUsesGuidanceNotHardBan(t *testing.T) 
 	}
 	text := string(out)
 	if strings.Contains(text, "DO NOT modify any source code.") {
-		t.Fatalf("research mode should use guidance, not a hard source-code ban:\n%s", text)
+		t.Fatalf("worker protocol should use guidance, not a hard source-code ban:\n%s", text)
 	}
-	if !strings.Contains(text, "Research mode typically focuses on producing reports; code modification controlled by target config.") {
-		t.Fatalf("research mode guidance missing updated target-config wording:\n%s", text)
+	if !strings.Contains(text, "The assignment may ask for code, reports, or a mixed slice.") {
+		t.Fatalf("worker guidance missing generic assignment wording:\n%s", text)
 	}
 }
 
-func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
+func TestRenderSubagentProtocolKeepsWorkerMethodologyConciseForCodeSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -606,10 +606,10 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
-	modeSection := sectionBetween(string(out), "## Mode: Develop", "## Context")
+	modeSection := sectionBetween(string(out), "## Worker Contract", "## Context")
 	for _, want := range []string{
 		"one coherent capability slice at a time",
-		"Your code will be reviewed. Every change must be justified and minimal.",
+		"If the slice is code-heavy, your changes will be reviewed. Every change must be justified and minimal.",
 		"If a local validation command is configured, run it before handing work back:",
 		"Keep changes minimal and correct. Do not add unrelated improvements, but do not cut corners on the change you are making.",
 		"Respect file ownership from the current inbox assignment.",
@@ -617,14 +617,14 @@ func TestRenderSubagentProtocolKeepsDevelopMethodologyConcise(t *testing.T) {
 		"go test ./...",
 	} {
 		if !strings.Contains(modeSection, want) {
-			t.Fatalf("develop mode section missing %q:\n%s", want, modeSection)
+			t.Fatalf("worker contract section missing %q:\n%s", want, modeSection)
 		}
 	}
 	if strings.Contains(modeSection, "avoid gold-plating") {
-		t.Fatalf("develop mode section should replace legacy gold-plating guidance:\n%s", modeSection)
+		t.Fatalf("worker contract section should replace legacy gold-plating guidance:\n%s", modeSection)
 	}
 	if got := nonEmptyLineCount(modeSection); got > 25 {
-		t.Fatalf("develop mode section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
+		t.Fatalf("worker contract section has %d non-empty lines, want <= 25:\n%s", got, modeSection)
 	}
 }
 
@@ -633,7 +633,7 @@ func TestRenderMasterProtocolRefinesReviewRoutingAndDepthCap(t *testing.T) {
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		SummaryPath: "/tmp/summary.md",
 	}
@@ -664,7 +664,7 @@ func TestRenderMasterProtocolAddsConditionalRacingPattern(t *testing.T) {
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		SummaryPath: "/tmp/summary.md",
 	}
@@ -696,7 +696,7 @@ func TestRenderMasterProtocolRequiresConcreteParallelAssignmentBoundaries(t *tes
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		SummaryPath: "/tmp/summary.md",
 	}
@@ -711,7 +711,7 @@ func TestRenderMasterProtocolRequiresConcreteParallelAssignmentBoundaries(t *tes
 	}
 	text := string(out)
 	for _, want := range []string{
-		"When dispatching parallel develop work, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.",
+		"When dispatching parallel worker slices, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -724,7 +724,7 @@ func TestRenderSubagentProtocolIncludesQualityJournalAndSelfCheck(t *testing.T) 
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -772,7 +772,7 @@ func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 	data := ProtocolData{
 		RunName:             "demo",
 		Objective:           "investigate auth",
-		Mode:                goalx.ModeResearch,
+		Mode:                goalx.ModeWorker,
 		Engine:              "codex",
 		ProjectRoot:         "/tmp/project",
 		Target:              goalx.TargetConfig{Files: []string{"report.md"}},
@@ -815,7 +815,7 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -827,7 +827,7 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 		GoalPath:               "/tmp/goal.json",
 		AcceptanceStatePath:    "/tmp/acceptance.json",
 		Sessions: []SessionData{
-			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeDevelop},
+			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeWorker},
 		},
 	}
 
@@ -862,7 +862,7 @@ func TestRenderSubagentProtocolEscalatesProofOnlyAssignmentsAgainstMissingOutcom
 	data := ProtocolData{
 		RunName:             "demo",
 		Objective:           "ship it",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Engine:              "codex",
 		ProjectRoot:         "/tmp/project",
 		SessionName:         "session-1",
@@ -873,7 +873,7 @@ func TestRenderSubagentProtocolEscalatesProofOnlyAssignmentsAgainstMissingOutcom
 		GoalPath:            "/tmp/goal.json",
 		AcceptanceStatePath: "/tmp/acceptance.json",
 		Sessions: []SessionData{
-			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeDevelop},
+			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeWorker},
 		},
 	}
 
@@ -900,7 +900,7 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 	data := ProtocolData{
 		Objective:           "ship it",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
 		AcceptanceStatePath: "/tmp/acceptance.json",
@@ -919,8 +919,8 @@ func TestRenderMasterProtocolIncludesGoalBoundaryChecklistInstructions(t *testin
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Mode",
-		"The user specified **develop** mode.",
+		"### Intent Guidance",
+		"No explicit intent was provided. Choose the best execution path yourself.",
 		"## Operations",
 		"run-charter.json",
 		"goal boundary",
@@ -978,7 +978,7 @@ func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testin
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
 		ObjectiveContractPath: "/tmp/objective-contract.json",
@@ -1013,7 +1013,7 @@ func TestRenderMasterProtocolRequiresObjectiveContractIntegrity(t *testing.T) {
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
 		ObjectiveContractPath: "/tmp/objective-contract.json",
@@ -1049,7 +1049,7 @@ func TestRenderMasterProtocolRequiresBoundaryShapeComparisonBeforeDispatch(t *te
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
 		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
@@ -1078,7 +1078,7 @@ func TestRenderMasterProtocolForbidsProofOnlyBoundaryCollapse(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
 		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
@@ -1107,7 +1107,7 @@ func TestRenderMasterProtocolIncludesOptimizerDoctrine(t *testing.T) {
 	data := ProtocolData{
 		Objective:        "optimize pipeline discovery",
 		RunName:          "demo",
-		Mode:             goalx.ModeDevelop,
+		Mode:             goalx.ModeWorker,
 		TmuxSession:      "ar-demo",
 		SummaryPath:      "/tmp/summary.md",
 		CoordinationPath: "/tmp/coordination.json",
@@ -1152,7 +1152,7 @@ func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
@@ -1195,12 +1195,12 @@ func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
 	}
 }
 
-func TestRenderMasterProtocolIncludesResearchModeLaunchGuidance(t *testing.T) {
+func TestRenderMasterProtocolIncludesIntentAndWorkerLaunchGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:           "audit auth",
 		RunName:             "demo",
-		Mode:                goalx.ModeResearch,
+		Mode:                goalx.ModeWorker,
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
 		AcceptanceNotesPath: "/tmp/acceptance.md",
@@ -1217,8 +1217,8 @@ func TestRenderMasterProtocolIncludesResearchModeLaunchGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Mode",
-		"The user specified **research** mode.",
+		"### Intent Guidance",
+		"No explicit intent was provided. Choose the best execution path yourself.",
 		"goalx add --run demo",
 	} {
 		if !strings.Contains(text, want) {
@@ -1248,26 +1248,24 @@ func TestRenderMasterProtocolIncludesAutoModeGuidance(t *testing.T) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Mode",
-		"No mode was specified.",
-		"Determine the best approach (research, develop, or hybrid)",
-		"You have full autonomy to decide.",
+		"### Intent Guidance",
+		"No explicit intent was provided. Choose the best execution path yourself.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q", want)
 		}
 	}
 	if strings.Contains(text, "The user specified **auto** mode.") {
-		t.Fatalf("rendered master protocol should not treat auto as a literal requested mode:\n%s", text)
+		t.Fatalf("rendered master protocol should not expose legacy mode wording:\n%s", text)
 	}
 }
 
-func TestRenderSubagentProtocolIncludesOptimizerDoctrineInResearchMode(t *testing.T) {
+func TestRenderSubagentProtocolIncludesOptimizerDoctrineInWorkerAnalysisSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -1303,12 +1301,12 @@ func TestRenderSubagentProtocolIncludesOptimizerDoctrineInResearchMode(t *testin
 	}
 }
 
-func TestRenderSubagentProtocolEncouragesBetterArchitecturePathsInDevelopMode(t *testing.T) {
+func TestRenderSubagentProtocolEncouragesBetterArchitecturePathsInWorkerCodeSlices(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		Engine:                 "codex",
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
@@ -1334,12 +1332,12 @@ func TestRenderSubagentProtocolEncouragesBetterArchitecturePathsInDevelopMode(t 
 		"report it clearly instead of silently following the old boundary",
 	} {
 		if !strings.Contains(text, want) {
-			t.Fatalf("rendered develop protocol missing %q", want)
+			t.Fatalf("rendered worker protocol missing %q", want)
 		}
 	}
 }
 
-func TestRenderSubagentProtocolTreatsAutoModeAsDevelop(t *testing.T) {
+func TestRenderSubagentProtocolTreatsAutoModeAsWorker(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		RunName:                "demo",
@@ -1364,11 +1362,11 @@ func TestRenderSubagentProtocolTreatsAutoModeAsDevelop(t *testing.T) {
 		t.Fatalf("read rendered protocol: %v", err)
 	}
 	text := string(out)
-	if !strings.Contains(text, "## Mode: Develop") {
-		t.Fatalf("auto subagent protocol should use develop guidance:\n%s", text)
+	if !strings.Contains(text, "## Worker Contract") {
+		t.Fatalf("auto subagent protocol should render worker guidance:\n%s", text)
 	}
-	if strings.Contains(text, "## Mode: Research") {
-		t.Fatalf("auto subagent protocol should not use research guidance:\n%s", text)
+	if strings.Contains(text, "## Mode:") {
+		t.Fatalf("subagent protocol should not expose legacy mode sections:\n%s", text)
 	}
 }
 
@@ -1377,7 +1375,7 @@ func TestRenderSubagentProtocolUsesRuntimeDimensionsAndReportsDir(t *testing.T) 
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "investigate auth",
-		Mode:              goalx.ModeResearch,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -1424,7 +1422,7 @@ func TestRenderMasterProtocolOmitsLegacyPlannedSessionsAndPresetDisplays(t *test
 	data := map[string]any{
 		"Objective": "ship it",
 		"RunName":   "demo",
-		"Mode":      goalx.ModeDevelop,
+		"Mode":      goalx.ModeWorker,
 		"Engines":   goalx.BuiltinEngines,
 		"Master":    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		"PlannedSessions": []map[string]string{
@@ -1461,7 +1459,7 @@ func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *tes
 	data := ProtocolData{
 		Objective:           "ship it",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Engines:             goalx.BuiltinEngines,
 		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:         "ar-demo",
@@ -1506,7 +1504,7 @@ func TestRenderMasterProtocolIncludesGoalxWaitLoopGuidance(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "codex", Model: "best"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -1539,7 +1537,7 @@ func TestRenderMasterProtocolClarifiesKeepUsesRecordedParentBoundary(t *testing.
 		RunName:     "demo",
 		Objective:   "ship it",
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		SummaryPath: "/tmp/summary.md",
 	}
 
@@ -1554,8 +1552,8 @@ func TestRenderMasterProtocolClarifiesKeepUsesRecordedParentBoundary(t *testing.
 	text := string(out)
 	for _, want := range []string{
 		"`goalx keep --run demo session-N` only merges committed session branch history relative to that session's recorded parent/base ref.",
-		"Do not assume every develop session branch is rooted directly on the run worktree.",
-		"If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.",
+		"Do not assume every worker branch is rooted directly on the run worktree.",
+		"If a worker session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.",
 		"If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.",
 		"After you finish a manual run-root integration, record it with `goalx integrate --run demo --method partial_adopt --from session-N,session-M`.",
 	} {
@@ -1570,7 +1568,7 @@ func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 	data := ProtocolData{
 		Objective:           "ship it",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "best"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
@@ -1612,7 +1610,7 @@ func TestRenderMasterProtocolBindsRequiredFrontierFactsToImmediateIntervention(t
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Engine:      "codex",
 		ProjectRoot: "/tmp/project",
 	}
@@ -1639,12 +1637,12 @@ func TestRenderMasterProtocolBindsRequiredFrontierFactsToImmediateIntervention(t
 	}
 }
 
-func TestRenderMasterProtocolIncludesReportsAndResearchCompletionGuidance(t *testing.T) {
+func TestRenderMasterProtocolIncludesReportsAndCompletionGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
 		Objective:      "audit auth",
 		RunName:        "demo",
-		Mode:           goalx.ModeResearch,
+		Mode:           goalx.ModeWorker,
 		Master:         goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:    "ar-demo",
 		SummaryPath:    "/tmp/summary.md",
@@ -1676,7 +1674,6 @@ func TestRenderMasterProtocolIncludesReportsAndResearchCompletionGuidance(t *tes
 		"Missing user credentials, external approval, or real-world publish access does not justify treating a required outcome as end-to-end verified.",
 		"If a session produced valuable work outside the original items, that work matters.",
 		"If a session shows no journal output for 15+ minutes while its lease is healthy",
-		"Research runs usually close out through reports and goal updates; develop runs usually close out through reviewed code, verification evidence, and `goalx keep`.",
 		"Run `goalx verify --run demo` when you need fresh acceptance evidence.",
 		"goalx dimension [--run NAME] <session-N|all> --set depth,adversarial",
 		"goalx dimension [--run NAME] <session-N> --add creative",
@@ -1701,7 +1698,7 @@ func TestRenderMasterProtocolOmitsDuplicatedColdTablesButKeepsDispatchGuidance(t
 	data := ProtocolData{
 		Objective:   "audit auth",
 		RunName:     "demo",
-		Mode:        goalx.ModeResearch,
+		Mode:        goalx.ModeWorker,
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession: "ar-demo",
 		SummaryPath: "/tmp/summary.md",
@@ -1714,8 +1711,7 @@ func TestRenderMasterProtocolOmitsDuplicatedColdTablesButKeepsDispatchGuidance(t
 			"codex": {Description: "Fast code editing", Models: map[string]string{"best": "gpt-5.4"}},
 		},
 		Preferences: goalx.PreferencesConfig{
-			Research: goalx.PreferencePolicy{Guidance: "multi-perspective"},
-			Develop:  goalx.PreferencePolicy{Guidance: "speed"},
+			Worker: goalx.PreferencePolicy{Guidance: "speed"},
 		},
 		DimensionsPath: "/tmp/control/dimensions.json",
 		DimensionsCatalog: map[string]string{
@@ -1736,8 +1732,7 @@ func TestRenderMasterProtocolOmitsDuplicatedColdTablesButKeepsDispatchGuidance(t
 	text := string(out)
 	for _, want := range []string{
 		"### Preferences",
-		"| Research | multi-perspective |",
-		"| Develop | speed |",
+		"| Worker | speed |",
 		"Prefer policy-based session launches.",
 		"Explicit `--engine/--model` is an override.",
 		"goalx dimension [--run NAME] <session-N|all> --set depth,adversarial",
@@ -1768,7 +1763,7 @@ func TestRenderMasterProtocolIncludesWaitSafetyNetGuidance(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -1795,7 +1790,7 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		Engines:               goalx.BuiltinEngines,
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
@@ -1837,14 +1832,10 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		"deliveries.json",
 		"proof/completion.json",
 		"dispatchable_slices",
-		"goalx add --run demo --mode research",
-		"goalx add --run demo --mode research --effort high",
-		"goalx add --run demo --mode develop --effort medium",
-		"goalx add --run demo --mode research --engine ENGINE --model MODEL --effort LEVEL",
+		"goalx add --run demo --effort high",
+		"goalx add --run demo --engine ENGINE --model MODEL --effort LEVEL",
 		"goalx afford --run demo master",
 		"canonical command surface",
-		"temporary research session",
-		"Research-mode sessions produce evidence and reports, not mergeable code changes.",
 		"Check the coordination digest version each control cycle.",
 		"Default to current repo state, control files, runtime state, and latest session outputs.",
 		"Only reread older journal history when the current state is ambiguous",
@@ -1896,7 +1887,7 @@ func TestRenderMasterProtocolOmitsOldSyncOnlyLivenessGuidance(t *testing.T) {
 	data := ProtocolData{
 		Objective:           "ship it",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "best"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
@@ -1933,7 +1924,7 @@ func TestRenderMasterProtocolIncludesOptimizationDoctrine(t *testing.T) {
 	data := ProtocolData{
 		Objective:           "maximize cross-platform discovery throughput",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
@@ -2044,7 +2035,7 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
@@ -2112,7 +2103,7 @@ func TestRenderMasterProtocolUsesInspectFirstStaleEscalation(t *testing.T) {
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		SummaryPath: "/tmp/summary.md",
 	}
@@ -2142,7 +2133,7 @@ func TestRenderMasterProtocolRequiresActionOnBlockedOwnerFacts(t *testing.T) {
 	data := ProtocolData{
 		RunName:     "demo",
 		Objective:   "ship it",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		Engine:      "codex",
 		ProjectRoot: "/tmp/project",
 		GoalPath:    "/tmp/goal.json",
@@ -2173,7 +2164,7 @@ func TestRenderSubagentProtocolRequiresInboxRecheckOnRepeatedWake(t *testing.T) 
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "ship it",
-		Mode:              goalx.ModeDevelop,
+		Mode:              goalx.ModeWorker,
 		Engine:            "codex",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -2207,7 +2198,7 @@ func TestRenderMasterProtocolIncludesExplicitCoverageOwnershipGuidance(t *testin
 	data := ProtocolData{
 		Objective:           "ship it",
 		RunName:             "demo",
-		Mode:                goalx.ModeDevelop,
+		Mode:                goalx.ModeWorker,
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
@@ -2253,7 +2244,7 @@ func TestRenderMasterProtocolOmitsProviderNativeCapabilityGuidance(t *testing.T)
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2296,7 +2287,7 @@ func TestRenderMasterProtocolDefinesRootMasterAsControlPlane(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2329,7 +2320,7 @@ func TestRenderMasterProtocolDropsCapabilityFirstRoutingHint(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2357,7 +2348,7 @@ func TestRenderMasterProtocolTreatsProviderDialogsAsIncidents(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2389,7 +2380,7 @@ func TestRenderSubagentProtocolOmitsProviderNativeOwnedSurfaceLanguage(t *testin
 	data := ProtocolData{
 		RunName:           "demo",
 		Objective:         "ship it",
-		Mode:              goalx.ModeDevelop,
+		Mode:              goalx.ModeWorker,
 		Engine:            "claude-code",
 		ProjectRoot:       "/tmp/project",
 		SessionName:       "session-1",
@@ -2424,7 +2415,7 @@ func TestRenderMasterProtocolIncludesAutonomyPersistenceGuidance(t *testing.T) {
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2456,7 +2447,7 @@ func TestRenderMasterProtocolIncludesGenericExecutionGuidanceForCodex(t *testing
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2500,7 +2491,7 @@ func TestRenderMasterProtocolIncludesAutonomyPersistenceGuidanceForCodex(t *test
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2532,7 +2523,7 @@ func TestRenderMasterProtocolIncludesExecutionDisciplineForClaude(t *testing.T) 
 	data := ProtocolData{
 		Objective:     "ship it",
 		RunName:       "demo",
-		Mode:          goalx.ModeDevelop,
+		Mode:          goalx.ModeWorker,
 		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:   "ar-demo",
 		SummaryPath:   "/tmp/summary.md",
@@ -2560,7 +2551,7 @@ func TestRenderMasterProtocolReferencesGoalxContextAndAfford(t *testing.T) {
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		ContextIndexPath:      "/tmp/control/context-index.json",
 		ActivityPath:          "/tmp/control/activity.json",
@@ -2599,11 +2590,11 @@ func TestRenderMasterProtocolIncludesSelectionFacts(t *testing.T) {
 	data := ProtocolData{
 		Objective:             "ship it",
 		RunName:               "demo",
-		Mode:                  goalx.ModeDevelop,
+		Mode:                  goalx.ModeWorker,
 		Master:                goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		Roles:                 goalx.RoleDefaultsConfig{Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus"}, Develop: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini"}},
+		Roles:                 goalx.RoleDefaultsConfig{Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini"}},
 		SelectionSnapshotPath: "/tmp/run/selection-policy.json",
-		SelectionPolicy:       goalx.EffectiveSelectionPolicy{MasterCandidates: []string{"codex/gpt-5.4", "claude-code/opus"}, ResearchCandidates: []string{"claude-code/opus"}, DevelopCandidates: []string{"codex/gpt-5.4-mini"}, DisabledTargets: []string{"claude-code/sonnet"}},
+		SelectionPolicy:       goalx.EffectiveSelectionPolicy{MasterCandidates: []string{"codex/gpt-5.4", "claude-code/opus"}, WorkerCandidates: []string{"codex/gpt-5.4-mini", "claude-code/opus"}, DisabledTargets: []string{"claude-code/sonnet"}},
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -2618,8 +2609,7 @@ func TestRenderMasterProtocolIncludesSelectionFacts(t *testing.T) {
 	for _, want := range []string{
 		"Selection snapshot: `/tmp/run/selection-policy.json`",
 		"Bootstrap master target: `codex/gpt-5.4`",
-		"Research default target: `claude-code/opus`",
-		"Develop default target: `codex/gpt-5.4-mini`",
+		"Worker default target: `codex/gpt-5.4-mini`",
 		"Master candidates: `codex/gpt-5.4, claude-code/opus`",
 		"Disabled targets: `claude-code/sonnet`",
 		"Treat these as factual candidate pools and bans, not hidden framework judgment.",
@@ -2635,7 +2625,7 @@ func TestRenderMasterProtocolUsesContextInsteadOfCharterForStartup(t *testing.T)
 	data := ProtocolData{
 		Objective: "ship it",
 		RunName:   "demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 
@@ -2661,7 +2651,7 @@ func TestRenderMasterProtocolRoutesSessionDispatchThroughTell(t *testing.T) {
 	data := ProtocolData{
 		Objective: "ship it",
 		RunName:   "demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 	}
 
@@ -2695,7 +2685,7 @@ func TestRenderMasterProtocolStatusRecordIsFactsOnly(t *testing.T) {
 	data := ProtocolData{
 		Objective:   "ship it",
 		RunName:     "demo",
-		Mode:        goalx.ModeDevelop,
+		Mode:        goalx.ModeWorker,
 		StatusPath:  "/tmp/status.json",
 		Master:      goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession: "ar-demo",

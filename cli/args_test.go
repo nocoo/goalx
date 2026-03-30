@@ -30,12 +30,10 @@ func TestExtractRunFlagMissingValue(t *testing.T) {
 func TestParseStartInitArgs(t *testing.T) {
 	opts, err := parseStartInitArgs([]string{
 		"ship feature",
-		"--research",
 		"--parallel", "3",
 		"--name", "demo-run",
 		"--master", "codex/best",
-		"--research-role", "claude-code/opus",
-		"--develop-role", "codex/fast",
+		"--worker", "codex/fast",
 	})
 	if err != nil {
 		t.Fatalf("parseStartInitArgs: %v", err)
@@ -43,8 +41,8 @@ func TestParseStartInitArgs(t *testing.T) {
 	if opts.Objective != "ship feature" {
 		t.Fatalf("objective = %q", opts.Objective)
 	}
-	if opts.Mode != goalx.ModeResearch {
-		t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeResearch)
+	if opts.Mode != goalx.ModeWorker {
+		t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeWorker)
 	}
 	if opts.Parallel != 3 {
 		t.Fatalf("parallel = %d, want 3", opts.Parallel)
@@ -55,23 +53,20 @@ func TestParseStartInitArgs(t *testing.T) {
 	if opts.Master != "codex/best" {
 		t.Fatalf("master = %q, want codex/best", opts.Master)
 	}
-	if opts.ResearchRole != "claude-code/opus" {
-		t.Fatalf("research-role = %q", opts.ResearchRole)
-	}
-	if opts.DevelopRole != "codex/fast" {
-		t.Fatalf("develop-role = %q", opts.DevelopRole)
+	if opts.Worker != "codex/fast" {
+		t.Fatalf("worker = %q", opts.Worker)
 	}
 }
 
 func TestParseLaunchOptionsRejectsAmbiguousTopLevelEngineFlags(t *testing.T) {
-	_, err := parseLaunchOptions([]string{"audit auth", "--engine", "codex"}, goalx.ModeResearch, true)
+	_, err := parseLaunchOptions([]string{"audit auth", "--engine", "codex"}, goalx.ModeWorker, true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
 
 func TestParseLaunchOptionsLeavesParallelUnsetWhenOmitted(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeResearch, false)
+	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeWorker, false)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -81,7 +76,7 @@ func TestParseLaunchOptionsLeavesParallelUnsetWhenOmitted(t *testing.T) {
 }
 
 func TestParseLaunchOptionsLeavesParallelUnsetByDefault(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeResearch, true)
+	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -101,7 +96,7 @@ func TestParseLaunchOptionsKeepsAutoDefaultMode(t *testing.T) {
 }
 
 func TestParseLaunchOptionsAcceptsNoSnapshotFlag(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth", "--no-snapshot"}, goalx.ModeResearch, true)
+	opts, err := parseLaunchOptions([]string{"audit auth", "--no-snapshot"}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -115,7 +110,7 @@ func TestParseLaunchOptionsSupportsRepeatedDimensions(t *testing.T) {
 		"audit auth",
 		"--dimension", "audit",
 		"--dimension", "adversarial,user",
-	}, goalx.ModeResearch, true)
+	}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -131,16 +126,22 @@ func TestParseLaunchOptionsRejectsRemovedLegacySelectionFlags(t *testing.T) {
 		{"audit auth", "--preset", "codex"},
 		{"audit auth", "--route-role", "develop"},
 		{"audit auth", "--route-profile", "build_balanced"},
+		{"audit auth", "--research"},
+		{"audit auth", "--develop"},
+		{"audit auth", "--research-role", "claude-code/opus"},
+		{"audit auth", "--develop-role", "codex/fast"},
+		{"audit auth", "--research-effort", "high"},
+		{"audit auth", "--develop-effort", "medium"},
 	}
 	for _, args := range tests {
-		if _, err := parseLaunchOptions(args, goalx.ModeResearch, true); err == nil {
+		if _, err := parseLaunchOptions(args, goalx.ModeWorker, true); err == nil {
 			t.Fatalf("parseLaunchOptions(%#v) unexpectedly succeeded", args)
 		}
 	}
 }
 
 func TestParseLaunchOptionsSupportsBudgetOverride(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "15m"}, goalx.ModeResearch, true)
+	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "15m"}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestParseLaunchOptionsSupportsBudgetOverride(t *testing.T) {
 }
 
 func TestParseLaunchOptionsSupportsExplicitZeroBudgetOverride(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "0"}, goalx.ModeResearch, true)
+	opts, err := parseLaunchOptions([]string{"audit auth", "--budget", "0"}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestParseLaunchOptionsSupportsExplicitZeroBudgetOverride(t *testing.T) {
 }
 
 func TestParseLaunchOptionsRejectsRemovedAuditorFlag(t *testing.T) {
-	if _, err := parseLaunchOptions([]string{"audit auth", "--auditor", "codex/gpt-5.4"}, goalx.ModeResearch, true); err == nil {
+	if _, err := parseLaunchOptions([]string{"audit auth", "--auditor", "codex/gpt-5.4"}, goalx.ModeWorker, true); err == nil {
 		t.Fatal("expected error for removed --auditor flag")
 	}
 }

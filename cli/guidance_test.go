@@ -20,7 +20,7 @@ func writeGuidanceRunFixture(t *testing.T) (string, string, *goalx.Config, *RunM
 
 	cfg := &goalx.Config{
 		Name:      "guidance-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
@@ -76,7 +76,7 @@ func seedGuidanceSessionFixture(t *testing.T, runDir string, cfg *goalx.Config) 
 		SessionName:     sessionName,
 		ExperimentID:    "exp_guidance_session_1",
 		RoleKind:        "develop",
-		Mode:            string(goalx.ModeDevelop),
+		Mode:            string(goalx.ModeWorker),
 		Engine:          "codex",
 		Model:           "gpt-5.4-mini",
 		OriginCharterID: loadCharterIDForTests(t, runDir),
@@ -88,7 +88,7 @@ func seedGuidanceSessionFixture(t *testing.T, runDir string, cfg *goalx.Config) 
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         sessionName,
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		WorktreePath: WorktreePath(runDir, cfg.Name, 1),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)

@@ -144,15 +144,13 @@ type ContextProviderBootstrap struct {
 }
 
 type ContextSelection struct {
-	ExplicitSelection  bool              `json:"explicit_selection,omitempty"`
-	DisabledEngines    []string          `json:"disabled_engines,omitempty"`
-	DisabledTargets    []string          `json:"disabled_targets,omitempty"`
-	MasterCandidates   []string          `json:"master_candidates,omitempty"`
-	ResearchCandidates []string          `json:"research_candidates,omitempty"`
-	DevelopCandidates  []string          `json:"develop_candidates,omitempty"`
-	MasterEffort       goalx.EffortLevel `json:"master_effort,omitempty"`
-	ResearchEffort     goalx.EffortLevel `json:"research_effort,omitempty"`
-	DevelopEffort      goalx.EffortLevel `json:"develop_effort,omitempty"`
+	ExplicitSelection bool              `json:"explicit_selection,omitempty"`
+	DisabledEngines   []string          `json:"disabled_engines,omitempty"`
+	DisabledTargets   []string          `json:"disabled_targets,omitempty"`
+	MasterCandidates  []string          `json:"master_candidates,omitempty"`
+	WorkerCandidates  []string          `json:"worker_candidates,omitempty"`
+	MasterEffort      goalx.EffortLevel `json:"master_effort,omitempty"`
+	WorkerEffort      goalx.EffortLevel `json:"worker_effort,omitempty"`
 }
 
 type ContextSession struct {
@@ -305,15 +303,13 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 	if selectionSnapshot != nil {
 		index.SelectionSnapshotPath = SelectionSnapshotPath(runDir)
 		index.Selection = &ContextSelection{
-			ExplicitSelection:  selectionSnapshot.ExplicitSelection,
-			DisabledEngines:    append([]string(nil), selectionSnapshot.Policy.DisabledEngines...),
-			DisabledTargets:    append([]string(nil), selectionSnapshot.Policy.DisabledTargets...),
-			MasterCandidates:   append([]string(nil), selectionSnapshot.Policy.MasterCandidates...),
-			ResearchCandidates: append([]string(nil), selectionSnapshot.Policy.ResearchCandidates...),
-			DevelopCandidates:  append([]string(nil), selectionSnapshot.Policy.DevelopCandidates...),
-			MasterEffort:       selectionSnapshot.Policy.MasterEffort,
-			ResearchEffort:     selectionSnapshot.Policy.ResearchEffort,
-			DevelopEffort:      selectionSnapshot.Policy.DevelopEffort,
+			ExplicitSelection: selectionSnapshot.ExplicitSelection,
+			DisabledEngines:   append([]string(nil), selectionSnapshot.Policy.DisabledEngines...),
+			DisabledTargets:   append([]string(nil), selectionSnapshot.Policy.DisabledTargets...),
+			MasterCandidates:  append([]string(nil), selectionSnapshot.Policy.MasterCandidates...),
+			WorkerCandidates:  append([]string(nil), selectionSnapshot.Policy.WorkerCandidates...),
+			MasterEffort:      selectionSnapshot.Policy.MasterEffort,
+			WorkerEffort:      selectionSnapshot.Policy.WorkerEffort,
 		}
 	}
 	if strings.TrimSpace(index.RunIdentity.Intent) == runIntentEvolve {

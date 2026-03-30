@@ -38,12 +38,11 @@ type ObjectiveContract struct {
 }
 
 type ObjectiveClause struct {
-	ID                      string                     `json:"id"`
-	Text                    string                     `json:"text"`
-	Kind                    string                     `json:"kind"`
-	SourceExcerpt           string                     `json:"source_excerpt"`
-	RequiredSurfaces        []ObjectiveRequiredSurface `json:"required_surfaces"`
-	ApprovalRequiredForDrop bool                       `json:"approval_required_for_drop,omitempty"`
+	ID               string                     `json:"id"`
+	Text             string                     `json:"text"`
+	Kind             string                     `json:"kind"`
+	SourceExcerpt    string                     `json:"source_excerpt"`
+	RequiredSurfaces []ObjectiveRequiredSurface `json:"required_surfaces"`
 }
 
 func ObjectiveContractPath(runDir string) string {

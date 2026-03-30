@@ -56,7 +56,7 @@ func TestLeaseLoopRenewsAndExpiresMasterLease(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "lease-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

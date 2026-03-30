@@ -149,31 +149,18 @@ func fillMissingSelectionDefaults(cfg *Config, policy EffectiveSelectionPolicy) 
 	if cfg.Master.Effort == "" && policy.MasterEffort != "" {
 		cfg.Master.Effort = policy.MasterEffort
 	}
-	if cfg.Roles.Research.Engine == "" || cfg.Roles.Research.Model == "" {
-		if target, ok := firstSelectionTarget(policy.ResearchCandidates); ok {
-			if cfg.Roles.Research.Engine == "" {
-				cfg.Roles.Research.Engine = target.Engine
+	if cfg.Roles.Worker.Engine == "" || cfg.Roles.Worker.Model == "" {
+		if target, ok := firstSelectionTarget(policy.WorkerCandidates); ok {
+			if cfg.Roles.Worker.Engine == "" {
+				cfg.Roles.Worker.Engine = target.Engine
 			}
-			if cfg.Roles.Research.Model == "" {
-				cfg.Roles.Research.Model = target.Model
-			}
-		}
-	}
-	if cfg.Roles.Research.Effort == "" && policy.ResearchEffort != "" {
-		cfg.Roles.Research.Effort = policy.ResearchEffort
-	}
-	if cfg.Roles.Develop.Engine == "" || cfg.Roles.Develop.Model == "" {
-		if target, ok := firstSelectionTarget(policy.DevelopCandidates); ok {
-			if cfg.Roles.Develop.Engine == "" {
-				cfg.Roles.Develop.Engine = target.Engine
-			}
-			if cfg.Roles.Develop.Model == "" {
-				cfg.Roles.Develop.Model = target.Model
+			if cfg.Roles.Worker.Model == "" {
+				cfg.Roles.Worker.Model = target.Model
 			}
 		}
 	}
-	if cfg.Roles.Develop.Effort == "" && policy.DevelopEffort != "" {
-		cfg.Roles.Develop.Effort = policy.DevelopEffort
+	if cfg.Roles.Worker.Effort == "" && policy.WorkerEffort != "" {
+		cfg.Roles.Worker.Effort = policy.WorkerEffort
 	}
 }
 
@@ -182,16 +169,12 @@ func overlaySelectionPolicyDefaults(policy EffectiveSelectionPolicy, cfg *Config
 		return policy
 	}
 	policy.MasterCandidates = promoteSelectionTarget(policy.MasterCandidates, cfg.Master.Engine, cfg.Master.Model)
-	policy.ResearchCandidates = promoteSelectionTarget(policy.ResearchCandidates, cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
-	policy.DevelopCandidates = promoteSelectionTarget(policy.DevelopCandidates, cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	policy.WorkerCandidates = promoteSelectionTarget(policy.WorkerCandidates, cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	if cfg.Master.Effort != "" {
 		policy.MasterEffort = cfg.Master.Effort
 	}
-	if cfg.Roles.Research.Effort != "" {
-		policy.ResearchEffort = cfg.Roles.Research.Effort
-	}
-	if cfg.Roles.Develop.Effort != "" {
-		policy.DevelopEffort = cfg.Roles.Develop.Effort
+	if cfg.Roles.Worker.Effort != "" {
+		policy.WorkerEffort = cfg.Roles.Worker.Effort
 	}
 	return policy
 }
@@ -226,26 +209,15 @@ func applyResolveOverrides(cfg *Config, req ResolveRequest) {
 			cfg.Master.Effort = req.MasterOverride.Effort
 		}
 	}
-	if req.ResearchOverride != nil {
-		if req.ResearchOverride.Engine != "" {
-			cfg.Roles.Research.Engine = req.ResearchOverride.Engine
+	if req.WorkerOverride != nil {
+		if req.WorkerOverride.Engine != "" {
+			cfg.Roles.Worker.Engine = req.WorkerOverride.Engine
 		}
-		if req.ResearchOverride.Model != "" {
-			cfg.Roles.Research.Model = req.ResearchOverride.Model
+		if req.WorkerOverride.Model != "" {
+			cfg.Roles.Worker.Model = req.WorkerOverride.Model
 		}
-		if req.ResearchOverride.Effort != "" {
-			cfg.Roles.Research.Effort = req.ResearchOverride.Effort
-		}
-	}
-	if req.DevelopOverride != nil {
-		if req.DevelopOverride.Engine != "" {
-			cfg.Roles.Develop.Engine = req.DevelopOverride.Engine
-		}
-		if req.DevelopOverride.Model != "" {
-			cfg.Roles.Develop.Model = req.DevelopOverride.Model
-		}
-		if req.DevelopOverride.Effort != "" {
-			cfg.Roles.Develop.Effort = req.DevelopOverride.Effort
+		if req.WorkerOverride.Effort != "" {
+			cfg.Roles.Worker.Effort = req.WorkerOverride.Effort
 		}
 	}
 }

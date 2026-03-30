@@ -31,7 +31,7 @@ func TestNextSessionIndexSkipsOccupiedWorktreeSlot(t *testing.T) {
 	runName := "slot-run"
 	runDir := writeRunSpecFixture(t, projectRoot, &goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	})
@@ -54,7 +54,7 @@ func TestNextAvailableSessionIndexSkipsOccupiedWorktreeSlot(t *testing.T) {
 	runName := "slot-run"
 	runDir := writeRunSpecFixture(t, projectRoot, &goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	})

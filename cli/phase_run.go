@@ -133,9 +133,7 @@ func phaseRunMetadataPatch(source *savedPhaseSource, phaseKind string) *RunMetad
 	return patch
 }
 
-func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions, nc *nextConfigJSON) error {
-	opts = mergeNextConfigIntoPhaseOptions(opts, nc, spec.Mode)
-
+func runPhaseAction(projectRoot string, spec phaseActionSpec, opts phaseOptions) error {
 	source, err := loadSavedPhaseSource(projectRoot, opts.From)
 	if err != nil {
 		return err
@@ -208,14 +206,12 @@ func buildPhaseResolveRequest(projectRoot string, phaseKind string, mode goalx.M
 	}
 	_ = projectRoot
 	_ = baseCfg
-	masterOverride, researchOverride, developOverride, err := launchRoleOverrides(launchOptions{
-		Master:         opts.Master,
-		ResearchRole:   opts.ResearchRole,
-		DevelopRole:    opts.DevelopRole,
-		Effort:         opts.Effort,
-		MasterEffort:   opts.MasterEffort,
-		ResearchEffort: opts.ResearchEffort,
-		DevelopEffort:  opts.DevelopEffort,
+	masterOverride, workerOverride, err := launchRoleOverrides(launchOptions{
+		Master:       opts.Master,
+		Worker:       opts.Worker,
+		Effort:       opts.Effort,
+		MasterEffort: opts.MasterEffort,
+		WorkerEffort: opts.WorkerEffort,
 	})
 	if err != nil {
 		return goalx.ResolveRequest{}, err
@@ -231,8 +227,7 @@ func buildPhaseResolveRequest(projectRoot string, phaseKind string, mode goalx.M
 		Parallel:                  parallel,
 		ClearSessions:             true,
 		MasterOverride:            masterOverride,
-		ResearchOverride:          researchOverride,
-		DevelopOverride:           developOverride,
+		WorkerOverride:            workerOverride,
 		RequireEngineAvailability: true,
 	}
 	return req, nil
@@ -240,12 +235,10 @@ func buildPhaseResolveRequest(projectRoot string, phaseKind string, mode goalx.M
 
 func phaseSelectionOverrideRequested(opts phaseOptions) bool {
 	return strings.TrimSpace(opts.Master) != "" ||
-		strings.TrimSpace(opts.ResearchRole) != "" ||
-		strings.TrimSpace(opts.DevelopRole) != "" ||
+		strings.TrimSpace(opts.Worker) != "" ||
 		opts.Effort != "" ||
 		opts.MasterEffort != "" ||
-		opts.ResearchEffort != "" ||
-		opts.DevelopEffort != ""
+		opts.WorkerEffort != ""
 }
 
 func resolvePhaseObjective(phaseKind string, sourceRun string, explicit string) string {

@@ -10,20 +10,18 @@ import (
 const (
 	runIntentDeliver   = "deliver"
 	runIntentEvolve    = "evolve"
-	runIntentResearch  = "research"
-	runIntentDevelop   = "develop"
 	runIntentDebate    = "debate"
 	runIntentImplement = "implement"
 	runIntentExplore   = "explore"
 )
 
 var (
-	runEntrypoint           = Run
-	runAutoWithOptions      = startResolvedLaunch
-	runLaunchWithOptions    = startResolvedLaunch
-	runDebateWithNextConfig = runDebate
-	runImplementWithNextCfg = runImplement
-	runExploreIntent        = runExplore
+	runEntrypoint        = Run
+	runAutoWithOptions   = startResolvedLaunch
+	runLaunchWithOptions = startResolvedLaunch
+	runDebateIntent      = runDebate
+	runImplementIntent   = runImplement
+	runExploreIntent     = runExplore
 )
 
 type runRequest struct {
@@ -31,7 +29,7 @@ type runRequest struct {
 	Args   []string
 }
 
-func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
+func Run(projectRoot string, args []string) error {
 	if wantsHelp(args) {
 		fmt.Println(runUsage())
 		return nil
@@ -56,24 +54,10 @@ func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
 		}
 		printAutoStarted()
 		return nil
-	case runIntentResearch:
-		opts, err := parseLaunchOptions(req.Args, goalx.ModeResearch, false)
-		if err != nil {
-			return err
-		}
-		opts.Intent = req.Intent
-		return runLaunchWithOptions(projectRoot, opts)
-	case runIntentDevelop:
-		opts, err := parseLaunchOptions(req.Args, goalx.ModeDevelop, false)
-		if err != nil {
-			return err
-		}
-		opts.Intent = req.Intent
-		return runLaunchWithOptions(projectRoot, opts)
 	case runIntentDebate:
-		return runDebateWithNextConfig(projectRoot, req.Args, nc)
+		return runDebateIntent(projectRoot, req.Args)
 	case runIntentImplement:
-		return runImplementWithNextCfg(projectRoot, req.Args, nc)
+		return runImplementIntent(projectRoot, req.Args)
 	case runIntentExplore:
 		return runExploreIntent(projectRoot, req.Args)
 	default:
@@ -82,7 +66,7 @@ func Run(projectRoot string, args []string, nc *nextConfigJSON) error {
 }
 
 func runUsage() string {
-	return `usage: goalx run "objective" [--intent deliver|evolve|research|develop] [flags]
+	return `usage: goalx run "objective" [--intent deliver|evolve] [flags]
        goalx run --from RUN --intent debate [flags]
 
 notes:
@@ -122,7 +106,7 @@ func normalizeRunIntent(raw string) (string, error) {
 	switch strings.TrimSpace(raw) {
 	case "", "auto", runIntentDeliver:
 		return runIntentDeliver, nil
-	case runIntentEvolve, runIntentResearch, runIntentDevelop, runIntentDebate, runIntentImplement, runIntentExplore:
+	case runIntentEvolve, runIntentDebate, runIntentImplement, runIntentExplore:
 		return strings.TrimSpace(raw), nil
 	default:
 		return "", fmt.Errorf("unknown --intent %q", raw)

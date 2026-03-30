@@ -219,9 +219,8 @@ func TestBuildAffordancesIncludesSessionTellAndAttachCommands(t *testing.T) {
 	for _, want := range []string{
 		`goalx tell --run guidance-run session-N "message"`,
 		`goalx attach --run guidance-run session-N`,
-		`goalx add --run guidance-run --mode research --effort high --worktree "sub-goal"`,
-		`goalx add --run guidance-run --mode develop --effort medium --worktree "sub-goal"`,
-		`goalx add --run guidance-run --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`,
+		`goalx add --run guidance-run --effort high --worktree "sub-goal"`,
+		`goalx add --run guidance-run --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("affordance commands missing %q:\n%s", want, joined)
@@ -296,7 +295,7 @@ func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) 
 	joinedCommands := strings.Join(commands, "\n")
 	for _, want := range []string{
 		"goalx diff --run guidance-run session-1 session-2",
-		`goalx add --run guidance-run --mode develop --worktree --base-branch session-N "follow-on direction"`,
+		`goalx add --run guidance-run --worktree --base-branch session-N "follow-on direction"`,
 		"goalx durable write experiments --run guidance-run --kind experiment.closed --actor master --body-file /abs/path.experiment-closed.json",
 		"goalx durable write experiments --run guidance-run --kind evolve.stopped --actor master --body-file /abs/path.evolve-stopped.json",
 	} {
@@ -416,14 +415,12 @@ func TestBuildAffordancesIncludesSelectionFacts(t *testing.T) {
 	writeSelectionSnapshotFixture(t, runDir, testSelectionSnapshot{
 		Version: 1,
 		Policy: goalx.EffectiveSelectionPolicy{
-			DisabledEngines:    []string{"aider"},
-			MasterCandidates:   []string{"codex/gpt-5.4", "claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus"},
-			DevelopCandidates:  []string{"codex/gpt-5.4-mini"},
+			DisabledEngines:  []string{"aider"},
+			MasterCandidates: []string{"codex/gpt-5.4", "claude-code/opus"},
+			WorkerCandidates: []string{"codex/gpt-5.4-mini", "claude-code/opus"},
 		},
-		Master:   goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
+		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
 	})
 
 	doc, err := BuildAffordances(repo, cfg.Name, runDir, "master")

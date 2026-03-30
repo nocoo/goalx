@@ -51,26 +51,7 @@ func Result(projectRoot string, args []string) error {
 		return err
 	}
 
-	if target.Config.Mode == goalx.ModeDevelop {
-		if data, err := os.ReadFile(SummaryPath(target.Dir)); err == nil && len(data) > 0 {
-			if full {
-				fmt.Print(string(data))
-				return nil
-			}
-			printRunResult(data)
-			return nil
-		} else if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("read summary: %w", err)
-		}
-		if data, err := loadResultFallback(target.Dir); err == nil {
-			if full {
-				fmt.Print(string(data))
-				return nil
-			}
-			printRunResult(data)
-			return nil
-		}
-	} else if data, err := loadResultSurface(target.Dir); err == nil {
+	if data, err := loadResultSurface(target.Dir); err == nil {
 		if full {
 			fmt.Print(string(data))
 			return nil
@@ -173,7 +154,7 @@ func loadResultFallback(runDir string) ([]byte, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("no saved research report found in %s", runDir)
+	return nil, fmt.Errorf("no saved result surface found in %s", runDir)
 }
 
 func loadRunScopedReportFiles(runDir string) ([][]byte, error) {
@@ -302,5 +283,5 @@ func loadResultIntegration(projectRoot, savedRunDir, runName string) (*Integrati
 		}
 	}
 
-	return nil, fmt.Errorf("integration.json not found for develop run %q", runName)
+	return nil, fmt.Errorf("integration.json not found for run %q", runName)
 }

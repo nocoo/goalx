@@ -364,7 +364,7 @@ func TestRenderSubagentProtocolIncludesSessionInboxAckPath(t *testing.T) {
 	data := ProtocolData{
 		RunName:                "demo",
 		Objective:              "ship it",
-		Mode:                   goalx.ModeDevelop,
+		Mode:                   goalx.ModeWorker,
 		ProjectRoot:            "/tmp/project",
 		SessionName:            "session-1",
 		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",

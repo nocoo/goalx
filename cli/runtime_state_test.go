@@ -74,7 +74,7 @@ func TestRefreshSessionRuntimeProjectionPreservesParkedState(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "parked",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestRefreshSessionRuntimeProjectionPreservesActiveStateWhenJournalHasNotAdv
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:             "session-1",
 		State:            "active",
-		Mode:             string(goalx.ModeDevelop),
+		Mode:             string(goalx.ModeWorker),
 		LastRound:        3,
 		LastJournalState: "idle",
 	}); err != nil {
@@ -150,7 +150,7 @@ func TestUpsertSessionRuntimeStatePreservesConcurrentEntries(t *testing.T) {
 			if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 				Name:       sessionName,
 				State:      "active",
-				Mode:       string(goalx.ModeDevelop),
+				Mode:       string(goalx.ModeWorker),
 				OwnerScope: "concurrent slice",
 			}); err != nil {
 				t.Errorf("UpsertSessionRuntimeState(%s): %v", sessionName, err)

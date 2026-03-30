@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	EvolveFrontierActive                          = "active"
-	EvolveFrontierStopped                         = "stopped"
-	EvolveManagementGapMissingStopOrDispatch      = "missing_stop_or_dispatch"
-	EvolveManagementGapReviewWithoutManagedStop   = "review_without_managed_stop"
-	EvolveManagementGapUnclosedAbandonedCandidate = "unclosed_abandoned_candidate"
+	EvolveFrontierActive                        = "active"
+	EvolveFrontierStopped                       = "stopped"
+	EvolveManagementGapMissingStopOrDispatch    = "missing_stop_or_dispatch"
+	EvolveManagementGapReviewWithoutManagedStop = "review_without_managed_stop"
 )
 
 type EvolveFacts struct {
@@ -23,6 +22,7 @@ type EvolveFacts struct {
 	BestExperimentID      string   `json:"best_experiment_id,omitempty"`
 	OpenCandidateIDs      []string `json:"open_candidate_ids,omitempty"`
 	OpenCandidateCount    int      `json:"open_candidate_count,omitempty"`
+	ActiveSessionCount    int      `json:"active_session_count,omitempty"`
 	LastStopReasonCode    string   `json:"last_stop_reason_code,omitempty"`
 	LastStopAt            string   `json:"last_stop_at,omitempty"`
 	LastManagementEventAt string   `json:"last_management_event_at,omitempty"`
@@ -48,6 +48,11 @@ func BuildEvolveFacts(runDir string) (*EvolveFacts, error) {
 	}
 
 	facts := &EvolveFacts{Version: 1}
+	if sessionsState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir)); err != nil {
+		return nil, err
+	} else {
+		facts.ActiveSessionCount = countRuntimeActiveSessions(sessionsState)
+	}
 	if state, err := LoadIntegrationState(IntegrationStatePath(runDir)); err != nil {
 		return nil, err
 	} else if state != nil {
@@ -216,13 +221,10 @@ func detectEvolveManagementGap(facts *EvolveFacts, status *RunStatusRecord) stri
 	if facts == nil || status == nil {
 		return ""
 	}
-	if hasUnclosedAbandonedCandidate(facts, status) {
-		return EvolveManagementGapUnclosedAbandonedCandidate
-	}
-	if strings.TrimSpace(status.Phase) == runStatusPhaseReview && activeRunStatusSessionCount(status.ActiveSessions) == 0 && facts.FrontierState != EvolveFrontierStopped {
+	if strings.TrimSpace(status.Phase) == runStatusPhaseReview && facts.ActiveSessionCount == 0 && facts.FrontierState != EvolveFrontierStopped {
 		return EvolveManagementGapReviewWithoutManagedStop
 	}
-	if facts.FrontierState != EvolveFrontierActive || activeRunStatusSessionCount(status.ActiveSessions) > 0 {
+	if facts.FrontierState != EvolveFrontierActive || facts.ActiveSessionCount > 0 {
 		return ""
 	}
 	statusUpdatedAt, statusOK := parseRFC3339Time(status.UpdatedAt)
@@ -237,27 +239,24 @@ func detectEvolveManagementGap(facts *EvolveFacts, status *RunStatusRecord) stri
 	}
 }
 
-func hasUnclosedAbandonedCandidate(facts *EvolveFacts, status *RunStatusRecord) bool {
-	bestExperimentID := strings.TrimSpace(facts.BestExperimentID)
-	if bestExperimentID == "" {
-		return false
-	}
-	phase := strings.TrimSpace(status.Phase)
-	if facts.FrontierState != EvolveFrontierStopped && phase != runStatusPhaseReview {
-		return false
-	}
-	for _, id := range facts.OpenCandidateIDs {
-		if strings.TrimSpace(id) != "" && strings.TrimSpace(id) != bestExperimentID {
-			return true
-		}
-	}
-	return false
-}
-
 func activeRunStatusSessionCount(names []string) int {
 	count := 0
 	for _, name := range names {
 		if strings.TrimSpace(name) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func countRuntimeActiveSessions(state *SessionsRuntimeState) int {
+	if state == nil || state.Sessions == nil {
+		return 0
+	}
+	count := 0
+	for _, session := range state.Sessions {
+		switch strings.TrimSpace(session.State) {
+		case "active", "progress", "working", "idle":
 			count++
 		}
 	}

@@ -75,7 +75,7 @@ func TestRelaunchMasterRerendersProtocolWithFreshFacts(t *testing.T) {
 	if err := os.WriteFile(JournalPath(runDir, "session-2"), nil, 0o644); err != nil {
 		t.Fatalf("seed session-2 journal: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", cfg.Target)
+	identity, err := NewSessionIdentity(runDir, "session-2", "master-derived-develop", goalx.ModeWorker, "codex", "gpt-5.4", "", "", "", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestRelaunchMasterRerendersProtocolWithFreshFacts(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-2",
 		State: "active",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -132,9 +132,8 @@ func TestRelaunchMasterUsesSelectionSnapshotWhenPresent(t *testing.T) {
 		Policy: goalx.EffectiveSelectionPolicy{
 			MasterCandidates: []string{"claude-code/opus", "codex/gpt-5.4"},
 		},
-		Master:   goalx.MasterConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortMedium},
+		Master: goalx.MasterConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
 	})
 
 	if err := relaunchMaster(repo, runDir, goalx.TmuxSessionName(repo, runName), cfg); err != nil {

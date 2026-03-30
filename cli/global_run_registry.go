@@ -26,7 +26,6 @@ type GlobalRunRef struct {
 	RunDir      string `json:"run_dir,omitempty"`
 	RunID       string `json:"run_id,omitempty"`
 	TmuxSession string `json:"tmux_session,omitempty"`
-	Mode        string `json:"mode,omitempty"`
 	Objective   string `json:"objective,omitempty"`
 	State       string `json:"state,omitempty"`
 	UpdatedAt   string `json:"updated_at,omitempty"`
@@ -155,7 +154,6 @@ func UpsertGlobalRun(projectRoot string, cfg *goalx.Config, state string) error 
 			ProjectRoot: projectRoot,
 			RunDir:      goalx.RunDir(projectRoot, cfg.Name),
 			TmuxSession: goalx.TmuxSessionName(projectRoot, cfg.Name),
-			Mode:        string(cfg.Mode),
 			State:       state,
 			UpdatedAt:   time.Now().UTC().Format(time.RFC3339),
 		}
@@ -176,9 +174,6 @@ func UpdateGlobalRunState(projectRoot, runName, state string) error {
 				ProjectRoot: projectRoot,
 				RunDir:      goalx.RunDir(projectRoot, runName),
 				TmuxSession: goalx.TmuxSessionName(projectRoot, runName),
-			}
-			if cfg, err := LoadRunSpec(ref.RunDir); err == nil && cfg != nil {
-				ref.Mode = string(cfg.Mode)
 			}
 		}
 		ref.State = state

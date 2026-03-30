@@ -84,29 +84,6 @@ func TestRefreshDisplayFactsRepairsCloseoutReadyRunWhenWorkerWindowKeepsTmuxSess
 	}
 }
 
-func TestNextTreatsCloseoutReadyStrandedRunAsCompleted(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := initGitRepo(t)
-	writeAndCommit(t, repo, "base.txt", "base", "base commit")
-	_, _ = prepareCloseoutReadyActiveRun(t, repo)
-	installLingeringWorkerTmux(t)
-
-	out := captureStdout(t, func() {
-		if err := Next(repo, nil); err != nil {
-			t.Fatalf("Next: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "Completed run: lifecycle-run (not yet saved)") {
-		t.Fatalf("next output missing completed-run guidance:\n%s", out)
-	}
-	if strings.Contains(out, "Degraded run: lifecycle-run") {
-		t.Fatalf("next output should not treat closeout-ready run as degraded:\n%s", out)
-	}
-}
-
 func TestTellRejectsCloseoutReadyRunBeforeExplicitFinalization(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

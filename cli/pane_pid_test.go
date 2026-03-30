@@ -26,10 +26,10 @@ func TestStartPersistsMasterPanePID(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -74,16 +74,16 @@ func TestAddPersistsPanePIDForNewSession(t *testing.T) {
 	installFakePaneTmux(t, true, "9876", 0)
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -98,7 +98,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"--run", runName, "--mode", "develop", "second direction"}); err != nil {
+	if err := Add(repo, []string{"--run", runName, "second direction"}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -279,7 +279,7 @@ func TestScanLivenessReportsJournalStaleMinutes(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -364,7 +364,7 @@ func TestRunLeaseLoopWritesExitAuditLog(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "lease-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

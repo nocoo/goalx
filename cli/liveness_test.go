@@ -18,7 +18,7 @@ func TestScanLivenessReportsHealthyMasterAndSession(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -78,7 +78,7 @@ func TestScanLivenessNotifiesMasterWhenSessionDies(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -157,7 +157,7 @@ func TestScanLivenessDoesNotNotifyMasterWhenParkedSessionDies(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -181,7 +181,7 @@ func TestScanLivenessDoesNotNotifyMasterWhenParkedSessionDies(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "parked",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		WorktreePath: sessionWT,
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
@@ -229,7 +229,7 @@ func TestRunSidecarTickWritesLivenessState(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

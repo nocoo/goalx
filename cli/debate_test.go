@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,10 +20,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  research:
-    engine: codex
-    model: gpt-5.4
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -34,7 +30,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
 		Objective: "audit auth flow",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -44,19 +40,16 @@ master:
   engine: claude-code
   model: opus
 roles:
-  research:
+  worker:
     engine: claude-code
     model: sonnet
-  develop:
-    engine: codex
-    model: gpt-5.4
 target:
   files: ["."]
 local_validation:
   command: go test ./...
 `)
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -67,8 +60,8 @@ local_validation:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
-		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 }
 
@@ -82,7 +75,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  research:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -92,7 +85,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
 		Objective: "audit auth flow",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -100,13 +93,11 @@ local_validation:
 	writeSelectionSnapshotFixture(t, SavedRunDir(projectRoot, "research-a"), testSelectionSnapshot{
 		Version: 1,
 		Policy: goalx.EffectiveSelectionPolicy{
-			MasterCandidates:   []string{"claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus"},
-			DevelopCandidates:  []string{"codex/gpt-5.4"},
+			MasterCandidates: []string{"claude-code/opus"},
+			WorkerCandidates: []string{"claude-code/opus", "codex/gpt-5.4"},
 		},
-		Master:   goalx.MasterConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortMedium},
+		Master: goalx.MasterConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
 	})
 	writeProjectConfigFixture(t, projectRoot, `
 master:
@@ -118,7 +109,7 @@ local_validation:
   command: go test ./cli/...
 `)
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -129,8 +120,8 @@ local_validation:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Fatalf("master = %s/%s, want saved snapshot claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "opus" {
-		t.Fatalf("research role = %s/%s, want saved snapshot claude-code/opus", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "opus" {
+		t.Fatalf("research role = %s/%s, want saved snapshot claude-code/opus", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if cfg.Target.Files[0] != "cli/" {
 		t.Fatalf("target.files = %#v, want current shared config target", cfg.Target.Files)
@@ -150,7 +141,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  research:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -160,7 +151,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
 		Objective: "audit auth flow",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -168,14 +159,14 @@ local_validation:
 	writeSelectionSnapshotFixture(t, SavedRunDir(projectRoot, "research-a"), testSelectionSnapshot{
 		Version: 1,
 		Policy: goalx.EffectiveSelectionPolicy{
-			MasterCandidates:   []string{"claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus"},
+			MasterCandidates: []string{"claude-code/opus"},
+			WorkerCandidates: []string{"claude-code/opus"},
 		},
-		Master:   goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
+		Master: goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
 	})
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--master", "codex/gpt-5.4", "--research-role", "codex/gpt-5.4", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--master", "codex/gpt-5.4", "--worker", "codex/gpt-5.4", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -186,59 +177,12 @@ local_validation:
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %s/%s, want explicit preset codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research role = %s/%s, want explicit CLI codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4" {
+		t.Fatalf("research role = %s/%s, want codex/gpt-5.4", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 }
 
-func TestDebateIgnoresLegacyNextConfigPresetForResolvedSavedRun(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	projectRoot := t.TempDir()
-	writeProjectConfigFixture(t, projectRoot, `
-master:
-  engine: codex
-  model: gpt-5.4
-roles:
-  research:
-    engine: codex
-    model: gpt-5.4
-target:
-  files: ["."]
-local_validation:
-  command: go test ./...
-`)
-	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
-		Objective: "audit auth flow",
-		Mode:      goalx.ModeResearch,
-	}, map[string]string{
-		"summary.md":          "# summary\n",
-		"session-1-report.md": "# report\n",
-	})
-
-	var nc nextConfigJSON
-	if err := json.Unmarshal([]byte(`{"preset":"claude"}`), &nc); err != nil {
-		t.Fatalf("unmarshal next_config: %v", err)
-	}
-
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, &nc); err != nil {
-		t.Fatalf("Debate: %v", err)
-	}
-
-	cfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
-	if err != nil {
-		t.Fatalf("load goalx.yaml: %v", err)
-	}
-	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
-		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
-	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research role = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
-	}
-}
-
-func TestDebateIgnoresLegacyNextConfigSelectionOverrides(t *testing.T) {
+func TestDebateAppliesCanonicalPhaseOverridesFromCLI(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -248,7 +192,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  research:
+  worker:
     engine: claude-code
     model: sonnet
 target:
@@ -258,33 +202,26 @@ local_validation:
 `)
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Parallel:  2,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	var nc nextConfigJSON
-	if err := json.Unmarshal([]byte(`{
-		"parallel": 3,
-		"objective": "custom debate objective",
-		"dimensions": ["depth", "adversarial", "evidence"],
-		"engine": "codex",
-		"model": "fast",
-		"preset": "codex",
-		"route_role": "research",
-		"route_profile": "research_deep",
-		"effort": "high"
-	}`), &nc); err != nil {
-		t.Fatalf("unmarshal next_config: %v", err)
-	}
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--budget", "15m", "--write-config"}, &nc); err != nil {
+	if err := Debate(projectRoot, []string{
+		"--from", "research-a",
+		"--parallel", "3",
+		"--objective", "custom debate objective",
+		"--dimension", "depth,adversarial,evidence",
+		"--budget", "15m",
+		"--write-config",
+	}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -295,8 +232,8 @@ local_validation:
 	if cfg.Parallel != 3 {
 		t.Fatalf("parallel = %d, want 3", cfg.Parallel)
 	}
-	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
-		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "sonnet" {
+		t.Fatalf("worker role = %s/%s, want claude-code/sonnet", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if cfg.Objective != "custom debate objective" {
 		t.Fatalf("objective = %q, want custom debate objective", cfg.Objective)
@@ -321,19 +258,19 @@ func TestDebateInheritsSavedParallelWithoutOverride(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Parallel:  5,
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -353,19 +290,19 @@ func TestDebateInheritsSavedSessionFanoutWithoutParallel(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Sessions:  make([]goalx.SessionConfig, 4),
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
 	})
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -388,12 +325,12 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Parallel:  1,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 	}, nil)
 	runDir := SavedRunDir(projectRoot, "research-a")
@@ -407,7 +344,7 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 		Sessions: []SessionArtifacts{
 			{
 				Name: "session-1",
-				Mode: string(goalx.ModeResearch),
+				Mode: string(goalx.ModeWorker),
 				Artifacts: []ArtifactMeta{
 					{Kind: "report", Path: reportPath, RelPath: "custom-findings.txt", DurableName: "session-1-report.md"},
 				},
@@ -417,7 +354,7 @@ func TestDebateUsesSavedManifestReportArtifacts(t *testing.T) {
 		t.Fatalf("SaveArtifacts: %v", err)
 	}
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -448,11 +385,11 @@ func TestDebateReadsLegacyProjectScopedSavedRun(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 	}
 	data, err := yaml.Marshal(&cfg)
@@ -469,14 +406,14 @@ func TestDebateReadsLegacyProjectScopedSavedRun(t *testing.T) {
 		t.Fatalf("write report: %v", err)
 	}
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 }
 
 func TestDebateHelpPrintsUsage(t *testing.T) {
 	out := captureStdout(t, func() {
-		if err := Debate(t.TempDir(), []string{"--help"}, nil); err != nil {
+		if err := Debate(t.TempDir(), []string{"--help"}); err != nil {
 			t.Fatalf("Debate --help: %v", err)
 		}
 	})
@@ -502,7 +439,7 @@ func TestDebateStartCreatesFreshCharterWithPreservedRootLineage(t *testing.T) {
 	installPhaseStartFakeTmux(t)
 	stubLaunchRunSidecar(t)
 
-	if err := Debate(projectRoot, []string{"--from", "research-a"}, nil); err != nil {
+	if err := Debate(projectRoot, []string{"--from", "research-a"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 
@@ -516,11 +453,11 @@ func TestPhaseWriteConfigUsesManualDraft(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 	}, map[string]string{
 		"summary.md":          "# summary\n",
@@ -528,7 +465,7 @@ func TestPhaseWriteConfigUsesManualDraft(t *testing.T) {
 	})
 
 	out := captureStdout(t, func() {
-		if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}, nil); err != nil {
+		if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
 			t.Fatalf("Debate --write-config: %v", err)
 		}
 	})

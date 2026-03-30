@@ -98,7 +98,7 @@ func TestRunSidecarTickUsesWakeSubmitForPromptCapableUrgentMaster(t *testing.T) 
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -167,7 +167,7 @@ func TestRunSidecarTickDoesNotInterruptActiveWorkingMasterOnUrgentUnread(t *test
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -221,7 +221,7 @@ func TestRunSidecarTickWritesTargetScopedRecoveryForUrgentSession(t *testing.T) 
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -240,7 +240,7 @@ func TestRunSidecarTickWritesTargetScopedRecoveryForUrgentSession(t *testing.T) 
 	if err := EnsureSessionControl(runDir, "session-1"); err != nil {
 		t.Fatalf("EnsureSessionControl: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.EffortHigh, "high", "", goalx.TargetConfig{})
+	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeWorker, "codex", "gpt-5.4", goalx.EffortHigh, "high", "", goalx.TargetConfig{})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestRelaunchMasterRecreatesWindow(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -352,7 +352,7 @@ func TestRunSidecarTickDoesNotRelaunchMasterForUrgentUnreadAlone(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -417,7 +417,7 @@ func TestRunSidecarTickDoesNotInterruptProviderDialogWithoutUnread(t *testing.T)
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

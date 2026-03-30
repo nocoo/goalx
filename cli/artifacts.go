@@ -192,10 +192,6 @@ func buildRunArtifactsManifest(runDir string, cfg *goalx.Config) *ArtifactsManif
 			continue
 		}
 		sessionArtifacts := ensureSessionArtifactsEntry(manifest, sessionName, identity.Mode)
-		if goalx.Mode(identity.Mode) != goalx.ModeResearch {
-			continue
-		}
-
 		reportPath, relPath := resolveSessionReportArtifact(runDir, cfg.Name, sessionName, identity.Target.Files, sessionsState)
 		if reportPath == "" {
 			continue

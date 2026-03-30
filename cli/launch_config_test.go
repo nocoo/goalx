@@ -55,12 +55,9 @@ master:
   engine: codex
   model: best
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 `
 	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte(cfgYAML), 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
@@ -68,7 +65,7 @@ roles:
 
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("buildLaunchConfig: %v", err)
@@ -89,7 +86,7 @@ func TestBuildLaunchConfigOverridesParallelWhenFlagProvided(t *testing.T) {
 
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Parallel:  2,
 	})
 	if err != nil {
@@ -100,7 +97,7 @@ func TestBuildLaunchConfigOverridesParallelWhenFlagProvided(t *testing.T) {
 	}
 }
 
-func TestBuildLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) {
+func TestBuildLaunchConfigWorkerDoesNotHardcodeReportDefaults(t *testing.T) {
 	projectRoot := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir .goalx: %v", err)
@@ -114,19 +111,19 @@ func TestBuildLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) {
 
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("buildLaunchConfig: %v", err)
 	}
 	if len(cfg.Target.Readonly) != 0 {
-		t.Fatalf("research launch should not hardcode readonly target, got %#v", cfg.Target.Readonly)
+		t.Fatalf("worker launch should not hardcode readonly target, got %#v", cfg.Target.Readonly)
 	}
 	if len(cfg.Target.Files) == 1 && cfg.Target.Files[0] == "report.md" {
-		t.Fatalf("research launch should not hardcode report.md target: %#v", cfg.Target.Files)
+		t.Fatalf("worker launch should not hardcode report.md target: %#v", cfg.Target.Files)
 	}
 	if cfg.LocalValidation.Command == "test -s report.md && echo 'ok'" {
-		t.Fatalf("research launch should not hardcode report local validation")
+		t.Fatalf("worker launch should not hardcode report local validation")
 	}
 }
 
@@ -169,10 +166,8 @@ func TestBuildLaunchConfigAutoPreservesConfiguredEffortDefaults(t *testing.T) {
 master:
   effort: high
 roles:
-  research:
+  worker:
     effort: high
-  develop:
-    effort: medium
 local_validation:
   command: go test ./...
 target:
@@ -195,11 +190,8 @@ target:
 	if cfg.Master.Effort != goalx.EffortHigh {
 		t.Fatalf("master effort = %q, want %q", cfg.Master.Effort, goalx.EffortHigh)
 	}
-	if cfg.Roles.Research.Effort != goalx.EffortHigh {
-		t.Fatalf("research effort = %q, want %q", cfg.Roles.Research.Effort, goalx.EffortHigh)
-	}
-	if cfg.Roles.Develop.Effort != goalx.EffortMedium {
-		t.Fatalf("develop effort = %q, want %q", cfg.Roles.Develop.Effort, goalx.EffortMedium)
+	if cfg.Roles.Worker.Effort != goalx.EffortHigh {
+		t.Fatalf("worker effort = %q, want %q", cfg.Roles.Worker.Effort, goalx.EffortHigh)
 	}
 }
 
@@ -211,7 +203,7 @@ func TestBuildLaunchConfigPreviewLeavesTargetAndLocalValidationUnsetWhenUnconfig
 
 	cfg, err := buildLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("buildLaunchConfig: %v", err)
@@ -229,7 +221,7 @@ func TestBuildLaunchConfigPreviewLeavesTargetAndLocalValidationUnsetWhenUnconfig
 	}
 	req, err := buildLaunchResolveRequest(projectRoot, layers.Config, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("buildLaunchResolveRequest: %v", err)
@@ -252,7 +244,7 @@ local_validation:
 
 	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -275,7 +267,7 @@ local_validation:
 
 	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -288,19 +280,16 @@ local_validation:
 	}
 }
 
-func TestResolveLaunchConfigResearchWithClaudePresetAndClaudeOnlyPath(t *testing.T) {
+func TestResolveLaunchConfigWorkerWithClaudeOnlyPath(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeLaunchConfigProjectFile(t, projectRoot, `
 master:
   engine: claude-code
   model: opus
 roles:
-  research:
+  worker:
     engine: claude-code
     model: sonnet
-  develop:
-    engine: codex
-    model: gpt-5.4
 target:
   files: ["."]
 local_validation:
@@ -312,27 +301,24 @@ local_validation:
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
 	}
-	if resolvedCfg.Config.Mode != goalx.ModeResearch {
-		t.Fatalf("mode = %q, want %q", resolvedCfg.Config.Mode, goalx.ModeResearch)
+	if resolvedCfg.Config.Mode != goalx.ModeWorker {
+		t.Fatalf("mode = %q, want %q", resolvedCfg.Config.Mode, goalx.ModeWorker)
 	}
 }
 
-func TestResolveLaunchConfigDevelopWithClaudePresetAndClaudeOnlyPathFailsOnMissingCodex(t *testing.T) {
+func TestResolveLaunchConfigWorkerWithMissingConfiguredEngineFails(t *testing.T) {
 	projectRoot := t.TempDir()
 	writeLaunchConfigProjectFile(t, projectRoot, `
 master:
   engine: claude-code
   model: opus
 roles:
-  research:
-    engine: claude-code
-    model: sonnet
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -346,13 +332,13 @@ local_validation:
 
 	_, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err == nil {
 		t.Fatal("resolveLaunchConfig unexpectedly succeeded")
 	}
-	if !strings.Contains(err.Error(), "roles.develop") || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "required command") {
-		t.Fatalf("resolveLaunchConfig error = %v, want missing codex command for develop path", err)
+	if !strings.Contains(err.Error(), "roles.worker") || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "required command") {
+		t.Fatalf("resolveLaunchConfig error = %v, want missing codex command for worker path", err)
 	}
 }
 
@@ -363,10 +349,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  research:
-    engine: claude-code
-    model: opus
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -385,7 +368,7 @@ local_validation:
 	if err == nil {
 		t.Fatal("resolveLaunchConfig unexpectedly succeeded")
 	}
-	if !strings.Contains(err.Error(), "roles.develop") || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "required command") {
+	if !strings.Contains(err.Error(), "roles.worker") || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "required command") {
 		t.Fatalf("resolveLaunchConfig error = %v, want missing codex command for auto path", err)
 	}
 }
@@ -403,7 +386,7 @@ local_validation:
 
 	_, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err == nil {
 		t.Fatal("resolveLaunchConfig accepted unknown memory.llm_extract mode")
@@ -424,7 +407,7 @@ local_validation:
 
 	resolved, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -458,7 +441,7 @@ local_validation:
 	}
 }
 
-func TestBuildLaunchConfigResearchAndDevelopMatchResolverDefaults(t *testing.T) {
+func TestBuildLaunchConfigWorkerMatchesResolverDefaults(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -479,41 +462,26 @@ local_validation:
 		t.Fatalf("LoadConfigLayers: %v", err)
 	}
 
-	tests := []struct {
-		name string
-		mode goalx.Mode
-	}{
-		{name: "research", mode: goalx.ModeResearch},
-		{name: "develop", mode: goalx.ModeDevelop},
+	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
+		Objective: "ship it",
+		Mode:      goalx.ModeWorker,
+	})
+	if err != nil {
+		t.Fatalf("resolveLaunchConfig: %v", err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
-				Objective: "ship it",
-				Mode:      tt.mode,
-			})
-			if err != nil {
-				t.Fatalf("resolveLaunchConfig: %v", err)
-			}
-			resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
-				Objective: "ship it",
-				Mode:      tt.mode,
-			})
-			if err != nil {
-				t.Fatalf("ResolveConfig: %v", err)
-			}
-			cfg := resolvedCfg.Config
-			if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
-				t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
-			}
-			if cfg.Roles.Research.Engine != resolved.Config.Roles.Research.Engine || cfg.Roles.Research.Model != resolved.Config.Roles.Research.Model {
-				t.Fatalf("research = %s/%s, want %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model, resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
-			}
-			if cfg.Roles.Develop.Engine != resolved.Config.Roles.Develop.Engine || cfg.Roles.Develop.Model != resolved.Config.Roles.Develop.Model {
-				t.Fatalf("develop = %s/%s, want %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model, resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
-			}
-		})
+	resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
+		Objective: "ship it",
+		Mode:      goalx.ModeWorker,
+	})
+	if err != nil {
+		t.Fatalf("ResolveConfig: %v", err)
+	}
+	cfg := resolvedCfg.Config
+	if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
+		t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
+	}
+	if cfg.Roles.Worker.Engine != resolved.Config.Roles.Worker.Engine || cfg.Roles.Worker.Model != resolved.Config.Roles.Worker.Model {
+		t.Fatalf("worker = %s/%s, want %s/%s", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model, resolved.Config.Roles.Worker.Engine, resolved.Config.Roles.Worker.Model)
 	}
 }
 
@@ -524,7 +492,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -538,7 +506,7 @@ sessions:
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -568,7 +536,7 @@ local_validation:
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -589,12 +557,9 @@ master:
   engine: codex
   model: best
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 target:
   files: ["."]
 local_validation:
@@ -603,7 +568,7 @@ local_validation:
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
@@ -613,7 +578,7 @@ local_validation:
 	}
 }
 
-func TestResolveLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) {
+func TestResolveLaunchConfigWorkerDoesNotHardcodeReportDefaults(t *testing.T) {
 	projectRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(projectRoot, "go.mod"), []byte("module example.com/demo\n\ngo 1.24\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
@@ -624,20 +589,20 @@ func TestResolveLaunchConfigResearchDoesNotHardcodeReportDefaults(t *testing.T) 
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "audit auth",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("resolveLaunchConfig: %v", err)
 	}
 	cfg := resolvedCfg.Config
 	if len(cfg.Target.Readonly) != 0 {
-		t.Fatalf("research launch should not hardcode readonly target, got %#v", cfg.Target.Readonly)
+		t.Fatalf("worker launch should not hardcode readonly target, got %#v", cfg.Target.Readonly)
 	}
 	if len(cfg.Target.Files) == 1 && cfg.Target.Files[0] == "report.md" {
-		t.Fatalf("research launch should not hardcode report.md target: %#v", cfg.Target.Files)
+		t.Fatalf("worker launch should not hardcode report.md target: %#v", cfg.Target.Files)
 	}
 	if cfg.LocalValidation.Command == "test -s report.md && echo 'ok'" {
-		t.Fatalf("research launch should not hardcode report local validation")
+		t.Fatalf("worker launch should not hardcode report local validation")
 	}
 }
 
@@ -674,10 +639,8 @@ func TestResolveLaunchConfigAutoPreservesConfiguredEffortDefaults(t *testing.T) 
 master:
   effort: high
 roles:
-  research:
+  worker:
     effort: high
-  develop:
-    effort: medium
 local_validation:
   command: go test ./...
 target:
@@ -698,11 +661,8 @@ target:
 	if cfg.Master.Effort != goalx.EffortHigh {
 		t.Fatalf("master effort = %q, want %q", cfg.Master.Effort, goalx.EffortHigh)
 	}
-	if cfg.Roles.Research.Effort != goalx.EffortHigh {
-		t.Fatalf("research effort = %q, want %q", cfg.Roles.Research.Effort, goalx.EffortHigh)
-	}
-	if cfg.Roles.Develop.Effort != goalx.EffortMedium {
-		t.Fatalf("develop effort = %q, want %q", cfg.Roles.Develop.Effort, goalx.EffortMedium)
+	if cfg.Roles.Worker.Effort != goalx.EffortHigh {
+		t.Fatalf("worker effort = %q, want %q", cfg.Roles.Worker.Effort, goalx.EffortHigh)
 	}
 }
 
@@ -721,7 +681,7 @@ local_validation:
 
 	resolvedCfg, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective:  "audit auth",
-		Mode:       goalx.ModeDevelop,
+		Mode:       goalx.ModeWorker,
 		Dimensions: []string{"audit", "adversarial", "evidence"},
 	})
 	if err != nil {
@@ -740,7 +700,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -751,7 +711,7 @@ local_validation:
 
 	_, err := resolveLaunchConfig(projectRoot, launchOptions{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err == nil {
 		t.Fatal("resolveLaunchConfig unexpectedly succeeded")
@@ -769,10 +729,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  research:
-    engine: claude-code
-    model: opus
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -802,10 +759,7 @@ local_validation:
 	if buildCfg.Master.Engine != resolvedCfg.Config.Master.Engine || buildCfg.Master.Model != resolvedCfg.Config.Master.Model {
 		t.Fatalf("master = %s/%s, want %s/%s", buildCfg.Master.Engine, buildCfg.Master.Model, resolvedCfg.Config.Master.Engine, resolvedCfg.Config.Master.Model)
 	}
-	if buildCfg.Roles.Research.Engine != resolvedCfg.Config.Roles.Research.Engine || buildCfg.Roles.Research.Model != resolvedCfg.Config.Roles.Research.Model {
-		t.Fatalf("research = %s/%s, want %s/%s", buildCfg.Roles.Research.Engine, buildCfg.Roles.Research.Model, resolvedCfg.Config.Roles.Research.Engine, resolvedCfg.Config.Roles.Research.Model)
-	}
-	if buildCfg.Roles.Develop.Engine != resolvedCfg.Config.Roles.Develop.Engine || buildCfg.Roles.Develop.Model != resolvedCfg.Config.Roles.Develop.Model {
-		t.Fatalf("develop = %s/%s, want %s/%s", buildCfg.Roles.Develop.Engine, buildCfg.Roles.Develop.Model, resolvedCfg.Config.Roles.Develop.Engine, resolvedCfg.Config.Roles.Develop.Model)
+	if buildCfg.Roles.Worker.Engine != resolvedCfg.Config.Roles.Worker.Engine || buildCfg.Roles.Worker.Model != resolvedCfg.Config.Roles.Worker.Model {
+		t.Fatalf("worker = %s/%s, want %s/%s", buildCfg.Roles.Worker.Engine, buildCfg.Roles.Worker.Model, resolvedCfg.Config.Roles.Worker.Engine, resolvedCfg.Config.Roles.Worker.Model)
 	}
 }

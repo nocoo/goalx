@@ -26,10 +26,10 @@ func TestStartCleansUpOnLaunchFailure(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
@@ -149,7 +149,7 @@ func TestStartPreservesExistingRunOnPreflightFailure(t *testing.T) {
 
 	existing := goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "existing run",
 		Master: goalx.MasterConfig{
 			Engine: "codex",
@@ -174,7 +174,7 @@ func TestStartPreservesExistingRunOnPreflightFailure(t *testing.T) {
 
 	startCfg := &goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "new run should fail preflight",
 		Master: goalx.MasterConfig{
 			Engine: "codex",
@@ -213,10 +213,10 @@ func TestStartLaunchesOnlyMaster(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Parallel: 2,
 		Target: goalx.TargetConfig{
@@ -373,8 +373,8 @@ esac
 	if snapshot.Master.Engine != "codex" || snapshot.Master.Model != "gpt-5.4" {
 		t.Fatalf("selection snapshot master = %s/%s, want codex/gpt-5.4", snapshot.Master.Engine, snapshot.Master.Model)
 	}
-	if snapshot.Research.Engine != "codex" || snapshot.Research.Model != "gpt-5.4" {
-		t.Fatalf("selection snapshot research = %s/%s, want codex/gpt-5.4", snapshot.Research.Engine, snapshot.Research.Model)
+	if snapshot.Worker.Engine != "codex" || snapshot.Worker.Model != "gpt-5.4" {
+		t.Fatalf("selection snapshot worker = %s/%s, want codex/gpt-5.4", snapshot.Worker.Engine, snapshot.Worker.Model)
 	}
 	if snapshot.Policy.MasterCandidates[0] != "codex/gpt-5.4" {
 		t.Fatalf("selection snapshot master_candidates = %#v, want codex first", snapshot.Policy.MasterCandidates)
@@ -560,8 +560,8 @@ esac
 	if len(snapshot.Policy.MasterCandidates) < 2 || snapshot.Policy.MasterCandidates[0] != "codex/gpt-5.4" || snapshot.Policy.MasterCandidates[1] != "claude-code/opus" {
 		t.Fatalf("snapshot master_candidates = %#v, want codex then claude", snapshot.Policy.MasterCandidates)
 	}
-	if len(snapshot.Policy.ResearchCandidates) == 0 || snapshot.Policy.ResearchCandidates[0] != "claude-code/opus" {
-		t.Fatalf("snapshot research_candidates = %#v, want claude-code/opus first", snapshot.Policy.ResearchCandidates)
+	if len(snapshot.Policy.WorkerCandidates) < 3 || snapshot.Policy.WorkerCandidates[0] != "codex/gpt-5.4" || snapshot.Policy.WorkerCandidates[1] != "claude-code/opus" || snapshot.Policy.WorkerCandidates[2] != "codex/gpt-5.4-mini" {
+		t.Fatalf("snapshot worker_candidates = %#v, want codex, claude, codex-mini", snapshot.Policy.WorkerCandidates)
 	}
 }
 
@@ -578,10 +578,10 @@ func TestStartInitializesRootExperimentLineage(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
@@ -687,7 +687,7 @@ func TestStartRefreshesActivityAfterMasterLaunch(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:            "guidance-start",
-		Mode:            goalx.ModeDevelop,
+		Mode:            goalx.ModeWorker,
 		Objective:       "ship it",
 		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -839,10 +839,10 @@ esac
 		t.Helper()
 		cfg := goalx.Config{
 			Name:      name,
-			Mode:      goalx.ModeDevelop,
+			Mode:      goalx.ModeWorker,
 			Objective: objective,
 			Roles: goalx.RoleDefaultsConfig{
-				Develop: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+				Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 			},
 			Target: goalx.TargetConfig{Files: []string{"README.md"}},
 			LocalValidation: goalx.LocalValidationConfig{
@@ -913,7 +913,7 @@ local_validation:
 	}
 	resolved, err := goalx.ResolveConfig(layers, goalx.ResolveRequest{
 		Objective: "ship it",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 	})
 	if err != nil {
 		t.Fatalf("ResolveConfig: %v", err)
@@ -923,11 +923,8 @@ local_validation:
 	if cfg.Master.Engine != resolved.Config.Master.Engine || cfg.Master.Model != resolved.Config.Master.Model {
 		t.Fatalf("master = %s/%s, want %s/%s", cfg.Master.Engine, cfg.Master.Model, resolved.Config.Master.Engine, resolved.Config.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != resolved.Config.Roles.Research.Engine || cfg.Roles.Research.Model != resolved.Config.Roles.Research.Model {
-		t.Fatalf("research = %s/%s, want %s/%s", cfg.Roles.Research.Engine, cfg.Roles.Research.Model, resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
-	}
-	if cfg.Roles.Develop.Engine != resolved.Config.Roles.Develop.Engine || cfg.Roles.Develop.Model != resolved.Config.Roles.Develop.Model {
-		t.Fatalf("develop = %s/%s, want %s/%s", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model, resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != resolved.Config.Roles.Worker.Engine || cfg.Roles.Worker.Model != resolved.Config.Roles.Worker.Model {
+		t.Fatalf("worker = %s/%s, want %s/%s", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model, resolved.Config.Roles.Worker.Engine, resolved.Config.Roles.Worker.Model)
 	}
 }
 
@@ -942,10 +939,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  research:
-    engine: codex
-    model: gpt-5.4
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -996,11 +990,8 @@ esac
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %s/%s, want codex/gpt-5.4", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
-	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "gpt-5.4" {
-		t.Fatalf("develop = %s/%s, want codex/gpt-5.4", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4" {
+		t.Fatalf("worker = %s/%s, want codex/gpt-5.4", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 }
 
@@ -1017,10 +1008,10 @@ func TestStartAddsClaudeMasterInboxHook(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "claude-master",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
@@ -1139,10 +1130,10 @@ func TestStartRendersMasterPreferences(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
@@ -1153,10 +1144,7 @@ func TestStartRendersMasterPreferences(t *testing.T) {
 			Model:  "gpt-5.4",
 		},
 		Preferences: goalx.PreferencesConfig{
-			Research: goalx.PreferencePolicy{
-				Guidance: "multi-perspective",
-			},
-			Develop: goalx.PreferencePolicy{
+			Worker: goalx.PreferencePolicy{
 				Guidance: "speed",
 			},
 		},
@@ -1233,8 +1221,7 @@ esac
 	text := string(masterProtocol)
 	for _, want := range []string{
 		"### Preferences",
-		"| Research | multi-perspective |",
-		"| Develop | speed |",
+		"| Worker | speed |",
 		"Prefer policy-based session launches.",
 		"Explicit `--engine/--model` is an override.",
 		"Liveness state: `" + LivenessPath(runDir) + "`",
@@ -1261,10 +1248,10 @@ func TestStartLaunchesMasterWithCurrentProcessEnvWithoutSnapshot(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
@@ -1393,7 +1380,7 @@ func TestStartAutoSnapshotsTrackedChangesIntoRunWorktree(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:            "snapshot-demo",
-		Mode:            goalx.ModeDevelop,
+		Mode:            goalx.ModeWorker,
 		Objective:       "ship feature",
 		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -1506,7 +1493,7 @@ func TestStartCopiesGitignoredFilesToRunWorktree(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:            "mirror-demo",
-		Mode:            goalx.ModeDevelop,
+		Mode:            goalx.ModeWorker,
 		Objective:       "mirror ignored files",
 		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},

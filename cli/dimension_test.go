@@ -12,7 +12,7 @@ func TestDimensionSetAppliesToAllSessions(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name: "dimension-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 	}
 	runDir := writeRunSpecFixture(t, projectRoot, cfg)
 	for _, sessionName := range []string{"session-1", "session-2"} {
@@ -47,7 +47,7 @@ func TestDimensionAddAndRemoveUpdateNamedSession(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name: "dimension-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 	}
 	runDir := writeRunSpecFixture(t, projectRoot, cfg)
 	if err := os.WriteFile(JournalPath(runDir, "session-1"), nil, 0o644); err != nil {
@@ -94,7 +94,7 @@ func TestDimensionRejectsUnsupportedTargetMutationCombination(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name: "dimension-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 	}
 	runDir := writeRunSpecFixture(t, projectRoot, cfg)
 	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {

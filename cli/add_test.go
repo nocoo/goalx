@@ -23,18 +23,18 @@ func TestAddExtendsExplicitSessionsSnapshot(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
   - hint: second
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -47,7 +47,7 @@ local_validation:
 		}
 	}
 
-	if err := Add(repo, []string{"third direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"third direction", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-3"))
@@ -57,7 +57,7 @@ local_validation:
 	if identity == nil {
 		t.Fatal("session-3 identity missing")
 	}
-	if identity.RoleKind != "develop" || identity.Mode != string(goalx.ModeDevelop) {
+	if identity.RoleKind != "worker" || identity.Mode != string(goalx.ModeWorker) {
 		t.Fatalf("session-3 identity role/mode = %+v", identity)
 	}
 
@@ -81,7 +81,7 @@ local_validation:
 	}
 }
 
-func TestAddAttachesDimensionsWithoutReplacingDirection(t *testing.T) {
+func TestAddNoLongerRequiresModeFlag(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -94,16 +94,15 @@ func TestAddAttachesDimensionsWithoutReplacingDirection(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
 target:
   files: ["."]
 local_validation:
@@ -118,7 +117,60 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"audit root cause", "--mode", "develop", "--dimension", "adversarial", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"audit root cause", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
+	if err != nil {
+		t.Fatalf("LoadSessionIdentity: %v", err)
+	}
+	if identity == nil {
+		t.Fatal("session-2 identity missing")
+	}
+	if identity.RoleKind != "worker" || identity.Mode != string(goalx.ModeWorker) {
+		t.Fatalf("session-2 identity role/mode = %+v", identity)
+	}
+}
+
+func TestAddAttachesDimensionsWithoutReplacingDirection(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	writeReadyTmuxScript(t, tmuxPath)
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	snapshot := []byte(`name: add-run
+mode: worker
+objective: implement audit fixes
+roles:
+  worker:
+    engine: codex
+    model: fast
+parallel: 1
+sessions:
+  - hint: first
+    mode: worker
+target:
+  files: ["."]
+local_validation:
+  command: "go test ./..."
+`)
+	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
+	runWT := RunWorktreePath(runDir)
+	if err := CreateWorktree(repo, runWT, "goalx/"+runName+"/root"); err != nil {
+		t.Fatalf("CreateWorktree run root: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "journals", "session-1.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("seed session-1 journal: %v", err)
+	}
+
+	if err := Add(repo, []string{"audit root cause", "--dimension", "adversarial", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -158,16 +210,16 @@ func TestAddCreatesDimensionsStateEvenWithoutDimensionOverrides(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -185,7 +237,7 @@ local_validation:
 		t.Fatalf("dimensions state should start missing, stat err = %v", err)
 	}
 
-	if err := Add(repo, []string{"audit root cause", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"audit root cause", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -214,16 +266,16 @@ func TestAddDoesNotPublishSessionRuntimeStateToCoordination(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -246,7 +298,7 @@ local_validation:
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
 
-	if err := Add(repo, []string{"audit root cause", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"audit root cause", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -275,16 +327,16 @@ func TestAddFailsWhenRunBudgetIsExhausted(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -310,7 +362,7 @@ local_validation:
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
 
-	err = Add(repo, []string{"second direction", "--mode", "develop", "--run", runName})
+	err = Add(repo, []string{"second direction", "--run", runName})
 	if err == nil {
 		t.Fatal("Add error = nil, want budget exhausted")
 	}
@@ -337,19 +389,16 @@ func TestAddPropagatesEngineToRenderedProtocol(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -364,7 +413,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"second direction", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -396,18 +445,18 @@ func TestAddRendersSessionLocalValidationOverride(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
   - hint: second
-    mode: develop
+    mode: worker
     local_validation:
       command: "test -s report.md"
 target:
@@ -423,7 +472,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"second direction", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -453,16 +502,16 @@ func TestAddWorktreeUsesSessionBaseBranch(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -485,14 +534,14 @@ local_validation:
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: session1WT,
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
 
-	if err := Add(repo, []string{"follow up slice", "--mode", "develop", "--worktree", "--base-branch", "session-1", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"follow up slice", "--worktree", "--base-branch", "session-1", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -551,16 +600,16 @@ func TestAddWorktreeBaseBranchFailsForSharedSession(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -574,12 +623,12 @@ local_validation:
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "active",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
 
-	err := Add(repo, []string{"follow up slice", "--mode", "develop", "--worktree", "--base-branch", "session-1", "--run", runName})
+	err := Add(repo, []string{"follow up slice", "--worktree", "--base-branch", "session-1", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "has no dedicated branch") {
 		t.Fatalf("Add error = %v, want dedicated branch error", err)
 	}
@@ -598,10 +647,10 @@ func TestAddWorktreeWithoutExplicitBaseRecordsRunRootParent(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 parallel: 0
@@ -616,7 +665,7 @@ local_validation:
 		t.Fatalf("CreateWorktree run root: %v", err)
 	}
 
-	if err := Add(repo, []string{"new slice", "--mode", "develop", "--worktree", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"new slice", "--worktree", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -648,19 +697,16 @@ func TestAddRendersAcceptanceContractAndTeamContext(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -679,7 +725,7 @@ acceptance:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"second direction", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -736,19 +782,16 @@ esac
 	t.Setenv("FOO_TOOLCHAIN_ROOT", "/opt/add-before")
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -765,7 +808,7 @@ local_validation:
 	t.Setenv("ANTHROPIC_API_KEY", "anthropic-after")
 	t.Setenv("FOO_TOOLCHAIN_ROOT", "/opt/add-after")
 
-	if err := Add(repo, []string{"--run", runName, "--worktree", "--mode", "research", "audit root cause"}); err != nil {
+	if err := Add(repo, []string{"--run", runName, "--worktree", "audit root cause"}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -833,16 +876,16 @@ esac
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -857,7 +900,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"--run", runName, "--mode", "develop", "second direction"}); err != nil {
+	if err := Add(repo, []string{"--run", runName, "second direction"}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -902,16 +945,16 @@ func TestAddWithWorktreeCopiesGitignoredFiles(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -927,7 +970,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"--run", runName, "--worktree", "--mode", "develop", "second direction"}); err != nil {
+	if err := Add(repo, []string{"--run", runName, "--worktree", "second direction"}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -953,10 +996,10 @@ func TestAddNotifiesMasterViaInbox(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
@@ -965,7 +1008,7 @@ master:
   model: gpt-5.4
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -980,7 +1023,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"second direction", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -989,7 +1032,7 @@ local_validation:
 		t.Fatalf("read session inbox: %v", err)
 	}
 	sessionText := string(sessionInbox)
-	for _, want := range []string{`"type":"develop"`, `"source":"master"`, `"body":"second direction"`} {
+	for _, want := range []string{`"type":"worker"`, `"source":"master"`, `"body":"second direction"`} {
 		if !strings.Contains(sessionText, want) {
 			t.Fatalf("session inbox missing %q:\n%s", want, sessionText)
 		}
@@ -1034,16 +1077,16 @@ func TestAddRollsBackWhenMasterInboxWriteFails(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1060,7 +1103,7 @@ local_validation:
 		return MasterInboxMessage{}, os.ErrPermission
 	}
 
-	err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName})
+	err := Add(repo, []string{"second direction", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "notify master inbox") {
 		t.Fatalf("Add error = %v, want notify master inbox failure", err)
 	}
@@ -1106,10 +1149,10 @@ func TestAddStartsNumberingFromExistingRunArtifacts(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 parallel: 3
@@ -1120,10 +1163,10 @@ local_validation:
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
 
-	if err := Add(repo, []string{"first direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"first direction", "--run", runName}); err != nil {
 		t.Fatalf("Add first: %v", err)
 	}
-	if err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"second direction", "--run", runName}); err != nil {
 		t.Fatalf("Add second: %v", err)
 	}
 
@@ -1147,7 +1190,7 @@ local_validation:
 	}
 }
 
-func TestAddSupportsResearchModeOverride(t *testing.T) {
+func TestAddUsesWorkerDefaultsForNewSessions(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -1160,19 +1203,16 @@ func TestAddSupportsResearchModeOverride(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1183,7 +1223,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"investigate failing auth flow", "--mode", "research", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"investigate failing auth flow", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 	identity, err := LoadSessionIdentity(SessionIdentityPath(runDir, "session-2"))
@@ -1193,7 +1233,7 @@ local_validation:
 	if identity == nil {
 		t.Fatal("session-2 identity missing")
 	}
-	if identity.RoleKind != "research" || identity.Engine != "claude-code" || identity.Model != "opus" {
+	if identity.RoleKind != "worker" || identity.Engine != "claude-code" || identity.Model != "opus" {
 		t.Fatalf("session-2 identity = %+v", identity)
 	}
 
@@ -1205,8 +1245,8 @@ local_validation:
 	if !ok {
 		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
 	}
-	if sess.Mode != string(goalx.ModeResearch) {
-		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeResearch)
+	if sess.Mode != string(goalx.ModeWorker) {
+		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeWorker)
 	}
 
 	out, err := os.ReadFile(filepath.Join(runDir, "program-2.md"))
@@ -1215,8 +1255,7 @@ local_validation:
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Mode: Research",
-		"Research mode typically focuses on producing reports; code modification controlled by target config.",
+		"## Worker Contract",
 		"## Execution Discipline",
 		"## Autonomy Persistence",
 	} {
@@ -1226,7 +1265,7 @@ local_validation:
 	}
 }
 
-func TestAddRoutesByModeAndEffortWhenEngineModelNotExplicit(t *testing.T) {
+func TestAddRoutesByWorkerDefaultsAndEffortWhenEngineModelNotExplicit(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -1242,17 +1281,14 @@ func TestAddRoutesByModeAndEffortWhenEngineModelNotExplicit(t *testing.T) {
 mode: auto
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
     effort: high
-  develop:
-    engine: codex
-    model: gpt-5.4
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1263,7 +1299,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	if err := Add(repo, []string{"investigate auth regression", "--mode", "research", "--effort", "high", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"investigate auth regression", "--effort", "high", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -1274,8 +1310,8 @@ local_validation:
 	if identity == nil {
 		t.Fatal("session-2 identity missing")
 	}
-	if identity.Mode != string(goalx.ModeResearch) {
-		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeResearch)
+	if identity.Mode != string(goalx.ModeWorker) {
+		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeWorker)
 	}
 	if identity.Engine != "claude-code" || identity.Model != "opus" {
 		t.Fatalf("engine/model = %q/%q, want claude-code/opus", identity.Engine, identity.Model)
@@ -1304,7 +1340,7 @@ func TestAddExplicitEngineModelBypassesRoleDefaults(t *testing.T) {
 mode: auto
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
 parallel: 0
@@ -1315,7 +1351,7 @@ local_validation:
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
 
-	if err := Add(repo, []string{"investigate auth regression", "--mode", "research", "--engine", "codex", "--model", "gpt-5.4", "--effort", "high", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"investigate auth regression", "--engine", "codex", "--model", "gpt-5.4", "--effort", "high", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -1326,8 +1362,8 @@ local_validation:
 	if identity == nil {
 		t.Fatal("session-1 identity missing")
 	}
-	if identity.Mode != string(goalx.ModeResearch) {
-		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeResearch)
+	if identity.Mode != string(goalx.ModeWorker) {
+		t.Fatalf("mode = %q, want %q", identity.Mode, goalx.ModeWorker)
 	}
 	if identity.Engine != "codex" || identity.Model != "gpt-5.4" {
 		t.Fatalf("engine/model = %q/%q, want codex/gpt-5.4", identity.Engine, identity.Model)
@@ -1353,10 +1389,10 @@ func TestAddRejectsUnknownFlag(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 parallel: 0
@@ -1367,7 +1403,7 @@ local_validation:
 `)
 	runName, runDir := writeAddRunFixture(t, repo, string(snapshot))
 
-	err := Add(repo, []string{"second direction", "--mode", "develop", "--unknown", "value", "--run", runName})
+	err := Add(repo, []string{"second direction", "--unknown", "value", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), `unknown flag "--unknown"`) {
 		t.Fatalf("Add error = %v, want unknown flag", err)
 	}
@@ -1380,8 +1416,8 @@ func TestAddRejectsRemovedRouteFlags(t *testing.T) {
 	t.Parallel()
 
 	tests := [][]string{
-		{"second direction", "--mode", "develop", "--route-role", "develop"},
-		{"second direction", "--mode", "develop", "--route-profile", "missing-profile"},
+		{"second direction", "--route-role", "develop"},
+		{"second direction", "--route-profile", "missing-profile"},
 	}
 	for _, args := range tests {
 		if err := Add(t.TempDir(), args); err == nil {
@@ -1406,7 +1442,7 @@ func TestAddRejectsExplicitEngineModelWithoutMode(t *testing.T) {
 mode: auto
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
 parallel: 0
@@ -1417,9 +1453,8 @@ local_validation:
 `)
 	runName, _ := writeAddRunFixture(t, repo, string(snapshot))
 
-	err := Add(repo, []string{"second direction", "--engine", "codex", "--model", "gpt-5.4", "--run", runName})
-	if err == nil || !strings.Contains(err.Error(), "--mode is required") {
-		t.Fatalf("Add error = %v, want missing --mode", err)
+	if err := Add(repo, []string{"second direction", "--engine", "codex", "--model", "gpt-5.4", "--run", runName}); err != nil {
+		t.Fatalf("Add: %v", err)
 	}
 }
 
@@ -1436,16 +1471,16 @@ func TestAddRequiresDurableIdentityForExistingSessions(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1459,7 +1494,7 @@ local_validation:
 		t.Fatalf("remove session identity: %v", err)
 	}
 
-	err := Add(repo, []string{"second direction", "--mode", "develop", "--run", runName})
+	err := Add(repo, []string{"second direction", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "session identity") {
 		t.Fatalf("Add error = %v, want missing session identity", err)
 	}
@@ -1493,16 +1528,16 @@ esac
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1513,7 +1548,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	err := Add(repo, []string{"first direction", "--mode", "develop", "--run", runName})
+	err := Add(repo, []string{"first direction", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "create tmux window") {
 		t.Fatalf("Add error = %v, want tmux window failure", err)
 	}
@@ -1597,16 +1632,16 @@ esac
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["src/"]
 local_validation:
@@ -1617,7 +1652,7 @@ local_validation:
 		t.Fatalf("seed session-1 journal: %v", err)
 	}
 
-	err := Add(repo, []string{"blank launch", "--mode", "develop", "--run", runName})
+	err := Add(repo, []string{"blank launch", "--run", runName})
 	if err == nil || !strings.Contains(err.Error(), "launch handshake") {
 		t.Fatalf("Add error = %v, want launch handshake failure", err)
 	}
@@ -1669,7 +1704,7 @@ local_validation:
 	}
 }
 
-func TestAddResearchModeOverrideUsesResearchRoleWithoutExplicitSessions(t *testing.T) {
+func TestAddUsesWorkerDefaultsWithoutExplicitSessions(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -1682,15 +1717,12 @@ func TestAddResearchModeOverrideUsesResearchRoleWithoutExplicitSessions(t *testi
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  research:
+  worker:
     engine: claude-code
     model: opus
-  develop:
-    engine: codex
-    model: fast
 parallel: 1
 target:
   files: ["src/"]
@@ -1716,10 +1748,8 @@ local_validation:
 	if effective.Engine == "" || effective.Model == "" {
 		roleDefaults := goalx.SessionConfig{}
 		switch effective.Mode {
-		case goalx.ModeResearch:
-			roleDefaults = cfg.Roles.Research
-		case goalx.ModeDevelop:
-			roleDefaults = cfg.Roles.Develop
+		case goalx.ModeWorker:
+			roleDefaults = cfg.Roles.Worker
 		}
 		if effective.Engine == "" {
 			effective.Engine = roleDefaults.Engine
@@ -1750,7 +1780,7 @@ local_validation:
 		t.Fatalf("SaveSessionIdentity session-1: %v", err)
 	}
 
-	if err := Add(repo, []string{"audit root cause", "--mode", "research", "--run", runName}); err != nil {
+	if err := Add(repo, []string{"audit root cause", "--run", runName}); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 
@@ -1762,8 +1792,8 @@ local_validation:
 	if !ok {
 		t.Fatalf("runtime state missing session-2: %#v", state.Sessions)
 	}
-	if sess.Mode != string(goalx.ModeResearch) {
-		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeResearch)
+	if sess.Mode != string(goalx.ModeWorker) {
+		t.Fatalf("session-2 mode = %q, want %q", sess.Mode, goalx.ModeWorker)
 	}
 
 	out, err := os.ReadFile(filepath.Join(runDir, "program-2.md"))
@@ -1772,7 +1802,7 @@ local_validation:
 	}
 	text := string(out)
 	for _, want := range []string{
-		"## Mode: Research",
+		"## Worker Contract",
 		"## Execution Discipline",
 		"## Autonomy Persistence",
 	} {
@@ -1798,16 +1828,16 @@ func TestAddHelpDoesNotCreateSession(t *testing.T) {
 	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	snapshot := []byte(`name: add-run
-mode: develop
+mode: worker
 objective: implement audit fixes
 roles:
-  develop:
+  worker:
     engine: codex
     model: codex
 parallel: 1
 sessions:
   - hint: first
-    mode: develop
+    mode: worker
 target:
   files: ["."]
 local_validation:
@@ -1866,11 +1896,11 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 	if cfg.Master.Model == "" {
 		cfg.Master.Model = "gpt-5.4"
 	}
-	if cfg.Roles.Research.Engine == "" {
-		cfg.Roles.Research = goalx.SessionConfig{Engine: "claude-code", Model: "opus"}
+	if cfg.Roles.Worker.Engine == "" {
+		cfg.Roles.Worker = goalx.SessionConfig{Engine: "claude-code", Model: "opus"}
 	}
-	if cfg.Roles.Develop.Engine == "" {
-		cfg.Roles.Develop = goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"}
+	if cfg.Roles.Worker.Engine == "" {
+		cfg.Roles.Worker = goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"}
 	}
 	if err := SaveRunSpec(runDir, cfg); err != nil {
 		t.Fatalf("SaveRunSpec: %v", err)
@@ -1926,10 +1956,8 @@ func writeAddRunFixture(t *testing.T, repo, snapshot string) (string, string) {
 		if effective.Engine == "" || effective.Model == "" {
 			roleDefaults := goalx.SessionConfig{}
 			switch effective.Mode {
-			case goalx.ModeResearch:
-				roleDefaults = cfg.Roles.Research
-			case goalx.ModeDevelop:
-				roleDefaults = cfg.Roles.Develop
+			case goalx.ModeWorker:
+				roleDefaults = cfg.Roles.Worker
 			}
 			if effective.Engine == "" {
 				effective.Engine = roleDefaults.Engine

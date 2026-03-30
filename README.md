@@ -2,7 +2,7 @@
 
 ## One Goal In. Continuous Software Evolution Out.
 
-GoalX is an autonomous engineering framework that turns a codebase goal into durable research, implementation, verification, and iterative improvement across isolated worktrees.
+GoalX is an autonomous engineering framework that turns a codebase goal into durable investigation, implementation, verification, and iterative improvement across isolated worktrees.
 
 ```bash
 goalx run "this product is a working investor-ready demo someone can open and immediately understand"
@@ -20,7 +20,7 @@ Runs accumulate across projects:
 
 ## Why GoalX
 
-- **Autonomous research and development**: one master agent reads the codebase, chooses the path, dispatches durable sessions, reviews results, and keeps moving.
+- **Autonomous execution across investigation and implementation**: one master agent reads the codebase, chooses the path, dispatches durable sessions, reviews results, and keeps moving.
 - **Continuous improvement, not one-shot output**: GoalX can stop at a result, or keep iterating with `--intent evolve` until the budget boundary is reached.
 - **Durable execution instead of chat-state luck**: runs, reports, journals, leases, and saved artifacts survive restarts; stopped or stranded runs can recover in place, and saved artifacts can continue into the next phase.
 - **Worktree-isolated parallelism**: GoalX can split work into isolated session worktrees, then merge cleanly back through explicit `keep` boundaries.
@@ -65,8 +65,7 @@ Default behavior:
 
 - if `codex` and `claude` are both available:
   - bootstrap master defaults to `codex/gpt-5.4`
-  - research workers default to `claude-code/opus`
-  - develop workers default to `codex/gpt-5.4`
+  - worker selection comes from the configured worker candidate pool
 - if only one supported engine is available, GoalX uses that engine
 - if no supported engine is on `PATH`, launch fails loudly
 
@@ -84,17 +83,12 @@ selection:
     - codex/gpt-5.4
     - claude-code/opus
 
-  research_candidates:
+  worker_candidates:
+    - codex/gpt-5.4
     - claude-code/opus
-    - codex/gpt-5.4
-
-  develop_candidates:
-    - codex/gpt-5.4
-    - codex/gpt-5.4-mini
 
   master_effort: high
-  research_effort: high
-  develop_effort: medium
+  worker_effort: high
 ```
 
 Important boundaries:
@@ -106,8 +100,7 @@ Important boundaries:
 How to shape `selection` in practice:
 
 - put the engine/model you want to bootstrap master with first in `master_candidates`
-- put the strongest analysis target first in `research_candidates`
-- put the fastest reliable implementation target first in `develop_candidates`
+- put the worker targets you want master to choose from in `worker_candidates`
 - use `disabled_engines` when a whole provider is currently off-limits
 - use `disabled_targets` when the engine is fine but a specific model is not
 - prefer 2-3 candidates per lane, not a long list
@@ -119,21 +112,19 @@ selection:
   master_candidates:
     - codex/gpt-5.4
     - claude-code/opus
-  research_candidates:
+  worker_candidates:
+    - codex/gpt-5.4
     - claude-code/opus
-    - codex/gpt-5.4
-  develop_candidates:
-    - codex/gpt-5.4
-    - codex/gpt-5.4-mini
+  worker_effort: high
   disabled_targets:
     - claude-code/sonnet
 ```
 
 If you use GoalX through Claude or Codex, the skill should help you edit this user config instead of inventing ad-hoc engine policy. Tell it what you want:
 
-- "default master to codex, but keep opus available for research"
+- "default master to codex, but keep opus available as a worker option"
 - "disable sonnet for now"
-- "develop should prefer gpt-5.4-mini unless explicitly overridden"
+- "keep gpt-5.4-mini in the worker pool for cheap implementation slices"
 
 ## Core Workflows
 
@@ -154,19 +145,17 @@ goalx save
 
 What happens:
 
-- the master reads the repo and decides whether it needs research, implementation, review, or more sessions
+- the master reads the repo and decides whether it needs investigation, implementation, review, or more sessions
 - sessions execute concrete slices of work
 - the master reviews, verifies, and closes out
 
-### Research Workflow
+### Intent-Guided Workflow
 
-Use this when you want findings, evidence, or a fix plan before code changes.
+Use `intent` to bias master behavior and output shape without creating separate runtime modes.
 
 ```bash
-goalx run "we understand why ranking quality regressed and have an evidence-backed recovery plan" --intent research
+goalx run "we understand why ranking quality regressed and have an evidence-backed recovery plan"
 ```
-
-Research runs are optimized for reports, evidence, and dispatchable next steps.
 
 ### Evolve Workflow
 
@@ -207,7 +196,7 @@ goalx run --from auth-audit --intent explore
 
 - `save + run --from` creates a new phase run from saved artifacts
 - `debate`: challenge and refine prior findings
-- `implement`: build from prior research or debate output
+- `implement`: build from prior evidence or debate output
 - `explore`: extend the evidence base and look for stronger paths
 
 ## Worktree Architecture
@@ -226,11 +215,11 @@ source root
 
 The merge boundaries are explicit:
 
-- `goalx keep --run NAME session-N` merges a reviewed develop session branch into the run root worktree
+- `goalx keep --run NAME session-N` merges a reviewed worker session branch into the run root worktree
 - `goalx integrate --run NAME --method partial_adopt --from session-1,session-2` records a master-owned run-root result after manual merge, cherry-pick, or partial adoption
 - `goalx keep --run NAME` merges the run root worktree back into your source root
 
-This matters because GoalX is built for parallel research and implementation without losing merge discipline.
+This matters because GoalX is built for parallel investigation and implementation without losing merge discipline.
 
 ## Run Architecture
 

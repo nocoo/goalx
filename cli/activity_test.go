@@ -300,10 +300,10 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
-	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle", Mode: string(goalx.ModeDevelop)}); err != nil {
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-1: %v", err)
 	}
-	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-2", State: "parked", Mode: string(goalx.ModeDevelop)}); err != nil {
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-2", State: "parked", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-2: %v", err)
 	}
 

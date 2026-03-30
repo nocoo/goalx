@@ -12,6 +12,5 @@ type ResolveRequest struct {
 	TargetOverride            *TargetConfig
 	LocalValidationOverride   *LocalValidationConfig
 	MasterOverride            *MasterConfig
-	ResearchOverride          *SessionConfig
-	DevelopOverride           *SessionConfig
+	WorkerOverride            *SessionConfig
 }

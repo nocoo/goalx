@@ -10,24 +10,22 @@ import (
 )
 
 type launchOptions struct {
-	Objective      string
-	Mode           goalx.Mode
-	Parallel       int
-	Name           string
-	ContextPaths   []string
-	Dimensions     []string
-	Effort         goalx.EffortLevel
-	Master         string
-	ResearchRole   string
-	DevelopRole    string
-	MasterEffort   goalx.EffortLevel
-	ResearchEffort goalx.EffortLevel
-	DevelopEffort  goalx.EffortLevel
-	Subs           []string
-	Intent         string
-	BudgetSet      bool
-	Budget         time.Duration
-	NoSnapshot     bool
+	Objective    string
+	Mode         goalx.Mode
+	Parallel     int
+	Name         string
+	ContextPaths []string
+	Dimensions   []string
+	Effort       goalx.EffortLevel
+	Master       string
+	Worker       string
+	MasterEffort goalx.EffortLevel
+	WorkerEffort goalx.EffortLevel
+	Subs         []string
+	Intent       string
+	BudgetSet    bool
+	Budget       time.Duration
+	NoSnapshot   bool
 }
 
 type startInitOptions = launchOptions
@@ -51,7 +49,7 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--research|--develop] [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
        goalx start --config PATH
 
 advanced/manual path:
@@ -60,15 +58,15 @@ advanced/manual path:
 notes:
   selection uses detected candidate pools by default.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  role defaults are separate: --master, --research-role, --develop-role.`
+  role defaults are separate: --master and --worker.`
 	case "init":
-		return `usage: goalx init "objective" [--research|--develop] [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--research-role ENGINE/MODEL] [--develop-role ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--research-effort LEVEL] [--develop-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context PATHS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--sub ENGINE/MODEL[:N]]
 
 notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   selection uses detected candidate pools by default.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  role defaults are separate: --master, --research-role, --develop-role.`
+  role defaults are separate: --master and --worker.`
 	default:
 		return `usage: goalx <start|init> "objective" [flags]`
 	}
@@ -85,16 +83,6 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 	opts.Objective = args[0]
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
-		case "--research":
-			if !allowModeSwitch {
-				return opts, fmt.Errorf("unexpected --research for this command")
-			}
-			opts.Mode = goalx.ModeResearch
-		case "--develop":
-			if !allowModeSwitch {
-				return opts, fmt.Errorf("unexpected --develop for this command")
-			}
-			opts.Mode = goalx.ModeDevelop
 		case "--parallel":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --parallel")
@@ -149,38 +137,22 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 				return opts, err
 			}
 			opts.MasterEffort = level
-		case "--research-role":
+		case "--worker":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --research-role")
+				return opts, fmt.Errorf("missing value for --worker")
 			}
 			i++
-			opts.ResearchRole = args[i]
-		case "--research-effort":
+			opts.Worker = args[i]
+		case "--worker-effort":
 			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --research-effort")
-			}
-			i++
-			level, err := goalx.ParseEffortLevel(args[i])
-			if err != nil {
-				return opts, err
-			}
-			opts.ResearchEffort = level
-		case "--develop-role":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --develop-role")
-			}
-			i++
-			opts.DevelopRole = args[i]
-		case "--develop-effort":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --develop-effort")
+				return opts, fmt.Errorf("missing value for --worker-effort")
 			}
 			i++
 			level, err := goalx.ParseEffortLevel(args[i])
 			if err != nil {
 				return opts, err
 			}
-			opts.DevelopEffort = level
+			opts.WorkerEffort = level
 		case "--sub":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --sub")
@@ -201,7 +173,7 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 		case "--no-snapshot":
 			opts.NoSnapshot = true
 		case "--engine", "--model":
-			return opts, fmt.Errorf("%s is ambiguous; use --master, --research-role, --develop-role, or --sub", args[i])
+			return opts, fmt.Errorf("%s is ambiguous; use --master, --worker, or --sub", args[i])
 		default:
 			return opts, fmt.Errorf("unknown flag %q", args[i])
 		}
@@ -238,7 +210,7 @@ func splitListFlag(raw string) []string {
 }
 
 func parseStartInitArgs(args []string) (startInitOptions, error) {
-	return parseLaunchOptions(args, goalx.ModeDevelop, true)
+	return parseLaunchOptions(args, goalx.ModeWorker, true)
 }
 
 func parseStartArgs(args []string) (startOptions, error) {
@@ -261,7 +233,7 @@ func parseStartArgs(args []string) (startOptions, error) {
 		}
 		return opts, nil
 	}
-	launch, err := parseLaunchOptions(args, goalx.ModeDevelop, true)
+	launch, err := parseLaunchOptions(args, goalx.ModeWorker, true)
 	if err != nil {
 		return opts, err
 	}

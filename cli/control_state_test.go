@@ -17,7 +17,7 @@ func TestEnsureControlStateMapsRunMetadataIntoRunIdentity(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "control-state",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

@@ -102,6 +102,9 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 	if statusComparison != nil && statusComparison.StatusRequiredRemaining != nil && statusComparison.GoalRequiredRemaining != nil && !statusComparison.StatusMatchesGoal {
 		advisories = append(advisories, fmt.Sprintf("Status drift: status_required_remaining=%d goal_required_remaining=%d goal_remaining_ids=%s", *statusComparison.StatusRequiredRemaining, *statusComparison.GoalRequiredRemaining, strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
 	}
+	if statusComparison != nil && !statusComparison.ActiveSessionsMatch {
+		advisories = append(advisories, fmt.Sprintf("Status drift: status_active_sessions=%s runtime_active_sessions=%s", strings.Join(statusComparison.StatusActiveSessions, ","), strings.Join(statusComparison.RuntimeActiveSessions, ",")))
+	}
 	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
 		if closeoutFacts.ObjectiveContractPresent && (!closeoutFacts.ObjectiveContractLocked || !closeoutFacts.ObjectiveIntegrityOK) {
 			advisories = append(advisories, "Objective integrity pending: "+objective)
@@ -148,10 +151,8 @@ func formatEvolveManagementAdvisory(facts *EvolveFacts, status *RunStatusRecord)
 	if facts == nil || strings.TrimSpace(facts.ManagementGap) == "" {
 		return ""
 	}
-	activeSessions := 0
 	phase := ""
 	if status != nil {
-		activeSessions = activeRunStatusSessionCount(status.ActiveSessions)
 		phase = strings.TrimSpace(status.Phase)
 	}
 	parts := make([]string, 0, 6)
@@ -160,7 +161,7 @@ func formatEvolveManagementAdvisory(facts *EvolveFacts, status *RunStatusRecord)
 		parts = append(parts,
 			"frontier_state="+blankAsUnknown(facts.FrontierState),
 			fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
-			fmt.Sprintf("active_sessions=%d", activeSessions),
+			fmt.Sprintf("active_sessions=%d", facts.ActiveSessionCount),
 		)
 		if facts.LastManagementEventAt != "" {
 			parts = append(parts, "last_management_event_at="+facts.LastManagementEventAt)
@@ -170,16 +171,8 @@ func formatEvolveManagementAdvisory(facts *EvolveFacts, status *RunStatusRecord)
 			"frontier_state="+blankAsUnknown(facts.FrontierState),
 			fmt.Sprintf("open_candidate_count=%d", facts.OpenCandidateCount),
 			"phase="+blankAsUnknown(phase),
-			fmt.Sprintf("active_sessions=%d", activeSessions),
+			fmt.Sprintf("active_sessions=%d", facts.ActiveSessionCount),
 		)
-	case EvolveManagementGapUnclosedAbandonedCandidate:
-		parts = append(parts, "frontier_state="+blankAsUnknown(facts.FrontierState))
-		if facts.BestExperimentID != "" {
-			parts = append(parts, "best_experiment_id="+facts.BestExperimentID)
-		}
-		if len(facts.OpenCandidateIDs) > 0 {
-			parts = append(parts, "open_candidate_ids="+strings.Join(facts.OpenCandidateIDs, ","))
-		}
 	default:
 		return ""
 	}

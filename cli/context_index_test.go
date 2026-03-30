@@ -153,18 +153,15 @@ func TestBuildContextIndexIncludesSelectionSnapshotFacts(t *testing.T) {
 		Version:           1,
 		ExplicitSelection: true,
 		Policy: goalx.EffectiveSelectionPolicy{
-			DisabledEngines:    []string{"aider"},
-			DisabledTargets:    []string{"claude-code/sonnet"},
-			MasterCandidates:   []string{"codex/gpt-5.4", "claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus"},
-			DevelopCandidates:  []string{"codex/gpt-5.4-mini", "codex/gpt-5.4"},
-			MasterEffort:       goalx.EffortHigh,
-			ResearchEffort:     goalx.EffortHigh,
-			DevelopEffort:      goalx.EffortMedium,
+			DisabledEngines:  []string{"aider"},
+			DisabledTargets:  []string{"claude-code/sonnet"},
+			MasterCandidates: []string{"codex/gpt-5.4", "claude-code/opus"},
+			WorkerCandidates: []string{"codex/gpt-5.4-mini", "codex/gpt-5.4", "claude-code/opus"},
+			MasterEffort:     goalx.EffortHigh,
+			WorkerEffort:     goalx.EffortMedium,
 		},
-		Master:   goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
-		Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
-		Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
+		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4-mini", Effort: goalx.EffortMedium},
 	})
 
 	index, err := BuildContextIndex(repo, cfg.Name, runDir)
@@ -187,8 +184,7 @@ func TestBuildContextIndexIncludesSelectionSnapshotFacts(t *testing.T) {
 	for _, want := range []string{
 		"Selection snapshot",
 		"Master candidates: `codex/gpt-5.4, claude-code/opus`",
-		"Research candidates: `claude-code/opus`",
-		"Develop candidates: `codex/gpt-5.4-mini, codex/gpt-5.4`",
+		"Worker candidates: `codex/gpt-5.4-mini, codex/gpt-5.4, claude-code/opus`",
 		"Disabled targets: `claude-code/sonnet`",
 	} {
 		if !strings.Contains(rendered, want) {
@@ -275,12 +271,11 @@ func TestBuildContextIndexIncludesObjectiveIntegritySummary(t *testing.T) {
 		State:         objectiveContractStateLocked,
 		Clauses: []ObjectiveClause{
 			{
-				ID:                      "ucl-1",
-				Text:                    "ship the live experience",
-				Kind:                    objectiveClauseKindDelivery,
-				SourceExcerpt:           "ship the live experience",
-				RequiredSurfaces:        []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
-				ApprovalRequiredForDrop: true,
+				ID:               "ucl-1",
+				Text:             "ship the live experience",
+				Kind:             objectiveClauseKindDelivery,
+				SourceExcerpt:    "ship the live experience",
+				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
 			},
 			{
 				ID:               "ucl-2",
@@ -723,7 +718,7 @@ func TestContextIndexUsesRunWorktreeForSharedSession(t *testing.T) {
 		SessionName:     sessionName,
 		ExperimentID:    "exp_guidance_shared_session_1",
 		RoleKind:        "develop",
-		Mode:            string(goalx.ModeDevelop),
+		Mode:            string(goalx.ModeWorker),
 		Engine:          "codex",
 		Model:           "gpt-5.4-mini",
 		OriginCharterID: loadCharterIDForTests(t, runDir),
@@ -734,7 +729,7 @@ func TestContextIndexUsesRunWorktreeForSharedSession(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         sessionName,
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		WorktreePath: "",
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)

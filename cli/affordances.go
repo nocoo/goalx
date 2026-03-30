@@ -165,33 +165,27 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Command: buildAttachCommand(runName, normalizedTarget),
 		},
 		{
-			ID:      "add-research",
+			ID:      "add-worker",
 			Kind:    "control",
-			Summary: "Launch a research worker using the current selection policy.",
-			Command: fmt.Sprintf(`goalx add --run %s --mode research --effort high --worktree "sub-goal"`, runName),
-		},
-		{
-			ID:      "add-develop",
-			Kind:    "control",
-			Summary: "Launch a develop worker using the current selection policy.",
-			Command: fmt.Sprintf(`goalx add --run %s --mode develop --effort medium --worktree "sub-goal"`, runName),
+			Summary: "Launch a worker using the current selection policy.",
+			Command: fmt.Sprintf(`goalx add --run %s --effort high --worktree "sub-goal"`, runName),
 		},
 		{
 			ID:      "add-override",
 			Kind:    "control",
 			Summary: "Launch an explicit engine/model override worker that bypasses the current selection policy.",
-			Command: fmt.Sprintf(`goalx add --run %s --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`, runName),
+			Command: fmt.Sprintf(`goalx add --run %s --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`, runName),
 		},
 		{
 			ID:      "replace",
 			Kind:    "control",
 			Summary: "Replace a stale or unsuitable durable worker.",
-			Command: fmt.Sprintf("goalx replace --run %s session-N --mode research --effort high", runName),
+			Command: fmt.Sprintf("goalx replace --run %s session-N --effort high", runName),
 		},
 		{
 			ID:      "keep-session",
 			Kind:    "control",
-			Summary: "Merge a reviewed develop session branch into the run worktree only. goalx keep only merges committed session branch history relative to that session's recorded parent/base ref; dirty uncommitted work must be committed first. If you need partial adoption or conflict resolution, inspect the session worktree and integrate manually. This does not merge into the source root yet.",
+			Summary: "Merge a reviewed worker session branch into the run worktree only. goalx keep only merges committed session branch history relative to that session's recorded parent/base ref; dirty uncommitted work must be committed first. If you need partial adoption or conflict resolution, inspect the session worktree and integrate manually. This does not merge into the source root yet.",
 			Command: fmt.Sprintf("goalx keep --run %s session-N", runName),
 		},
 		{
@@ -219,7 +213,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 				ID:      "fork-experiment",
 				Kind:    "control",
 				Summary: "Fork a follow-on dedicated worktree from an existing session branch to continue or compete on a concrete direction.",
-				Command: fmt.Sprintf(`goalx add --run %s --mode develop --worktree --base-branch session-N "follow-on direction"`, runName),
+				Command: fmt.Sprintf(`goalx add --run %s --worktree --base-branch session-N "follow-on direction"`, runName),
 			},
 			AffordanceItem{
 				ID:      "record-experiment-closed",
@@ -360,11 +354,8 @@ func buildSelectionFactsAffordance(index *ContextIndex) *AffordanceItem {
 	if len(index.Selection.MasterCandidates) > 0 {
 		item.Facts = append(item.Facts, fmt.Sprintf("Master candidates: `%s`.", strings.Join(index.Selection.MasterCandidates, ", ")))
 	}
-	if len(index.Selection.ResearchCandidates) > 0 {
-		item.Facts = append(item.Facts, fmt.Sprintf("Research candidates: `%s`.", strings.Join(index.Selection.ResearchCandidates, ", ")))
-	}
-	if len(index.Selection.DevelopCandidates) > 0 {
-		item.Facts = append(item.Facts, fmt.Sprintf("Develop candidates: `%s`.", strings.Join(index.Selection.DevelopCandidates, ", ")))
+	if len(index.Selection.WorkerCandidates) > 0 {
+		item.Facts = append(item.Facts, fmt.Sprintf("Worker candidates: `%s`.", strings.Join(index.Selection.WorkerCandidates, ", ")))
 	}
 	if len(index.Selection.DisabledEngines) > 0 {
 		item.Facts = append(item.Facts, fmt.Sprintf("Disabled engines: `%s`.", strings.Join(index.Selection.DisabledEngines, ", ")))

@@ -276,7 +276,7 @@ func TestKeepRejectsDirtySessionBoundaryBeforeMerging(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "idle",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       sessionBranch,
 		WorktreePath: sessionWT,
 	}); err != nil {
@@ -321,7 +321,7 @@ func TestKeepRejectsSessionWithoutCommittedBoundaryRelativeToParent(t *testing.T
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "idle",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       sessionBranch,
 		WorktreePath: sessionWT,
 	}); err != nil {
@@ -349,7 +349,7 @@ func TestKeepHelpExplainsRunAndSessionMergeSemantics(t *testing.T) {
 		"usage: goalx keep [--run NAME] [session-name]",
 		"merge the run worktree branch into the source root",
 		"require source-root HEAD to still descend from the run base revision",
-		"merge that develop session branch into the run worktree",
+		"merge that worker session branch into the run worktree",
 		"only committed session branch history is merged",
 		"dirty session worktrees must be committed first",
 		"inspect the session worktree and merge manually",
@@ -374,7 +374,7 @@ func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 
 	cfg := goalx.Config{
 		Name:            runName,
-		Mode:            goalx.ModeDevelop,
+		Mode:            goalx.ModeWorker,
 		Objective:       "keep demo",
 		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -403,7 +403,7 @@ func writeKeepRunFixture(t *testing.T, repo, runName string) string {
 func makeKeepSessionIdentity(t *testing.T, runDir, sessionName, runName, baseSelector, baseBranch string) *SessionIdentity {
 	t.Helper()
 
-	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(goalx.ModeDevelop), goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", goalx.TargetConfig{Files: []string{"."}})
+	identity, err := NewSessionIdentity(runDir, sessionName, sessionRoleKind(goalx.ModeWorker), goalx.ModeWorker, "codex", "gpt-5.4", "", "", "", goalx.TargetConfig{Files: []string{"."}})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

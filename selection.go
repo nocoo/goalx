@@ -6,14 +6,12 @@ import (
 )
 
 type EffectiveSelectionPolicy struct {
-	DisabledEngines    []string
-	DisabledTargets    []string
-	MasterCandidates   []string
-	ResearchCandidates []string
-	DevelopCandidates  []string
-	MasterEffort       EffortLevel
-	ResearchEffort     EffortLevel
-	DevelopEffort      EffortLevel
+	DisabledEngines  []string
+	DisabledTargets  []string
+	MasterCandidates []string
+	WorkerCandidates []string
+	MasterEffort     EffortLevel
+	WorkerEffort     EffortLevel
 }
 
 type SelectionTarget struct {
@@ -25,23 +23,19 @@ func hasSelectionConfig(cfg SelectionConfig) bool {
 	return len(cfg.DisabledEngines) > 0 ||
 		len(cfg.DisabledTargets) > 0 ||
 		len(cfg.MasterCandidates) > 0 ||
-		len(cfg.ResearchCandidates) > 0 ||
-		len(cfg.DevelopCandidates) > 0 ||
+		len(cfg.WorkerCandidates) > 0 ||
 		cfg.MasterEffort != "" ||
-		cfg.ResearchEffort != "" ||
-		cfg.DevelopEffort != ""
+		cfg.WorkerEffort != ""
 }
 
 func copySelectionConfig(src SelectionConfig) SelectionConfig {
 	return SelectionConfig{
-		DisabledEngines:    append([]string(nil), src.DisabledEngines...),
-		DisabledTargets:    append([]string(nil), src.DisabledTargets...),
-		MasterCandidates:   append([]string(nil), src.MasterCandidates...),
-		ResearchCandidates: append([]string(nil), src.ResearchCandidates...),
-		DevelopCandidates:  append([]string(nil), src.DevelopCandidates...),
-		MasterEffort:       src.MasterEffort,
-		ResearchEffort:     src.ResearchEffort,
-		DevelopEffort:      src.DevelopEffort,
+		DisabledEngines:  append([]string(nil), src.DisabledEngines...),
+		DisabledTargets:  append([]string(nil), src.DisabledTargets...),
+		MasterCandidates: append([]string(nil), src.MasterCandidates...),
+		WorkerCandidates: append([]string(nil), src.WorkerCandidates...),
+		MasterEffort:     src.MasterEffort,
+		WorkerEffort:     src.WorkerEffort,
 	}
 }
 
@@ -57,19 +51,13 @@ func normalizeSelectionConfig(cfg SelectionConfig, engines map[string]EngineConf
 	if out.MasterCandidates, err = normalizeSelectionTargets(out.MasterCandidates, "selection.master_candidates", engines); err != nil {
 		return SelectionConfig{}, err
 	}
-	if out.ResearchCandidates, err = normalizeSelectionTargets(out.ResearchCandidates, "selection.research_candidates", engines); err != nil {
-		return SelectionConfig{}, err
-	}
-	if out.DevelopCandidates, err = normalizeSelectionTargets(out.DevelopCandidates, "selection.develop_candidates", engines); err != nil {
+	if out.WorkerCandidates, err = normalizeSelectionTargets(out.WorkerCandidates, "selection.worker_candidates", engines); err != nil {
 		return SelectionConfig{}, err
 	}
 	if err := validateEffortLevel(out.MasterEffort, "selection.master_effort"); err != nil {
 		return SelectionConfig{}, err
 	}
-	if err := validateEffortLevel(out.ResearchEffort, "selection.research_effort"); err != nil {
-		return SelectionConfig{}, err
-	}
-	if err := validateEffortLevel(out.DevelopEffort, "selection.develop_effort"); err != nil {
+	if err := validateEffortLevel(out.WorkerEffort, "selection.worker_effort"); err != nil {
 		return SelectionConfig{}, err
 	}
 	return out, nil
@@ -183,28 +171,21 @@ func compileExplicitSelectionPolicy(selection SelectionConfig, engines map[strin
 		DisabledEngines: append([]string(nil), selection.DisabledEngines...),
 		DisabledTargets: append([]string(nil), selection.DisabledTargets...),
 		MasterEffort:    selection.MasterEffort,
-		ResearchEffort:  selection.ResearchEffort,
-		DevelopEffort:   selection.DevelopEffort,
+		WorkerEffort:    selection.WorkerEffort,
 	}
 
 	var err error
 	if policy.MasterCandidates, err = resolveSelectionCandidates(selection.MasterCandidates, defaults.MasterCandidates, defaultsErr); err != nil {
 		return EffectiveSelectionPolicy{}, err
 	}
-	if policy.ResearchCandidates, err = resolveSelectionCandidates(selection.ResearchCandidates, defaults.ResearchCandidates, defaultsErr); err != nil {
-		return EffectiveSelectionPolicy{}, err
-	}
-	if policy.DevelopCandidates, err = resolveSelectionCandidates(selection.DevelopCandidates, defaults.DevelopCandidates, defaultsErr); err != nil {
+	if policy.WorkerCandidates, err = resolveSelectionCandidates(selection.WorkerCandidates, defaults.WorkerCandidates, defaultsErr); err != nil {
 		return EffectiveSelectionPolicy{}, err
 	}
 	if policy.MasterEffort == "" && defaultsErr == nil {
 		policy.MasterEffort = defaults.MasterEffort
 	}
-	if policy.ResearchEffort == "" && defaultsErr == nil {
-		policy.ResearchEffort = defaults.ResearchEffort
-	}
-	if policy.DevelopEffort == "" && defaultsErr == nil {
-		policy.DevelopEffort = defaults.DevelopEffort
+	if policy.WorkerEffort == "" && defaultsErr == nil {
+		policy.WorkerEffort = defaults.WorkerEffort
 	}
 
 	disabledEngines := make(map[string]bool, len(policy.DisabledEngines))
@@ -217,17 +198,13 @@ func compileExplicitSelectionPolicy(selection SelectionConfig, engines map[strin
 	}
 
 	policy.MasterCandidates = filterUsableSelectionCandidates(policy.MasterCandidates, disabledEngines, disabledTargets, availability)
-	policy.ResearchCandidates = filterUsableSelectionCandidates(policy.ResearchCandidates, disabledEngines, disabledTargets, availability)
-	policy.DevelopCandidates = filterUsableSelectionCandidates(policy.DevelopCandidates, disabledEngines, disabledTargets, availability)
+	policy.WorkerCandidates = filterUsableSelectionCandidates(policy.WorkerCandidates, disabledEngines, disabledTargets, availability)
 
 	if len(policy.MasterCandidates) == 0 {
 		return EffectiveSelectionPolicy{}, fmt.Errorf("selection.master_candidates has no usable candidates after availability and disabled-target filtering")
 	}
-	if len(policy.ResearchCandidates) == 0 {
-		return EffectiveSelectionPolicy{}, fmt.Errorf("selection.research_candidates has no usable candidates after availability and disabled-target filtering")
-	}
-	if len(policy.DevelopCandidates) == 0 {
-		return EffectiveSelectionPolicy{}, fmt.Errorf("selection.develop_candidates has no usable candidates after availability and disabled-target filtering")
+	if len(policy.WorkerCandidates) == 0 {
+		return EffectiveSelectionPolicy{}, fmt.Errorf("selection.worker_candidates has no usable candidates after availability and disabled-target filtering")
 	}
 	return policy, nil
 }
@@ -248,30 +225,24 @@ func builtinSelectionDefaults(availability map[string]bool) (SelectionConfig, er
 	switch {
 	case hasCodex && hasClaude:
 		return SelectionConfig{
-			MasterCandidates:   []string{"codex/gpt-5.4", "claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus", "codex/gpt-5.4"},
-			DevelopCandidates:  []string{"codex/gpt-5.4", "codex/gpt-5.4-mini"},
-			MasterEffort:       EffortHigh,
-			ResearchEffort:     EffortHigh,
-			DevelopEffort:      EffortMedium,
+			MasterCandidates: []string{"codex/gpt-5.4", "claude-code/opus"},
+			WorkerCandidates: []string{"codex/gpt-5.4", "claude-code/opus", "codex/gpt-5.4-mini"},
+			MasterEffort:     EffortHigh,
+			WorkerEffort:     EffortMedium,
 		}, nil
 	case hasCodex:
 		return SelectionConfig{
-			MasterCandidates:   []string{"codex/gpt-5.4"},
-			ResearchCandidates: []string{"codex/gpt-5.4"},
-			DevelopCandidates:  []string{"codex/gpt-5.4", "codex/gpt-5.4-mini"},
-			MasterEffort:       EffortHigh,
-			ResearchEffort:     EffortHigh,
-			DevelopEffort:      EffortMedium,
+			MasterCandidates: []string{"codex/gpt-5.4"},
+			WorkerCandidates: []string{"codex/gpt-5.4", "codex/gpt-5.4-mini"},
+			MasterEffort:     EffortHigh,
+			WorkerEffort:     EffortMedium,
 		}, nil
 	case hasClaude:
 		return SelectionConfig{
-			MasterCandidates:   []string{"claude-code/opus"},
-			ResearchCandidates: []string{"claude-code/opus"},
-			DevelopCandidates:  []string{"claude-code/opus"},
-			MasterEffort:       EffortHigh,
-			ResearchEffort:     EffortHigh,
-			DevelopEffort:      EffortMedium,
+			MasterCandidates: []string{"claude-code/opus"},
+			WorkerCandidates: []string{"claude-code/opus"},
+			MasterEffort:     EffortHigh,
+			WorkerEffort:     EffortHigh,
 		}, nil
 	default:
 		return SelectionConfig{}, fmt.Errorf("no supported engines found in PATH; install claude or codex")
@@ -307,13 +278,12 @@ func compileConfigSelectionPolicy(cfg *Config) EffectiveSelectionPolicy {
 		return EffectiveSelectionPolicy{}
 	}
 	policy := EffectiveSelectionPolicy{
-		MasterEffort:   cfg.Master.Effort,
-		ResearchEffort: cfg.Roles.Research.Effort,
-		DevelopEffort:  cfg.Roles.Develop.Effort,
+		MasterEffort: cfg.Master.Effort,
+		WorkerEffort: workerRoleDefaults(cfg).Effort,
 	}
 	appendUniqueSelectionTarget(&policy.MasterCandidates, cfg.Master.Engine, cfg.Master.Model)
-	appendUniqueSelectionTarget(&policy.ResearchCandidates, cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
-	appendUniqueSelectionTarget(&policy.DevelopCandidates, cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	worker := workerRoleDefaults(cfg)
+	appendUniqueSelectionTarget(&policy.WorkerCandidates, worker.Engine, worker.Model)
 	return policy
 }
 
@@ -322,8 +292,7 @@ func hasConfiguredSelectionTargets(cfg *Config) bool {
 		return false
 	}
 	return (strings.TrimSpace(cfg.Master.Engine) != "" && strings.TrimSpace(cfg.Master.Model) != "") ||
-		(strings.TrimSpace(cfg.Roles.Research.Engine) != "" && strings.TrimSpace(cfg.Roles.Research.Model) != "") ||
-		(strings.TrimSpace(cfg.Roles.Develop.Engine) != "" && strings.TrimSpace(cfg.Roles.Develop.Model) != "")
+		(strings.TrimSpace(workerRoleDefaults(cfg).Engine) != "" && strings.TrimSpace(workerRoleDefaults(cfg).Model) != "")
 }
 
 func appendUniqueSelectionTarget(targets *[]string, engine, model string) {
@@ -355,19 +324,12 @@ func applyEffectiveSelectionPolicy(cfg *Config, policy EffectiveSelectionPolicy)
 	if policy.MasterEffort != "" {
 		cfg.Master.Effort = policy.MasterEffort
 	}
-	if target, ok := firstSelectionTarget(policy.ResearchCandidates); ok {
-		cfg.Roles.Research.Engine = target.Engine
-		cfg.Roles.Research.Model = target.Model
+	if target, ok := firstSelectionTarget(policy.WorkerCandidates); ok {
+		cfg.Roles.Worker.Engine = target.Engine
+		cfg.Roles.Worker.Model = target.Model
 	}
-	if policy.ResearchEffort != "" {
-		cfg.Roles.Research.Effort = policy.ResearchEffort
-	}
-	if target, ok := firstSelectionTarget(policy.DevelopCandidates); ok {
-		cfg.Roles.Develop.Engine = target.Engine
-		cfg.Roles.Develop.Model = target.Model
-	}
-	if policy.DevelopEffort != "" {
-		cfg.Roles.Develop.Effort = policy.DevelopEffort
+	if policy.WorkerEffort != "" {
+		cfg.Roles.Worker.Effort = policy.WorkerEffort
 	}
 }
 

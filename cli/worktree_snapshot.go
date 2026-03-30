@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -215,19 +216,51 @@ func snapshotWorktreeDiffFingerprint(worktreePath string, dirtyFiles int) (strin
 	hasher.Write([]byte("\n--unstaged--\n"))
 	hasher.Write(unstagedOut)
 	for _, relPath := range untrackedFiles {
-		hasher.Write([]byte("\n--untracked--\n"))
-		hasher.Write([]byte(relPath))
-		hasher.Write([]byte{'\n'})
-		data, err := os.ReadFile(filepath.Join(worktreePath, relPath))
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return "", fmt.Errorf("read untracked file %s in %s: %w", relPath, worktreePath, err)
+		if err := hashUntrackedPath(hasher, worktreePath, relPath); err != nil {
+			return "", err
 		}
-		hasher.Write(data)
 	}
 	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func hashUntrackedPath(hasher hash.Hash, worktreePath, relPath string) error {
+	fullPath := filepath.Join(worktreePath, relPath)
+	info, err := os.Lstat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("stat untracked path %s in %s: %w", relPath, worktreePath, err)
+	}
+	hasher.Write([]byte("\n--untracked--\n"))
+	hasher.Write([]byte(relPath))
+	hasher.Write([]byte{'\n'})
+	switch {
+	case info.IsDir():
+		hasher.Write([]byte("node=dir\n"))
+		return nil
+	case info.Mode()&os.ModeSymlink != 0:
+		target, err := os.Readlink(fullPath)
+		if err != nil {
+			return fmt.Errorf("read untracked symlink %s in %s: %w", relPath, worktreePath, err)
+		}
+		hasher.Write([]byte("node=symlink\n"))
+		hasher.Write([]byte(target))
+		return nil
+	case !info.Mode().IsRegular():
+		hasher.Write([]byte("node=" + info.Mode().String() + "\n"))
+		return nil
+	default:
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("read untracked file %s in %s: %w", relPath, worktreePath, err)
+		}
+		hasher.Write(data)
+		return nil
+	}
 }
 
 func gitUntrackedFiles(worktreePath string) ([]string, error) {

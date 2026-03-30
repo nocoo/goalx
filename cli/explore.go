@@ -6,13 +6,13 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-// Explore starts a follow-up research run from an explicit saved run.
+// Explore starts a follow-up run from an explicit saved run.
 func Explore(projectRoot string, args []string) error {
 	if wantsHelp(args) {
 		fmt.Println(phaseUsage("explore"))
 		return nil
 	}
-	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentExplore), nil)
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentExplore))
 }
 
 func runExplore(projectRoot string, args []string) error {
@@ -20,13 +20,13 @@ func runExplore(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
-	return runPhaseAction(projectRoot, explorePhaseSpec(), opts, nil)
+	return runPhaseAction(projectRoot, explorePhaseSpec(), opts)
 }
 
 func explorePhaseSpec() phaseActionSpec {
 	return phaseActionSpec{
 		Kind:         "explore",
-		Mode:         goalx.ModeResearch,
+		Mode:         goalx.ModeWorker,
 		NoContextErr: "no reports found in %s",
 		DraftHeader:  "# goalx manual draft — explore based on %s\n",
 		DefaultHints: explorePhaseHints,

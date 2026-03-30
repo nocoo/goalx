@@ -25,7 +25,7 @@ func TestIntegrateRecordsManualRunRootIntegration(t *testing.T) {
 	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
 		t.Fatalf("CreateWorktree run root: %v", err)
 	}
-	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeDevelop)); err != nil {
+	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeWorker)); err != nil {
 		t.Fatalf("initializeRootExperimentLineage: %v", err)
 	}
 
@@ -150,7 +150,7 @@ func TestIntegrateRejectsUnchangedRunRootHead(t *testing.T) {
 	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
 		t.Fatalf("CreateWorktree run root: %v", err)
 	}
-	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeDevelop)); err != nil {
+	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeWorker)); err != nil {
 		t.Fatalf("initializeRootExperimentLineage: %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestIntegrateRejectsDirtyRunRootWorktree(t *testing.T) {
 	if err := CreateWorktree(repo, runWT, runBranch); err != nil {
 		t.Fatalf("CreateWorktree run root: %v", err)
 	}
-	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeDevelop)); err != nil {
+	if err := initializeRootExperimentLineage(runDir, runWT, runName, string(goalx.ModeWorker)); err != nil {
 		t.Fatalf("initializeRootExperimentLineage: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(runWT, "dirty.txt"), []byte("dirty\n"), 0o644); err != nil {

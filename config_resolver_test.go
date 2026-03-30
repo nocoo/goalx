@@ -54,25 +54,24 @@ func TestResolveConfigSemantics(t *testing.T) {
 		resolved, err := resolveConfigFixture(resolverTestLayers{
 			Base: Config{
 				Name:      "demo",
-				Mode:      ModeDevelop,
+				Mode:      ModeWorker,
 				Objective: "lock config state",
 				Selection: SelectionConfig{
-					MasterCandidates:   []string{"claude-code/opus"},
-					ResearchCandidates: []string{"claude-code/opus"},
-					DevelopCandidates:  []string{"codex/gpt-5.4-mini"},
+					MasterCandidates: []string{"claude-code/opus"},
+					WorkerCandidates: []string{"codex/gpt-5.4-mini"},
 				},
 				Target:          TargetConfig{Files: []string{"README.md"}},
 				LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 			},
-		}, resolverTestRequest{Mode: ModeDevelop})
+		}, resolverTestRequest{Mode: ModeWorker})
 		if err != nil {
 			t.Fatalf("resolveConfigFixture: %v", err)
 		}
 		if resolved.Config.Master.Engine != "claude-code" || resolved.Config.Master.Model != "opus" {
 			t.Fatalf("master = %#v, want claude-code/opus", resolved.Config.Master)
 		}
-		if resolved.Config.Roles.Develop.Engine != "codex" || resolved.Config.Roles.Develop.Model != "gpt-5.4-mini" {
-			t.Fatalf("develop = %#v, want codex/gpt-5.4-mini", resolved.Config.Roles.Develop)
+		if resolved.Config.Roles.Worker.Engine != "codex" || resolved.Config.Roles.Worker.Model != "gpt-5.4-mini" {
+			t.Fatalf("develop = %#v, want codex/gpt-5.4-mini", resolved.Config.Roles.Worker)
 		}
 	})
 
@@ -80,7 +79,7 @@ func TestResolveConfigSemantics(t *testing.T) {
 		resolved, err := resolveConfigFixture(resolverTestLayers{
 			Base: Config{
 				Name:            "demo",
-				Mode:            ModeDevelop,
+				Mode:            ModeWorker,
 				Objective:       "lock config state",
 				Target:          TargetConfig{Files: []string{"README.md"}},
 				LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -88,7 +87,7 @@ func TestResolveConfigSemantics(t *testing.T) {
 			ManualDraft: &Config{
 				Master: MasterConfig{Engine: "claude-code", Model: "opus"},
 			},
-		}, resolverTestRequest{Mode: ModeDevelop})
+		}, resolverTestRequest{Mode: ModeWorker})
 		if err != nil {
 			t.Fatalf("resolveConfigFixture: %v", err)
 		}
@@ -101,7 +100,7 @@ func TestResolveConfigSemantics(t *testing.T) {
 		resolved, err := resolveConfigFixture(resolverTestLayers{
 			Base: Config{
 				Name:            "demo",
-				Mode:            ModeDevelop,
+				Mode:            ModeWorker,
 				Objective:       "lock config state",
 				Target:          TargetConfig{Files: []string{"README.md"}},
 				LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -110,7 +109,7 @@ func TestResolveConfigSemantics(t *testing.T) {
 				Master: MasterConfig{Engine: "claude-code", Model: "opus"},
 			},
 		}, resolverTestRequest{
-			Mode:         ModeDevelop,
+			Mode:         ModeWorker,
 			MasterEngine: "codex",
 			MasterModel:  "gpt-5.4",
 		})
@@ -128,7 +127,7 @@ func TestResolveConfigReturnsErrorWhenNoEngineCanBeSelected(t *testing.T) {
 
 	base := Config{
 		Name:            "demo",
-		Mode:            ModeDevelop,
+		Mode:            ModeWorker,
 		Objective:       "ship it",
 		Target:          TargetConfig{Files: []string{"README.md"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -170,8 +169,8 @@ func TestResolveConfigResolverUsesImplicitSelectionDefaults(t *testing.T) {
 	if resolved.Config.Master.Engine != "codex" || resolved.Config.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %#v, want codex/gpt-5.4", resolved.Config.Master)
 	}
-	if got := resolved.Config.Preferences.Develop.Guidance; got != "主力 gpt-5.4 medium。简单修复用 fast。" {
-		t.Fatalf("develop guidance = %q", got)
+	if got := resolved.Config.Preferences.Worker.Guidance; got != "默认 gpt-5.4 medium。复杂分析、架构分歧或高风险收口可升到 high 或改用 opus；轻量切片用 fast。" {
+		t.Fatalf("worker guidance = %q", got)
 	}
 	if got := resolved.SelectionPolicy.MasterCandidates[0]; got != "codex/gpt-5.4" {
 		t.Fatalf("master candidate = %q, want codex/gpt-5.4", got)

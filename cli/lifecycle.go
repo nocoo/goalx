@@ -276,7 +276,7 @@ func Resume(projectRoot string, args []string) error {
 }
 
 func Replace(projectRoot string, args []string) (err error) {
-	const usage = "usage: goalx replace [--run NAME] <session-name> [--mode MODE] [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]..."
+	const usage = "usage: goalx replace [--run NAME] <session-name> [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]..."
 	if printUsageIfHelp(args, usage) {
 		return nil
 	}
@@ -296,17 +296,6 @@ func Replace(projectRoot string, args []string) (err error) {
 	var explicitEngine, explicitModel bool
 	for i := 1; i < len(rest); i++ {
 		switch rest[i] {
-		case "--mode":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --mode")
-			}
-			i++
-			switch goalx.Mode(rest[i]) {
-			case goalx.ModeResearch, goalx.ModeDevelop:
-				opts.Mode = goalx.Mode(rest[i])
-			default:
-				return fmt.Errorf("invalid --mode %q (expected research or develop)", rest[i])
-			}
 		case "--engine":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("missing value for --engine")

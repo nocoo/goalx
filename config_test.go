@@ -117,11 +117,8 @@ func TestBuiltinDefaultsIncludePreferencesAndDimensions(t *testing.T) {
 	if got := BuiltinDimensions["audit"]; got == "" {
 		t.Fatal("builtin audit dimension missing")
 	}
-	if got := BuiltinDefaults.Preferences.Research.Guidance; got != "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。" {
-		t.Fatalf("research guidance = %q", got)
-	}
-	if got := BuiltinDefaults.Preferences.Develop.Guidance; got != "主力 gpt-5.4 medium。简单修复用 fast。" {
-		t.Fatalf("develop guidance = %q", got)
+	if got := BuiltinDefaults.Preferences.Worker.Guidance; got != "默认 gpt-5.4 medium。复杂分析、架构分歧或高风险收口可升到 high 或改用 opus；轻量切片用 fast。" {
+		t.Fatalf("worker guidance = %q", got)
 	}
 	if got := BuiltinDefaults.Preferences.Simple.Guidance; got != "轻量任务用 fast。" {
 		t.Fatalf("simple guidance = %q", got)
@@ -148,13 +145,10 @@ selection:
   master_candidates:
     - claude-code/sonnet
     - codex/gpt-5.4
-  research_candidates:
-    - claude-code/opus
-  develop_candidates:
+  worker_candidates:
     - codex/fast
   master_effort: high
-  research_effort: max
-  develop_effort: low
+  worker_effort: low
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
 		t.Fatalf("write user config: %v", err)
@@ -183,17 +177,11 @@ selection:
 	if resolved.Config.Master.Effort != EffortHigh {
 		t.Fatalf("master effort = %q, want high", resolved.Config.Master.Effort)
 	}
-	if resolved.Config.Roles.Research.Engine != "claude-code" || resolved.Config.Roles.Research.Model != "opus" {
-		t.Fatalf("research = %s/%s, want claude-code/opus", resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
+	if resolved.Config.Roles.Worker.Engine != "codex" || resolved.Config.Roles.Worker.Model != "fast" {
+		t.Fatalf("worker = %s/%s, want codex/fast", resolved.Config.Roles.Worker.Engine, resolved.Config.Roles.Worker.Model)
 	}
-	if resolved.Config.Roles.Research.Effort != EffortMax {
-		t.Fatalf("research effort = %q, want max", resolved.Config.Roles.Research.Effort)
-	}
-	if resolved.Config.Roles.Develop.Engine != "codex" || resolved.Config.Roles.Develop.Model != "fast" {
-		t.Fatalf("develop = %s/%s, want codex/fast", resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
-	}
-	if resolved.Config.Roles.Develop.Effort != EffortLow {
-		t.Fatalf("develop effort = %q, want low", resolved.Config.Roles.Develop.Effort)
+	if resolved.Config.Roles.Worker.Effort != EffortLow {
+		t.Fatalf("worker effort = %q, want low", resolved.Config.Roles.Worker.Effort)
 	}
 }
 
@@ -238,11 +226,8 @@ local_validation:
 	if resolved.Config.Master.Engine != "codex" || resolved.Config.Master.Model != "gpt-5.4" {
 		t.Fatalf("master = %s/%s, want codex/gpt-5.4", resolved.Config.Master.Engine, resolved.Config.Master.Model)
 	}
-	if resolved.Config.Roles.Research.Engine != "claude-code" || resolved.Config.Roles.Research.Model != "opus" {
-		t.Fatalf("research = %s/%s, want claude-code/opus", resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
-	}
-	if resolved.Config.Roles.Develop.Engine != "codex" || resolved.Config.Roles.Develop.Model != "gpt-5.4" {
-		t.Fatalf("develop = %s/%s, want codex/gpt-5.4", resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
+	if resolved.Config.Roles.Worker.Engine != "codex" || resolved.Config.Roles.Worker.Model != "gpt-5.4" {
+		t.Fatalf("worker = %s/%s, want codex/gpt-5.4", resolved.Config.Roles.Worker.Engine, resolved.Config.Roles.Worker.Model)
 	}
 	if resolved.SelectionPolicy.MasterCandidates[0] != "codex/gpt-5.4" {
 		t.Fatalf("master_candidates = %#v, want codex first", resolved.SelectionPolicy.MasterCandidates)
@@ -267,10 +252,9 @@ func TestImplicitSelectionDefaultsFillMissingTargetsWithoutOverwritingLegacyValu
 master:
   effort: max
 roles:
-  research:
+  worker:
     engine: claude-code
     model: sonnet
-  develop:
     effort: low
 target:
   files: ["README.md"]
@@ -287,7 +271,7 @@ local_validation:
 	}
 	resolved, err := ResolveConfig(layers, ResolveRequest{
 		Name:                      "demo",
-		Mode:                      ModeDevelop,
+		Mode:                      ModeWorker,
 		Objective:                 "ship it",
 		RequireEngineAvailability: true,
 	})
@@ -301,14 +285,11 @@ local_validation:
 	if resolved.Config.Master.Effort != EffortMax {
 		t.Fatalf("master effort = %q, want explicit max preserved", resolved.Config.Master.Effort)
 	}
-	if resolved.Config.Roles.Research.Engine != "claude-code" || resolved.Config.Roles.Research.Model != "sonnet" {
-		t.Fatalf("research = %s/%s, want explicit claude-code/sonnet preserved", resolved.Config.Roles.Research.Engine, resolved.Config.Roles.Research.Model)
+	if resolved.Config.Roles.Worker.Engine != "claude-code" || resolved.Config.Roles.Worker.Model != "sonnet" {
+		t.Fatalf("worker = %s/%s, want explicit claude-code/sonnet preserved", resolved.Config.Roles.Worker.Engine, resolved.Config.Roles.Worker.Model)
 	}
-	if resolved.Config.Roles.Develop.Engine != "codex" || resolved.Config.Roles.Develop.Model != "gpt-5.4" {
-		t.Fatalf("develop = %s/%s, want codex/gpt-5.4 default", resolved.Config.Roles.Develop.Engine, resolved.Config.Roles.Develop.Model)
-	}
-	if resolved.Config.Roles.Develop.Effort != EffortLow {
-		t.Fatalf("develop effort = %q, want explicit low preserved", resolved.Config.Roles.Develop.Effort)
+	if resolved.Config.Roles.Worker.Effort != EffortLow {
+		t.Fatalf("worker effort = %q, want explicit low preserved", resolved.Config.Roles.Worker.Effort)
 	}
 }
 
@@ -349,7 +330,7 @@ func TestResolveConfigPreviewRejectsSelectionInManualDraft(t *testing.T) {
 	_, err = ResolveConfigPreview(layers, ResolveRequest{
 		ManualDraft: &Config{
 			Name:      "draft",
-			Mode:      ModeDevelop,
+			Mode:      ModeWorker,
 			Objective: "ship it",
 			Selection: SelectionConfig{
 				MasterCandidates: []string{"codex/gpt-5.4"},
@@ -379,7 +360,7 @@ func TestResolveSelectionRejectsMalformedAndDuplicateTargets(t *testing.T) {
 selection:
   master_candidates:
     - codex
-  develop_candidates:
+  worker_candidates:
     - codex/gpt-5.4
     - codex/gpt-5.4
 `) + "\n")
@@ -394,12 +375,12 @@ selection:
 	}
 	_, err = ResolveConfigPreview(layers, ResolveRequest{
 		Name:                    "demo",
-		Mode:                    ModeDevelop,
+		Mode:                    ModeWorker,
 		Objective:               "ship it",
 		TargetOverride:          &TargetConfig{Files: []string{"README.md"}},
 		LocalValidationOverride: &LocalValidationConfig{Command: "go test ./..."},
 	})
-	if err == nil || (!strings.Contains(err.Error(), "selection.master_candidates[0]") && !strings.Contains(err.Error(), "selection.develop_candidates contains duplicate")) {
+	if err == nil || (!strings.Contains(err.Error(), "selection.master_candidates[0]") && !strings.Contains(err.Error(), "selection.worker_candidates contains duplicate")) {
 		t.Fatalf("ResolveConfigPreview error = %v, want malformed or duplicate selection target", err)
 	}
 }
@@ -420,8 +401,8 @@ func TestLoadConfigUsesBuiltinPreferencesAndDimensionsWhenUnset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadResolvedConfigForTest: %v", err)
 	}
-	if got := cfg.Preferences.Research.Guidance; got != "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。" {
-		t.Fatalf("research guidance = %q", got)
+	if got := cfg.Preferences.Worker.Guidance; got != "默认 gpt-5.4 medium。复杂分析、架构分歧或高风险收口可升到 high 或改用 opus；轻量切片用 fast。" {
+		t.Fatalf("worker guidance = %q", got)
 	}
 	if got := cfg.Preferences.Simple.Guidance; got != "轻量任务用 fast。" {
 		t.Fatalf("simple guidance = %q", got)
@@ -544,10 +525,10 @@ func TestExpandSessionsExplicit(t *testing.T) {
 func TestValidateConfigOK(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test objective",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -564,7 +545,7 @@ func TestValidateConfigAcceptsAutoMode(t *testing.T) {
 		Mode:      ModeAuto,
 		Objective: "test objective",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -597,7 +578,7 @@ func TestResolveAcceptanceCommandUsesAcceptanceOverride(t *testing.T) {
 }
 
 func TestValidateConfigMissingObjective(t *testing.T) {
-	cfg := &Config{Name: "test", Mode: ModeDevelop}
+	cfg := &Config{Name: "test", Mode: ModeWorker}
 	if err := ValidateConfig(cfg, BuiltinEngines); err == nil {
 		t.Error("expected error for missing objective")
 	}
@@ -606,10 +587,10 @@ func TestValidateConfigMissingObjective(t *testing.T) {
 func TestValidateConfigPlaceholder(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 		Target:          TargetConfig{Files: []string{"TODO: specify"}},
 		LocalValidation: LocalValidationConfig{Command: "go test"},
@@ -623,10 +604,10 @@ func TestValidateConfigPlaceholder(t *testing.T) {
 func TestValidateConfigAllowsSessionOverridesWithParallel(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 		Parallel:        2,
 		Sessions:        []SessionConfig{{Hint: "a"}},
@@ -642,10 +623,10 @@ func TestValidateConfigAllowsSessionOverridesWithParallel(t *testing.T) {
 func TestValidateConfigRejectsAcceptancePlaceholder(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test objective",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "claude-code", Model: "sonnet"},
+			Worker: SessionConfig{Engine: "claude-code", Model: "sonnet"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -737,7 +718,7 @@ func TestLoadConfigMergesTopLevelUserPreferences(t *testing.T) {
 	}
 	userCfg := []byte(strings.TrimSpace(`
 preferences:
-  research:
+  worker:
     guidance: multi-perspective
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
@@ -751,7 +732,7 @@ preferences:
 	}
 	projectCfg := []byte(strings.TrimSpace(`
 preferences:
-  develop:
+  worker:
     guidance: speed
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(projectGoalxDir, "config.yaml"), projectCfg, 0o644); err != nil {
@@ -759,7 +740,7 @@ preferences:
 	}
 	runCfg := []byte(strings.TrimSpace(`
 name: demo
-mode: develop
+mode: worker
 objective: ship it
 target:
   files: [README.md]
@@ -774,11 +755,8 @@ local_validation:
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if cfg.Preferences.Research.Guidance != "multi-perspective" {
-		t.Fatalf("research guidance = %q, want multi-perspective", cfg.Preferences.Research.Guidance)
-	}
-	if cfg.Preferences.Develop.Guidance != "speed" {
-		t.Fatalf("develop guidance = %q, want speed", cfg.Preferences.Develop.Guidance)
+	if cfg.Preferences.Worker.Guidance != "speed" {
+		t.Fatalf("worker guidance = %q, want speed", cfg.Preferences.Worker.Guidance)
 	}
 }
 
@@ -794,29 +772,20 @@ func TestLoadConfigReadsTopLevelSelectionAndEffort(t *testing.T) {
 selection:
   master_candidates:
     - claude-code/opus
-  research_candidates:
-    - codex/gpt-5.4
-  develop_candidates:
+  worker_candidates:
     - codex/gpt-5.4-mini
-  research_effort: high
-  develop_effort: medium
+  worker_effort: medium
 master:
   engine: claude-code
   model: opus
   effort: high
 roles:
-  research:
-    engine: codex
-    model: gpt-5.4
-    effort: high
-  develop:
+  worker:
     engine: codex
     model: gpt-5.4
     effort: medium
 preferences:
-  research:
-    guidance: default to gpt-5.4 high
-  develop:
+  worker:
     guidance: default to gpt-5.4 medium
 `) + "\n")
 	if err := os.WriteFile(filepath.Join(userGoalxDir, "config.yaml"), userCfg, 0o644); err != nil {
@@ -843,23 +812,14 @@ local_validation:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" || cfg.Master.Effort != EffortHigh {
 		t.Fatalf("master = %#v, want claude-code/opus/high", cfg.Master)
 	}
-	if cfg.Roles.Research.Effort != EffortHigh {
-		t.Fatalf("research effort = %q, want high", cfg.Roles.Research.Effort)
+	if cfg.Roles.Worker.Effort != EffortMedium {
+		t.Fatalf("worker effort = %q, want medium", cfg.Roles.Worker.Effort)
 	}
-	if cfg.Roles.Develop.Effort != EffortMedium {
-		t.Fatalf("develop effort = %q, want medium", cfg.Roles.Develop.Effort)
+	if cfg.Preferences.Worker.Guidance != "default to gpt-5.4 medium" {
+		t.Fatalf("worker guidance = %q, want top-level guidance", cfg.Preferences.Worker.Guidance)
 	}
-	if cfg.Preferences.Research.Guidance != "default to gpt-5.4 high" {
-		t.Fatalf("research guidance = %q, want top-level guidance", cfg.Preferences.Research.Guidance)
-	}
-	if cfg.Preferences.Develop.Guidance != "default to gpt-5.4 medium" {
-		t.Fatalf("develop guidance = %q, want top-level guidance", cfg.Preferences.Develop.Guidance)
-	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "gpt-5.4-mini" {
-		t.Fatalf("develop = %#v, want codex/gpt-5.4-mini", cfg.Roles.Develop)
-	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research = %#v, want codex/gpt-5.4", cfg.Roles.Research)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4-mini" {
+		t.Fatalf("worker = %#v, want codex/gpt-5.4-mini", cfg.Roles.Worker)
 	}
 	if cfg.LocalValidation.Command != "go build ./... && go test ./..." {
 		t.Fatalf("local_validation.command = %q, want project local validation", cfg.LocalValidation.Command)
@@ -906,7 +866,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  develop:
+  worker:
     engine: claude-code
     model: sonnet
 `) + "\n")
@@ -925,7 +885,7 @@ master:
   engine: codex
   model: fast
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 `) + "\n")
@@ -934,7 +894,7 @@ roles:
 	}
 	runCfg := []byte(strings.TrimSpace(`
 name: demo
-mode: develop
+mode: worker
 objective: ship it
 target:
   files: [README.md]
@@ -949,8 +909,8 @@ local_validation:
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "fast" {
-		t.Fatalf("develop role = %s/%s, want codex/fast", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "fast" {
+		t.Fatalf("worker role = %s/%s, want codex/fast", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "fast" {
 		t.Fatalf("master engine/model = %s/%s, want codex/fast", cfg.Master.Engine, cfg.Master.Model)
@@ -1000,7 +960,7 @@ master:
   engine: codex
   model: fast
 roles:
-  develop:
+  worker:
     engine: codex
     model: fast
 `) + "\n")
@@ -1009,7 +969,7 @@ roles:
 	}
 	runCfg := []byte(strings.TrimSpace(`
 name: demo
-mode: develop
+mode: worker
 objective: ship it
 target:
   files: [README.md]
@@ -1031,8 +991,8 @@ local_validation:
 	if cfg.Master.Engine != "codex" || cfg.Master.Model != "fast" {
 		t.Fatalf("master engine/model = %s/%s, want codex/fast", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Develop.Engine != "codex" || cfg.Roles.Develop.Model != "fast" {
-		t.Fatalf("develop role = %s/%s, want codex/fast", cfg.Roles.Develop.Engine, cfg.Roles.Develop.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "fast" {
+		t.Fatalf("develop role = %s/%s, want codex/fast", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if engines["codex"].Command != "codex --project {model_id}" {
 		t.Fatalf("engines[codex].command = %q, want project override", engines["codex"].Command)
@@ -1155,7 +1115,7 @@ dimensions:
 	}
 	projectCfg := []byte(strings.TrimSpace(`
 name: demo
-mode: develop
+mode: worker
 objective: lock config state
 target:
   files: [README.md]
@@ -1208,7 +1168,7 @@ func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 
 	cfg := Config{
 		Name:      "demo",
-		Mode:      ModeResearch,
+		Mode:      ModeWorker,
 		Objective: "investigate",
 		Target: TargetConfig{
 			Files: []string{"report.md"},
@@ -1242,10 +1202,10 @@ func TestLoadConfigFiltersContextFilesToExternalRefs(t *testing.T) {
 func TestValidateConfigRejectsOldCodexModels(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "codex", Model: "gpt-5.2"},
+			Worker: SessionConfig{Engine: "codex", Model: "gpt-5.2"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test"},
@@ -1263,10 +1223,10 @@ func TestValidateConfigRejectsOldCodexModels(t *testing.T) {
 func TestValidateConfigRejectsCrossEngineModelAlias(t *testing.T) {
 	cfg := &Config{
 		Name:      "test",
-		Mode:      ModeDevelop,
+		Mode:      ModeWorker,
 		Objective: "test",
 		Roles: RoleDefaultsConfig{
-			Develop: SessionConfig{Engine: "codex", Model: "codex"},
+			Worker: SessionConfig{Engine: "codex", Model: "codex"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test"},
@@ -1285,7 +1245,7 @@ func TestValidateConfigRejectsCrossEngineModelAlias(t *testing.T) {
 func TestMergeConfig(t *testing.T) {
 	base := Config{
 		Name:            "base",
-		Mode:            ModeDevelop,
+		Mode:            ModeWorker,
 		LocalValidation: LocalValidationConfig{Command: "make test"},
 	}
 	overlay := Config{
@@ -1342,23 +1302,20 @@ func TestMergeConfigTargetFieldLevel(t *testing.T) {
 func TestMergeConfigPreferencesFieldLevel(t *testing.T) {
 	base := Config{
 		Preferences: PreferencesConfig{
-			Research: PreferencePolicy{Guidance: "multi-perspective"},
-			Simple:   PreferencePolicy{Guidance: "keep it simple"},
+			Worker: PreferencePolicy{Guidance: "multi-perspective"},
+			Simple: PreferencePolicy{Guidance: "keep it simple"},
 		},
 	}
 	overlay := Config{
 		Preferences: PreferencesConfig{
-			Develop: PreferencePolicy{Guidance: "speed"},
+			Worker: PreferencePolicy{Guidance: "speed"},
 		},
 	}
 
 	mergeConfig(&base, &overlay)
 
-	if base.Preferences.Research.Guidance != "multi-perspective" {
-		t.Fatalf("Research.Guidance = %q, want preserved base guidance", base.Preferences.Research.Guidance)
-	}
-	if base.Preferences.Develop.Guidance != "speed" {
-		t.Fatalf("Develop.Guidance = %q, want overlay guidance", base.Preferences.Develop.Guidance)
+	if base.Preferences.Worker.Guidance != "speed" {
+		t.Fatalf("Worker.Guidance = %q, want overlay guidance", base.Preferences.Worker.Guidance)
 	}
 	if base.Preferences.Simple.Guidance != "keep it simple" {
 		t.Fatalf("Simple.Guidance = %q, want preserved base guidance", base.Preferences.Simple.Guidance)
@@ -1378,13 +1335,13 @@ func TestLoadYAMLNotFound(t *testing.T) {
 func TestLoadYAMLValid(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.yaml")
-	os.WriteFile(path, []byte("name: test-run\nmode: research\nobjective: do stuff\n"), 0644)
+	os.WriteFile(path, []byte("name: test-run\nmode: worker\nobjective: do stuff\n"), 0644)
 
 	cfg, err := LoadYAML[Config](path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Name != "test-run" || cfg.Mode != ModeResearch {
+	if cfg.Name != "test-run" || cfg.Mode != ModeWorker {
 		t.Errorf("cfg = %+v", cfg)
 	}
 }
@@ -1399,14 +1356,14 @@ func cloneStringMap(src map[string]string) map[string]string {
 
 func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 	cfg := &Config{
-		Mode:            ModeDevelop,
-		Roles:           RoleDefaultsConfig{Research: SessionConfig{Engine: "claude-code", Model: "opus"}},
+		Mode:            ModeWorker,
+		Roles:           RoleDefaultsConfig{Worker: SessionConfig{Engine: "claude-code", Model: "opus"}},
 		Target:          TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
 			{
 				Hint:            "investigate root cause",
-				Mode:            ModeResearch,
+				Mode:            ModeWorker,
 				Target:          &TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
 				LocalValidation: &LocalValidationConfig{Command: "test -s report.md"},
 			},
@@ -1414,21 +1371,24 @@ func TestEffectiveSessionConfigOverridesRunDefaults(t *testing.T) {
 	}
 
 	got := EffectiveSessionConfig(cfg, 0)
-	if got.Mode != ModeResearch {
-		t.Fatalf("Mode = %q, want %q", got.Mode, ModeResearch)
+	if got.Mode != ModeWorker {
+		t.Fatalf("Mode = %q, want %q", got.Mode, ModeWorker)
 	}
 	if !reflect.DeepEqual(got.Target.Files, []string{"report.md"}) {
 		t.Fatalf("Target.Files = %#v, want report target", got.Target.Files)
 	}
 	if got.LocalValidation.Command != "test -s report.md" {
-		t.Fatalf("LocalValidation.Command = %q, want research local validation", got.LocalValidation.Command)
+		t.Fatalf("LocalValidation.Command = %q, want session local validation override", got.LocalValidation.Command)
+	}
+	if got.Engine != "claude-code" || got.Model != "opus" {
+		t.Fatalf("Engine/Model = %s/%s, want worker defaults", got.Engine, got.Model)
 	}
 }
 
 func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	cfg := &Config{
-		Mode:            ModeDevelop,
-		Roles:           RoleDefaultsConfig{Develop: SessionConfig{Engine: "codex", Model: "fast"}},
+		Mode:            ModeWorker,
+		Roles:           RoleDefaultsConfig{Worker: SessionConfig{Engine: "codex", Model: "fast"}},
 		Target:          TargetConfig{Files: []string{"src/"}, Readonly: []string{"vendor/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 		Sessions: []SessionConfig{
@@ -1446,43 +1406,41 @@ func TestEffectiveSessionConfigInheritsRunDefaults(t *testing.T) {
 	if got.LocalValidation.Command != "go test ./..." {
 		t.Fatalf("LocalValidation.Command = %q, want inherited run local validation", got.LocalValidation.Command)
 	}
-	if got.Engine != "" || got.Model != "" {
-		t.Fatalf("Engine/Model = %s/%s, want unset engine/model", got.Engine, got.Model)
+	if got.Engine != "codex" || got.Model != "fast" {
+		t.Fatalf("Engine/Model = %s/%s, want inherited worker defaults", got.Engine, got.Model)
 	}
 }
 
-func TestEffectiveSessionConfigUsesModeSpecificRoleDefaults(t *testing.T) {
+func TestEffectiveSessionConfigUsesWorkerRoleDefaultsForAllSessions(t *testing.T) {
 	cfg := &Config{
-		Mode: ModeDevelop,
+		Mode: ModeWorker,
 		Roles: RoleDefaultsConfig{
-			Research: SessionConfig{Engine: "claude-code", Model: "opus"},
-			Develop:  SessionConfig{Engine: "codex", Model: "fast"},
+			Worker: SessionConfig{Engine: "codex", Model: "fast"},
 		},
 		Sessions: []SessionConfig{
-			{Mode: ModeResearch},
-			{Mode: ModeDevelop},
+			{Mode: ModeWorker},
+			{Mode: ModeWorker},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
 	}
 
-	gotResearch := EffectiveSessionConfig(cfg, 0)
-	gotDevelop := EffectiveSessionConfig(cfg, 1)
+	gotFirst := EffectiveSessionConfig(cfg, 0)
+	gotSecond := EffectiveSessionConfig(cfg, 1)
 
-	if gotResearch.Engine != "claude-code" || gotResearch.Model != "opus" {
-		t.Fatalf("research session = %s/%s", gotResearch.Engine, gotResearch.Model)
+	if gotFirst.Engine != "codex" || gotFirst.Model != "fast" {
+		t.Fatalf("first session = %s/%s", gotFirst.Engine, gotFirst.Model)
 	}
-	if gotDevelop.Engine != "codex" || gotDevelop.Model != "fast" {
-		t.Fatalf("develop session = %s/%s", gotDevelop.Engine, gotDevelop.Model)
+	if gotSecond.Engine != "codex" || gotSecond.Model != "fast" {
+		t.Fatalf("second session = %s/%s", gotSecond.Engine, gotSecond.Model)
 	}
 }
 
-func TestEffectiveSessionConfigLeavesAutoRunSessionsUnsetByDefault(t *testing.T) {
+func TestEffectiveSessionConfigAppliesWorkerDefaultsInAutoRuns(t *testing.T) {
 	cfg := &Config{
 		Mode: ModeAuto,
 		Roles: RoleDefaultsConfig{
-			Research: SessionConfig{Engine: "claude-code", Model: "opus"},
-			Develop:  SessionConfig{Engine: "codex", Model: "fast"},
+			Worker: SessionConfig{Engine: "codex", Model: "fast"},
 		},
 		Target:          TargetConfig{Files: []string{"src/"}},
 		LocalValidation: LocalValidationConfig{Command: "go test ./..."},
@@ -1493,17 +1451,14 @@ func TestEffectiveSessionConfigLeavesAutoRunSessionsUnsetByDefault(t *testing.T)
 	if got.Mode != "" {
 		t.Fatalf("Mode = %q, want unset mode", got.Mode)
 	}
-	if got.Engine != "" || got.Model != "" {
-		t.Fatalf("Engine/Model = %s/%s, want unset engine/model", got.Engine, got.Model)
+	if got.Engine != "codex" || got.Model != "fast" {
+		t.Fatalf("Engine/Model = %s/%s, want worker defaults", got.Engine, got.Model)
 	}
 }
 
-func TestEffectiveSessionConfigRequiresExplicitSessionModeForRoleDefaults(t *testing.T) {
+func TestEffectiveSessionConfigLeavesEngineUnsetWithoutWorkerDefaults(t *testing.T) {
 	cfg := &Config{
-		Mode: ModeResearch,
-		Roles: RoleDefaultsConfig{
-			Research: SessionConfig{Engine: "claude-code", Model: "sonnet"},
-		},
+		Mode:   ModeWorker,
 		Target: TargetConfig{Files: []string{"report.md"}},
 		LocalValidation: LocalValidationConfig{
 			Command: "test -s report.md",

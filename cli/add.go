@@ -11,13 +11,13 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const addUsage = `usage: goalx add "research direction" [--run NAME] --mode MODE [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--worktree] [--base-branch BRANCH|session-N]`
+const addUsage = `usage: goalx add "direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--effort LEVEL] [--dimension SPEC]... [--worktree] [--base-branch BRANCH|session-N]`
 
 var appendMasterInboxMessage = AppendMasterInboxMessage
 
 // Add creates a new subagent session in a running run.
 func Add(projectRoot string, args []string) (err error) {
-	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--mode MODE] [--dimension NAME]
+	// Parse: goalx add "hint/direction" [--run NAME] [--engine ENGINE] [--model MODEL] [--dimension NAME]
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {
 		return err
@@ -34,7 +34,6 @@ func Add(projectRoot string, args []string) (err error) {
 	var flagEngine, flagModel string
 	var explicitEngine, explicitModel bool
 	var flagEffort goalx.EffortLevel
-	var flagMode goalx.Mode
 	var flagDimensions []string
 	useWorktree := false
 	baseBranchSelector := ""
@@ -65,17 +64,6 @@ func Add(projectRoot string, args []string) (err error) {
 				return err
 			}
 			flagEffort = level
-		case "--mode":
-			if i+1 >= len(rest) {
-				return fmt.Errorf("missing value for --mode")
-			}
-			i++
-			switch goalx.Mode(rest[i]) {
-			case goalx.ModeResearch, goalx.ModeDevelop:
-				flagMode = goalx.Mode(rest[i])
-			default:
-				return fmt.Errorf("invalid --mode %q (expected research or develop)", rest[i])
-			}
 		case "--dimension":
 			if i+1 >= len(rest) {
 				return fmt.Errorf("missing value for --dimension")
@@ -105,9 +93,6 @@ func Add(projectRoot string, args []string) (err error) {
 	}
 	if baseBranchSelector != "" && !useWorktree {
 		return fmt.Errorf("--base-branch requires --worktree")
-	}
-	if flagMode == "" {
-		return fmt.Errorf("--mode is required")
 	}
 	hint := strings.Join(hintParts, " ")
 
@@ -163,9 +148,7 @@ func Add(projectRoot string, args []string) (err error) {
 	if flagModel != "" {
 		sessionCfg.Model = flagModel
 	}
-	if flagMode != "" {
-		sessionCfg.Mode = flagMode
-	}
+	sessionCfg.Mode = goalx.ModeWorker
 	if flagEffort != "" {
 		sessionCfg.Effort = flagEffort
 	}
@@ -308,7 +291,7 @@ func Add(projectRoot string, args []string) (err error) {
 		return fmt.Errorf("init session control: %w", err)
 	}
 	cleanup.Add(func() error { return cleanupSessionControlSurface(rc.RunDir, sName) })
-	assignmentType := string(sessionIdentity.Mode)
+	assignmentType := "worker"
 	if assignmentType == "" {
 		assignmentType = "tell"
 	}
@@ -336,7 +319,7 @@ func Add(projectRoot string, args []string) (err error) {
 	subData := ProtocolData{
 		RunName:                   rc.Config.Name,
 		Objective:                 rc.Config.Objective,
-		Mode:                      goalx.Mode(sessionIdentity.Mode),
+		Mode:                      goalx.ModeWorker,
 		Engine:                    sessionIdentity.Engine,
 		Sessions:                  sessionDataList,
 		Target:                    sessionIdentity.Target,
@@ -416,7 +399,7 @@ func Add(projectRoot string, args []string) (err error) {
 		Session:          sName,
 		Branch:           branch,
 		Worktree:         workdir,
-		Intent:           sessionIdentity.Mode,
+		Intent:           "worker",
 		BaseRef:          sessionIdentity.BaseBranch,
 		BaseExperimentID: sessionIdentity.BaseExperimentID,
 		CreatedAt:        sessionIdentity.CreatedAt,

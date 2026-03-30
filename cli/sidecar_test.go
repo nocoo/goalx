@@ -20,7 +20,7 @@ func TestRunSidecarTickRenewsLease(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -109,7 +109,7 @@ func TestRunSidecarTickAppliesPendingControlOpsBeforeMaintenance(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -169,7 +169,7 @@ func TestRunSidecarTickWritesEvolveFactsOnlyForEvolveRun(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -207,7 +207,7 @@ func TestRunSidecarTickWritesEvolveFactsOnlyForEvolveRun(t *testing.T) {
 
 	runDir2 := writeRunSpecFixture(t, repo, &goalx.Config{
 		Name:      "sidecar-run-non-evolve",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	})
@@ -217,13 +217,13 @@ func TestRunSidecarTickWritesEvolveFactsOnlyForEvolveRun(t *testing.T) {
 	}
 	bootstrapSidecarIdentityFixture(t, runDir2, repo, &goalx.Config{
 		Name:      "sidecar-run-non-evolve",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}, meta2)
 	if _, err := EnsureRuntimeState(runDir2, &goalx.Config{
 		Name:      "sidecar-run-non-evolve",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}); err != nil {
@@ -248,7 +248,7 @@ func TestRunSidecarTickDeliversDueMasterWakeReminder(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -321,7 +321,7 @@ func TestRunSidecarTickQueuesRefreshContextWhenIdentityFenceChanges(t *testing.T
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -384,7 +384,7 @@ func TestRunSidecarTickRelaunchesMissingMasterWindowOnActiveRun(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -403,7 +403,7 @@ func TestRunSidecarTickRelaunchesMissingMasterWindowOnActiveRun(t *testing.T) {
 	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 
 	fakeBin := t.TempDir()
 	logPath := filepath.Join(fakeBin, "tmux.log")
@@ -465,7 +465,7 @@ func TestRunSidecarTickAlertsMasterOnceWhenSessionWindowMissing(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -484,7 +484,7 @@ func TestRunSidecarTickAlertsMasterOnceWhenSessionWindowMissing(t *testing.T) {
 	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 
 	fakeBin := t.TempDir()
 	tmuxPath := filepath.Join(fakeBin, "tmux")
@@ -541,7 +541,7 @@ func TestRunSidecarTickProjectsSessionJournalStateIntoRuntime(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -557,11 +557,11 @@ func TestRunSidecarTickProjectsSessionJournalStateIntoRuntime(t *testing.T) {
 	if err := EnsureControlState(runDir); err != nil {
 		t.Fatalf("EnsureControlState: %v", err)
 	}
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "gpt-5.4", goalx.TargetConfig{}, goalx.LocalValidationConfig{})
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeResearch),
+		Mode:         string(goalx.ModeWorker),
 		WorktreePath: WorktreePath(runDir, cfg.Name, 1),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
@@ -611,7 +611,7 @@ func TestRunSidecarTickDoesNotQueueRefreshContextWhenIdentityFenceUnchanged(t *t
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -790,7 +790,7 @@ func TestDropTerminatesSidecarBeforeRemovingRunDir(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: drop-run\nmode: worker\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n"), 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
 
@@ -818,7 +818,7 @@ func TestSidecarRenewsLeaseUntilContextStops(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -870,7 +870,7 @@ func TestSidecarStopsWhenRunIdentityChanges(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "base", "base commit")
 	cfg := &goalx.Config{
 		Name:      "sidecar-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -1490,7 +1490,7 @@ func TestRunSidecarTickDoesNotAlertMissingParkedSession(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "parked",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -1761,7 +1761,7 @@ func TestRunSidecarTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-4",
 		State: "idle",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-4: %v", err)
 	}
@@ -1864,7 +1864,7 @@ func TestRunSidecarTickRealertsRequiredFrontierWhenStateChanges(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-4",
 		State: "idle",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-4: %v", err)
 	}

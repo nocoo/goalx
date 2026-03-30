@@ -89,14 +89,13 @@ func buildLaunchResolveRequest(projectRoot string, baseCfg goalx.Config, opts la
 	_ = projectRoot
 	_ = baseCfg
 
-	masterOverride, researchOverride, developOverride, err := launchRoleOverrides(opts)
+	masterOverride, workerOverride, err := launchRoleOverrides(opts)
 	if err != nil {
 		return goalx.ResolveRequest{}, err
 	}
 
 	req.MasterOverride = masterOverride
-	req.ResearchOverride = researchOverride
-	req.DevelopOverride = developOverride
+	req.WorkerOverride = workerOverride
 	return req, nil
 }
 
@@ -163,14 +162,14 @@ func applyLaunchSessionOverrides(cfg *goalx.Config, opts launchOptions, dimensio
 	return nil
 }
 
-func launchRoleOverrides(opts launchOptions) (*goalx.MasterConfig, *goalx.SessionConfig, *goalx.SessionConfig, error) {
+func launchRoleOverrides(opts launchOptions) (*goalx.MasterConfig, *goalx.SessionConfig, error) {
 	var masterOverride *goalx.MasterConfig
 	if opts.Master != "" || opts.MasterEffort != "" || opts.Effort != "" {
 		override := &goalx.MasterConfig{}
 		if opts.Master != "" {
 			engine, model, err := parseEngineModelValue("--master", opts.Master)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, err
 			}
 			override.Engine = engine
 			override.Model = model
@@ -183,45 +182,26 @@ func launchRoleOverrides(opts launchOptions) (*goalx.MasterConfig, *goalx.Sessio
 		masterOverride = override
 	}
 
-	var researchOverride *goalx.SessionConfig
-	if opts.ResearchRole != "" || opts.ResearchEffort != "" || opts.Effort != "" {
+	var workerOverride *goalx.SessionConfig
+	if opts.Worker != "" || opts.WorkerEffort != "" || opts.Effort != "" {
 		override := &goalx.SessionConfig{}
-		if opts.ResearchRole != "" {
-			engine, model, err := parseEngineModelValue("--research-role", opts.ResearchRole)
+		if opts.Worker != "" {
+			engine, model, err := parseEngineModelValue("--worker", opts.Worker)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, err
 			}
 			override.Engine = engine
 			override.Model = model
 		}
-		if opts.ResearchEffort != "" {
-			override.Effort = opts.ResearchEffort
+		if opts.WorkerEffort != "" {
+			override.Effort = opts.WorkerEffort
 		} else if opts.Effort != "" {
 			override.Effort = opts.Effort
 		}
-		researchOverride = override
+		workerOverride = override
 	}
 
-	var developOverride *goalx.SessionConfig
-	if opts.DevelopRole != "" || opts.DevelopEffort != "" || opts.Effort != "" {
-		override := &goalx.SessionConfig{}
-		if opts.DevelopRole != "" {
-			engine, model, err := parseEngineModelValue("--develop-role", opts.DevelopRole)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			override.Engine = engine
-			override.Model = model
-		}
-		if opts.DevelopEffort != "" {
-			override.Effort = opts.DevelopEffort
-		} else if opts.Effort != "" {
-			override.Effort = opts.Effort
-		}
-		developOverride = override
-	}
-
-	return masterOverride, researchOverride, developOverride, nil
+	return masterOverride, workerOverride, nil
 }
 
 func parseEngineModelValue(flagName, value string) (string, string, error) {

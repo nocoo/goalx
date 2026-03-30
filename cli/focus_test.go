@@ -23,7 +23,7 @@ func TestFocusSetsFocusedRun(t *testing.T) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: beta\nmode: develop\nobjective: keep moving\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: beta\nmode: worker\nobjective: keep moving\n"), 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
 
@@ -114,7 +114,7 @@ func TestFocusRejectsCrossProjectSelector(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "beta",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -154,7 +154,7 @@ func TestFocusAllowsLocalRunNameThatLooksLikeRunID(t *testing.T) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: run_demo\nmode: develop\nobjective: keep moving\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: run_demo\nmode: worker\nobjective: keep moving\n"), 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
 	if err := SaveProjectRegistry(projectRoot, &ProjectRegistry{

@@ -72,7 +72,7 @@ func TestStartRequiresExplicitManualConfig(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
 	writeRootConfigFixture(t, repo, goalx.Config{
 		Name:            "manual-draft",
-		Mode:            goalx.ModeResearch,
+		Mode:            goalx.ModeWorker,
 		Objective:       "audit auth flow",
 		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -97,7 +97,7 @@ func TestStartWithExplicitManualConfig(t *testing.T) {
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
 	writeRootConfigFixture(t, repo, goalx.Config{
 		Name:            "manual-draft",
-		Mode:            goalx.ModeResearch,
+		Mode:            goalx.ModeWorker,
 		Objective:       "audit auth flow",
 		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
@@ -160,7 +160,7 @@ func TestLoadManualDraftConfigAllowsUnsetTargetAndLocalValidation(t *testing.T) 
 	}
 	writeRootConfigFixture(t, projectRoot, goalx.Config{
 		Name:      "preview-draft",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship it",
 	})
 
@@ -197,7 +197,7 @@ func TestLoadManualDraftConfigDraftContextReplacesSharedContextBeforeFiltering(t
 	}
 	writeRootConfigFixture(t, projectRoot, goalx.Config{
 		Name:            "draft-context",
-		Mode:            goalx.ModeDevelop,
+		Mode:            goalx.ModeWorker,
 		Objective:       "ship it",
 		Target:          goalx.TargetConfig{Files: []string{"."}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "go test ./..."},

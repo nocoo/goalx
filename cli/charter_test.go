@@ -46,7 +46,7 @@ func TestRunCharterPathAndRoundTrip(t *testing.T) {
 	if charter.Paths.Goal != GoalPath(runDir) || charter.Paths.Acceptance != AcceptanceStatePath(runDir) || charter.Paths.Proof != CompletionStatePath(runDir) {
 		t.Fatalf("charter paths = %+v", charter.Paths)
 	}
-	if charter.RoleContracts.Master == nil || charter.RoleContracts.ResearchSubagent == nil || charter.RoleContracts.DevelopSubagent == nil {
+	if charter.RoleContracts.Master == nil || charter.RoleContracts.Worker == nil {
 		t.Fatalf("charter role contracts missing: %+v", charter.RoleContracts)
 	}
 	if charter.CharterID == "" {

@@ -241,7 +241,7 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:       runName,
-		Mode:       goalx.ModeDevelop,
+		Mode:       goalx.ModeWorker,
 		Objective:  "ship feature",
 		Acceptance: goalx.AcceptanceConfig{Command: "printf 'gate ok\\n'"},
 	}
@@ -252,7 +252,7 @@ func TestVerifyDoesNotRewriteRunStateOrStatus(t *testing.T) {
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"develop","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"verify-run","mode":"worker","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
@@ -335,7 +335,7 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 	}
 	cfg := goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "read only",
 		Master:    goalx.MasterConfig{Engine: "codex"},
 	}
@@ -346,7 +346,7 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	runStateBefore := []byte(`{"version":1,"run":"readonly-run","mode":"develop","objective":"read only","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
+	runStateBefore := []byte(`{"version":1,"run":"readonly-run","mode":"worker","objective":"read only","active":true,"phase":"working","updated_at":"2026-03-23T00:00:00Z"}`)
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), runStateBefore, 0o644); err != nil {
 		t.Fatalf("write run state: %v", err)
 	}
@@ -368,7 +368,7 @@ func writeReadOnlyRunFixture(t *testing.T, repo string) (string, string, []byte,
 	if err := EnsureControlState(runDir); err != nil {
 		t.Fatalf("EnsureControlState: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", sessionRoleKind(goalx.ModeDevelop), goalx.ModeDevelop, "codex", "", "", "", "", cfg.Target)
+	identity, err := NewSessionIdentity(runDir, "session-1", sessionRoleKind(goalx.ModeWorker), goalx.ModeWorker, "codex", "", "", "", "", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

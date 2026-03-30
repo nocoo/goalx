@@ -12,7 +12,7 @@ func TestHasUnsavedRunArtifactsTreatsIntegrationStateAsUnsaved(t *testing.T) {
 	runName := "demo"
 	cfg := &goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Target:    goalx.TargetConfig{Files: []string{"README.md"}},
 	}
@@ -20,12 +20,12 @@ func TestHasUnsavedRunArtifactsTreatsIntegrationStateAsUnsaved(t *testing.T) {
 	seedSaveRunProvenance(t, projectRoot, runDir, runName, cfg.Objective)
 
 	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
-		Version:             1,
-		CurrentExperimentID: "exp-1",
-		CurrentBranch:       "goalx/demo/1",
-		CurrentCommit:       "abc123",
-		LastIntegrationID:   "int-1",
-		LastMethod:          "keep",
+		Version:                 1,
+		CurrentExperimentID:     "exp-1",
+		CurrentBranch:           "goalx/demo/1",
+		CurrentCommit:           "abc123",
+		LastIntegrationID:       "int-1",
+		LastMethod:              "keep",
 		LastSourceExperimentIDs: []string{"exp-1"},
 	}); err != nil {
 		t.Fatalf("SaveIntegrationState: %v", err)

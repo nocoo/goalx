@@ -14,13 +14,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Mode is the run mode: research, develop, or auto.
+// Mode is the run mode: worker or auto.
 type Mode string
 
 const (
-	ModeResearch Mode = "research"
-	ModeDevelop  Mode = "develop"
-	ModeAuto     Mode = "auto"
+	ModeWorker Mode = "worker"
+	ModeAuto   Mode = "auto"
 )
 
 // Config is the merged configuration for a single run.
@@ -93,9 +92,8 @@ type SessionConfig struct {
 }
 
 type PreferencesConfig struct {
-	Research PreferencePolicy `yaml:"research,omitempty"`
-	Develop  PreferencePolicy `yaml:"develop,omitempty"`
-	Simple   PreferencePolicy `yaml:"simple,omitempty"`
+	Worker PreferencePolicy `yaml:"worker,omitempty"`
+	Simple PreferencePolicy `yaml:"simple,omitempty"`
 }
 
 type PreferencePolicy struct {
@@ -103,19 +101,16 @@ type PreferencePolicy struct {
 }
 
 type RoleDefaultsConfig struct {
-	Research SessionConfig `yaml:"research,omitempty"`
-	Develop  SessionConfig `yaml:"develop,omitempty"`
+	Worker SessionConfig `yaml:"worker,omitempty"`
 }
 
 type SelectionConfig struct {
-	DisabledEngines    []string    `yaml:"disabled_engines,omitempty"`
-	DisabledTargets    []string    `yaml:"disabled_targets,omitempty"`
-	MasterCandidates   []string    `yaml:"master_candidates,omitempty"`
-	ResearchCandidates []string    `yaml:"research_candidates,omitempty"`
-	DevelopCandidates  []string    `yaml:"develop_candidates,omitempty"`
-	MasterEffort       EffortLevel `yaml:"master_effort,omitempty"`
-	ResearchEffort     EffortLevel `yaml:"research_effort,omitempty"`
-	DevelopEffort      EffortLevel `yaml:"develop_effort,omitempty"`
+	DisabledEngines  []string    `yaml:"disabled_engines,omitempty"`
+	DisabledTargets  []string    `yaml:"disabled_targets,omitempty"`
+	MasterCandidates []string    `yaml:"master_candidates,omitempty"`
+	WorkerCandidates []string    `yaml:"worker_candidates,omitempty"`
+	MasterEffort     EffortLevel `yaml:"master_effort,omitempty"`
+	WorkerEffort     EffortLevel `yaml:"worker_effort,omitempty"`
 }
 
 type EffortLevel string
@@ -203,14 +198,11 @@ var BuiltinEngines = map[string]EngineConfig{
 
 // BuiltinDefaults are the hardcoded default values.
 var BuiltinDefaults = Config{
-	Mode:     ModeDevelop,
+	Mode:     ModeWorker,
 	Parallel: 1,
 	Preferences: PreferencesConfig{
-		Research: PreferencePolicy{
-			Guidance: "默认 gpt-5.4 high。深度分析/架构设计用 opus。简单信息收集用 fast。",
-		},
-		Develop: PreferencePolicy{
-			Guidance: "主力 gpt-5.4 medium。简单修复用 fast。",
+		Worker: PreferencePolicy{
+			Guidance: "默认 gpt-5.4 medium。复杂分析、架构分歧或高风险收口可升到 high 或改用 opus；轻量切片用 fast。",
 		},
 		Simple: PreferencePolicy{
 			Guidance: "轻量任务用 fast。",
@@ -317,8 +309,11 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	if cfg.Objective == "" {
 		return fmt.Errorf("objective is required")
 	}
-	if cfg.Mode != ModeResearch && cfg.Mode != ModeDevelop && cfg.Mode != ModeAuto {
-		return fmt.Errorf("mode must be 'research', 'develop', or 'auto', got %q", cfg.Mode)
+	if cfg.Mode == "" {
+		cfg.Mode = BuiltinDefaults.Mode
+	}
+	if cfg.Mode != ModeWorker && cfg.Mode != ModeAuto {
+		return fmt.Errorf("mode must be 'worker' or 'auto', got %q", cfg.Mode)
 	}
 	if cfg.Name == "" {
 		return fmt.Errorf("name is required (use --name or let goalx init generate one)")
@@ -364,8 +359,8 @@ func ValidateConfig(cfg *Config, engines map[string]EngineConfig) error {
 	sessions := ExpandSessions(cfg)
 	for i := range sessions {
 		sess := EffectiveSessionConfig(cfg, i)
-		if sess.Mode != "" && sess.Mode != ModeResearch && sess.Mode != ModeDevelop {
-			return fmt.Errorf("session-%d mode must be 'research' or 'develop', got %q", i+1, sess.Mode)
+		if sess.Mode != "" && sess.Mode != ModeWorker {
+			return fmt.Errorf("session-%d mode must be 'worker', got %q", i+1, sess.Mode)
 		}
 		if err := validateEffortLevel(sess.Effort, fmt.Sprintf("session-%d.effort", i+1)); err != nil {
 			return err
@@ -518,19 +513,21 @@ func selectedLaunchRoles(cfg *Config) []selectedLaunchRole {
 	if cfg == nil {
 		return nil
 	}
-	switch cfg.Mode {
-	case ModeResearch:
-		return []selectedLaunchRole{{name: "roles.research", cfg: cfg.Roles.Research}}
-	case ModeDevelop:
-		return []selectedLaunchRole{{name: "roles.develop", cfg: cfg.Roles.Develop}}
-	case ModeAuto:
-		return []selectedLaunchRole{
-			{name: "roles.research", cfg: cfg.Roles.Research},
-			{name: "roles.develop", cfg: cfg.Roles.Develop},
-		}
-	default:
-		return nil
+	role := workerRoleDefaults(cfg)
+	if role.Engine != "" || role.Model != "" || role.Effort != "" {
+		return []selectedLaunchRole{{name: "roles.worker", cfg: role}}
 	}
+	if cfg.Mode == "" || cfg.Mode == ModeWorker || cfg.Mode == ModeAuto {
+		return []selectedLaunchRole{{name: "roles.worker", cfg: role}}
+	}
+	return nil
+}
+
+func workerRoleDefaults(cfg *Config) SessionConfig {
+	if cfg == nil {
+		return SessionConfig{}
+	}
+	return cfg.Roles.Worker
 }
 
 func launchBinaryName(command string) string {
@@ -673,13 +670,8 @@ func explicitRoleSession(cfg *Config, mode Mode) SessionConfig {
 	if cfg == nil {
 		return SessionConfig{}
 	}
-	switch mode {
-	case ModeResearch:
-		return cfg.Roles.Research
-	case ModeDevelop:
-		return cfg.Roles.Develop
-	}
-	return SessionConfig{}
+	_ = mode
+	return workerRoleDefaults(cfg)
 }
 
 func fillSessionDefaults(session SessionConfig, defaults SessionConfig) SessionConfig {
@@ -771,23 +763,15 @@ func mergeConfig(base, overlay *Config) {
 		base.Selection = copySelectionConfig(overlay.Selection)
 	}
 	mergePreferencesConfig(&base.Preferences, &overlay.Preferences)
-	if overlay.Roles.Research.Engine != "" {
-		base.Roles.Research.Engine = overlay.Roles.Research.Engine
+	overlayWorker := workerRoleDefaults(overlay)
+	if overlayWorker.Engine != "" {
+		base.Roles.Worker.Engine = overlayWorker.Engine
 	}
-	if overlay.Roles.Research.Model != "" {
-		base.Roles.Research.Model = overlay.Roles.Research.Model
+	if overlayWorker.Model != "" {
+		base.Roles.Worker.Model = overlayWorker.Model
 	}
-	if overlay.Roles.Research.Effort != "" {
-		base.Roles.Research.Effort = overlay.Roles.Research.Effort
-	}
-	if overlay.Roles.Develop.Engine != "" {
-		base.Roles.Develop.Engine = overlay.Roles.Develop.Engine
-	}
-	if overlay.Roles.Develop.Model != "" {
-		base.Roles.Develop.Model = overlay.Roles.Develop.Model
-	}
-	if overlay.Roles.Develop.Effort != "" {
-		base.Roles.Develop.Effort = overlay.Roles.Develop.Effort
+	if overlayWorker.Effort != "" {
+		base.Roles.Worker.Effort = overlayWorker.Effort
 	}
 	if overlay.Parallel > 0 {
 		base.Parallel = overlay.Parallel
@@ -840,8 +824,7 @@ func mergeConfig(base, overlay *Config) {
 }
 
 func mergePreferencesConfig(base, overlay *PreferencesConfig) {
-	mergePreferencePolicy(&base.Research, overlay.Research)
-	mergePreferencePolicy(&base.Develop, overlay.Develop)
+	mergePreferencePolicy(&base.Worker, overlay.Worker)
 	mergePreferencePolicy(&base.Simple, overlay.Simple)
 }
 

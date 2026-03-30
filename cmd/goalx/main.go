@@ -11,7 +11,7 @@ import (
 	"github.com/vonbai/goalx/cli"
 )
 
-const usage = `goalx — autonomous research CLI
+const usage = `goalx — autonomous goal execution CLI
 
 Usage:
   goalx run     "objective" [flags]   Primary goal entrypoint; defaults to deliver semantics
@@ -42,19 +42,17 @@ Usage:
   goalx drop    [--run RUN]           Cleanup branch + worktree
   goalx report  [--run RUN]           Generate markdown report from journal
   goalx result  [NAME]                 Show saved summary or merged result details
-  goalx add     "direction" [--run RUN] --mode MODE [flags] Add a session to a running run
+  goalx add     "direction" [--run RUN] [flags] Add a session to a running run
   goalx dimension [--run RUN] <session-N|all> Adjust runtime dimension assignments
   goalx tell    [--run RUN] [target] "message" Send a durable instruction to master or a session
   goalx ack-session [--run RUN] <session>      Acknowledge latest processed session inbox entry
   goalx wait    [--run RUN] [target] [--timeout DURATION] Block on unread inbox entries or timeout
   goalx observe [RUN]                  Capture live output from all tmux windows
-  goalx next                           Show next pipeline step
 
 Notes:
   RUN selectors are local-first. Bare NAME stays in the current project; use project-id/run or run_id for cross-project targeting.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
-  Use --master, --research-role, and --develop-role for role-specific engine/model defaults.
-  Use goalx run --intent research or --intent develop when you want a non-default launch hint.
+  Use --master and --worker for role-specific engine/model defaults.
   goalx run --intent debate|implement|explore requires --from RUN unless you choose --write-config.
   .goalx/config.yaml is the shared project config; .goalx/goalx.yaml is an explicit manual draft only.
 
@@ -63,7 +61,7 @@ Run 'goalx <command> --help' for details.`
 var (
 	errInterrupted       = errors.New("interrupted by signal")
 	mainStart            = cli.Start
-	mainRun              = func(projectRoot string, args []string) error { return cli.Run(projectRoot, args, nil) }
+	mainRun              = cli.Run
 	mainStop             = cli.Stop
 	mainRecover          = cli.Recover
 	mainWait             = cli.Wait
@@ -185,8 +183,6 @@ func runCommand(cwd, cmd string, args []string) error {
 		return mainWait(cwd, args)
 	case "observe":
 		return cli.Observe(cwd, args)
-	case "next":
-		return cli.Next(cwd, args)
 	case "claude-hook":
 		return cli.ClaudeHook(cwd, args)
 	case "sidecar":

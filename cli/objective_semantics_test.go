@@ -11,7 +11,7 @@ func TestEnsureRuntimeStateCreatesValidState(t *testing.T) {
 	runDir := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "stale runtime objective",
 	}
 
@@ -34,7 +34,7 @@ func TestRegisterRunRegistriesDoNotPersistObjective(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "stale registry objective",
 	}
 
@@ -66,7 +66,7 @@ func TestLoadDerivedRunStatePrefersCharterObjective(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "charter objective",
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
@@ -99,7 +99,7 @@ func TestReportUsesCharterObjectiveDisplay(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "charter objective",
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)

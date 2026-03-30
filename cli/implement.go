@@ -6,27 +6,27 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-// Implement starts a develop-mode implementation run from an explicit saved run.
-func Implement(projectRoot string, args []string, nc *nextConfigJSON) error {
+// Implement starts an implementation run from an explicit saved run.
+func Implement(projectRoot string, args []string) error {
 	if wantsHelp(args) {
 		fmt.Println(phaseUsage("implement"))
 		return nil
 	}
-	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentImplement), nc)
+	return runEntrypoint(projectRoot, prependRunIntent(args, runIntentImplement))
 }
 
-func runImplement(projectRoot string, args []string, nc *nextConfigJSON) error {
+func runImplement(projectRoot string, args []string) error {
 	opts, err := parsePhaseOptions("implement", args)
 	if err != nil {
 		return err
 	}
-	return runPhaseAction(projectRoot, implementPhaseSpec(), opts, nc)
+	return runPhaseAction(projectRoot, implementPhaseSpec(), opts)
 }
 
 func implementPhaseSpec() phaseActionSpec {
 	return phaseActionSpec{
 		Kind:         "implement",
-		Mode:         goalx.ModeDevelop,
+		Mode:         goalx.ModeWorker,
 		NoContextErr: "no reports/summary found in %s",
 		DraftHeader:  "# goalx manual draft — implement fixes from %s\n",
 		DefaultHints: implementPhaseHints,

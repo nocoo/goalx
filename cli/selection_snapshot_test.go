@@ -14,8 +14,7 @@ type testSelectionSnapshot struct {
 	ExplicitSelection bool                           `json:"explicit_selection,omitempty"`
 	Policy            goalx.EffectiveSelectionPolicy `json:"policy"`
 	Master            goalx.MasterConfig             `json:"master"`
-	Research          goalx.SessionConfig            `json:"research"`
-	Develop           goalx.SessionConfig            `json:"develop"`
+	Worker            goalx.SessionConfig            `json:"worker"`
 }
 
 func testSelectionSnapshotPath(runDir string) string {

@@ -13,8 +13,7 @@ type SelectionSnapshot struct {
 	ExplicitSelection bool                           `json:"explicit_selection,omitempty"`
 	Policy            goalx.EffectiveSelectionPolicy `json:"policy"`
 	Master            goalx.MasterConfig             `json:"master"`
-	Research          goalx.SessionConfig            `json:"research"`
-	Develop           goalx.SessionConfig            `json:"develop"`
+	Worker            goalx.SessionConfig            `json:"worker"`
 }
 
 func SelectionSnapshotPath(runDir string) string {
@@ -33,8 +32,7 @@ func BuildSelectionSnapshot(cfg *goalx.Config, policy goalx.EffectiveSelectionPo
 		ExplicitSelection: explicit,
 		Policy:            copySelectionPolicy(policy),
 		Master:            cfg.Master,
-		Research:          cfg.Roles.Research,
-		Develop:           cfg.Roles.Develop,
+		Worker:            cfg.Roles.Worker,
 	}
 }
 
@@ -71,30 +69,27 @@ func applySelectionSnapshotConfig(cfg *goalx.Config, snapshot *SelectionSnapshot
 		return
 	}
 	cfg.Master = snapshot.Master
-	cfg.Roles.Research = snapshot.Research
-	cfg.Roles.Develop = snapshot.Develop
+	if snapshot.Worker.Engine != "" || snapshot.Worker.Model != "" || snapshot.Worker.Effort != "" {
+		cfg.Roles.Worker = snapshot.Worker
+	}
 }
 
 func selectionPolicyEmpty(policy goalx.EffectiveSelectionPolicy) bool {
 	return len(policy.DisabledEngines) == 0 &&
 		len(policy.DisabledTargets) == 0 &&
 		len(policy.MasterCandidates) == 0 &&
-		len(policy.ResearchCandidates) == 0 &&
-		len(policy.DevelopCandidates) == 0 &&
+		len(policy.WorkerCandidates) == 0 &&
 		policy.MasterEffort == "" &&
-		policy.ResearchEffort == "" &&
-		policy.DevelopEffort == ""
+		policy.WorkerEffort == ""
 }
 
 func copySelectionPolicy(policy goalx.EffectiveSelectionPolicy) goalx.EffectiveSelectionPolicy {
 	return goalx.EffectiveSelectionPolicy{
-		DisabledEngines:    append([]string(nil), policy.DisabledEngines...),
-		DisabledTargets:    append([]string(nil), policy.DisabledTargets...),
-		MasterCandidates:   append([]string(nil), policy.MasterCandidates...),
-		ResearchCandidates: append([]string(nil), policy.ResearchCandidates...),
-		DevelopCandidates:  append([]string(nil), policy.DevelopCandidates...),
-		MasterEffort:       policy.MasterEffort,
-		ResearchEffort:     policy.ResearchEffort,
-		DevelopEffort:      policy.DevelopEffort,
+		DisabledEngines:  append([]string(nil), policy.DisabledEngines...),
+		DisabledTargets:  append([]string(nil), policy.DisabledTargets...),
+		MasterCandidates: append([]string(nil), policy.MasterCandidates...),
+		WorkerCandidates: append([]string(nil), policy.WorkerCandidates...),
+		MasterEffort:     policy.MasterEffort,
+		WorkerEffort:     policy.WorkerEffort,
 	}
 }

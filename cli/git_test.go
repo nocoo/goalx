@@ -272,7 +272,7 @@ func TestDropRemovesRunDirectoryAndBranch(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
-	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
+	snapshot := []byte("name: drop-run\nmode: worker\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
 	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestDropSkipsSourceRootGitCleanupWhenProjectRootMissing(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
-	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
+	snapshot := []byte("name: drop-run\nmode: worker\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
 	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
@@ -382,7 +382,7 @@ func TestDropRefusesUnsavedRunWithArtifacts(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
-	snapshot := []byte("name: drop-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
+	snapshot := []byte("name: drop-run\nmode: worker\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
 	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
@@ -431,7 +431,7 @@ func TestDropAcceptsLegacySavedRun(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
-	snapshot := []byte("name: saved-run\nmode: research\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
+	snapshot := []byte("name: saved-run\nmode: worker\nobjective: demo\ntarget:\n  files: [\"report.md\"]\nlocal_validation:\n  command: \"test -f base.txt\"\n")
 	if err := os.WriteFile(RunSpecPath(runDir), snapshot, 0o644); err != nil {
 		t.Fatalf("write run snapshot: %v", err)
 	}
@@ -453,7 +453,7 @@ func TestInitBootstrapsGoalxExcludeRule(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	repo := initGitRepo(t)
-	if err := Init(repo, []string{"audit auth flow", "--research"}); err != nil {
+	if err := Init(repo, []string{"audit auth flow"}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 
@@ -507,7 +507,7 @@ func TestAttachDistinguishesDegradedTransportFromStoppedRun(t *testing.T) {
 
 	runDir := writeRunSpecFixture(t, repo, &goalx.Config{
 		Name:      "attach-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship it",
 		Master:    goalx.MasterConfig{Engine: "codex"},
 	})

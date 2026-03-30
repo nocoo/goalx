@@ -80,7 +80,7 @@ func TestMainSupportsResultCommand(t *testing.T) {
 
 	cfg := goalx.Config{
 		Name: "demo-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -109,7 +109,7 @@ func TestMainInitWritesPreviewManualDraftOnEmptyProject(t *testing.T) {
 	binPath := buildGoalxBinary(t, home)
 
 	projectRoot := t.TempDir()
-	out := runGoalx(t, binPath, home, projectRoot, "init", "ship it", "--develop", "--name", "demo")
+	out := runGoalx(t, binPath, home, projectRoot, "init", "ship it", "--name", "demo")
 	if !strings.Contains(out, "Generated") {
 		t.Fatalf("init output missing generated message:\n%s", out)
 	}
@@ -156,12 +156,11 @@ master:
 
 	writeSavedRunFixture(t, projectRoot, "research-a", goalx.Config{
 		Name:      "research-a",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth",
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
-			Research: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
-			Develop:  goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Target:          goalx.TargetConfig{Files: []string{"report.md"}},
 		LocalValidation: goalx.LocalValidationConfig{Command: "printf old\n"},
@@ -169,7 +168,7 @@ master:
 		"summary.md": "# research summary\n",
 	})
 
-	out := runGoalx(t, binPath, home, projectRoot, "run", "--from", "research-a", "--intent", "debate", "--write-config", "--research-role", "codex/gpt-5.4", "--name", "debate-a")
+	out := runGoalx(t, binPath, home, projectRoot, "run", "--from", "research-a", "--intent", "debate", "--write-config", "--worker", "codex/gpt-5.4", "--name", "debate-a")
 	if !strings.Contains(out, "Generated manual draft") {
 		t.Fatalf("debate output missing generated message:\n%s", out)
 	}
@@ -184,8 +183,8 @@ master:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "sonnet" {
 		t.Fatalf("master = %s/%s, want shared config claude-code/sonnet", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "codex" || cfg.Roles.Research.Model != "gpt-5.4" {
-		t.Fatalf("research = %s/%s, want codex/gpt-5.4", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "codex" || cfg.Roles.Worker.Model != "gpt-5.4" {
+		t.Fatalf("worker = %s/%s, want codex/gpt-5.4", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if len(cfg.Target.Files) != 1 || cfg.Target.Files[0] != "src/" {
 		t.Fatalf("target.files = %#v, want shared config target", cfg.Target.Files)
@@ -243,7 +242,7 @@ func TestRunCommandDispatchesRun(t *testing.T) {
 	called := false
 	mainRun = func(_ string, args []string) error {
 		called = true
-		want := []string{"ship it", "--intent", "research"}
+		want := []string{"ship it", "--intent", "deliver"}
 		if len(args) != len(want) {
 			t.Fatalf("args = %v, want %v", args, want)
 		}
@@ -255,7 +254,7 @@ func TestRunCommandDispatchesRun(t *testing.T) {
 		return nil
 	}
 
-	if err := runCommand(t.TempDir(), "run", []string{"ship it", "--intent", "research"}); err != nil {
+	if err := runCommand(t.TempDir(), "run", []string{"ship it", "--intent", "deliver"}); err != nil {
 		t.Fatalf("runCommand run: %v", err)
 	}
 	if !called {

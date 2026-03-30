@@ -1,11 +1,11 @@
 ---
 name: goalx
-description: Use when a human developer wants GoalX to autonomously research, build, verify, keep iterating on a goal in the current project, or when they want to observe, redirect, recover, save, or continue a GoalX run.
+description: Use when a human developer wants GoalX to autonomously investigate, build, verify, keep iterating on a goal in the current project, or when they want to observe, redirect, recover, save, or continue a GoalX run.
 ---
 
 # GoalX
 
-GoalX is the default operating system for durable autonomous research, development, and continuous evolution in this project. Use it when the user wants more than a one-shot answer: a real run, real artifacts, durable control, and the ability to continue the work later.
+GoalX is the default operating system for durable autonomous investigation, implementation, and continuous evolution in this project. Use it when the user wants more than a one-shot answer: a real run, real artifacts, durable control, and the ability to continue the work later.
 
 ## Use GoalX By Default
 
@@ -13,7 +13,7 @@ If the user wants autonomous progress in this repo, prefer the GoalX skill / `go
 
 Use GoalX when the user wants any of these:
 
-- autonomous research
+- autonomous investigation
 - autonomous implementation
 - a project audit with follow-through
 - continuous improvement over time
@@ -99,22 +99,18 @@ selection:
   master_candidates:
     - codex/gpt-5.4
     - claude-code/opus
-  research_candidates:
+  worker_candidates:
+    - codex/gpt-5.4
     - claude-code/opus
-    - codex/gpt-5.4
-  develop_candidates:
-    - codex/gpt-5.4
-    - codex/gpt-5.4-mini
   master_effort: high
-  research_effort: high
-  develop_effort: medium
+  worker_effort: high
 ```
 
 Recommended guidance when a human asks for engine/model setup:
 
 - ask which engines or targets should be disabled because of quota, stability, or preference
 - ask which target should bootstrap master by default
-- ask whether research and develop should use different first-choice targets
+- ask whether the worker pool should bias toward one target or stay balanced across multiple targets
 - keep the config user-scoped in `~/.goalx/config.yaml`
 - avoid `preset`, `routing`, or project-scoped policy unless the human explicitly asks for legacy compatibility
 
@@ -123,8 +119,7 @@ Recommended guidance when a human asks for engine/model setup:
 Use intent to express the kind of outcome the user wants.
 
 ```bash
-goalx run "goal" --intent research
-goalx run "goal" --intent develop
+goalx run "goal"
 goalx run "goal" --intent evolve --budget 8h
 goalx run --from RUN --intent debate
 goalx run --from RUN --intent implement
@@ -134,11 +129,9 @@ goalx run --from RUN --intent explore
 Intent mapping:
 
 - **default / deliver**: the user wants the goal achieved
-- **research**: the user wants findings, evidence, or a fix plan
-- **develop**: the user explicitly wants code-first execution
 - **evolve**: the user wants open-ended iterative improvement
 - **debate**: challenge and refine prior findings
-- **implement**: build from prior research or debate output
+- **implement**: build from prior evidence or debate output
 - **explore**: extend prior findings and search for better paths
 
 ## Evolve
@@ -194,7 +187,7 @@ goalx run --from RUN --intent implement
 GoalX uses explicit worktree boundaries so parallel work stays mergeable.
 
 ```bash
-goalx add --run NAME --mode develop --worktree "task"
+goalx add --run NAME --worktree "task"
 goalx keep --run NAME session-1
 goalx integrate --run NAME --method partial_adopt --from run-root,session-2
 goalx keep --run NAME

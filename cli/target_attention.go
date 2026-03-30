@@ -218,7 +218,7 @@ func deriveTargetAttentionState(facts TargetAttentionFacts) string {
 	switch {
 	case presence == TargetPresenceParked:
 		return TargetAttentionHealthy
-	case runtimeState == "parked" || runtimeState == "kept":
+	case runtimeState == "parked" || runtimeState == "kept" || runtimeState == "stopped":
 		return TargetAttentionHealthy
 	case (runtimeState == "active" || runtimeState == "progress" || runtimeState == "working" || runtimeState == "idle") && presence != "" && presence != TargetPresencePresent && presence != TargetPresenceUnknown:
 		return TargetAttentionOwnershipRisky

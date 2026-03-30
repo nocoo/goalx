@@ -63,22 +63,19 @@ func Review(projectRoot string, args []string) error {
 		entries, _ := goalx.LoadJournal(jPath)
 		fmt.Printf("Journal: %s\n", goalx.Summary(entries))
 
-		// Mode-specific output
 		identity, err := RequireSessionIdentity(rc.RunDir, sName)
 		if err != nil {
 			return fmt.Errorf("load %s identity: %w", sName, err)
 		}
-		if goalx.Mode(identity.Mode) == goalx.ModeResearch {
-			reportPath := ""
-			if artifact := FindSessionArtifact(manifest, sName, "report"); artifact != nil {
-				reportPath = artifact.Path
-			}
-			if reportPath == "" {
-				reportPath = findSessionReport(workdir, identity.Target.Files)
-			}
-			if reportPath != "" {
-				printFirstLines(reportPath, 20)
-			}
+		reportPath := ""
+		if artifact := FindSessionArtifact(manifest, sName, "report"); artifact != nil {
+			reportPath = artifact.Path
+		}
+		if reportPath == "" {
+			reportPath = findSessionReport(workdir, identity.Target.Files)
+		}
+		if reportPath != "" {
+			printFirstLines(reportPath, 20)
 		} else {
 			out, err := exec.Command("git", "-C", workdir, "diff", "--stat", "HEAD~5").Output()
 			if err == nil && len(out) > 0 {

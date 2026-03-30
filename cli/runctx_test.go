@@ -24,7 +24,7 @@ func TestResolveRunPrefersFocusedRun(t *testing.T) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}
-	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: beta\nmode: develop\nobjective: keep moving\n"), 0o644); err != nil {
+	if err := os.WriteFile(RunSpecPath(runDir), []byte("name: beta\nmode: worker\nobjective: keep moving\n"), 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
 
@@ -59,7 +59,7 @@ func TestResolveRunUsesLocalRunForBareExplicitName(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "global-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -106,7 +106,7 @@ func TestResolveRunDoesNotUseBareGlobalLookup(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "shared-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -146,7 +146,7 @@ func TestResolveRunUsesExplicitProjectSelectorForCrossProjectRun(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "global-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -179,7 +179,7 @@ func TestResolveRunUsesRunIDSelectorAcrossProjects(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "global-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
@@ -220,7 +220,7 @@ func TestResolveRunPrefersLocalRunNameThatLooksLikeRunID(t *testing.T) {
 
 	cfg := &goalx.Config{
 		Name:      "run_demo",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}

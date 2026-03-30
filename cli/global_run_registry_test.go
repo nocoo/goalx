@@ -17,7 +17,7 @@ func TestGlobalRunRegistryLookupHydratesRunIDFromRunScopedMetadata(t *testing.T)
 
 	cfg := &goalx.Config{
 		Name:      "alpha",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit alpha",
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
@@ -65,7 +65,7 @@ func TestUpsertGlobalRunPreservesConcurrentEntries(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		configs = append(configs, &goalx.Config{
 			Name:      fmt.Sprintf("run-%d", i),
-			Mode:      goalx.ModeDevelop,
+			Mode:      goalx.ModeWorker,
 			Objective: fmt.Sprintf("ship run %d", i),
 		})
 	}

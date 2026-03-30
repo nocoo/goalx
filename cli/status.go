@@ -313,13 +313,21 @@ func targetLossSummary(rc *RunContext) string {
 		return ""
 	}
 	parts := make([]string, 0, 4)
-	if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+	if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
+		if label := targetPresenceMissingLabel("master", facts); label != "" {
+			parts = append(parts, label)
+		}
+	} else if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
 		parts = append(parts, label)
 	}
 	if indexes, err := existingSessionIndexes(rc.RunDir); err == nil {
 		for _, idx := range indexes {
 			name := SessionName(idx)
-			if label := transportMissingLabel(name, loadTransportTargetFacts(rc.RunDir, name)); label != "" {
+			if facts, factsErr := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, name); factsErr == nil {
+				if label := targetPresenceMissingLabel(name, facts); label != "" {
+					parts = append(parts, label)
+				}
+			} else if label := transportMissingLabel(name, loadTransportTargetFacts(rc.RunDir, name)); label != "" {
 				parts = append(parts, label)
 			}
 		}

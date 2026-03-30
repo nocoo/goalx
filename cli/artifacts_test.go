@@ -121,7 +121,7 @@ func TestBuildRunArtifactsManifestPrefersRunReportsDir(t *testing.T) {
 	}
 
 	seedSaveRunProvenance(t, t.TempDir(), runDir, runName, "collect reports")
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", goalx.TargetConfig{Files: []string{"report.md"}}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "", goalx.TargetConfig{Files: []string{"report.md"}}, goalx.LocalValidationConfig{})
 
 	runReport := filepath.Join(reportsDir, "session-1-report.md")
 	if err := os.WriteFile(runReport, []byte("run report\n"), 0o644); err != nil {
@@ -153,7 +153,7 @@ func TestBuildRunArtifactsManifestFallsBackToSessionWorktree(t *testing.T) {
 	}
 
 	seedSaveRunProvenance(t, t.TempDir(), runDir, runName, "collect reports")
-	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeResearch, "codex", "", goalx.TargetConfig{Files: []string{"report.md"}}, goalx.LocalValidationConfig{})
+	seedSaveSessionIdentity(t, runDir, "session-1", goalx.ModeWorker, "codex", "", goalx.TargetConfig{Files: []string{"report.md"}}, goalx.LocalValidationConfig{})
 
 	legacyReport := filepath.Join(wtPath, "report.md")
 	if err := os.WriteFile(legacyReport, []byte("legacy report\n"), 0o644); err != nil {

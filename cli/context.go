@@ -120,11 +120,8 @@ func renderContextIndex(index *ContextIndex) string {
 		if identity.RoleContracts.Master != nil {
 			writeContextLine("Master role", identity.RoleContracts.Master.Mandate)
 		}
-		if identity.RoleContracts.ResearchSubagent != nil {
-			writeContextLine("Research role", identity.RoleContracts.ResearchSubagent.Mandate)
-		}
-		if identity.RoleContracts.DevelopSubagent != nil {
-			writeContextLine("Develop role", identity.RoleContracts.DevelopSubagent.Mandate)
+		if identity.RoleContracts.Worker != nil {
+			writeContextLine("Worker role", identity.RoleContracts.Worker.Mandate)
 		}
 	}
 	if index.GoalBoundary != nil {
@@ -223,11 +220,8 @@ func renderContextIndex(index *ContextIndex) string {
 		if len(index.Selection.MasterCandidates) > 0 {
 			writeContextLine("Master candidates", strings.Join(index.Selection.MasterCandidates, ", "))
 		}
-		if len(index.Selection.ResearchCandidates) > 0 {
-			writeContextLine("Research candidates", strings.Join(index.Selection.ResearchCandidates, ", "))
-		}
-		if len(index.Selection.DevelopCandidates) > 0 {
-			writeContextLine("Develop candidates", strings.Join(index.Selection.DevelopCandidates, ", "))
+		if len(index.Selection.WorkerCandidates) > 0 {
+			writeContextLine("Worker candidates", strings.Join(index.Selection.WorkerCandidates, ", "))
 		}
 		if len(index.Selection.DisabledEngines) > 0 {
 			writeContextLine("Disabled engines", strings.Join(index.Selection.DisabledEngines, ", "))

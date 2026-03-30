@@ -3,6 +3,8 @@ package cli
 import (
 	"strings"
 	"testing"
+
+	goalx "github.com/vonbai/goalx"
 )
 
 func TestLoadRunStatusRecordParsesCanonicalShape(t *testing.T) {
@@ -90,5 +92,41 @@ func TestSaveRunStatusRecordRejectsRequiredRemainingDriftFromGoal(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "required_remaining=0 does not match goal required_remaining=1") {
 		t.Fatalf("SaveRunStatusRecord error = %v, want required_remaining drift", err)
+	}
+}
+
+func TestBuildRunStatusComparisonIncludesRuntimeActiveSessionDrift(t *testing.T) {
+	runDir := t.TempDir()
+	requiredRemaining := 1
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseWorking,
+		RequiredRemaining: &requiredRemaining,
+		ActiveSessions:    []string{"session-3", "session-4"},
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "active", Mode: string(goalx.ModeWorker)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-1: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-3", State: "parked", Mode: string(goalx.ModeWorker)}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState session-3: %v", err)
+	}
+
+	comparison, err := BuildRunStatusComparison(runDir)
+	if err != nil {
+		t.Fatalf("BuildRunStatusComparison: %v", err)
+	}
+	if comparison == nil {
+		t.Fatal("BuildRunStatusComparison returned nil")
+	}
+	if comparison.ActiveSessionsMatch {
+		t.Fatalf("ActiveSessionsMatch = true, want false: %+v", comparison)
+	}
+	if got := strings.Join(comparison.StatusActiveSessions, ","); got != "session-3,session-4" {
+		t.Fatalf("StatusActiveSessions = %q, want session-3,session-4", got)
+	}
+	if got := strings.Join(comparison.RuntimeActiveSessions, ","); got != "session-1" {
+		t.Fatalf("RuntimeActiveSessions = %q, want session-1", got)
 	}
 }

@@ -58,7 +58,11 @@ func Observe(projectRoot string, args []string) error {
 
 		fmt.Println("### master")
 		printObserveMasterQueue(rc.RunDir)
-		if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+		if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
+			if label := targetPresenceObserveLabel("master", facts); label != "" {
+				fmt.Println(label)
+			}
+		} else if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
 			fmt.Println(label)
 		}
 		printJournalExcerpt(filepath.Join(rc.RunDir, "master.jsonl"))
@@ -72,7 +76,11 @@ func Observe(projectRoot string, args []string) error {
 		for _, num := range sessionIndexes {
 			fmt.Printf("### %s\n", SessionName(num))
 			printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState)
-			if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
+			if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, SessionName(num)); err == nil {
+				if label := targetPresenceObserveLabel(SessionName(num), facts); label != "" {
+					fmt.Println(label)
+				}
+			} else if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 				fmt.Println(label)
 			}
 			printJournalExcerpt(JournalPath(rc.RunDir, SessionName(num)))
@@ -83,7 +91,13 @@ func Observe(projectRoot string, args []string) error {
 
 	fmt.Println("### master")
 	printObserveMasterQueue(rc.RunDir)
-	if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
+	if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
+		if label := targetPresenceObserveLabel("master", facts); label != "" {
+			fmt.Println(label)
+		} else {
+			printPaneCapture(rc.TmuxSession, "master")
+		}
+	} else if label := transportMissingLabel("master", loadTransportTargetFacts(rc.RunDir, "master")); label != "" {
 		fmt.Println(label)
 	} else {
 		printPaneCapture(rc.TmuxSession, "master")
@@ -100,7 +114,13 @@ func Observe(projectRoot string, args []string) error {
 		windowName := sessionWindowName(rc.Config.Name, num)
 		fmt.Printf("### %s\n", SessionName(num))
 		printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState)
-		if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
+		if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, SessionName(num)); err == nil {
+			if label := targetPresenceObserveLabel(SessionName(num), facts); label != "" {
+				fmt.Println(label)
+			} else {
+				printPaneCapture(rc.TmuxSession, windowName)
+			}
+		} else if label := transportMissingLabel(SessionName(num), loadTransportTargetFacts(rc.RunDir, SessionName(num))); label != "" {
 			fmt.Println(label)
 		} else {
 			printPaneCapture(rc.TmuxSession, windowName)

@@ -43,7 +43,7 @@ master:
   engine: codex
   model: gpt-5.4
 roles:
-  research:
+  worker:
     engine: codex
     model: gpt-5.4
 target:
@@ -53,7 +53,7 @@ local_validation:
 `)
 	writeResolvedSavedRunFixture(t, projectRoot, "research-a", launchOptions{
 		Objective: "audit auth flow",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 	}, map[string]string{
 		"summary.md":          "# summary\n",
 		"session-1-report.md": "# report\n",
@@ -65,7 +65,7 @@ master:
   engine: claude-code
   model: opus
 roles:
-  research:
+  worker:
     engine: claude-code
     model: sonnet
 target:
@@ -90,8 +90,8 @@ context:
 	if cfg.Master.Engine != "claude-code" || cfg.Master.Model != "opus" {
 		t.Fatalf("master = %s/%s, want claude-code/opus", cfg.Master.Engine, cfg.Master.Model)
 	}
-	if cfg.Roles.Research.Engine != "claude-code" || cfg.Roles.Research.Model != "sonnet" {
-		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Research.Engine, cfg.Roles.Research.Model)
+	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "sonnet" {
+		t.Fatalf("research role = %s/%s, want claude-code/sonnet", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
 	if len(cfg.Context.Refs) != 1 || cfg.Context.Refs[0] != "ticket-123" {
 		t.Fatalf("context.refs = %#v, want ticket-123", cfg.Context.Refs)
@@ -158,7 +158,7 @@ func writeSavedPhaseSourceFixture(t *testing.T, projectRoot, runName, phaseKind 
 	t.Helper()
 	cfg := goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
 		Parallel:  2,
 		Master: goalx.MasterConfig{

@@ -12,12 +12,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestResultPrintsLatestResearchSummary(t *testing.T) {
+func TestResultPrintsLatestSavedSummary(t *testing.T) {
 	projectRoot := t.TempDir()
 
 	olderDir := writeSavedResultRun(t, projectRoot, "older-run", goalx.Config{
 		Name: "older-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -26,7 +26,7 @@ func TestResultPrintsLatestResearchSummary(t *testing.T) {
 	})
 	newerDir := writeSavedResultRun(t, projectRoot, "newer-run", goalx.Config{
 		Name: "newer-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -52,7 +52,7 @@ func TestResultPrintsLatestResearchSummary(t *testing.T) {
 	}
 }
 
-func TestResultPrintsDevelopBranchSummary(t *testing.T) {
+func TestResultPrintsBranchSummaryFromIntegration(t *testing.T) {
 	projectRoot := initGitRepo(t)
 	writeAndCommit(t, projectRoot, "README.md", "base\n", "base commit")
 
@@ -64,19 +64,19 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 
 	runDir := writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
 		Name: "dev-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
 	}, nil)
 
 	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
-		Version:             1,
-		CurrentExperimentID: "exp-1",
-		CurrentBranch:       branch,
-		CurrentCommit:       strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
-		LastIntegrationID:   "int-1",
-		LastMethod:          "keep",
+		Version:                 1,
+		CurrentExperimentID:     "exp-1",
+		CurrentBranch:           branch,
+		CurrentCommit:           strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
+		LastIntegrationID:       "int-1",
+		LastMethod:              "keep",
 		LastSourceExperimentIDs: []string{"exp-1"},
 	}); err != nil {
 		t.Fatalf("SaveIntegrationState: %v", err)
@@ -100,7 +100,7 @@ func TestResultPrintsDevelopBranchSummary(t *testing.T) {
 	}
 }
 
-func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
+func TestResultPrefersSummarySurfaceWhenAvailable(t *testing.T) {
 	projectRoot := initGitRepo(t)
 	writeAndCommit(t, projectRoot, "README.md", "base\n", "base commit")
 
@@ -112,7 +112,7 @@ func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
 
 	runDir := writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
 		Name: "dev-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
@@ -121,12 +121,12 @@ func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
 	})
 
 	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
-		Version:             1,
-		CurrentExperimentID: "exp-1",
-		CurrentBranch:       branch,
-		CurrentCommit:       strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
-		LastIntegrationID:   "int-1",
-		LastMethod:          "keep",
+		Version:                 1,
+		CurrentExperimentID:     "exp-1",
+		CurrentBranch:           branch,
+		CurrentCommit:           strings.TrimSpace(gitOutput(t, projectRoot, "rev-parse", branch)),
+		LastIntegrationID:       "int-1",
+		LastMethod:              "keep",
 		LastSourceExperimentIDs: []string{"exp-1"},
 	}); err != nil {
 		t.Fatalf("SaveIntegrationState: %v", err)
@@ -146,12 +146,12 @@ func TestResultPrefersSummarySurfaceForDevelopRuns(t *testing.T) {
 	}
 }
 
-func TestResultFailsWhenDevelopIntegrationMissing(t *testing.T) {
+func TestResultFailsWhenIntegrationMissing(t *testing.T) {
 	projectRoot := t.TempDir()
 
 	writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
 		Name: "dev-run",
-		Mode: goalx.ModeDevelop,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},
@@ -159,7 +159,7 @@ func TestResultFailsWhenDevelopIntegrationMissing(t *testing.T) {
 
 	err := Result(projectRoot, []string{"dev-run"})
 	if err == nil {
-		t.Fatal("expected develop result to fail without integration.json")
+		t.Fatal("expected result to fail without integration.json")
 	}
 	if !strings.Contains(err.Error(), "integration.json") {
 		t.Fatalf("Result error = %v, want integration.json failure", err)
@@ -171,7 +171,7 @@ func TestResultPrintsSmartResearchSummaryByDefault(t *testing.T) {
 
 	writeSavedResultRun(t, projectRoot, "smart-run", goalx.Config{
 		Name: "smart-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -239,7 +239,7 @@ hidden details
 `) + "\n"
 	writeSavedResultRun(t, projectRoot, "smart-run", goalx.Config{
 		Name: "smart-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -263,7 +263,7 @@ func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
 
 	runDir := writeSavedResultRun(t, projectRoot, "report-only-run", goalx.Config{
 		Name: "report-only-run",
-		Mode: goalx.ModeResearch,
+		Mode: goalx.ModeWorker,
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -278,7 +278,7 @@ func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
 		Sessions: []SessionArtifacts{
 			{
 				Name: "session-1",
-				Mode: string(goalx.ModeResearch),
+				Mode: string(goalx.ModeWorker),
 				Artifacts: []ArtifactMeta{
 					{Kind: "report", Path: reportPath, RelPath: "custom-findings.txt", DurableName: "session-1-report.md"},
 				},
@@ -303,7 +303,7 @@ func TestResultFallsBackToActiveResearchReportWhenSavedRunMissing(t *testing.T) 
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "active-run",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "inspect repo",
 		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
 	}
@@ -331,7 +331,7 @@ func TestResultFallsBackToActiveReportBeforeDevelopSelectionExists(t *testing.T)
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "active-run",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "inspect repo",
 		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
 	}
@@ -363,7 +363,7 @@ func TestResultReadsLegacyProjectScopedSavedRun(t *testing.T) {
 	}
 	cfg := goalx.Config{
 		Name:   "legacy-run",
-		Mode:   goalx.ModeResearch,
+		Mode:   goalx.ModeWorker,
 		Target: goalx.TargetConfig{Files: []string{"report.md"}},
 	}
 	data, err := yaml.Marshal(&cfg)

@@ -205,7 +205,7 @@ func TestResumeUsesRunWorktreeWhenSessionHasNoDedicatedWorktree(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:       "session-1",
 		State:      "parked",
-		Mode:       string(goalx.ModeDevelop),
+		Mode:       string(goalx.ModeWorker),
 		Branch:     "goalx/" + runName + "/1",
 		OwnerScope: "db race triage",
 	}); err != nil {
@@ -293,7 +293,7 @@ esac
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "parked",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: WorktreePath(runDir, runName, 1),
 		OwnerScope:   "db race triage",
@@ -397,12 +397,12 @@ func TestResumeUsesDurableSessionIdentityInsteadOfCurrentConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
-	cfg.Roles.Research.Engine = "claude-code"
-	cfg.Roles.Research.Model = "opus"
+	cfg.Roles.Worker.Engine = "claude-code"
+	cfg.Roles.Worker.Model = "opus"
 	cfg.Sessions = []goalx.SessionConfig{{
 		Engine: "claude-code",
 		Model:  "opus",
-		Mode:   goalx.ModeResearch,
+		Mode:   goalx.ModeWorker,
 		Target: &goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
 		LocalValidation: &goalx.LocalValidationConfig{
 			Command: "test -s report.md",
@@ -533,7 +533,7 @@ func TestReplaceCreatesReplacementSessionWithExplicitOverrideAndLineage(t *testi
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: session1WT,
 	}); err != nil {
@@ -863,7 +863,7 @@ esac
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: session1WT,
 	}); err != nil {
@@ -877,7 +877,7 @@ esac
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
-	cfg.Roles.Research = goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh}
+	cfg.Roles.Worker = goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh}
 	if err := SaveRunSpec(runDir, cfg); err != nil {
 		t.Fatalf("SaveRunSpec: %v", err)
 	}
@@ -889,7 +889,7 @@ esac
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
 
-	err = Replace(repo, []string{"--run", runName, "session-1", "--mode", "research", "--effort", "high"})
+	err = Replace(repo, []string{"--run", runName, "session-1", "--effort", "high"})
 	if err == nil || !strings.Contains(err.Error(), "create tmux window") {
 		t.Fatalf("Replace error = %v, want replacement launch failure", err)
 	}
@@ -1019,7 +1019,7 @@ esac
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: session1WT,
 	}); err != nil {
@@ -1033,7 +1033,7 @@ esac
 	if err != nil {
 		t.Fatalf("LoadRunSpec: %v", err)
 	}
-	cfg.Roles.Research = goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh}
+	cfg.Roles.Worker = goalx.SessionConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh}
 	if err := SaveRunSpec(runDir, cfg); err != nil {
 		t.Fatalf("SaveRunSpec: %v", err)
 	}
@@ -1045,7 +1045,7 @@ esac
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
 
-	err = Replace(repo, []string{"--run", runName, "session-1", "--mode", "research", "--effort", "high"})
+	err = Replace(repo, []string{"--run", runName, "session-1", "--effort", "high"})
 	if err == nil || !strings.Contains(err.Error(), "launch handshake") {
 		t.Fatalf("Replace error = %v, want replacement launch handshake failure", err)
 	}
@@ -1131,7 +1131,7 @@ func TestReplaceRejectsDirtyDedicatedWorktreeTakeover(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:         "session-1",
 		State:        "active",
-		Mode:         string(goalx.ModeDevelop),
+		Mode:         string(goalx.ModeWorker),
 		Branch:       "goalx/" + runName + "/1",
 		WorktreePath: session1WT,
 	}); err != nil {
@@ -1193,7 +1193,7 @@ func TestStatusShowsParkedSessionStateFromRuntime(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:       "session-1",
 		State:      "parked",
-		Mode:       string(goalx.ModeDevelop),
+		Mode:       string(goalx.ModeWorker),
 		OwnerScope: "db race triage",
 		LastRound:  3,
 	}); err != nil {
@@ -1305,10 +1305,10 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 
 	cfg := goalx.Config{
 		Name:      runName,
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "fix pipeline",
 		Roles: goalx.RoleDefaultsConfig{
-			Develop: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
 		Master: goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		Sessions: []goalx.SessionConfig{
@@ -1374,7 +1374,7 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err := SaveIdentityFence(IdentityFencePath(runDir), fence); err != nil {
 		t.Fatalf("SaveIdentityFence: %v", err)
 	}
-	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeDevelop, "codex", "gpt-5.4", "", "", "", cfg.Target)
+	identity, err := NewSessionIdentity(runDir, "session-1", "master-derived-develop", goalx.ModeWorker, "codex", "gpt-5.4", "", "", "", cfg.Target)
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}

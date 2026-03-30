@@ -16,7 +16,7 @@ Without a session name:
 - skip the merge when the run tree is already integrated
 
 With session-N:
-- merge that develop session branch into the run worktree
+- merge that worker session branch into the run worktree
 - only committed session branch history is merged
 - dirty session worktrees must be committed first
 - require a recorded session parent/base ref to define the merge boundary

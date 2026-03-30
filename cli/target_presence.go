@@ -84,6 +84,29 @@ func targetPresenceMissing(facts TargetPresenceFacts) bool {
 	return state != "" && state != TargetPresencePresent && state != TargetPresenceUnknown && state != TargetPresenceParked
 }
 
+func targetPresenceMissingLabel(target string, facts TargetPresenceFacts) string {
+	switch strings.TrimSpace(facts.State) {
+	case TargetPresenceSessionMissing:
+		return target + " session missing"
+	case TargetPresenceWindowMissing:
+		return target + " window missing"
+	case TargetPresencePaneMissing:
+		return target + " pane missing"
+	default:
+		return ""
+	}
+}
+
+func targetPresenceObserveLabel(target string, facts TargetPresenceFacts) string {
+	if label := targetPresenceMissingLabel(target, facts); label != "" {
+		return label
+	}
+	if strings.TrimSpace(facts.State) == TargetPresenceParked {
+		return target + " parked"
+	}
+	return ""
+}
+
 func buildTmuxTargetPresence(target, kind, window, checkedAt string, sessionExists, windowExpected bool, windowsByName map[string]struct{}, panesByWindow map[string]tmuxPaneRef) TargetPresenceFacts {
 	facts := TargetPresenceFacts{
 		Target:          target,

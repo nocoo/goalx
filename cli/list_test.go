@@ -18,7 +18,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 
 	activeRun := writeRunSpecFixture(t, repo, &goalx.Config{
 		Name:      "alpha",
-		Mode:      goalx.ModeDevelop,
+		Mode:      goalx.ModeWorker,
 		Objective: "ship alpha",
 	})
 	if err := SaveControlRunState(ControlRunStatePath(activeRun), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
@@ -30,7 +30,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 
 	degradedRun := writeRunSpecFixture(t, repo, &goalx.Config{
 		Name:      "beta",
-		Mode:      goalx.ModeResearch,
+		Mode:      goalx.ModeWorker,
 		Objective: "audit beta",
 	})
 	if err := SaveControlRunState(ControlRunStatePath(degradedRun), &ControlRunState{Version: 1, LifecycleState: "active"}); err != nil {
@@ -52,7 +52,7 @@ func TestListShowsDerivedStatusAndCanonicalSelector(t *testing.T) {
 		"alpha",
 		"active",
 		"beta",
-		"stranded",
+		"degraded",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("list output missing %q:\n%s", want, out)

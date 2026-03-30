@@ -13,7 +13,7 @@ import (
 func TestObserveShowsRunRuntimeStateAndRunStatusRecord(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 
-	runState := `{"version":1,"run":"guidance-run","mode":"develop","active":true,"updated_at":"2026-03-25T00:00:00Z"}`
+	runState := `{"version":1,"run":"guidance-run","mode":"worker","active":true,"updated_at":"2026-03-25T00:00:00Z"}`
 	if err := os.WriteFile(RunRuntimeStatePath(runDir), []byte(runState), 0o644); err != nil {
 		t.Fatalf("write run runtime state: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestObserveShowsSessionLaunchFacts(t *testing.T) {
 	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
-	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "", goalx.TargetConfig{})
+	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeWorker, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "", goalx.TargetConfig{})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestObserveShowsSessionLaunchFacts(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "active",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestObserveShowsSessionLaunchFacts(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"Launch: mode=develop engine=codex/gpt-5.4-mini effort=high/xhigh",
+		"Launch: mode=worker engine=codex/gpt-5.4-mini effort=high/xhigh",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)
@@ -214,7 +214,7 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
-	identity, err := NewSessionIdentity(runDir, "session-1", "research", goalx.ModeResearch, "claude-code", "opus", goalx.EffortHigh, "high", "", goalx.TargetConfig{})
+	identity, err := NewSessionIdentity(runDir, "session-1", "research", goalx.ModeWorker, "claude-code", "opus", goalx.EffortHigh, "high", "", goalx.TargetConfig{})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestObserveShowsSessionTransportFacts(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "active",
-		Mode:  string(goalx.ModeResearch),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
-	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeDevelop, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "", goalx.TargetConfig{})
+	identity, err := NewSessionIdentity(runDir, "session-1", "develop", goalx.ModeWorker, "codex", "gpt-5.4-mini", goalx.EffortHigh, "xhigh", "", goalx.TargetConfig{})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestObserveShowsProviderDialogFactsForMasterAndSession(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "active",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
@@ -605,10 +605,10 @@ func TestObserveShowsExplicitCoverageFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
-	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-4", State: "idle", Mode: string(goalx.ModeDevelop)}); err != nil {
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-4", State: "idle", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-4: %v", err)
 	}
-	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-5", State: "parked", Mode: string(goalx.ModeDevelop)}); err != nil {
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-5", State: "parked", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-5: %v", err)
 	}
 
@@ -920,7 +920,7 @@ func TestObserveWarnsAboutMasterOrphanedAndPrematureBlockedFrontierFacts(t *test
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
-	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-4", State: "idle", Mode: string(goalx.ModeDevelop)}); err != nil {
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-4", State: "idle", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState session-4: %v", err)
 	}
 
@@ -961,7 +961,7 @@ func TestObserveShowsSharedRunRootWorktreeSummary(t *testing.T) {
 	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
-	identity, err := NewSessionIdentity(runDir, "session-1", "shared slice", goalx.ModeDevelop, "codex", "gpt-5.4", goalx.EffortMedium, "medium", "", goalx.TargetConfig{})
+	identity, err := NewSessionIdentity(runDir, "session-1", "shared slice", goalx.ModeWorker, "codex", "gpt-5.4", goalx.EffortMedium, "medium", "", goalx.TargetConfig{})
 	if err != nil {
 		t.Fatalf("NewSessionIdentity: %v", err)
 	}
@@ -971,7 +971,7 @@ func TestObserveShowsSharedRunRootWorktreeSummary(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
 		Name:  "session-1",
 		State: "active",
-		Mode:  string(goalx.ModeDevelop),
+		Mode:  string(goalx.ModeWorker),
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}

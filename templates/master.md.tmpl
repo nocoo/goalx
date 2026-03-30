@@ -25,11 +25,11 @@ You are the **orchestrator** of this run.
 {{end}}
 {{- end}}
 
-### Mode
-{{if eq .Mode "auto"}}
-No mode was specified. Determine the best approach (research, develop, or hybrid) based on the objective. You have full autonomy to decide.
-{{else if .Mode}}
-The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
+### Intent Guidance
+{{if .Intent}}
+The user specified `intent={{.Intent}}`. Treat intent as output/strategy guidance, not a separate runtime mode.
+{{else}}
+No explicit intent was provided. Choose the best execution path yourself.
 {{- end}}
 
 ### Run
@@ -64,7 +64,7 @@ The user specified **{{.Mode}}** mode. Use this as guidance for your approach.
 - Bias toward producing meaningful code or system improvements, not stopping at diagnosis alone.
 - When exploring divergent paths, use isolated worktrees and explicit base branches instead of mutating one branch blindly.
 - Base-branch fork pattern: `goalx add --run {{.RunName}} --worktree --base-branch session-N`
-- Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..." --mode develop` when a trial should fork from an existing session result.
+- Use `goalx add --run {{.RunName}} --worktree --base-branch session-N "..."` when a trial should fork from an existing session result.
 - Keep the current best path visible in durable state, and close weaker trials with `experiment.closed` instead of leaving them implicitly abandoned.
 - Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned or rejected experiments for humans in the final writeup.
 {{end}}
@@ -86,16 +86,13 @@ goalx dimension [--run NAME] <session-N> --remove depth
 {{end}}
 Write supporting findings to `{{.ReportsDir}}`. The final user-facing run result belongs in `{{.SummaryPath}}`.
 
-{{if or .Preferences.Research.Guidance .Preferences.Develop.Guidance .Preferences.Simple.Guidance}}
+{{if or .Preferences.Worker.Guidance .Preferences.Simple.Guidance}}
 ### Preferences
 
 | Scenario | Guidance |
 |----------|----------|
-{{- if .Preferences.Research.Guidance}}
-| Research | {{.Preferences.Research.Guidance}} |
-{{- end}}
-{{- if .Preferences.Develop.Guidance}}
-| Develop | {{.Preferences.Develop.Guidance}} |
+{{- if .Preferences.Worker.Guidance}}
+| Worker | {{.Preferences.Worker.Guidance}} |
 {{- end}}
 {{- if .Preferences.Simple.Guidance}}
 | Simple | {{.Preferences.Simple.Guidance}} |
@@ -117,8 +114,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Treat configured `parallel` as initial fan-out guidance, not a permanent ceiling; you may still add or resume more durable workers later when the goal warrants it.
 - Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.
 - Sessions without dedicated worktrees share the run worktree. Do not launch multiple simultaneous no-worktree sessions that modify files. Use `goalx add --worktree` for parallel isolation.
-- Worktree-based sessions may fork from the run root or from another session. Do not assume every develop session branch is rooted directly on the run worktree.
-- When dispatching parallel develop work, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.
+- Worktree-based sessions may fork from the run root or from another session. Do not assume every worker branch is rooted directly on the run worktree.
+- When dispatching parallel worker slices, make the inbox brief concrete: required outcome, allowed edit boundary, validation signal, and whether the branch should be kept, partially adopted, or treated as disposable exploration.
 - If an urgent required item is active and you are not directly coding it yourself, dispatch or resume a worker quickly instead of carrying passive master ownership across repeated control cycles.
 - When durable ownership becomes explicit, inspect `goalx schema coordination` and write `coordination` through `goalx durable write coordination --run {{.RunName}} --body-file /abs/path.json`.
 - If `{{.CoordinationPath}}` shows uncovered current-goal work, required outcomes must not remain silently unmapped.
@@ -154,8 +151,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Subagents claim done prematurely. Verify before accepting: check evidence density, clear evidence, and actionability of findings.
 - Default to one independent review round per implementation path.
 - If a review finds new decisive evidence, redirect or take over; otherwise arbitrate instead of spinning review/fix/re-review loops.
-- Research-mode sessions produce evidence and reports, not mergeable code changes. Develop-mode sessions produce code and may be merged with `goalx keep`.
-- In develop mode, start a temporary research session when uncertainty blocks implementation or path choice.
+- Worker sessions may produce reports, code, or both. Inspect the actual artifact surfaces before deciding how to review, keep, or manually adopt the result.
+- If uncertainty blocks execution or path choice, dispatch a short evidence-gathering worker slice instead of hard-coding separate investigation and implementation lanes.
 - If you keep a decision record in the coordination digest, keep it short: current problem, chosen path, and one-line reason. Full reasoning belongs in journals.
 - Treat the root master session as the run's control authority, not its default execution surface.
 - Choose the execution surface with the lowest volatility that can still produce the required outcome and proof.
@@ -255,7 +252,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - If stale facts persist after inspection or follow-up recheck, or transport/pane facts show a real blockage, park it and replace it.
 - Long model waits or test runs are not by themselves proof that ownership failed.
 - When a session is stale or stuck, prefer `goalx park` plus a replacement or resumed worker over silently routing around the gap.
-- Research outputs may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
+- Worker reports and journals may contain `dispatchable_slices`; you may dispatch them into fresh or resumed sessions or directly adopt them yourself.
 {{if .CoordinationPath}}- Check the coordination digest version each control cycle. Re-read the full coordination content only when it changes, when the user redirects the run, before `goalx verify`, before `goalx keep`, or before a phase transition.
 {{end}}- Re-read `goalx context --run {{.RunName}}`, `{{.GoalPath}}`, `{{.AcceptanceStatePath}}`, `{{.RunMetadataPath}}`, and `{{.CompletionProofPath}}` before deciding the run is complete.
 - If you use `{{.CompletionProofPath}}`, treat it as an agent-owned closeout/evidence surface. GoalX does not validate verdicts or proof structure there.
@@ -282,12 +279,12 @@ Use the selection facts and these preferences together when choosing engines. Pr
 
 ### Closeout Workflow
 
-1. Research runs usually close out through reports and goal updates; develop runs usually close out through reviewed code, verification evidence, and `goalx keep`.
+1. Close out against the actual run outputs. If the run produced code, review and integrate it. If it produced reports, keep the reports and summarize the evidence. If it produced both, close out both surfaces.
 2. Run `goalx verify --run {{.RunName}}` when you need fresh acceptance evidence. It only records exit code + output; you interpret the result.
 3. Dispatch or run review before accepting non-trivial work, especially after any change touching 5+ files.
 4. Merge any session worktrees with `goalx keep --run {{.RunName}} session-N`.
 5. `goalx keep --run {{.RunName}} session-N` only merges committed session branch history relative to that session's recorded parent/base ref. It does not include uncommitted dirty worktree changes.
-6. If a develop session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.
+6. If a worker session still has dirty uncommitted files, require a focused local commit before `goalx keep`, or inspect/take over the work yourself.
 7. If `goalx keep` is not the right fit because there are conflicts, only part of the session result should survive, or the run root/master already changed in overlapping areas, inspect the session worktree directly and integrate the right subset yourself.
 8. After you finish a manual run-root integration, record it with `goalx integrate --run {{.RunName}} --method partial_adopt --from session-N,session-M`.
 9. Use `goalx status`, `goalx observe`, `goalx context`, and `goalx afford` to confirm the current run-root lineage and the session's recorded parent/base ref before merging.
@@ -298,9 +295,9 @@ Use the selection facts and these preferences together when choosing engines. Pr
 
 ### Phase Transition
 
-1. If the goal needs a **next phase** (implement, debate, more-research), decide why and record it.
+1. If the goal needs a **next phase** (`implement`, `debate`, or `explore`), decide why and record it.
 2. For `implement`, a fresh verification result is useful when an explicit acceptance command exists, but it is evidence, not a hard prerequisite for transition.
-3. For `debate` and `more-research`, record why acceptance is still not met. Do not move unfinished current-goal required work into a future goal unless the user explicitly approved removing it from scope.
+3. For `debate` and `explore`, record why acceptance is still not met. Do not move unfinished current-goal required work into a future goal unless the user explicitly approved removing it from scope.
 4. Then stop sessions, save artifacts, and **execute the transition yourself** with the appropriate next-phase command:
    ```bash
    goalx stop --run {{.RunName}} && goalx save {{.RunName}} && goalx run --from {{.RunName}} --intent debate
@@ -312,11 +309,9 @@ Use the selection facts and these preferences together when choosing engines. Pr
 
 {{if .SelectionSnapshotPath}}- Selection snapshot: `{{.SelectionSnapshotPath}}`{{end}}
 - Bootstrap master target: `{{.Master.Engine}}/{{.Master.Model}}`
-{{if and .Roles.Research.Engine .Roles.Research.Model}}- Research default target: `{{.Roles.Research.Engine}}/{{.Roles.Research.Model}}`{{end}}
-{{if and .Roles.Develop.Engine .Roles.Develop.Model}}- Develop default target: `{{.Roles.Develop.Engine}}/{{.Roles.Develop.Model}}`{{end}}
+{{if and .Roles.Worker.Engine .Roles.Worker.Model}}- Worker default target: `{{.Roles.Worker.Engine}}/{{.Roles.Worker.Model}}`{{end}}
 {{if .SelectionPolicy.MasterCandidates}}- Master candidates: `{{join .SelectionPolicy.MasterCandidates ", "}}`{{end}}
-{{if .SelectionPolicy.ResearchCandidates}}- Research candidates: `{{join .SelectionPolicy.ResearchCandidates ", "}}`{{end}}
-{{if .SelectionPolicy.DevelopCandidates}}- Develop candidates: `{{join .SelectionPolicy.DevelopCandidates ", "}}`{{end}}
+{{if .SelectionPolicy.WorkerCandidates}}- Worker candidates: `{{join .SelectionPolicy.WorkerCandidates ", "}}`{{end}}
 {{if .SelectionPolicy.DisabledEngines}}- Disabled engines: `{{join .SelectionPolicy.DisabledEngines ", "}}`{{end}}
 {{if .SelectionPolicy.DisabledTargets}}- Disabled targets: `{{join .SelectionPolicy.DisabledTargets ", "}}`{{end}}
 - Treat these as factual candidate pools and bans, not hidden framework judgment.
@@ -340,9 +335,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Append an event-log durable surface after inspecting its contract: `goalx durable write goal-log --run {{.RunName}} --kind decision --actor master --body-file /abs/path.json`
 - Record acceptance results: `goalx verify --run {{.RunName}}`
 - Record a manual run-root integration: `goalx integrate --run {{.RunName}} --method partial_adopt --from session-N,session-M`
-- Launch a research worker using the current selection policy: `goalx add --run {{.RunName}} --mode research --effort high --worktree "sub-goal"`
-- Launch a develop worker using the current selection policy: `goalx add --run {{.RunName}} --mode develop --effort medium --worktree "sub-goal"`
-- Launch an explicit override worker: `goalx add --run {{.RunName}} --mode research --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`
+- Launch a worker using the current selection policy: `goalx add --run {{.RunName}} --effort high --worktree "sub-goal"`
+- Launch an explicit override worker: `goalx add --run {{.RunName}} --engine ENGINE --model MODEL --effort LEVEL --worktree "sub-goal"`
 - Explicit `--engine/--model` bypasses the current selection policy. Use it only for intentional overrides.
 - Save artifacts: `goalx save {{.RunName}}`
 - Stop current run before restarting if needed: `goalx stop --run {{.RunName}}`
@@ -355,4 +349,4 @@ Use the selection facts and these preferences together when choosing engines. Pr
 
 `{{.StatusPath}}` is master-written. The framework does not populate it. Write it through `goalx durable write status --run {{.RunName}} --body-file /abs/path.json` whenever run state materially changes.
 Inspect the canonical status contract with `goalx schema status` instead of inventing fields from memory or copying older prompt examples.
-If merge intent matters before stopping a develop-mode session, record it in `status` using the canonical status schema. Keep this file factual: progress coverage, active ownership, and latest verification timestamps belong here; verdicts belong in journals, proof, and summary.
+If merge intent matters before stopping a worker session, record it in `status` using the canonical status schema. Keep this file factual: progress coverage, active ownership, and latest verification timestamps belong here; verdicts belong in journals, proof, and summary.

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestRunStartsDeliverPathByDefault(t *testing.T) {
 	}
 
 	out := captureStdout(t, func() {
-		if err := Run(t.TempDir(), []string{"ship it"}, nil); err != nil {
+		if err := Run(t.TempDir(), []string{"ship it"}); err != nil {
 			t.Fatalf("Run: %v", err)
 		}
 	})
@@ -39,33 +40,6 @@ func TestRunStartsDeliverPathByDefault(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("run output missing %q:\n%s", want, out)
 		}
-	}
-}
-
-func TestRunIntentResearchUsesResearchLaunchMode(t *testing.T) {
-	oldLaunch := runLaunchWithOptions
-	defer func() { runLaunchWithOptions = oldLaunch }()
-
-	calls := 0
-	runLaunchWithOptions = func(projectRoot string, opts launchOptions) error {
-		calls++
-		if projectRoot == "" {
-			t.Fatal("projectRoot should not be empty")
-		}
-		if opts.Objective != "audit auth" {
-			t.Fatalf("objective = %q, want audit auth", opts.Objective)
-		}
-		if opts.Mode != goalx.ModeResearch {
-			t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeResearch)
-		}
-		return nil
-	}
-
-	if err := Run(t.TempDir(), []string{"audit auth", "--intent", "research"}, nil); err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if calls != 1 {
-		t.Fatalf("launch calls = %d, want 1", calls)
 	}
 }
 
@@ -92,7 +66,7 @@ func TestRunIntentEvolveUsesAutoLaunchMode(t *testing.T) {
 	}
 
 	out := captureStdout(t, func() {
-		if err := Run(t.TempDir(), []string{"ship auth", "--intent", "evolve"}, nil); err != nil {
+		if err := Run(t.TempDir(), []string{"ship auth", "--intent", "evolve"}); err != nil {
 			t.Fatalf("Run: %v", err)
 		}
 	})
@@ -106,18 +80,14 @@ func TestRunIntentEvolveUsesAutoLaunchMode(t *testing.T) {
 }
 
 func TestRunIntentDebateUsesPhasePath(t *testing.T) {
-	oldDebate := runDebateWithNextConfig
-	defer func() { runDebateWithNextConfig = oldDebate }()
+	oldDebate := runDebateIntent
+	defer func() { runDebateIntent = oldDebate }()
 
 	calls := 0
-	expectedNC := &nextConfigJSON{Parallel: 3}
-	runDebateWithNextConfig = func(projectRoot string, args []string, nc *nextConfigJSON) error {
+	runDebateIntent = func(projectRoot string, args []string) error {
 		calls++
 		if projectRoot == "" {
 			t.Fatal("projectRoot should not be empty")
-		}
-		if nc != expectedNC {
-			t.Fatalf("next config = %#v, want %#v", nc, expectedNC)
 		}
 		want := []string{"--from", "research-a", "--write-config"}
 		if len(args) != len(want) {
@@ -131,7 +101,7 @@ func TestRunIntentDebateUsesPhasePath(t *testing.T) {
 		return nil
 	}
 
-	if err := Run(t.TempDir(), []string{"--from", "research-a", "--intent", "debate", "--write-config"}, expectedNC); err != nil {
+	if err := Run(t.TempDir(), []string{"--from", "research-a", "--intent", "debate", "--write-config"}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if calls != 1 {
@@ -140,20 +110,34 @@ func TestRunIntentDebateUsesPhasePath(t *testing.T) {
 }
 
 func TestRunRejectsUnknownIntent(t *testing.T) {
-	err := Run(t.TempDir(), []string{"ship it", "--intent", "mystery"}, nil)
+	err := Run(t.TempDir(), []string{"ship it", "--intent", "mystery"})
 	if err == nil || !strings.Contains(err.Error(), `unknown --intent "mystery"`) {
 		t.Fatalf("Run error = %v, want unknown intent", err)
 	}
 }
 
+func TestRunRejectsRemovedResearchAndDevelopIntents(t *testing.T) {
+	for _, intent := range []string{"research", "develop"} {
+		err := Run(t.TempDir(), []string{"ship it", "--intent", intent})
+		if err == nil || !strings.Contains(err.Error(), fmt.Sprintf(`unknown --intent %q`, intent)) {
+			t.Fatalf("Run(%q) error = %v, want unknown intent", intent, err)
+		}
+	}
+}
+
 func TestRunHelpPrintsUsage(t *testing.T) {
 	out := captureStdout(t, func() {
-		if err := Run(t.TempDir(), []string{"--help"}, nil); err != nil {
+		if err := Run(t.TempDir(), []string{"--help"}); err != nil {
 			t.Fatalf("Run --help: %v", err)
 		}
 	})
 	if !strings.Contains(out, "usage: goalx run") {
 		t.Fatalf("run help missing usage:\n%s", out)
+	}
+	for _, unwanted := range []string{"research", "develop"} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("run help should omit removed intent %q:\n%s", unwanted, out)
+		}
 	}
 	if strings.Contains(out, "legacy command names remain temporary aliases") {
 		t.Fatalf("run help should not mention legacy aliases:\n%s", out)
@@ -164,11 +148,7 @@ func TestDebateRoutesThroughRunEntrypoint(t *testing.T) {
 	oldRun := runEntrypoint
 	defer func() { runEntrypoint = oldRun }()
 
-	expectedNC := &nextConfigJSON{Context: []string{"README.md"}}
-	runEntrypoint = func(_ string, args []string, nc *nextConfigJSON) error {
-		if nc != expectedNC {
-			t.Fatalf("next config = %#v, want %#v", nc, expectedNC)
-		}
+	runEntrypoint = func(_ string, args []string) error {
 		want := []string{"--intent", runIntentDebate, "--from", "research-a"}
 		if len(args) != len(want) {
 			t.Fatalf("args = %v, want %v", args, want)
@@ -181,7 +161,7 @@ func TestDebateRoutesThroughRunEntrypoint(t *testing.T) {
 		return nil
 	}
 
-	if err := Debate(t.TempDir(), []string{"--from", "research-a"}, expectedNC); err != nil {
+	if err := Debate(t.TempDir(), []string{"--from", "research-a"}); err != nil {
 		t.Fatalf("Debate: %v", err)
 	}
 }
