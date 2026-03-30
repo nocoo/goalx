@@ -52,7 +52,7 @@ func TestResultPrintsLatestSavedSummary(t *testing.T) {
 	}
 }
 
-func TestResultPrintsBranchSummaryFromIntegration(t *testing.T) {
+func TestResultFailsWhenSummaryMissingEvenIfIntegrationExists(t *testing.T) {
 	projectRoot := initGitRepo(t)
 	writeAndCommit(t, projectRoot, "README.md", "base\n", "base commit")
 
@@ -82,21 +82,12 @@ func TestResultPrintsBranchSummaryFromIntegration(t *testing.T) {
 		t.Fatalf("SaveIntegrationState: %v", err)
 	}
 
-	out := captureStdout(t, func() {
-		if err := Result(projectRoot, []string{"dev-run"}); err != nil {
-			t.Fatalf("Result: %v", err)
-		}
-	})
-
-	for _, want := range []string{
-		"exp-1",
-		branch,
-		"feat: update readme",
-		"README.md |",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("result output missing %q:\n%s", want, out)
-		}
+	err := Result(projectRoot, []string{"dev-run"})
+	if err == nil {
+		t.Fatal("expected result to fail without summary.md even when integration exists")
+	}
+	if !strings.Contains(err.Error(), "summary.md") {
+		t.Fatalf("Result error = %v, want summary.md failure", err)
 	}
 }
 
@@ -146,7 +137,7 @@ func TestResultPrefersSummarySurfaceWhenAvailable(t *testing.T) {
 	}
 }
 
-func TestResultFailsWhenIntegrationMissing(t *testing.T) {
+func TestResultFailsWhenSummaryMissing(t *testing.T) {
 	projectRoot := t.TempDir()
 
 	writeSavedResultRun(t, projectRoot, "dev-run", goalx.Config{
@@ -159,10 +150,10 @@ func TestResultFailsWhenIntegrationMissing(t *testing.T) {
 
 	err := Result(projectRoot, []string{"dev-run"})
 	if err == nil {
-		t.Fatal("expected result to fail without integration.json")
+		t.Fatal("expected result to fail without summary.md")
 	}
-	if !strings.Contains(err.Error(), "integration.json") {
-		t.Fatalf("Result error = %v, want integration.json failure", err)
+	if !strings.Contains(err.Error(), "summary.md") {
+		t.Fatalf("Result error = %v, want summary.md failure", err)
 	}
 }
 
@@ -258,7 +249,7 @@ hidden details
 	}
 }
 
-func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
+func TestResultFailsWhenOnlySavedManifestReportExists(t *testing.T) {
 	projectRoot := t.TempDir()
 
 	runDir := writeSavedResultRun(t, projectRoot, "report-only-run", goalx.Config{
@@ -288,18 +279,16 @@ func TestResultFallsBackToSavedManifestReportWhenSummaryMissing(t *testing.T) {
 		t.Fatalf("SaveArtifacts: %v", err)
 	}
 
-	out := captureStdout(t, func() {
-		if err := Result(projectRoot, []string{"report-only-run"}); err != nil {
-			t.Fatalf("Result: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "# report only") {
-		t.Fatalf("result output missing manifest-backed report:\n%s", out)
+	err := Result(projectRoot, []string{"report-only-run"})
+	if err == nil {
+		t.Fatal("expected result to fail without summary.md")
+	}
+	if !strings.Contains(err.Error(), "summary.md") {
+		t.Fatalf("Result error = %v, want summary.md failure", err)
 	}
 }
 
-func TestResultFallsBackToActiveResearchReportWhenSavedRunMissing(t *testing.T) {
+func TestResultFailsWhenActiveRunOnlyHasReport(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "active-run",
@@ -316,18 +305,16 @@ func TestResultFallsBackToActiveResearchReportWhenSavedRunMissing(t *testing.T) 
 		t.Fatalf("write active report: %v", err)
 	}
 
-	out := captureStdout(t, func() {
-		if err := Result(projectRoot, []string{"active-run"}); err != nil {
-			t.Fatalf("Result: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "# active report") {
-		t.Fatalf("result output missing active run report:\n%s", out)
+	err := Result(projectRoot, []string{"active-run"})
+	if err == nil {
+		t.Fatal("expected result to fail without summary.md")
+	}
+	if !strings.Contains(err.Error(), "summary.md") {
+		t.Fatalf("Result error = %v, want summary.md failure", err)
 	}
 }
 
-func TestResultFallsBackToActiveReportBeforeDevelopSelectionExists(t *testing.T) {
+func TestResultFailsWhenActiveRunOnlyHasCurrentReport(t *testing.T) {
 	projectRoot := t.TempDir()
 	cfg := &goalx.Config{
 		Name:      "active-run",
@@ -344,14 +331,12 @@ func TestResultFallsBackToActiveReportBeforeDevelopSelectionExists(t *testing.T)
 		t.Fatalf("write current report: %v", err)
 	}
 
-	out := captureStdout(t, func() {
-		if err := Result(projectRoot, []string{"active-run"}); err != nil {
-			t.Fatalf("Result: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "# current report") {
-		t.Fatalf("result output missing active report fallback:\n%s", out)
+	err := Result(projectRoot, []string{"active-run"})
+	if err == nil {
+		t.Fatal("expected result to fail without summary.md")
+	}
+	if !strings.Contains(err.Error(), "summary.md") {
+		t.Fatalf("Result error = %v, want summary.md failure", err)
 	}
 }
 

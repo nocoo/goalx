@@ -160,6 +160,7 @@ goalx run "we understand why ranking quality regressed and have an evidence-back
 
 - `deliver` stays the default fresh-run path when the user wants the goal achieved.
 - `explore` is the fresh evidence-first path when the user wants investigation, alternatives, and reports before implementation.
+- fresh `explore` tells the master to start with evidence expansion and path comparison; implementation should follow only when current-run evidence clearly justifies it.
 - `--readonly` declares a no-edit execution boundary in `target.readonly` and surfaces it to workers through GoalX protocol/context/affordances. It is a GoalX contract boundary, not an OS sandbox.
 
 ### Evolve Workflow
@@ -278,7 +279,7 @@ goalx save
 - `goalx tell` redirects the master or a session durably
 - `goalx recover --run NAME` relaunches a stopped or stranded run in place
 - `goalx verify` records acceptance facts; it does not declare completion
-- `goalx result` reads the current saved result surfaces
+- `goalx result` reads the canonical final result surface in `summary.md`; if `summary.md` is missing, the run is not closed out yet
 - `goalx save` exports the run into durable saved-run storage for later phase continuation
 
 Active operator docs explain the workflow. `goalx schema` is the canonical place to inspect durable protocol shape.

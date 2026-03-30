@@ -4,23 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
 	"strings"
-
-	goalx "github.com/vonbai/goalx"
 )
 
 type resultRun struct {
-	Name   string
-	Dir    string
-	Config *goalx.Config
-	Saved  bool
+	Dir string
 }
 
-// Result prints the canonical run-level result surface when present, then falls
-// back to supporting reports or kept-branch metadata for older runs.
+// Result prints the canonical run-level result surface.
 func Result(projectRoot string, args []string) error {
 	if printUsageIfHelp(args, "usage: goalx result [NAME] [--full]") {
 		return nil
@@ -51,48 +42,27 @@ func Result(projectRoot string, args []string) error {
 		return err
 	}
 
-	if data, err := loadResultSurface(target.Dir); err == nil {
-		if full {
-			fmt.Print(string(data))
-			return nil
-		}
-		printRunResult(data)
-		return nil
-	}
-
-	integration, err := loadResultIntegration(projectRoot, target.Dir, target.Config.Name)
+	data, err := loadResultSurface(target.Dir)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("Experiment: %s\n", integration.CurrentExperimentID)
-	fmt.Printf("Branch: %s\n", integration.CurrentBranch)
-	logOut, err := exec.Command("git", "-C", projectRoot, "log", "--oneline", "-5", integration.CurrentBranch).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git log %s: %w: %s", integration.CurrentBranch, err, logOut)
+	if full {
+		fmt.Print(string(data))
+		return nil
 	}
-	fmt.Print(string(logOut))
-
-	diffOut, err := exec.Command("git", "-C", projectRoot, "show", "--stat", "--format=", integration.CurrentBranch).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git show %s: %w: %s", integration.CurrentBranch, err, diffOut)
-	}
-	fmt.Print(string(diffOut))
+	printRunResult(data)
 	return nil
 }
 
 func resolveResultRun(projectRoot, runName string) (*resultRun, error) {
 	location, err := ResolveSavedRunLocation(projectRoot, runName)
 	if err == nil {
-		cfg, loadErr := LoadSavedRunSpec(location.Dir)
+		_, loadErr := LoadSavedRunSpec(location.Dir)
 		if loadErr != nil {
 			return nil, fmt.Errorf("load saved config: %w", loadErr)
 		}
 		return &resultRun{
-			Name:   cfg.Name,
-			Dir:    location.Dir,
-			Config: cfg,
-			Saved:  true,
+			Dir: location.Dir,
 		}, nil
 	}
 
@@ -107,10 +77,7 @@ func resolveResultRun(projectRoot, runName string) (*resultRun, error) {
 	rc, activeErr := ResolveRun(projectRoot, runName)
 	if activeErr == nil {
 		return &resultRun{
-			Name:   rc.Name,
-			Dir:    rc.RunDir,
-			Config: rc.Config,
-			Saved:  false,
+			Dir: rc.RunDir,
 		}, nil
 	}
 
@@ -121,63 +88,15 @@ func resolveResultRun(projectRoot, runName string) (*resultRun, error) {
 }
 
 func loadResultSurface(runDir string) ([]byte, error) {
-	data, err := os.ReadFile(SummaryPath(runDir))
+	summaryPath := SummaryPath(runDir)
+	data, err := os.ReadFile(summaryPath)
 	if err == nil && len(data) > 0 {
 		return data, nil
 	}
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("read summary: %w", err)
 	}
-	return loadResultFallback(runDir)
-}
-
-func loadResultFallback(runDir string) ([]byte, error) {
-	contextFiles, _, err := CollectSavedResearchContext(runDir)
-	if err != nil {
-		contextFiles = nil
-	}
-	for _, path := range contextFiles {
-		switch filepath.Base(path) {
-		case "summary.md", "experiments.jsonl", "integration.json":
-			continue
-		}
-		data, err := os.ReadFile(path)
-		if err == nil && len(data) > 0 {
-			return data, nil
-		}
-	}
-	reportFiles, err := loadRunScopedReportFiles(runDir)
-	if err == nil {
-		for _, data := range reportFiles {
-			if len(data) > 0 {
-				return data, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("no saved result surface found in %s", runDir)
-}
-
-func loadRunScopedReportFiles(runDir string) ([][]byte, error) {
-	entries, err := os.ReadDir(ReportsDir(runDir))
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		names = append(names, entry.Name())
-	}
-	sort.Strings(names)
-	out := make([][]byte, 0, len(names))
-	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(ReportsDir(runDir), name))
-		if err == nil && len(data) > 0 {
-			out = append(out, data)
-		}
-	}
-	return out, nil
+	return nil, fmt.Errorf("summary.md missing at %s; final result is not available yet (use goalx review or inspect reports/ for in-progress outputs)", summaryPath)
 }
 
 func parseSections(data []byte) map[string]string {
@@ -267,21 +186,4 @@ func summarizeSectionLines(section string, limit int) string {
 		return strings.Join(lines, "\n")
 	}
 	return strings.Join(append(lines[:limit], fmt.Sprintf("... (%d more lines)", len(lines)-limit)), "\n")
-}
-
-func loadResultIntegration(projectRoot, savedRunDir, runName string) (*IntegrationState, error) {
-	for _, path := range []string{
-		filepath.Join(savedRunDir, "integration.json"),
-		filepath.Join(goalx.RunDir(projectRoot, runName), "integration.json"),
-	} {
-		state, err := LoadIntegrationState(path)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", path, err)
-		}
-		if state != nil {
-			return state, nil
-		}
-	}
-
-	return nil, fmt.Errorf("integration.json not found for run %q", runName)
 }

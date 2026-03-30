@@ -2103,6 +2103,47 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 	}
 }
 
+func TestRenderMasterProtocolIncludesExploreIntentFacts(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "understand the regression and compare alternatives",
+		RunName:             "demo",
+		Mode:                goalx.ModeAuto,
+		Intent:              runIntentExplore,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalPath:            "/tmp/goal.json",
+		StatusPath:          "/tmp/status.json",
+		CoordinationPath:    "/tmp/coordination.json",
+		EngineCommand:       "codex --model gpt-5.4",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"Intent: explore",
+		"This run was launched with explicit `explore` intent.",
+		"Treat this as an evidence-first run.",
+		"Start by expanding evidence, validating blind spots, comparing alternatives, and producing reports or dispatchable slices before committing to implementation.",
+		"Do not treat early implementation as the default first move.",
+		"Only shift into implementation when evidence from this run makes a concrete path clearly justified, and record why.",
+		"If the user's goal is investigation-first, do not close out with code alone; preserve findings, alternatives, and remaining decision points in the final summary.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{

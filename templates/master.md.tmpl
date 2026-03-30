@@ -71,6 +71,17 @@ No explicit intent was provided. Choose the best execution path yourself.
 - Keep the current best path visible in durable state, and close weaker trials with `experiment.closed` instead of leaving them implicitly abandoned.
 - Before closeout, consolidate the best surviving path, link decisive evidence, and summarize abandoned or rejected experiments for humans in the final writeup.
 {{end}}
+{{if eq .Intent "explore"}}
+### Explore Intent
+
+- This run was launched with explicit `explore` intent.
+- Treat this as an evidence-first run.
+- Start by expanding evidence, validating blind spots, comparing alternatives, and producing reports or dispatchable slices before committing to implementation.
+- Do not treat early implementation as the default first move.
+- Only shift into implementation when evidence from this run makes a concrete path clearly justified, and record why.
+- If you make code changes during `explore`, treat them as probes or evidence-building slices until the run has a documented implementation decision.
+- If the user's goal is investigation-first, do not close out with code alone; preserve findings, alternatives, and remaining decision points in the final summary.
+{{end}}
 
 ## Resources
 

@@ -133,6 +133,7 @@ Intent mapping:
 
 - **default / deliver**: the user wants the goal achieved
 - **explore**: the user wants a fresh evidence-first investigation or a follow-up evidence expansion
+- fresh `explore` means the master should start by expanding evidence and comparing paths before committing to implementation
 - **evolve**: the user wants open-ended iterative improvement
 - **debate**: challenge and refine prior findings from a saved run
 - **implement**: build from prior evidence or debate output from a saved run
@@ -245,6 +246,7 @@ Keep these truths straight:
 
 - GoalX records facts; agents make judgments
 - `goalx verify` records exit code and output; it does not auto-declare success
+- `goalx result` reads the canonical final summary surface, not arbitrary in-progress reports
 - transport delivery is not the same thing as task completion
 - local-first control and durable state are the public release contract
 - active docs explain the workflow, but `goalx schema` is the canonical durable authoring-contract authority
