@@ -13,57 +13,59 @@ import (
 )
 
 type ContextIndex struct {
-	Version               int                        `json:"version"`
-	CheckedAt             string                     `json:"checked_at,omitempty"`
-	ProjectRoot           string                     `json:"project_root,omitempty"`
-	RunDir                string                     `json:"run_dir,omitempty"`
-	RunName               string                     `json:"run_name,omitempty"`
-	RunWorktree           string                     `json:"run_worktree,omitempty"`
-	ContextFiles          []string                   `json:"context_files,omitempty"`
-	ContextRefs           []string                   `json:"context_refs,omitempty"`
-	TargetFiles           []string                   `json:"target_files,omitempty"`
-	ReadonlyPaths         []string                   `json:"readonly_paths,omitempty"`
-	RunIdentity           ContextRunIdentity         `json:"run_identity"`
-	ReportsDir            string                     `json:"reports_dir,omitempty"`
-	CharterPath           string                     `json:"charter_path,omitempty"`
-	ObjectiveContractPath string                     `json:"objective_contract_path,omitempty"`
-	GoalPath              string                     `json:"goal_path,omitempty"`
-	StatusPath            string                     `json:"status_path,omitempty"`
-	ExperimentsLogPath    string                     `json:"experiments_log_path,omitempty"`
-	IntegrationStatePath  string                     `json:"integration_state_path,omitempty"`
-	AcceptanceStatePath   string                     `json:"acceptance_state_path,omitempty"`
-	CompletionProofPath   string                     `json:"completion_proof_path,omitempty"`
-	CoordinationPath      string                     `json:"coordination_path,omitempty"`
-	SummaryPath           string                     `json:"summary_path,omitempty"`
-	ControlDir            string                     `json:"control_dir,omitempty"`
-	ActivityPath          string                     `json:"activity_path,omitempty"`
-	WorktreeSnapshotPath  string                     `json:"worktree_snapshot_path,omitempty"`
-	SelectionSnapshotPath string                     `json:"selection_snapshot_path,omitempty"`
-	TransportFactsPath    string                     `json:"transport_facts_path,omitempty"`
-	MemoryQueryPath       string                     `json:"memory_query_path,omitempty"`
-	MemoryContextPath     string                     `json:"memory_context_path,omitempty"`
-	CompilerInputPath     string                     `json:"compiler_input_path,omitempty"`
-	CompilerReportPath    string                     `json:"compiler_report_path,omitempty"`
-	EvolveFactsPath       string                     `json:"evolve_facts_path,omitempty"`
-	AffordancesJSONPath   string                     `json:"affordances_json_path,omitempty"`
-	AffordancesMarkdown   string                     `json:"affordances_markdown_path,omitempty"`
-	ContextIndexPath      string                     `json:"context_index_path,omitempty"`
-	DimensionsPath        string                     `json:"dimensions_path,omitempty"`
-	Master                ContextMaster              `json:"master"`
-	Evolve                *ContextEvolve             `json:"evolve,omitempty"`
-	ObjectiveIntegrity    *ContextObjectiveIntegrity `json:"objective_integrity,omitempty"`
-	GoalBoundary          *ContextGoalBoundary       `json:"goal_boundary,omitempty"`
-	RunStatus             *ContextRunStatus          `json:"run_status,omitempty"`
-	Acceptance            *ContextAcceptance         `json:"acceptance,omitempty"`
-	QualityDebt           *ContextQualityDebt        `json:"quality_debt,omitempty"`
-	Closeout              *ContextCloseout           `json:"closeout,omitempty"`
-	Selection             *ContextSelection          `json:"selection,omitempty"`
-	Sessions              []ContextSession           `json:"sessions,omitempty"`
-	ProviderRuntimeFacts  []ProviderRuntimeFact      `json:"provider_runtime_facts,omitempty"`
-	ClaudeCodeAvailable   bool                       `json:"claude_code_available,omitempty"`
-	CodexAvailable        bool                       `json:"codex_available,omitempty"`
-	GitAvailable          bool                       `json:"git_available,omitempty"`
-	TmuxAvailable         bool                       `json:"tmux_available,omitempty"`
+	Version               int                         `json:"version"`
+	CheckedAt             string                      `json:"checked_at,omitempty"`
+	ProjectRoot           string                      `json:"project_root,omitempty"`
+	RunDir                string                      `json:"run_dir,omitempty"`
+	RunName               string                      `json:"run_name,omitempty"`
+	RunWorktree           string                      `json:"run_worktree,omitempty"`
+	ContextFiles          []string                    `json:"context_files,omitempty"`
+	ContextRefs           []string                    `json:"context_refs,omitempty"`
+	TargetFiles           []string                    `json:"target_files,omitempty"`
+	ReadonlyPaths         []string                    `json:"readonly_paths,omitempty"`
+	RunIdentity           ContextRunIdentity          `json:"run_identity"`
+	ReportsDir            string                      `json:"reports_dir,omitempty"`
+	CharterPath           string                      `json:"charter_path,omitempty"`
+	ObjectiveContractPath string                      `json:"objective_contract_path,omitempty"`
+	GoalPath              string                      `json:"goal_path,omitempty"`
+	StatusPath            string                      `json:"status_path,omitempty"`
+	ExperimentsLogPath    string                      `json:"experiments_log_path,omitempty"`
+	IntegrationStatePath  string                      `json:"integration_state_path,omitempty"`
+	AcceptanceStatePath   string                      `json:"acceptance_state_path,omitempty"`
+	CompletionProofPath   string                      `json:"completion_proof_path,omitempty"`
+	CoordinationPath      string                      `json:"coordination_path,omitempty"`
+	SummaryPath           string                      `json:"summary_path,omitempty"`
+	ControlDir            string                      `json:"control_dir,omitempty"`
+	ActivityPath          string                      `json:"activity_path,omitempty"`
+	WorktreeSnapshotPath  string                      `json:"worktree_snapshot_path,omitempty"`
+	SelectionSnapshotPath string                      `json:"selection_snapshot_path,omitempty"`
+	TransportFactsPath    string                      `json:"transport_facts_path,omitempty"`
+	MemoryQueryPath       string                      `json:"memory_query_path,omitempty"`
+	MemoryContextPath     string                      `json:"memory_context_path,omitempty"`
+	GuidedIntakePath      string                      `json:"guided_intake_path,omitempty"`
+	CompilerInputPath     string                      `json:"compiler_input_path,omitempty"`
+	CompilerReportPath    string                      `json:"compiler_report_path,omitempty"`
+	EvolveFactsPath       string                      `json:"evolve_facts_path,omitempty"`
+	AffordancesJSONPath   string                      `json:"affordances_json_path,omitempty"`
+	AffordancesMarkdown   string                      `json:"affordances_markdown_path,omitempty"`
+	ContextIndexPath      string                      `json:"context_index_path,omitempty"`
+	DimensionsPath        string                      `json:"dimensions_path,omitempty"`
+	Master                ContextMaster               `json:"master"`
+	Evolve                *ContextEvolve              `json:"evolve,omitempty"`
+	ObjectiveIntegrity    *ContextObjectiveIntegrity  `json:"objective_integrity,omitempty"`
+	GoalBoundary          *ContextGoalBoundary        `json:"goal_boundary,omitempty"`
+	RunStatus             *ContextRunStatus           `json:"run_status,omitempty"`
+	Acceptance            *ContextAcceptance          `json:"acceptance,omitempty"`
+	QualityDebt           *ContextQualityDebt         `json:"quality_debt,omitempty"`
+	Closeout              *ContextCloseout            `json:"closeout,omitempty"`
+	Selection             *ContextSelection           `json:"selection,omitempty"`
+	ProtocolComposition   *ContextProtocolComposition `json:"protocol_composition,omitempty"`
+	Sessions              []ContextSession            `json:"sessions,omitempty"`
+	ProviderRuntimeFacts  []ProviderRuntimeFact       `json:"provider_runtime_facts,omitempty"`
+	ClaudeCodeAvailable   bool                        `json:"claude_code_available,omitempty"`
+	CodexAvailable        bool                        `json:"codex_available,omitempty"`
+	GitAvailable          bool                        `json:"git_available,omitempty"`
+	TmuxAvailable         bool                        `json:"tmux_available,omitempty"`
 }
 
 type ContextRunIdentity struct {
@@ -171,6 +173,15 @@ type ContextSelection struct {
 	WorkerCandidates  []string          `json:"worker_candidates,omitempty"`
 	MasterEffort      goalx.EffortLevel `json:"master_effort,omitempty"`
 	WorkerEffort      goalx.EffortLevel `json:"worker_effort,omitempty"`
+}
+
+type ContextProtocolComposition struct {
+	Philosophy         []string `json:"philosophy,omitempty"`
+	BehaviorContract   []string `json:"behavior_contract,omitempty"`
+	RequiredRoles      []string `json:"required_roles,omitempty"`
+	RequiredGates      []string `json:"required_gates,omitempty"`
+	RequiredProofKinds []string `json:"required_proof_kinds,omitempty"`
+	SelectedPriorRefs  []string `json:"selected_prior_refs,omitempty"`
 }
 
 type ContextSession struct {
@@ -288,6 +299,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		TransportFactsPath:    TransportFactsPath(runDir),
 		MemoryQueryPath:       MemoryQueryPath(runDir),
 		MemoryContextPath:     MemoryContextPath(runDir),
+		GuidedIntakePath:      GuidedIntakePath(runDir),
 		CompilerInputPath:     CompilerInputPath(runDir),
 		CompilerReportPath:    CompilerReportPath(runDir),
 		AffordancesJSONPath:   AffordancesJSONPath(runDir),
@@ -343,6 +355,18 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 			WorkerCandidates:  append([]string(nil), selectionSnapshot.Policy.WorkerCandidates...),
 			MasterEffort:      selectionSnapshot.Policy.MasterEffort,
 			WorkerEffort:      selectionSnapshot.Policy.WorkerEffort,
+		}
+	}
+	if composition, err := buildProtocolComposition(runDir, ProtocolComposition{}); err != nil {
+		return nil, err
+	} else if composition.Enabled {
+		index.ProtocolComposition = &ContextProtocolComposition{
+			Philosophy:         append([]string(nil), composition.Philosophy...),
+			BehaviorContract:   append([]string(nil), composition.BehaviorContract...),
+			RequiredRoles:      append([]string(nil), composition.RequiredRoles...),
+			RequiredGates:      append([]string(nil), composition.RequiredGates...),
+			RequiredProofKinds: append([]string(nil), composition.RequiredProofKinds...),
+			SelectedPriorRefs:  append([]string(nil), composition.SelectedPriorRefs...),
 		}
 	}
 	if strings.TrimSpace(index.RunIdentity.Intent) == runIntentEvolve {

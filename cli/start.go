@@ -308,6 +308,9 @@ func bootstrapStartDurables(projectRoot string, state *startRunState, cfg *goalx
 	if err := SaveRunMetadata(RunMetadataPath(state.runDir), meta); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("write run metadata: %w", err)
 	}
+	if err := ensureGuidedIntake(state.runDir, cfg, meta); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("write guided intake: %w", err)
+	}
 	if err := EnsureSuccessCompilation(projectRoot, state.runDir, cfg, meta); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("compile success plane: %w", err)
 	}
@@ -470,13 +473,16 @@ func applyRunMetadataPatch(meta *RunMetadata, patch *RunMetadata) {
 	if patch.ParentRun != "" {
 		meta.ParentRun = patch.ParentRun
 	}
+	if patch.GuidedLaunch {
+		meta.GuidedLaunch = true
+	}
 }
 
 func launchRunMetadataPatch(opts launchOptions) *RunMetadata {
-	if strings.TrimSpace(opts.Intent) == "" {
+	if strings.TrimSpace(opts.Intent) == "" && !opts.Guided {
 		return nil
 	}
-	return &RunMetadata{Intent: strings.TrimSpace(opts.Intent)}
+	return &RunMetadata{Intent: strings.TrimSpace(opts.Intent), GuidedLaunch: opts.Guided}
 }
 
 func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx.Config, engines map[string]goalx.EngineConfig, masterCmd string, meta *RunMetadata) (ProtocolData, error) {
@@ -541,10 +547,10 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 		CoordinationPath:       CoordinationPath(runDir),
 		MasterInboxPath:        MasterInboxPath(runDir),
 		MasterCursorPath:       MasterCursorPath(runDir),
-			ControlRunIdentityPath: ControlRunIdentityPath(runDir),
-			ControlRunStatePath:    ControlRunStatePath(runDir),
-			MasterLeasePath:        ControlLeasePath(runDir, "master"),
-			LivenessPath:           LivenessPath(runDir),
+		ControlRunIdentityPath: ControlRunIdentityPath(runDir),
+		ControlRunStatePath:    ControlRunStatePath(runDir),
+		MasterLeasePath:        ControlLeasePath(runDir, "master"),
+		LivenessPath:           LivenessPath(runDir),
 		WorktreeSnapshotPath:   WorktreeSnapshotPath(runDir),
 		ControlRemindersPath:   ControlRemindersPath(runDir),
 		ControlDeliveriesPath:  ControlDeliveriesPath(runDir),

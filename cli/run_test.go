@@ -130,6 +130,33 @@ func TestRunIntentExploreUsesAutoLaunchModeWithoutFrom(t *testing.T) {
 	}
 }
 
+func TestRunGuidedFlagPassesThroughToLaunchOptions(t *testing.T) {
+	oldAuto := runAutoWithOptions
+	defer func() { runAutoWithOptions = oldAuto }()
+
+	calls := 0
+	runAutoWithOptions = func(projectRoot string, opts launchOptions) error {
+		calls++
+		if !opts.Guided {
+			t.Fatal("opts.Guided = false, want true")
+		}
+		if opts.Intent != runIntentDeliver {
+			t.Fatalf("intent = %q, want deliver", opts.Intent)
+		}
+		if opts.Objective != "ship it" {
+			t.Fatalf("objective = %q, want ship it", opts.Objective)
+		}
+		return nil
+	}
+
+	if err := Run(t.TempDir(), []string{"ship it", "--guided"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("auto calls = %d, want 1", calls)
+	}
+}
+
 func TestRunIntentDebateUsesPhasePath(t *testing.T) {
 	oldDebate := runDebateIntent
 	defer func() { runDebateIntent = oldDebate }()
@@ -244,9 +271,10 @@ func TestRunHelpPrintsUsage(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [flags]`,
+		`goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [--guided] [flags]`,
 		`goalx run --from RUN --intent debate|implement|explore [--readonly] [flags]`,
 		`--readonly`,
+		`--guided`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("run help missing %q:\n%s", want, out)

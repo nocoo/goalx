@@ -80,6 +80,10 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		return nil, err
 	}
 	normalizedTarget := normalizedAffordanceTarget(target)
+	compilerDoctrinePaths := []string{SuccessModelPath(runDir), ProofPlanPath(runDir), WorkflowPlanPath(runDir), DomainPackPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)}
+	if fileExists(GuidedIntakePath(runDir)) {
+		compilerDoctrinePaths = append(compilerDoctrinePaths, GuidedIntakePath(runDir))
+	}
 	doc := &AffordancesDocument{
 		Version:    1,
 		CheckedAt:  time.Now().UTC().Format(time.RFC3339),
@@ -109,6 +113,13 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Summary: "Read the structural context index for this run.",
 			Command: fmt.Sprintf("goalx context --run %s", runName),
 			Paths:   []string{ContextIndexPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)},
+		},
+		{
+			ID:      "compiler-doctrine",
+			Kind:    "fact",
+			Summary: "Read the compiler-composed doctrine currently shaping protocol behavior.",
+			Facts:   buildCompilerDoctrineFacts(index),
+			Paths:   compilerDoctrinePaths,
 		},
 		{
 			ID:      "afford",
@@ -313,6 +324,32 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 	}
 	if len(facts) == 0 {
 		return nil
+	}
+	return facts
+}
+
+func buildCompilerDoctrineFacts(index *ContextIndex) []string {
+	if index == nil || index.ProtocolComposition == nil {
+		return nil
+	}
+	facts := []string{}
+	if len(index.ProtocolComposition.Philosophy) > 0 {
+		facts = append(facts, "philosophy="+strings.Join(index.ProtocolComposition.Philosophy, ","))
+	}
+	if len(index.ProtocolComposition.BehaviorContract) > 0 {
+		facts = append(facts, "contract="+strings.Join(index.ProtocolComposition.BehaviorContract, ","))
+	}
+	if len(index.ProtocolComposition.RequiredRoles) > 0 {
+		facts = append(facts, "roles="+strings.Join(index.ProtocolComposition.RequiredRoles, ","))
+	}
+	if len(index.ProtocolComposition.RequiredGates) > 0 {
+		facts = append(facts, "gates="+strings.Join(index.ProtocolComposition.RequiredGates, ","))
+	}
+	if len(index.ProtocolComposition.RequiredProofKinds) > 0 {
+		facts = append(facts, "proof_kinds="+strings.Join(index.ProtocolComposition.RequiredProofKinds, ","))
+	}
+	if len(index.ProtocolComposition.SelectedPriorRefs) > 0 {
+		facts = append(facts, "selected_priors="+strings.Join(index.ProtocolComposition.SelectedPriorRefs, ","))
 	}
 	return facts
 }

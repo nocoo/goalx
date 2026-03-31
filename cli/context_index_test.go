@@ -758,6 +758,9 @@ func TestBuildContextIndexIncludesCompilerReportPath(t *testing.T) {
 	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
 		Version:         1,
 		CompilerVersion: "compiler-v2",
+		SelectedPriorRefs: []string{
+			"prior/operator-cockpit",
+		},
 	}); err != nil {
 		t.Fatalf("SaveCompilerReport: %v", err)
 	}
@@ -772,12 +775,46 @@ func TestBuildContextIndexIncludesCompilerReportPath(t *testing.T) {
 	if index.CompilerReportPath != CompilerReportPath(runDir) {
 		t.Fatalf("compiler_report_path = %q, want %q", index.CompilerReportPath, CompilerReportPath(runDir))
 	}
+	if index.ProtocolComposition == nil {
+		t.Fatal("protocol_composition = nil, want summary")
+	}
+	if len(index.ProtocolComposition.Philosophy) == 0 {
+		t.Fatalf("protocol composition philosophy = %v, want non-empty", index.ProtocolComposition.Philosophy)
+	}
+	if len(index.ProtocolComposition.SelectedPriorRefs) != 1 || index.ProtocolComposition.SelectedPriorRefs[0] != "prior/operator-cockpit" {
+		t.Fatalf("protocol composition selected priors = %v, want compiler report prior", index.ProtocolComposition.SelectedPriorRefs)
+	}
 
 	rendered := renderContextIndex(index)
-	for _, want := range []string{"Compiler input", "Compiler report"} {
+	for _, want := range []string{"Compiler input", "Compiler report", "## Protocol Composition", "Selected prior refs"} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
 		}
+	}
+}
+
+func TestBuildContextIndexIncludesGuidedIntakePathWhenPresent(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveGuidedIntake(GuidedIntakePath(runDir), &GuidedIntake{
+		Version:   1,
+		Guided:    true,
+		Objective: cfg.Objective,
+		Intent:    runIntentDeliver,
+	}); err != nil {
+		t.Fatalf("SaveGuidedIntake: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.GuidedIntakePath != GuidedIntakePath(runDir) {
+		t.Fatalf("guided_intake_path = %q, want %q", index.GuidedIntakePath, GuidedIntakePath(runDir))
+	}
+
+	rendered := renderContextIndex(index)
+	if !strings.Contains(rendered, "Guided intake") {
+		t.Fatalf("rendered context missing guided intake line:\n%s", rendered)
 	}
 }
 

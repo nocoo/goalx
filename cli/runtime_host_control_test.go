@@ -2158,6 +2158,13 @@ func TestRunRuntimeHostTickRefreshesDomainPackFromPromotedSuccessPrior(t *testin
 	if len(pack.Signals) == 0 || !slices.Contains(pack.Signals, "success_prior_present") {
 		t.Fatalf("domain pack signals = %v, want success_prior_present", pack.Signals)
 	}
+	composition, err := buildProtocolComposition(runDir, ProtocolComposition{})
+	if err != nil {
+		t.Fatalf("buildProtocolComposition: %v", err)
+	}
+	if len(composition.SelectedPriorRefs) != 1 {
+		t.Fatalf("protocol composition selected prior refs = %v, want one selected prior", composition.SelectedPriorRefs)
+	}
 
 	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
 	if err != nil {

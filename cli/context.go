@@ -106,6 +106,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Selection snapshot", index.SelectionSnapshotPath)
 	writeContextLine("Memory query", index.MemoryQueryPath)
 	writeContextLine("Memory context", index.MemoryContextPath)
+	writeContextLine("Guided intake", index.GuidedIntakePath)
 	writeContextLine("Compiler input", index.CompilerInputPath)
 	writeContextLine("Compiler report", index.CompilerReportPath)
 	writeContextLine("Context index", index.ContextIndexPath)
@@ -264,6 +265,15 @@ func renderContextIndex(index *ContextIndex) string {
 		if len(index.Selection.DisabledTargets) > 0 {
 			writeContextLine("Disabled targets", strings.Join(index.Selection.DisabledTargets, ", "))
 		}
+	}
+	if index.ProtocolComposition != nil {
+		b.WriteString("\n## Protocol Composition\n\n")
+		writeContextLine("Philosophy", strings.Join(index.ProtocolComposition.Philosophy, ", "))
+		writeContextLine("Behavior contract", strings.Join(index.ProtocolComposition.BehaviorContract, ", "))
+		writeContextLine("Required roles", strings.Join(index.ProtocolComposition.RequiredRoles, ", "))
+		writeContextLine("Required gates", strings.Join(index.ProtocolComposition.RequiredGates, ", "))
+		writeContextLine("Required proof kinds", strings.Join(index.ProtocolComposition.RequiredProofKinds, ", "))
+		writeContextLine("Selected prior refs", strings.Join(index.ProtocolComposition.SelectedPriorRefs, ", "))
 	}
 	if index.ClaudeCodeAvailable || index.CodexAvailable || index.GitAvailable || index.TmuxAvailable {
 		b.WriteString("## Capabilities\n\n")

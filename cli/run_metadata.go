@@ -31,6 +31,7 @@ type RunMetadata struct {
 	SourceRun       string `json:"source_run,omitempty"`
 	SourcePhase     string `json:"source_phase,omitempty"`
 	ParentRun       string `json:"parent_run,omitempty"`
+	GuidedLaunch    bool   `json:"guided_launch,omitempty"`
 	CharterID       string `json:"charter_id,omitempty"`
 	CharterHash     string `json:"charter_hash,omitempty"`
 	StartedAt       string `json:"started_at,omitempty"`

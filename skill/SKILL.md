@@ -58,6 +58,7 @@ The normal loop is:
 
 ```bash
 goalx run "goal"
+goalx run "goal" --guided
 goalx status
 goalx observe
 goalx schema status
@@ -120,6 +121,7 @@ Use intent to express the kind of outcome the user wants.
 
 ```bash
 goalx run "goal"
+goalx run "goal" --guided
 goalx run "goal" --intent explore
 goalx run "goal" --intent explore --readonly
 goalx run "goal" --intent evolve --budget 8h
@@ -141,6 +143,7 @@ Intent mapping:
 Boundary flag:
 
 - **--readonly**: declare a no-edit execution boundary in `target.readonly` for report-first or investigation-only runs; GoalX exposes it in protocol/context/affordances instead of pretending it is an OS sandbox
+- **--guided**: write a richer launch-time intake artifact and feed it into the success compiler when the goal is non-trivial or the hidden success bar matters
 
 Context injection:
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -440,5 +441,66 @@ func TestBuildAffordancesIncludesSelectionFacts(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("selection facts affordance missing: %+v", doc.Items)
+	}
+}
+
+func TestBuildAffordancesIncludesCompilerDoctrineFacts(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	if err := EnsureSuccessCompilation(repo, runDir, cfg, &RunMetadata{Version: 1, ProjectRoot: repo}); err != nil {
+		t.Fatalf("EnsureSuccessCompilation: %v", err)
+	}
+	if err := SaveGuidedIntake(GuidedIntakePath(runDir), &GuidedIntake{
+		Version: 1,
+		Guided:  true,
+		Intent:  runIntentDeliver,
+	}); err != nil {
+		t.Fatalf("SaveGuidedIntake: %v", err)
+	}
+	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
+		Version:           1,
+		SelectedPriorRefs: []string{"prior/operator-cockpit"},
+	}); err != nil {
+		t.Fatalf("SaveCompilerReport: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "master")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+	var item *AffordanceItem
+	for i := range doc.Items {
+		if doc.Items[i].ID == "compiler-doctrine" {
+			item = &doc.Items[i]
+			break
+		}
+	}
+	if item == nil {
+		t.Fatal("compiler-doctrine item missing")
+	}
+	if item.Kind != "fact" {
+		t.Fatalf("compiler-doctrine kind = %q, want fact", item.Kind)
+	}
+	for _, want := range []string{
+		"philosophy=durable_state_first,dispatch_before_self_implementation,success_model_before_local_optimization,evidence_before_completion,localized_override_not_reset,thin_control_explicit_judgment",
+		"contract=compact_decisive_output,automatic_follow_through,durable_state_first_recovery,localized_override_semantics,evidence_backed_completion,workflow_gates_are_real",
+		"selected_priors=prior/operator-cockpit",
+	} {
+		if !slices.Contains(item.Facts, want) {
+			t.Fatalf("compiler-doctrine facts = %v, want %q", item.Facts, want)
+		}
+	}
+	for _, want := range []string{
+		SuccessModelPath(runDir),
+		ProofPlanPath(runDir),
+		WorkflowPlanPath(runDir),
+		DomainPackPath(runDir),
+		CompilerInputPath(runDir),
+		CompilerReportPath(runDir),
+		GuidedIntakePath(runDir),
+	} {
+		if !slices.Contains(item.Paths, want) {
+			t.Fatalf("compiler-doctrine paths = %v, want %q", item.Paths, want)
+		}
 	}
 }

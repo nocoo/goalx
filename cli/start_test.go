@@ -504,6 +504,116 @@ esac
 	}
 }
 
+func TestStartBootstrapsGuidedIntakeArtifactWhenRequested(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	if err := os.WriteFile(filepath.Join(repo, "AGENTS.md"), []byte("repo policy"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
+
+	goalxDir := filepath.Join(repo, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "demo",
+		Mode:      goalx.ModeWorker,
+		Objective: "audit auth flow",
+		Target: goalx.TargetConfig{
+			Files: []string{"README.md"},
+		},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master: goalx.MasterConfig{
+			Engine: "codex",
+			Model:  "gpt-5.4",
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	binDir := t.TempDir()
+	stateDir := t.TempDir()
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+state="${GOALX_FAKE_TMUX_STATE:?}"
+mkdir -p "$state"
+cmd="$1"
+shift
+case "$cmd" in
+  has-session)
+    target="$2"
+    if [ -f "$state/session_$target" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  new-session)
+    name=""
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" = "-s" ]; then
+        shift
+        name="$1"
+        break
+      fi
+      shift
+    done
+    : > "$state/session_$name"
+    exit 0
+    ;;
+  kill-session)
+    target="$2"
+    rm -f "$state/session_$target"
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
+
+	_ = stubRuntimeSupervisor(t)
+
+	if err := startResolvedLaunch(repo, launchOptions{
+		Objective: "audit auth flow",
+		Mode:      goalx.ModeAuto,
+		Guided:    true,
+	}); err != nil {
+		t.Fatalf("startResolvedLaunch: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, goalx.Slugify("audit auth flow"))
+	intake, err := LoadGuidedIntake(GuidedIntakePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadGuidedIntake: %v", err)
+	}
+	if intake == nil {
+		t.Fatal("guided intake missing")
+	}
+	if !intake.Guided {
+		t.Fatal("intake.Guided = false, want true")
+	}
+	if intake.Intent != runIntentDeliver {
+		t.Fatalf("intake.Intent = %q, want %q", intake.Intent, runIntentDeliver)
+	}
+	if len(intake.SuccessHints) == 0 || len(intake.AntiGoals) == 0 {
+		t.Fatalf("intake = %+v, want non-empty hints", intake)
+	}
+}
+
 func TestStartWithManualDraftPreservesImplicitSelectionPolicySnapshot(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -1354,12 +1464,12 @@ esac
 	runDir := goalx.RunDir(repo, cfg.Name)
 	runWT := RunWorktreePath(runDir)
 	logText := string(logData)
-		for _, want := range []string{
-			"new-session -d -s " + goalx.TmuxSessionName(repo, cfg.Name) + " -n master -c " + runWT + " env ",
-			"target-runner --run",
-			"--holder",
-			"master",
-			"FOO_TOOLCHAIN_ROOT='/opt/goalx-toolchain'",
+	for _, want := range []string{
+		"new-session -d -s " + goalx.TmuxSessionName(repo, cfg.Name) + " -n master -c " + runWT + " env ",
+		"target-runner --run",
+		"--holder",
+		"master",
+		"FOO_TOOLCHAIN_ROOT='/opt/goalx-toolchain'",
 		"HOME='" + home + "'",
 		"PATH='" + binDir + ":" + origPath + "'",
 		"OPENAI_API_KEY='sk-goalx'",

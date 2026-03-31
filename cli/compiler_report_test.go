@@ -76,3 +76,24 @@ func TestLoadCompilerReportRejectsInvalidReasonCode(t *testing.T) {
 		t.Fatalf("LoadCompilerReport error = %v, want reason_code hint", err)
 	}
 }
+
+func TestCompileBootstrapCompilerReportIncludesProtocolCompositionOutput(t *testing.T) {
+	report := compileBootstrapCompilerReport(&bootstrapCompilerSources{
+		SourceSlots: []CompilerInputSlot{
+			{Slot: CompilerInputSlotRepoPolicy, Refs: []string{"AGENTS.md"}},
+		},
+	})
+	if report == nil {
+		t.Fatal("compileBootstrapCompilerReport returned nil")
+	}
+	found := false
+	for _, output := range report.OutputSources {
+		if output.Output == "protocol-composition" && output.SourceSlot == CompilerInputSlotRepoPolicy {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("output_sources = %+v, want protocol-composition from repo_policy", report.OutputSources)
+	}
+}

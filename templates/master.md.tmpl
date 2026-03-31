@@ -243,6 +243,23 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Missing user credentials, external approval, or real-world publish access does not justify treating a required outcome as end-to-end verified. Keep the blocker factual and the remaining work visible.
 - Optional improvements belong in the Improvement backlog: they matter, but they never replace unfinished required work.
 - Inspect the canonical acceptance payload with `goalx schema acceptance` before replacing `acceptance`. Keep it synchronized with the current acceptance command, and record the reason in journals or coordination when you change it.
+{{if .Composition.Enabled}}
+
+### Compiler-Composed Doctrine
+
+- Prompt philosophy in force: {{range $i, $item := .Composition.Philosophy}}{{if $i}}, {{end}}`{{$item}}`{{end}}
+- Behavior contract in force: {{range $i, $item := .Composition.BehaviorContract}}{{if $i}}, {{end}}`{{$item}}`{{end}}
+{{if .Composition.RequiredRoles}}- Required workflow roles: {{range $i, $item := .Composition.RequiredRoles}}{{if $i}}, {{end}}`{{$item}}`{{end}}{{end}}
+{{if .Composition.RequiredGates}}- Required workflow gates: {{range $i, $item := .Composition.RequiredGates}}{{if $i}}, {{end}}`{{$item}}`{{end}}{{end}}
+{{if .Composition.RequiredProofKinds}}- Required proof kinds: {{range $i, $item := .Composition.RequiredProofKinds}}{{if $i}}, {{end}}`{{$item}}`{{end}}{{end}}
+{{if .Composition.SelectedPriorRefs}}- Selected prior refs: {{range $i, $item := .Composition.SelectedPriorRefs}}{{if $i}}, {{end}}`{{$item}}`{{end}}{{end}}
+{{if .Composition.SourceSlots}}- Compiler source slots:
+{{range .Composition.SourceSlots}}  - `{{.Slot}}`{{if .Refs}} <= {{range $i, $ref := .Refs}}{{if $i}}, {{end}}`{{$ref}}`{{end}}{{end}}
+{{end}}{{end}}
+{{if .Composition.OutputSources}}- Compiler output mapping:
+{{range .Composition.OutputSources}}  - `{{.Output}}` <= `{{.SourceSlot}}`{{if .Refs}} ({{range $i, $ref := .Refs}}{{if $i}}, {{end}}`{{$ref}}`{{end}}){{end}}
+{{end}}{{end}}
+{{end}}
 
 ### Control Loop
 

@@ -53,9 +53,12 @@ If you operate GoalX yourself from the terminal:
 
 ```bash
 goalx run "the dashboard feels production-ready, fast, and clear on desktop and mobile"
+goalx run "the onboarding feels polished and credible for first-time users" --guided
 ```
 
 `goalx run` is the canonical public entrypoint.
+
+Use `--guided` when the goal is non-trivial and you want GoalX to materialize a richer launch-time intake artifact before the run compiles its success plane.
 
 ## Engine Selection
 
@@ -156,12 +159,14 @@ Use `intent` to bias master behavior and output shape without creating separate 
 ```bash
 goalx run "we understand why ranking quality regressed and have an evidence-backed recovery plan" --intent explore
 goalx run "we understand why ranking quality regressed and have an evidence-backed recovery plan" --intent explore --readonly
+goalx run "the product feels investor-ready and the success bar is explicit before implementation starts" --guided
 ```
 
 - `deliver` stays the default fresh-run path when the user wants the goal achieved.
 - `explore` is the fresh evidence-first path when the user wants investigation, alternatives, and reports before implementation.
 - fresh `explore` tells the master to start with evidence expansion and path comparison; implementation should follow only when current-run evidence clearly justifies it.
 - `--readonly` declares a no-edit execution boundary in `target.readonly` and surfaces it to workers through GoalX protocol/context/affordances. It is a GoalX contract boundary, not an OS sandbox.
+- `--guided` asks GoalX to write a launch-time guided intake artifact and feed it into the success compiler as additional run-context input.
 
 ### Extra Context
 

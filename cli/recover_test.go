@@ -230,6 +230,13 @@ func TestRecoverPromotesSuccessPriorBeforeRelaunch(t *testing.T) {
 	if compilerInput == nil || len(compilerInput.SelectedPriorRefs) != 1 {
 		t.Fatalf("compiler input = %+v, want one selected prior ref", compilerInput)
 	}
+	composition, err := buildProtocolComposition(runDir, ProtocolComposition{})
+	if err != nil {
+		t.Fatalf("buildProtocolComposition: %v", err)
+	}
+	if len(composition.SelectedPriorRefs) != 1 {
+		t.Fatalf("protocol composition selected prior refs = %v, want one selected prior", composition.SelectedPriorRefs)
+	}
 }
 
 func installRecoverFakeTmux(t *testing.T, existingSession bool) (string, string) {

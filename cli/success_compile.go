@@ -12,11 +12,12 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const successCompilerVersion = "bootstrap-v1"
+const successCompilerVersion = "compiler-v2"
 
 type bootstrapCompilerSources struct {
 	Query            *MemoryQuery
 	Context          *MemoryContext
+	GuidedIntake     *GuidedIntake
 	PolicySourceRefs []string
 	PriorEntryIDs    []string
 	SourceSlots      []CompilerInputSlot
@@ -61,7 +62,7 @@ func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, met
 		return err
 	}
 
-	successModel := compileBootstrapSuccessModel(cfg, objectiveContract, goalState, objectiveContractHash, goalHash)
+	successModel := compileBootstrapSuccessModel(cfg, objectiveContract, goalState, objectiveContractHash, goalHash, compilerSources)
 	if err := SaveSuccessModel(SuccessModelPath(runDir), successModel); err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 		(!stringSliceEqual(successPriorStatements(beforeContext), successPriorStatements(afterContext)) && compilerInputSignature(afterCompilerInput) == ""), nil
 }
 
-func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *ObjectiveContract, goalState *GoalState, objectiveContractHash, goalHash string) *SuccessModel {
+func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *ObjectiveContract, goalState *GoalState, objectiveContractHash, goalHash string, sources *bootstrapCompilerSources) *SuccessModel {
 	model := &SuccessModel{
 		Version:               1,
 		CompilerVersion:       successCompilerVersion,
@@ -214,6 +215,18 @@ func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *Objectiv
 				Kind:     firstNonEmpty(strings.TrimSpace(item.Role), "goal_item"),
 				Text:     strings.TrimSpace(item.Text),
 				Required: true,
+			})
+		}
+	}
+	if sources != nil && sources.GuidedIntake != nil {
+		for i, antiGoal := range sources.GuidedIntake.AntiGoals {
+			text := strings.TrimSpace(antiGoal)
+			if text == "" {
+				continue
+			}
+			model.AntiGoals = append(model.AntiGoals, SuccessAntiGoal{
+				ID:   fmt.Sprintf("guided-%d", i+1),
+				Text: text,
 			})
 		}
 	}
@@ -298,9 +311,14 @@ func buildBootstrapCompilerSources(projectRoot, runDir string) (*bootstrapCompil
 	if err != nil {
 		return nil, err
 	}
+	intake, err := LoadGuidedIntake(GuidedIntakePath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	sources := &bootstrapCompilerSources{
-		Query:   query,
-		Context: context,
+		Query:        query,
+		Context:      context,
+		GuidedIntake: intake,
 	}
 	if query != nil {
 		selected, rejected, err := evaluateSuccessPriorCandidates(*query)
@@ -319,10 +337,17 @@ func buildBootstrapCompilerSources(projectRoot, runDir string) (*bootstrapCompil
 			Refs: []string{"AGENTS.md"},
 		})
 	}
+	runContextRefs := []string{}
 	if context != nil {
+		runContextRefs = append(runContextRefs, filepath.Join("control", "memory-context.json"))
+	}
+	if intake != nil {
+		runContextRefs = append(runContextRefs, filepath.Join("control", "guided-intake.json"))
+	}
+	if len(runContextRefs) > 0 {
 		sources.SourceSlots = append(sources.SourceSlots, CompilerInputSlot{
 			Slot: CompilerInputSlotRunContext,
-			Refs: []string{filepath.Join("control", "memory-context.json")},
+			Refs: runContextRefs,
 		})
 	}
 	if len(sources.PriorEntryIDs) > 0 {
@@ -369,7 +394,7 @@ func compileBootstrapCompilerReport(sources *bootstrapCompilerSources) *Compiler
 			Slot: slot.Slot,
 			Refs: append([]string(nil), slot.Refs...),
 		})
-		for _, output := range []string{"success-model", "proof-plan", "workflow-plan", "domain-pack"} {
+		for _, output := range []string{"success-model", "proof-plan", "workflow-plan", "domain-pack", "protocol-composition"} {
 			report.OutputSources = append(report.OutputSources, CompilerOutputSource{
 				Output:     output,
 				SourceSlot: slot.Slot,
@@ -402,6 +427,9 @@ func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *b
 	}
 	if sources != nil && sources.Context != nil && (len(sources.Context.Facts)+len(sources.Context.Procedures)+len(sources.Context.Pitfalls)+len(sources.Context.SecretRefs)+len(sources.Context.SuccessPriors)) > 0 {
 		signals = append(signals, "memory_context_present")
+	}
+	if sources != nil && sources.GuidedIntake != nil {
+		signals = append(signals, "guided_intake_present")
 	}
 	if len(priorEntryIDs) > 0 {
 		signals = append(signals, "success_prior_present")
