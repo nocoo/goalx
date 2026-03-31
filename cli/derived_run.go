@@ -12,20 +12,20 @@ import (
 )
 
 type DerivedRunState struct {
-	Name           string
-	Mode           string
-	Objective      string
-	RunDir         string
-	RunID          string
-	Epoch          int
-	Charter        string
-	Selector       string
+	Name            string
+	Mode            string
+	Objective       string
+	RunDir          string
+	RunID           string
+	Epoch           int
+	Charter         string
+	Selector        string
 	GoalState       string
 	ContinuityState string
-	Status         string
-	Completed      bool
-	HasLease       bool
-	HasTmuxSession bool
+	Status          string
+	Completed       bool
+	HasLease        bool
+	HasTmuxSession  bool
 }
 
 func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
@@ -58,6 +58,7 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 
 	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
 	controlState, _ := LoadControlRunState(ControlRunStatePath(runDir))
+	bootstrapLaunching := runBootstrapStillLaunching(runDir, controlState, runtimeState)
 	if controlState != nil {
 		state.GoalState = strings.TrimSpace(controlState.GoalState)
 		state.ContinuityState = strings.TrimSpace(controlState.ContinuityState)
@@ -96,6 +97,10 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 	case "dropped":
 		state.Status = "dropped"
 	default:
+		if bootstrapLaunching {
+			state.Status = "launching"
+			return state, nil
+		}
 		switch state.ContinuityState {
 		case "stranded":
 			state.Status = "stranded"
@@ -106,21 +111,21 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 			if err != nil {
 				return nil, err
 			}
-		sessionMissing := false
-		sessionTruthAvailable := false
-		for target, facts := range presence {
-			if !strings.HasPrefix(target, "session-") {
-				continue
+			sessionMissing := false
+			sessionTruthAvailable := false
+			for target, facts := range presence {
+				if !strings.HasPrefix(target, "session-") {
+					continue
+				}
+				if strings.TrimSpace(facts.State) == TargetPresencePresent || strings.TrimSpace(facts.State) == TargetPresenceParked {
+					sessionTruthAvailable = true
+				}
+				if targetPresenceMissing(facts) {
+					sessionMissing = true
+				}
 			}
-			if strings.TrimSpace(facts.State) == TargetPresencePresent || strings.TrimSpace(facts.State) == TargetPresenceParked {
-				sessionTruthAvailable = true
-			}
-			if targetPresenceMissing(facts) {
-				sessionMissing = true
-			}
-		}
-		masterMissing := targetPresenceMissing(presence["master"])
-		sidecarMissing := targetPresenceMissing(presence["runtime-host"])
+			masterMissing := targetPresenceMissing(presence["master"])
+			sidecarMissing := targetPresenceMissing(presence["runtime-host"])
 			switch {
 			case masterMissing || sidecarMissing || sessionMissing:
 				state.Status = "degraded"
@@ -132,6 +137,27 @@ func loadDerivedRunState(projectRoot, runDir string) (*DerivedRunState, error) {
 		}
 	}
 	return state, nil
+}
+
+func runBootstrapStillLaunching(runDir string, controlState *ControlRunState, runtimeState *RunRuntimeState) bool {
+	continuityRunning := controlRunContinuityRunning(controlState, runtimeState)
+	if !continuityRunning {
+		return false
+	}
+	operations, err := LoadControlOperationsState(ControlOperationsPath(runDir))
+	if err != nil || operations == nil {
+		return false
+	}
+	op, ok := operations.Targets[RunBootstrapOperationKey()]
+	if !ok || strings.TrimSpace(op.Kind) != ControlOperationKindRunBootstrap {
+		return false
+	}
+	switch strings.TrimSpace(op.State) {
+	case ControlOperationStatePreparing, ControlOperationStateHandshaking, ControlOperationStateReconciling:
+		return true
+	default:
+		return false
+	}
 }
 
 func deriveRunIdentitySurface(runDir, fallbackObjective string) (string, int, string, string) {

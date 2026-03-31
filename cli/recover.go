@@ -27,6 +27,17 @@ func Recover(projectRoot string, args []string) error {
 	if err != nil {
 		return err
 	}
+	controlState, err := LoadControlRunState(ControlRunStatePath(rc.RunDir))
+	if err != nil {
+		return err
+	}
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir))
+	if err != nil {
+		return err
+	}
+	if runBootstrapStillLaunching(rc.RunDir, controlState, runtimeState) {
+		return fmt.Errorf("run %q bootstrap is still in progress; wait for start to finish before recovering it", rc.Name)
+	}
 	if SessionExistsInRun(rc.RunDir, rc.TmuxSession) {
 		return fmt.Errorf("run '%s' is already active (tmux session %s exists)", rc.Name, rc.TmuxSession)
 	}
@@ -70,10 +81,6 @@ func Recover(projectRoot string, args []string) error {
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(rc.RunDir))
-	if err != nil {
-		return err
-	}
 	if runtimeState == nil {
 		runtimeState = &RunRuntimeState{
 			Version:   1,
@@ -96,10 +103,6 @@ func Recover(projectRoot string, args []string) error {
 		return err
 	}
 
-	controlState, err := LoadControlRunState(ControlRunStatePath(rc.RunDir))
-	if err != nil {
-		return err
-	}
 	if controlState == nil {
 		controlState = &ControlRunState{Version: 1}
 	}

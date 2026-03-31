@@ -218,6 +218,55 @@ func TestRecoverRequiresExistingRun(t *testing.T) {
 	}
 }
 
+func TestRecoverRejectsBootstrapInProgress(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "running",
+		UpdatedAt:       "2026-03-31T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeWorker),
+		Active:    true,
+		StartedAt: "2026-03-31T00:00:00Z",
+		UpdatedAt: "2026-03-31T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := submitControlOperationTarget(runDir, RunBootstrapOperationKey(), ControlOperationTarget{
+		Kind:              ControlOperationKindRunBootstrap,
+		State:             ControlOperationStatePreparing,
+		Summary:           "launching master runtime",
+		PendingConditions: []string{"master_window_ready"},
+	}); err != nil {
+		t.Fatalf("submitControlOperationTarget: %v", err)
+	}
+
+	supervisor := stubRuntimeSupervisor(t)
+
+	err := Recover(repo, []string{"--run", runName})
+	if err == nil || !strings.Contains(err.Error(), "bootstrap is still in progress") {
+		t.Fatalf("Recover error = %v, want bootstrap-in-progress rejection", err)
+	}
+	if supervisor.stopCalls != 0 || supervisor.startCalls != 0 {
+		t.Fatalf("runtime supervisor should not run during bootstrap conflict: %+v", supervisor)
+	}
+}
+
 func TestRecoverPromotesSuccessPriorBeforeRelaunch(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -124,8 +124,8 @@ func TestStatusShowsControlQueueAndLeaseSummary(t *testing.T) {
 		"run_status=degraded",
 		"unread_inbox=2",
 		"master_lease=healthy",
-			"runtime_host=expired",
-			"runtime host missing (lease_expired)",
+		"runtime_host=expired",
+		"runtime host missing (lease_expired)",
 		"reminders_due=1",
 		"deliveries_failed=1",
 		"LEASE",
@@ -184,7 +184,7 @@ func TestStatusPrefersCanonicalControlFactsOverStaleActivitySnapshot(t *testing.
 			DeliveriesFailed: 2,
 		},
 		Actors: map[string]ActivityActor{
-			"master":  {Lease: "expired"},
+			"master":       {Lease: "expired"},
 			"runtime-host": {Lease: "healthy"},
 		},
 	}); err != nil {
@@ -202,7 +202,7 @@ func TestStatusPrefersCanonicalControlFactsOverStaleActivitySnapshot(t *testing.
 		"epoch=1",
 		"unread_inbox=1",
 		"master_lease=healthy",
-			"runtime_host=expired",
+		"runtime_host=expired",
 		"reminders_due=1",
 		"deliveries_failed=1",
 	} {
@@ -1278,6 +1278,55 @@ func TestStatusShowsBlockedRequiredFrontierFacts(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestStatusShowsLaunchingWhenBootstrapInProgress(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "running",
+		UpdatedAt:       "2026-03-31T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeWorker),
+		Active:    true,
+		StartedAt: "2026-03-31T00:00:00Z",
+		UpdatedAt: "2026-03-31T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := submitControlOperationTarget(runDir, RunBootstrapOperationKey(), ControlOperationTarget{
+		Kind:              ControlOperationKindRunBootstrap,
+		State:             ControlOperationStatePreparing,
+		Summary:           "launching master runtime",
+		PendingConditions: []string{"master_window_ready"},
+	}); err != nil {
+		t.Fatalf("submitControlOperationTarget: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", runName}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "run_status=launching") {
+		t.Fatalf("status output missing launching state:\n%s", out)
 	}
 }
 
