@@ -37,6 +37,12 @@ func TestRunSidecarTickRenewsLease(t *testing.T) {
 	if err := EnsureControlState(runDir); err != nil {
 		t.Fatalf("EnsureControlState: %v", err)
 	}
+	if err := EnsureSuccessCompilation(repo, runDir, cfg, meta); err != nil {
+		t.Fatalf("EnsureSuccessCompilation: %v", err)
+	}
+	if _, _, err := RefreshIdentityFence(runDir, meta); err != nil {
+		t.Fatalf("RefreshIdentityFence: %v", err)
+	}
 
 	fakeBin := t.TempDir()
 	tmuxPath := filepath.Join(fakeBin, "tmux")
@@ -605,38 +611,23 @@ func TestRunSidecarTickProjectsSessionJournalStateIntoRuntime(t *testing.T) {
 }
 
 func TestRunSidecarTickDoesNotQueueRefreshContextWhenIdentityFenceUnchanged(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := initGitRepo(t)
-	writeAndCommit(t, repo, "README.md", "base", "base commit")
-	cfg := &goalx.Config{
-		Name:      "sidecar-run",
-		Mode:      goalx.ModeWorker,
-		Objective: "ship feature",
-		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	if err := EnsureSuccessCompilation(repo, runDir, cfg, meta); err != nil {
+		t.Fatalf("EnsureSuccessCompilation: %v", err)
 	}
-	runDir := writeRunSpecFixture(t, repo, cfg)
-	meta, err := EnsureRunMetadata(runDir, repo, cfg.Objective)
-	if err != nil {
-		t.Fatalf("EnsureRunMetadata: %v", err)
+	if _, err := RefreshRunGuidance(repo, cfg.Name, runDir); err != nil {
+		t.Fatalf("RefreshRunGuidance: %v", err)
 	}
-	bootstrapSidecarIdentityFixture(t, runDir, repo, cfg, meta)
-	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
-		t.Fatalf("EnsureRuntimeState: %v", err)
+	if _, _, err := RefreshIdentityFence(runDir, meta); err != nil {
+		t.Fatalf("RefreshIdentityFence: %v", err)
 	}
-	if err := EnsureControlState(runDir); err != nil {
-		t.Fatalf("EnsureControlState: %v", err)
+	if err := os.Remove(ControlRemindersPath(runDir)); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove reminders: %v", err)
 	}
 
-	fakeBin := t.TempDir()
-	tmuxPath := filepath.Join(fakeBin, "tmux")
-	if err := os.WriteFile(tmuxPath, []byte("#!/bin/sh\nif [ \"$1\" = \"has-session\" ]; then exit 0; fi\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("write fake tmux: %v", err)
-	}
-	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	installGuidanceFakeTmux(t, nil)
 
-	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 2*time.Minute, 4242); err != nil {
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, 2*time.Minute, os.Getpid()); err != nil {
 		t.Fatalf("runSidecarTick: %v", err)
 	}
 
@@ -2185,6 +2176,52 @@ func TestRunSidecarTickRefreshesDomainPackFromPromotedSuccessPrior(t *testing.T)
 	}
 	if !found {
 		t.Fatalf("expected refresh-context reminder after success-context change: %+v", reminders.Items)
+	}
+}
+
+func TestRunSidecarTickDoesNotRefreshCompilerContextOnIrrelevantMemoryChange(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	if err := os.WriteFile(filepath.Join(repo, "AGENTS.md"), []byte("repo policy"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
+	if err := EnsureSuccessCompilation(repo, runDir, cfg, meta); err != nil {
+		t.Fatalf("EnsureSuccessCompilation: %v", err)
+	}
+
+	installGuidanceFakeTmux(t, nil)
+
+	now := time.Date(2026, time.March, 31, 13, 30, 0, 0, time.UTC)
+	if err := writeProposalShard(now, []MemoryProposal{
+		{
+			ID:         "prop_fact_irrelevant",
+			State:      "proposed",
+			Kind:       MemoryKindFact,
+			Statement:  "deploy host is ops-7",
+			Selectors:  map[string]string{"project_id": "other-project"},
+			Evidence:   []MemoryEvidence{{Kind: "summary", Path: "/tmp/summary.md"}},
+			SourceRuns: []string{"run-1"},
+			CreatedAt:  "2026-03-31T13:30:00Z",
+			UpdatedAt:  "2026-03-31T13:30:00Z",
+		},
+	}); err != nil {
+		t.Fatalf("writeProposalShard: %v", err)
+	}
+
+	if err := runSidecarTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runSidecarTick: %v", err)
+	}
+
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders: %v", err)
+	}
+	for _, item := range reminders.Items {
+		if item.DedupeKey == "refresh-context" {
+			t.Fatalf("unexpected refresh-context reminder after irrelevant memory change: %+v", reminders.Items)
+		}
 	}
 }
 

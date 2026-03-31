@@ -97,6 +97,9 @@ func EnsureMemoryStore() error {
 	if err := ensureDir(MemoryProposalsDir()); err != nil {
 		return err
 	}
+	if err := ensureEmptyFile(MemoryPriorGovernancePath()); err != nil {
+		return err
+	}
 	if err := ensureJSONFile(filepath.Join(MemoryIndexesDir(), "selectors.json"), map[string]any{}); err != nil {
 		return err
 	}

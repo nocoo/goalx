@@ -51,6 +51,16 @@ func SupersedeMemoryEntry(oldID, newID string) error {
 		if err := saveCanonicalMemoryByKind(byKind); err != nil {
 			return err
 		}
+		if oldEntry := findCanonicalEntryPointer(byKind[MemoryKindSuccessPrior], oldID); oldEntry != nil {
+			if err := appendMemoryPriorGovernanceEventUnlocked(MemoryPriorGovernanceEvent{
+				EntryID:       oldID,
+				Kind:          MemoryPriorGovernanceKindSuperseded,
+				ReplacementID: newID,
+				RecordedAt:    time.Now().UTC().Format(time.RFC3339),
+			}); err != nil {
+				return err
+			}
+		}
 		return rebuildMemoryIndexesUnlocked()
 	})
 }
@@ -73,13 +83,18 @@ func promoteMemoryProposalsLocked() error {
 	}
 	aggregates := aggregateMemoryProposals(proposals)
 	changed := false
+	governanceEvents := make([]MemoryPriorGovernanceEvent, 0, len(aggregates))
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, aggregate := range aggregates {
 		if !memoryAggregatePromotable(aggregate) {
 			continue
 		}
-		if promoteAggregateIntoCanonical(byKind, aggregate, now) {
+		entryChanged, event := promoteAggregateIntoCanonical(byKind, aggregate, now)
+		if entryChanged {
 			changed = true
+		}
+		if event != nil {
+			governanceEvents = append(governanceEvents, *event)
 		}
 	}
 	if !changed {
@@ -87,6 +102,11 @@ func promoteMemoryProposalsLocked() error {
 	}
 	if err := saveCanonicalMemoryByKind(byKind); err != nil {
 		return err
+	}
+	for _, event := range governanceEvents {
+		if err := appendMemoryPriorGovernanceEventUnlocked(event); err != nil {
+			return err
+		}
 	}
 	return rebuildMemoryIndexesUnlocked()
 }
@@ -204,10 +224,18 @@ func memoryAggregatePromotable(aggregate memoryProposalAggregate) bool {
 	}
 }
 
-func promoteAggregateIntoCanonical(byKind map[MemoryKind][]MemoryEntry, aggregate memoryProposalAggregate, now string) bool {
+func promoteAggregateIntoCanonical(byKind map[MemoryKind][]MemoryEntry, aggregate memoryProposalAggregate, now string) (bool, *MemoryPriorGovernanceEvent) {
 	entryID := stableMemoryEntryID(aggregate.Kind, aggregate.Selectors, aggregate.Statement)
 	if existing := findActiveCanonicalEntry(byKind[aggregate.Kind], entryID); existing != nil {
-		return mergeAggregateIntoEntry(existing, aggregate, now)
+		changed := mergeAggregateIntoEntry(existing, aggregate, now)
+		if changed && aggregate.Kind == MemoryKindSuccessPrior {
+			return true, &MemoryPriorGovernanceEvent{
+				EntryID:    existing.ID,
+				Kind:       MemoryPriorGovernanceKindReinforced,
+				RecordedAt: now,
+			}
+		}
+		return changed, nil
 	}
 
 	entry := MemoryEntry{
@@ -233,7 +261,7 @@ func promoteAggregateIntoCanonical(byKind map[MemoryKind][]MemoryEntry, aggregat
 			_, _ = supersedeMemoryEntryInStore(byKind, prior.ID, entry.ID, now)
 		}
 	}
-	return true
+	return true, nil
 }
 
 func mergeAggregateIntoEntry(entry *MemoryEntry, aggregate memoryProposalAggregate, now string) bool {

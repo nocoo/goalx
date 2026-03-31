@@ -217,6 +217,13 @@ func TestRecoverPromotesSuccessPriorBeforeRelaunch(t *testing.T) {
 	if !slices.Contains(pack.Signals, "success_prior_present") {
 		t.Fatalf("domain pack signals = %v, want success_prior_present", pack.Signals)
 	}
+	compilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCompilerInput: %v", err)
+	}
+	if compilerInput == nil || len(compilerInput.SelectedPriorRefs) != 1 {
+		t.Fatalf("compiler input = %+v, want one selected prior ref", compilerInput)
+	}
 }
 
 func installRecoverFakeTmux(t *testing.T, existingSession bool) (string, string) {

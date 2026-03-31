@@ -108,7 +108,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "context",
 			Summary: "Read the structural context index for this run.",
 			Command: fmt.Sprintf("goalx context --run %s", runName),
-			Paths:   []string{ContextIndexPath(runDir)},
+			Paths:   []string{ContextIndexPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)},
 		},
 		{
 			ID:      "afford",

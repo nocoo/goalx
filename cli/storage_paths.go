@@ -35,6 +35,10 @@ func MemoryProposalsDir() string {
 	return filepath.Join(MemoryRootDir(), "proposals")
 }
 
+func MemoryPriorGovernancePath() string {
+	return filepath.Join(MemoryRootDir(), "success-prior-reports.jsonl")
+}
+
 func MemoryIndexesDir() string {
 	return filepath.Join(MemoryRootDir(), "indexes")
 }

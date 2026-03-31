@@ -11,12 +11,24 @@ import (
 )
 
 type DomainPack struct {
-	Version       int      `json:"version"`
-	CompiledAt    string   `json:"compiled_at,omitempty"`
-	Domain        string   `json:"domain"`
-	Signals       []string `json:"signals,omitempty"`
-	PolicySources []string `json:"policy_sources,omitempty"`
-	PriorEntryIDs []string `json:"prior_entry_ids,omitempty"`
+	Version       int             `json:"version"`
+	CompiledAt    string          `json:"compiled_at,omitempty"`
+	Domain        string          `json:"domain"`
+	Signals       []string        `json:"signals,omitempty"`
+	Slots         DomainPackSlots `json:"slots,omitempty"`
+	PriorEntryIDs []string        `json:"prior_entry_ids,omitempty"`
+}
+
+type DomainPackSlots struct {
+	RepoPolicy           DomainPackSlot `json:"repo_policy,omitempty"`
+	LearnedSuccessPriors DomainPackSlot `json:"learned_success_priors,omitempty"`
+	RunContext           DomainPackSlot `json:"run_context,omitempty"`
+}
+
+type DomainPackSlot struct {
+	Source   string   `json:"source,omitempty"`
+	Refs     []string `json:"refs,omitempty"`
+	EntryIDs []string `json:"entry_ids,omitempty"`
 }
 
 func DomainPackPath(runDir string) string {
@@ -86,6 +98,16 @@ func validateDomainPackInput(pack *DomainPack) error {
 	if strings.TrimSpace(pack.Domain) == "" {
 		return fmt.Errorf("domain pack domain is required")
 	}
+	if hasDomainPackSlotData(pack.Slots.RepoPolicy) && strings.TrimSpace(pack.Slots.RepoPolicy.Source) == "" {
+		return fmt.Errorf("domain pack repo_policy slot source is required")
+	}
+	if hasDomainPackSlotData(pack.Slots.RunContext) && strings.TrimSpace(pack.Slots.RunContext.Source) == "" {
+		return fmt.Errorf("domain pack run_context slot source is required")
+	}
+	if len(pack.PriorEntryIDs) > 0 && len(pack.Slots.LearnedSuccessPriors.EntryIDs) > 0 &&
+		!stringSliceEqual(compactStrings(pack.PriorEntryIDs), compactStrings(pack.Slots.LearnedSuccessPriors.EntryIDs)) {
+		return fmt.Errorf("domain pack prior_entry_ids must match learned_success_priors.entry_ids")
+	}
 	return nil
 }
 
@@ -96,6 +118,21 @@ func normalizeDomainPack(pack *DomainPack) {
 	pack.CompiledAt = strings.TrimSpace(pack.CompiledAt)
 	pack.Domain = strings.TrimSpace(pack.Domain)
 	pack.Signals = compactStrings(pack.Signals)
-	pack.PolicySources = compactStrings(pack.PolicySources)
+	normalizeDomainPackSlot(&pack.Slots.RepoPolicy)
+	normalizeDomainPackSlot(&pack.Slots.LearnedSuccessPriors)
+	normalizeDomainPackSlot(&pack.Slots.RunContext)
 	pack.PriorEntryIDs = compactStrings(pack.PriorEntryIDs)
+}
+
+func normalizeDomainPackSlot(slot *DomainPackSlot) {
+	if slot == nil {
+		return
+	}
+	slot.Source = strings.TrimSpace(slot.Source)
+	slot.Refs = compactStrings(slot.Refs)
+	slot.EntryIDs = compactStrings(slot.EntryIDs)
+}
+
+func hasDomainPackSlotData(slot DomainPackSlot) bool {
+	return strings.TrimSpace(slot.Source) != "" || len(slot.Refs) > 0 || len(slot.EntryIDs) > 0
 }

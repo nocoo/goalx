@@ -134,6 +134,45 @@ func TestSchemaPrintsWorkflowPlanContract(t *testing.T) {
 	}
 }
 
+func TestSchemaPrintsCompilerInputContract(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Schema(t.TempDir(), []string{"compiler-input"}); err != nil {
+			t.Fatalf("Schema: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"# GoalX Schema: compiler-input",
+		`"source_slots": [`,
+		`"selected_prior_refs": [`,
+		"goalx durable write compiler-input --run NAME --body-file /abs/path.json",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("schema output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSchemaPrintsCompilerReportContract(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Schema(t.TempDir(), []string{"compiler-report"}); err != nil {
+			t.Fatalf("Schema: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"# GoalX Schema: compiler-report",
+		`"available_source_slots": [`,
+		`"rejected_priors": [`,
+		`"reason_code": "no_selector_match"`,
+		"goalx durable write compiler-report --run NAME --body-file /abs/path.json",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("schema output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestSchemaPrintsInterventionLogContract(t *testing.T) {
 	out := captureStdout(t, func() {
 		if err := Schema(t.TempDir(), []string{"intervention-log"}); err != nil {

@@ -19,6 +19,9 @@ func TestStartCleansUpOnLaunchFailure(t *testing.T) {
 
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	if err := os.WriteFile(filepath.Join(repo, "AGENTS.md"), []byte("repo policy"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
 
 	goalxDir := filepath.Join(repo, ".goalx")
 	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
@@ -206,6 +209,9 @@ func TestStartBootstrapsSuccessCompilationBeforeMasterLaunch(t *testing.T) {
 
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	if err := os.WriteFile(filepath.Join(repo, "AGENTS.md"), []byte("repo policy"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
 
 	goalxDir := filepath.Join(repo, ".goalx")
 	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
@@ -360,6 +366,7 @@ esac
 		filepath.Join(runDir, "proof-plan.json"),
 		filepath.Join(runDir, "workflow-plan.json"),
 		filepath.Join(runDir, "domain-pack.json"),
+		filepath.Join(runDir, "compiler-input.json"),
 		filepath.Join(runDir, "goal-log.jsonl"),
 		filepath.Join(runDir, "reports"),
 		RunMetadataPath(runDir),
@@ -382,6 +389,29 @@ esac
 	}
 	if snapshot.Policy.MasterCandidates[0] != "codex/gpt-5.4" {
 		t.Fatalf("selection snapshot master_candidates = %#v, want codex first", snapshot.Policy.MasterCandidates)
+	}
+	compilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCompilerInput: %v", err)
+	}
+	if compilerInput == nil {
+		t.Fatal("compiler input missing")
+	}
+	if compilerInput.ObjectiveContractRef != "objective-contract.json" || compilerInput.GoalRef != "goal.json" {
+		t.Fatalf("compiler input refs = %+v, want objective-contract.json and goal.json", compilerInput)
+	}
+	if compilerInput.MemoryQueryRef != filepath.Join("control", "memory-query.json") {
+		t.Fatalf("memory_query_ref = %q, want control/memory-query.json", compilerInput.MemoryQueryRef)
+	}
+	if len(compilerInput.SourceSlots) == 0 {
+		t.Fatalf("compiler input source_slots = %+v, want non-empty", compilerInput.SourceSlots)
+	}
+	domainPack, err := LoadDomainPack(DomainPackPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadDomainPack: %v", err)
+	}
+	if domainPack == nil || domainPack.Slots.RepoPolicy.Source != "AGENTS.md" {
+		t.Fatalf("domain pack slots = %+v, want AGENTS.md repo policy slot", domainPack)
 	}
 	for _, path := range []string{
 		filepath.Join(runDir, "acceptance.md"),

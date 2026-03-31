@@ -749,6 +749,38 @@ func TestBuildContextIndexIncludesExecutionSurfaceFacts(t *testing.T) {
 	}
 }
 
+func TestBuildContextIndexIncludesCompilerReportPath(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	if err := EnsureSuccessCompilation(repo, runDir, cfg, &RunMetadata{Version: 1, ProjectRoot: repo}); err != nil {
+		t.Fatalf("EnsureSuccessCompilation: %v", err)
+	}
+	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
+		Version:         1,
+		CompilerVersion: "compiler-v2",
+	}); err != nil {
+		t.Fatalf("SaveCompilerReport: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.CompilerInputPath != CompilerInputPath(runDir) {
+		t.Fatalf("compiler_input_path = %q, want %q", index.CompilerInputPath, CompilerInputPath(runDir))
+	}
+	if index.CompilerReportPath != CompilerReportPath(runDir) {
+		t.Fatalf("compiler_report_path = %q, want %q", index.CompilerReportPath, CompilerReportPath(runDir))
+	}
+
+	rendered := renderContextIndex(index)
+	for _, want := range []string{"Compiler input", "Compiler report"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
 func TestContextIndexIncludesSessionRoster(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	seedGuidanceSessionFixture(t, runDir, cfg)

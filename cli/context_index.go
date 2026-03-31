@@ -42,6 +42,8 @@ type ContextIndex struct {
 	TransportFactsPath    string                     `json:"transport_facts_path,omitempty"`
 	MemoryQueryPath       string                     `json:"memory_query_path,omitempty"`
 	MemoryContextPath     string                     `json:"memory_context_path,omitempty"`
+	CompilerInputPath     string                     `json:"compiler_input_path,omitempty"`
+	CompilerReportPath    string                     `json:"compiler_report_path,omitempty"`
 	EvolveFactsPath       string                     `json:"evolve_facts_path,omitempty"`
 	AffordancesJSONPath   string                     `json:"affordances_json_path,omitempty"`
 	AffordancesMarkdown   string                     `json:"affordances_markdown_path,omitempty"`
@@ -286,6 +288,8 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		TransportFactsPath:    TransportFactsPath(runDir),
 		MemoryQueryPath:       MemoryQueryPath(runDir),
 		MemoryContextPath:     MemoryContextPath(runDir),
+		CompilerInputPath:     CompilerInputPath(runDir),
+		CompilerReportPath:    CompilerReportPath(runDir),
 		AffordancesJSONPath:   AffordancesJSONPath(runDir),
 		AffordancesMarkdown:   AffordancesMarkdownPath(runDir),
 		ContextIndexPath:      ContextIndexPath(runDir),

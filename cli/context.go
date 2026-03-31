@@ -106,6 +106,8 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Selection snapshot", index.SelectionSnapshotPath)
 	writeContextLine("Memory query", index.MemoryQueryPath)
 	writeContextLine("Memory context", index.MemoryContextPath)
+	writeContextLine("Compiler input", index.CompilerInputPath)
+	writeContextLine("Compiler report", index.CompilerReportPath)
 	writeContextLine("Context index", index.ContextIndexPath)
 	writeContextLine("Affordances", index.AffordancesMarkdown)
 	if identity := index.RunIdentity; identity.RunID != "" || identity.Objective != "" {

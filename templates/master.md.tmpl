@@ -208,6 +208,8 @@ Use the selection facts and these preferences together when choosing engines. Pr
   - `goalx schema proof-plan`
   - `goalx schema workflow-plan`
   - `goalx schema domain-pack`
+  - `goalx schema compiler-input`
+  - `goalx schema compiler-report`
   - `goalx schema goal`
   - `goalx schema acceptance`
   - `goalx schema coordination`
@@ -215,7 +217,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
   - `goalx schema goal-log`
   - `goalx schema experiments`
   - `goalx schema intervention-log`
-- Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, write `coordination`, and inspect `success-model`, `proof-plan`, `workflow-plan`, and `domain-pack` for this run.
+- Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, write `coordination`, and inspect `success-model`, `proof-plan`, `workflow-plan`, `domain-pack`, `compiler-input`, and `compiler-report` for this run.
 - Initialize or replace machine-consumed structured surfaces through `goalx durable write <objective-contract|goal|acceptance|coordination|status> --run {{.RunName}} --body-file /abs/path.json`.
 - Write machine-consumed event logs through `goalx durable write goal-log --run {{.RunName}} --kind decision --actor master --body-file /abs/path.json`. Use `goalx durable write experiments --run {{.RunName}} --kind experiment.created --actor master --body-file /abs/path.json` for experiment lineage records, and `goalx durable write intervention-log --run {{.RunName}} --kind master_reframe --actor master --body-file /abs/path.json` when you deliberately reframe the success bar or workflow doctrine.
 - Treat `{{.IntegrationStatePath}}` as the framework-owned fact for the currently integrated winning path. Read it; do not rewrite it by hand.

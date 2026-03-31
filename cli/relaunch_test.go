@@ -168,6 +168,7 @@ func TestRelaunchMasterRestoresMissingSuccessCompilationArtifacts(t *testing.T) 
 		ProofPlanPath(runDir),
 		WorkflowPlanPath(runDir),
 		DomainPackPath(runDir),
+		CompilerInputPath(runDir),
 	} {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			t.Fatalf("remove %s: %v", path, err)
@@ -183,9 +184,17 @@ func TestRelaunchMasterRestoresMissingSuccessCompilationArtifacts(t *testing.T) 
 		ProofPlanPath(runDir),
 		WorkflowPlanPath(runDir),
 		DomainPackPath(runDir),
+		CompilerInputPath(runDir),
 	} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected %s to exist after relaunch: %v", path, err)
 		}
+	}
+	compilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCompilerInput: %v", err)
+	}
+	if compilerInput == nil || compilerInput.ObjectiveContractRef != "objective-contract.json" {
+		t.Fatalf("compiler input = %+v, want objective-contract reference", compilerInput)
 	}
 }

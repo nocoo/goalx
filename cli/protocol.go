@@ -40,6 +40,8 @@ type ProtocolData struct {
 	ProofPlanPath          string
 	WorkflowPlanPath       string
 	DomainPackPath         string
+	CompilerInputPath      string
+	CompilerReportPath     string
 	GoalPath               string
 	GoalLogPath            string
 	InterventionLogPath    string
@@ -137,6 +139,12 @@ func normalizeProtocolData(data ProtocolData, runDir string) ProtocolData {
 	}
 	if data.DomainPackPath == "" && runDir != "" {
 		data.DomainPackPath = DomainPackPath(runDir)
+	}
+	if data.CompilerInputPath == "" && runDir != "" {
+		data.CompilerInputPath = CompilerInputPath(runDir)
+	}
+	if data.CompilerReportPath == "" && runDir != "" {
+		data.CompilerReportPath = CompilerReportPath(runDir)
 	}
 	if data.InterventionLogPath == "" && runDir != "" {
 		data.InterventionLogPath = InterventionLogPath(runDir)

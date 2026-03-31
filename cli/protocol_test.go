@@ -1073,7 +1073,7 @@ func TestRenderMasterProtocolRequiresBoundaryDesignBeforeFirstDispatch(t *testin
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, write `coordination`, and inspect `success-model`, `proof-plan`, `workflow-plan`, and `domain-pack` for this run.",
+		"Before the first `goalx add` or `goalx tell`, finish the initial boundary design: draft and lock `objective-contract`, replace `goal`, append the first `goal-log` decision, synchronize `acceptance`, write `coordination`, and inspect `success-model`, `proof-plan`, `workflow-plan`, `domain-pack`, `compiler-input`, and `compiler-report` for this run.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -2991,6 +2991,40 @@ func TestRenderMasterProtocolIncludesPriorPromotionBoundary(t *testing.T) {
 	want := "Validated success-delta lessons may become priors only through the memory proposal and promotion path; do not hand-edit canonical priors."
 	if !strings.Contains(text, want) {
 		t.Fatalf("rendered master protocol missing prior promotion boundary %q:\n%s", want, text)
+	}
+}
+
+func TestRenderMasterProtocolIncludesCompilerReportGuidance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:             "demo",
+		Objective:           "ship it",
+		Mode:                goalx.ModeWorker,
+		Engine:              "codex",
+		ProjectRoot:         "/tmp/project",
+		GoalPath:            "/tmp/goal.json",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		StatusPath:          "/tmp/status.json",
+		CoordinationPath:    "/tmp/coordination.json",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"`goalx schema compiler-input`",
+		"`goalx schema compiler-report`",
+		"inspect `success-model`, `proof-plan`, `workflow-plan`, `domain-pack`, `compiler-input`, and `compiler-report`",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
 	}
 }
 

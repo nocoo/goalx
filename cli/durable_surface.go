@@ -23,6 +23,8 @@ const (
 	DurableSurfaceProofPlan         DurableSurfaceName = "proof-plan"
 	DurableSurfaceWorkflowPlan      DurableSurfaceName = "workflow-plan"
 	DurableSurfaceDomainPack        DurableSurfaceName = "domain-pack"
+	DurableSurfaceCompilerInput     DurableSurfaceName = "compiler-input"
+	DurableSurfaceCompilerReport    DurableSurfaceName = "compiler-report"
 	DurableSurfaceGoalLog           DurableSurfaceName = "goal-log"
 	DurableSurfaceExperiments       DurableSurfaceName = "experiments"
 	DurableSurfaceInterventionLog   DurableSurfaceName = "intervention-log"
@@ -220,15 +222,56 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
-			Summary:         "Run-scoped snapshot of the repo policy, learned priors, and domain signals compiled into this run.",
-			Example:         `{"domain":"frontend_product","signals":["operator_console","quality_ambiguous"],"policy_sources":["AGENTS.md"],"prior_entry_ids":["mem_success_1"]}`,
+			Summary:         "Run-scoped composed snapshot of the repo policy, learned priors, and explicit run-context slots compiled into this run.",
+			Example:         `{"domain":"frontend_product","signals":["operator_console","quality_ambiguous"],"slots":{"repo_policy":{"source":"AGENTS.md","refs":["AGENTS.md"]},"learned_success_priors":{"entry_ids":["mem_success_1"]},"run_context":{"source":"control/memory-context.json","refs":["control/memory-context.json"]}},"prior_entry_ids":["mem_success_1"]}`,
 			FieldNotes: []string{
 				"`domain-pack` is a compiled run artifact, not canonical memory.",
+				"`slots` records which source class filled which composed pack slot.",
 				"`prior_entry_ids` references the exact memory entries used for this run snapshot.",
 			},
 			FrameworkOwnedFields: []string{"`version`", "`compiled_at`"},
 		},
 		Path: DomainPackPath,
+	},
+	DurableSurfaceCompilerInput: {
+		Name:               DurableSurfaceCompilerInput,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Frozen run-scoped snapshot of the compiler inputs used to build the success plane.",
+			Example:         `{"objective_contract_ref":"objective-contract.json","goal_ref":"goal.json","memory_query_ref":"control/memory-query.json","memory_context_ref":"control/memory-context.json","policy_source_refs":["AGENTS.md"],"selected_prior_refs":["mem_success_1"],"source_slots":[{"slot":"repo_policy","refs":["AGENTS.md"]},{"slot":"learned_success_priors","refs":["mem_success_1"]},{"slot":"run_context","refs":["control/memory-context.json"]}]}`,
+			FieldNotes: []string{
+				"`compiler-input` freezes the exact durable input graph used for this run compilation.",
+				"`source_slots` is restricted to repo_policy|learned_success_priors|run_context.",
+				"`selected_prior_refs` lists the memory entries the compiler actually selected.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`compiled_at`", "`compiler_version`"},
+		},
+		Path: CompilerInputPath,
+	},
+	DurableSurfaceCompilerReport: {
+		Name:               DurableSurfaceCompilerReport,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Structured compiler explanation showing selected sources, rejected priors, and output-to-source mappings.",
+			Example:         `{"available_source_slots":[{"slot":"repo_policy","refs":["AGENTS.md"]},{"slot":"learned_success_priors","refs":["mem_success_1"]}],"selected_prior_refs":["mem_success_1"],"rejected_priors":[{"ref":"mem_success_2","reason_code":"no_selector_match"}],"output_sources":[{"output":"success-model.dimension:dim-objective","source_slot":"repo_policy","refs":["AGENTS.md"]}]}`,
+			FieldNotes: []string{
+				"`compiler-report` explains compiler choices without adding semantic verdicts.",
+				"`rejected_priors.reason_code` is restricted to explicit reason codes.",
+				"`output_sources` maps compiled outputs back to source slots and refs.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`compiled_at`", "`compiler_version`"},
+		},
+		Path: CompilerReportPath,
 	},
 	DurableSurfaceGoalLog: {
 		Name:               DurableSurfaceGoalLog,

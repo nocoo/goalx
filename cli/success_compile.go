@@ -3,6 +3,7 @@ package cli
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,15 @@ import (
 )
 
 const successCompilerVersion = "bootstrap-v1"
+
+type bootstrapCompilerSources struct {
+	Query            *MemoryQuery
+	Context          *MemoryContext
+	PolicySourceRefs []string
+	PriorEntryIDs    []string
+	SourceSlots      []CompilerInputSlot
+	RejectedPriors   []CompilerRejectedPrior
+}
 
 func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, meta *RunMetadata) error {
 	if cfg == nil {
@@ -42,6 +52,14 @@ func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, met
 	if err != nil {
 		return err
 	}
+	compilerSources, err := buildBootstrapCompilerSources(projectRoot, runDir)
+	if err != nil {
+		return err
+	}
+	compilerInput := compileBootstrapCompilerInput(runDir, compilerSources)
+	if err := SaveCompilerInput(CompilerInputPath(runDir), compilerInput); err != nil {
+		return err
+	}
 
 	successModel := compileBootstrapSuccessModel(cfg, objectiveContract, goalState, objectiveContractHash, goalHash)
 	if err := SaveSuccessModel(SuccessModelPath(runDir), successModel); err != nil {
@@ -55,11 +73,14 @@ func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, met
 	if err := SaveWorkflowPlan(WorkflowPlanPath(runDir), workflowPlan); err != nil {
 		return err
 	}
-	domainPack, err := compileBootstrapDomainPack(projectRoot, runDir, cfg, meta)
+	domainPack, err := compileBootstrapDomainPack(cfg, meta, compilerSources)
 	if err != nil {
 		return err
 	}
 	if err := SaveDomainPack(DomainPackPath(runDir), domainPack); err != nil {
+		return err
+	}
+	if err := SaveCompilerReport(CompilerReportPath(runDir), compileBootstrapCompilerReport(compilerSources)); err != nil {
 		return err
 	}
 	return nil
@@ -106,6 +127,10 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 	if err != nil {
 		return false, err
 	}
+	beforeCompilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
+	if err != nil {
+		return false, err
+	}
 	beforeDomainPack, err := LoadDomainPack(DomainPackPath(runDir))
 	if err != nil {
 		return false, err
@@ -119,11 +144,22 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 		if err := RefreshRunMemoryContext(runDir); err != nil {
 			return false, fmt.Errorf("refresh run memory context: %w", err)
 		}
-		domainPack, err := compileBootstrapDomainPack(projectRoot, runDir, cfg, meta)
+		compilerSources, err := buildBootstrapCompilerSources(projectRoot, runDir)
+		if err != nil {
+			return false, err
+		}
+		compilerInput := compileBootstrapCompilerInput(runDir, compilerSources)
+		if err := SaveCompilerInput(CompilerInputPath(runDir), compilerInput); err != nil {
+			return false, err
+		}
+		domainPack, err := compileBootstrapDomainPack(cfg, meta, compilerSources)
 		if err != nil {
 			return false, err
 		}
 		if err := SaveDomainPack(DomainPackPath(runDir), domainPack); err != nil {
+			return false, err
+		}
+		if err := SaveCompilerReport(CompilerReportPath(runDir), compileBootstrapCompilerReport(compilerSources)); err != nil {
 			return false, err
 		}
 	}
@@ -132,12 +168,17 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 	if err != nil {
 		return false, err
 	}
+	afterCompilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
+	if err != nil {
+		return false, err
+	}
 	afterDomainPack, err := LoadDomainPack(DomainPackPath(runDir))
 	if err != nil {
 		return false, err
 	}
-	return !stringSliceEqual(successPriorStatements(beforeContext), successPriorStatements(afterContext)) ||
-		!stringSliceEqual(domainPackPriorIDs(beforeDomainPack), domainPackPriorIDs(afterDomainPack)), nil
+	return compilerInputSignature(beforeCompilerInput) != compilerInputSignature(afterCompilerInput) ||
+		!stringSliceEqual(domainPackPriorIDs(beforeDomainPack), domainPackPriorIDs(afterDomainPack)) ||
+		(!stringSliceEqual(successPriorStatements(beforeContext), successPriorStatements(afterContext)) && compilerInputSignature(afterCompilerInput) == ""), nil
 }
 
 func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *ObjectiveContract, goalState *GoalState, objectiveContractHash, goalHash string) *SuccessModel {
@@ -248,7 +289,7 @@ func compileBootstrapWorkflowPlan() *WorkflowPlan {
 	}
 }
 
-func compileBootstrapDomainPack(projectRoot, runDir string, cfg *goalx.Config, meta *RunMetadata) (*DomainPack, error) {
+func buildBootstrapCompilerSources(projectRoot, runDir string) (*bootstrapCompilerSources, error) {
 	query, err := LoadMemoryQueryFile(MemoryQueryPath(runDir))
 	if err != nil {
 		return nil, err
@@ -257,18 +298,94 @@ func compileBootstrapDomainPack(projectRoot, runDir string, cfg *goalx.Config, m
 	if err != nil {
 		return nil, err
 	}
-	priorEntryIDs := []string{}
+	sources := &bootstrapCompilerSources{
+		Query:   query,
+		Context: context,
+	}
 	if query != nil {
-		entries, err := RetrieveMemory(*query)
+		selected, rejected, err := evaluateSuccessPriorCandidates(*query)
 		if err != nil {
 			return nil, err
 		}
-		for _, entry := range entries {
-			if entry.Kind != MemoryKindSuccessPrior {
-				continue
-			}
-			priorEntryIDs = append(priorEntryIDs, entry.ID)
+		for _, entry := range selected {
+			sources.PriorEntryIDs = append(sources.PriorEntryIDs, entry.ID)
 		}
+		sources.RejectedPriors = append(sources.RejectedPriors, rejected...)
+	}
+	if _, err := os.Stat(filepath.Join(projectRoot, "AGENTS.md")); err == nil {
+		sources.PolicySourceRefs = append(sources.PolicySourceRefs, "AGENTS.md")
+		sources.SourceSlots = append(sources.SourceSlots, CompilerInputSlot{
+			Slot: CompilerInputSlotRepoPolicy,
+			Refs: []string{"AGENTS.md"},
+		})
+	}
+	if context != nil {
+		sources.SourceSlots = append(sources.SourceSlots, CompilerInputSlot{
+			Slot: CompilerInputSlotRunContext,
+			Refs: []string{filepath.Join("control", "memory-context.json")},
+		})
+	}
+	if len(sources.PriorEntryIDs) > 0 {
+		sources.SourceSlots = append(sources.SourceSlots, CompilerInputSlot{
+			Slot: CompilerInputSlotLearnedSuccessPriors,
+			Refs: append([]string(nil), sources.PriorEntryIDs...),
+		})
+	}
+	return sources, nil
+}
+
+func compileBootstrapCompilerInput(runDir string, sources *bootstrapCompilerSources) *CompilerInput {
+	input := &CompilerInput{
+		Version:              1,
+		CompilerVersion:      successCompilerVersion,
+		ObjectiveContractRef: filepath.Base(ObjectiveContractPath(runDir)),
+		GoalRef:              filepath.Base(GoalPath(runDir)),
+	}
+	if sources == nil {
+		return input
+	}
+	if sources.Query != nil {
+		input.MemoryQueryRef = filepath.Join("control", "memory-query.json")
+	}
+	if sources.Context != nil {
+		input.MemoryContextRef = filepath.Join("control", "memory-context.json")
+	}
+	input.PolicySourceRefs = append([]string(nil), sources.PolicySourceRefs...)
+	input.SelectedPriorRefs = append([]string(nil), sources.PriorEntryIDs...)
+	input.SourceSlots = append([]CompilerInputSlot(nil), sources.SourceSlots...)
+	return input
+}
+
+func compileBootstrapCompilerReport(sources *bootstrapCompilerSources) *CompilerReport {
+	report := &CompilerReport{
+		Version:         1,
+		CompilerVersion: successCompilerVersion,
+	}
+	if sources == nil {
+		return report
+	}
+	for _, slot := range sources.SourceSlots {
+		report.AvailableSourceSlots = append(report.AvailableSourceSlots, CompilerReportSlot{
+			Slot: slot.Slot,
+			Refs: append([]string(nil), slot.Refs...),
+		})
+		for _, output := range []string{"success-model", "proof-plan", "workflow-plan", "domain-pack"} {
+			report.OutputSources = append(report.OutputSources, CompilerOutputSource{
+				Output:     output,
+				SourceSlot: slot.Slot,
+				Refs:       append([]string(nil), slot.Refs...),
+			})
+		}
+	}
+	report.SelectedPriorRefs = append([]string(nil), sources.PriorEntryIDs...)
+	report.RejectedPriors = append([]CompilerRejectedPrior(nil), sources.RejectedPriors...)
+	return report
+}
+
+func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *bootstrapCompilerSources) (*DomainPack, error) {
+	priorEntryIDs := []string{}
+	if sources != nil {
+		priorEntryIDs = append(priorEntryIDs, sources.PriorEntryIDs...)
 	}
 	domain := "generic"
 	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
@@ -280,26 +397,119 @@ func compileBootstrapDomainPack(projectRoot, runDir string, cfg *goalx.Config, m
 	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
 		signals = append(signals, "intent:"+strings.TrimSpace(meta.Intent))
 	}
-	if query != nil && strings.TrimSpace(query.ProjectID) != "" {
-		signals = append(signals, "project:"+strings.TrimSpace(query.ProjectID))
+	if sources != nil && sources.Query != nil && strings.TrimSpace(sources.Query.ProjectID) != "" {
+		signals = append(signals, "project:"+strings.TrimSpace(sources.Query.ProjectID))
 	}
-	if context != nil && (len(context.Facts)+len(context.Procedures)+len(context.Pitfalls)+len(context.SecretRefs)+len(context.SuccessPriors)) > 0 {
+	if sources != nil && sources.Context != nil && (len(sources.Context.Facts)+len(sources.Context.Procedures)+len(sources.Context.Pitfalls)+len(sources.Context.SecretRefs)+len(sources.Context.SuccessPriors)) > 0 {
 		signals = append(signals, "memory_context_present")
 	}
 	if len(priorEntryIDs) > 0 {
 		signals = append(signals, "success_prior_present")
 	}
-	policySources := []string{}
-	if _, err := os.Stat(filepath.Join(projectRoot, "AGENTS.md")); err == nil {
-		policySources = append(policySources, "AGENTS.md")
-	}
-	return &DomainPack{
+	pack := &DomainPack{
 		Version:       1,
 		Domain:        domain,
 		Signals:       signals,
-		PolicySources: policySources,
 		PriorEntryIDs: priorEntryIDs,
-	}, nil
+	}
+	if sources != nil {
+		if len(sources.PolicySourceRefs) > 0 {
+			pack.Slots.RepoPolicy = DomainPackSlot{
+				Source: sources.PolicySourceRefs[0],
+				Refs:   append([]string(nil), sources.PolicySourceRefs...),
+			}
+		}
+		if sources.Context != nil {
+			pack.Slots.RunContext = DomainPackSlot{
+				Source: filepath.Join("control", "memory-context.json"),
+				Refs:   []string{filepath.Join("control", "memory-context.json")},
+			}
+		}
+		if len(priorEntryIDs) > 0 {
+			pack.Slots.LearnedSuccessPriors = DomainPackSlot{
+				EntryIDs: append([]string(nil), priorEntryIDs...),
+			}
+		}
+	}
+	return pack, nil
+}
+
+func evaluateSuccessPriorCandidates(query MemoryQuery) ([]MemoryEntry, []CompilerRejectedPrior, error) {
+	entries, err := RetrieveMemory(query)
+	if err != nil {
+		return nil, nil, err
+	}
+	selected := make([]MemoryEntry, 0)
+	selectedSet := make(map[string]struct{})
+	for _, entry := range entries {
+		if entry.Kind != MemoryKindSuccessPrior {
+			continue
+		}
+		selected = append(selected, entry)
+		selectedSet[entry.ID] = struct{}{}
+	}
+
+	allEntries, err := loadCanonicalEntriesForKind(MemoryKindSuccessPrior)
+	if err != nil {
+		return nil, nil, err
+	}
+	governance, err := loadMemoryPriorGovernanceSummary()
+	if err != nil {
+		return nil, nil, err
+	}
+	rejected := make([]CompilerRejectedPrior, 0)
+	for _, entry := range allEntries {
+		if _, ok := selectedSet[entry.ID]; ok {
+			continue
+		}
+		rejected = append(rejected, CompilerRejectedPrior{
+			Ref:        entry.ID,
+			ReasonCode: compilerRejectReasonForSuccessPrior(entry, query, governance[entry.ID]),
+		})
+	}
+	return selected, rejected, nil
+}
+
+func compilerRejectReasonForSuccessPrior(entry MemoryEntry, query MemoryQuery, summary memoryPriorGovernanceSummary) string {
+	if strings.TrimSpace(firstNonEmpty(summary.SupersededBy, entry.SupersededBy)) != "" {
+		return CompilerReasonSuperseded
+	}
+	if !memoryEntrySelectorsMatch(entry, query) {
+		return CompilerReasonNoSelectorMatch
+	}
+	if entry.ContradictedCount+summary.ContradictedCount > 0 {
+		return CompilerReasonContradicted
+	}
+	return CompilerReasonLowerPriority
+}
+
+func memoryEntrySelectorsMatch(entry MemoryEntry, query MemoryQuery) bool {
+	querySelectors := querySelectorMap(query)
+	for key, value := range entry.Selectors {
+		queryValue := querySelectors[key]
+		if queryValue == "" {
+			continue
+		}
+		if queryValue != value {
+			return false
+		}
+	}
+	return true
+}
+
+func compilerInputSignature(input *CompilerInput) string {
+	if input == nil {
+		return ""
+	}
+	payload := struct {
+		SelectedPriorRefs []string            `json:"selected_prior_refs,omitempty"`
+		SourceSlots       []CompilerInputSlot `json:"source_slots,omitempty"`
+	}{
+		SelectedPriorRefs: append([]string(nil), input.SelectedPriorRefs...),
+		SourceSlots:       append([]CompilerInputSlot(nil), input.SourceSlots...),
+	}
+	data, _ := json.Marshal(payload)
+	return string(data)
 }
 
 func hashFileSHA256(path string) (string, error) {
