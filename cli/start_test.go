@@ -584,6 +584,78 @@ esac
 	}
 }
 
+func TestBootstrapStartScaffoldPublishesCanonicalLaunchingStateBeforeWorktree(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+
+	cfg := &goalx.Config{
+		Name:      "bootstrap-scaffold",
+		Mode:      goalx.ModeWorker,
+		Objective: "ship feature",
+		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
+	}
+	state := newStartRunState(repo, cfg.Name)
+
+	meta, err := bootstrapStartScaffold(repo, state, cfg, nil, &RunMetadata{Intent: runIntentEvolve}, "")
+	if err != nil {
+		t.Fatalf("bootstrapStartScaffold: %v", err)
+	}
+	if meta == nil {
+		t.Fatal("run metadata missing")
+	}
+	if _, err := os.Stat(state.runWorktree); !os.IsNotExist(err) {
+		t.Fatalf("run worktree should not exist before worktree bootstrap, stat err = %v", err)
+	}
+
+	controlIdentity, err := LoadControlRunIdentity(ControlRunIdentityPath(state.runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunIdentity: %v", err)
+	}
+	if controlIdentity == nil {
+		t.Fatal("control run identity missing")
+	}
+	if controlIdentity.RunID != meta.RunID {
+		t.Fatalf("control run identity run_id = %q, want %q", controlIdentity.RunID, meta.RunID)
+	}
+	if controlIdentity.Epoch != meta.Epoch {
+		t.Fatalf("control run identity epoch = %d, want %d", controlIdentity.Epoch, meta.Epoch)
+	}
+	if controlIdentity.CharterID != meta.CharterID {
+		t.Fatalf("control run identity charter_id = %q, want %q", controlIdentity.CharterID, meta.CharterID)
+	}
+	if controlIdentity.CharterDigest != meta.CharterHash {
+		t.Fatalf("control run identity charter_hash = %q, want %q", controlIdentity.CharterDigest, meta.CharterHash)
+	}
+
+	startup, err := LoadRunStartupState(state.runDir, state.tmuxSession)
+	if err != nil {
+		t.Fatalf("LoadRunStartupState: %v", err)
+	}
+	if startup.Phase != "bootstrapping" {
+		t.Fatalf("startup phase = %q, want bootstrapping", startup.Phase)
+	}
+
+	derived, err := loadDerivedRunState(repo, state.runDir)
+	if err != nil {
+		t.Fatalf("loadDerivedRunState: %v", err)
+	}
+	if derived.Status != "launching" {
+		t.Fatalf("derived status = %q, want launching", derived.Status)
+	}
+	if derived.Charter != "ok" {
+		t.Fatalf("derived charter = %q, want ok", derived.Charter)
+	}
+	if derived.RunID != meta.RunID {
+		t.Fatalf("derived run_id = %q, want %q", derived.RunID, meta.RunID)
+	}
+	if derived.Epoch != meta.Epoch {
+		t.Fatalf("derived epoch = %d, want %d", derived.Epoch, meta.Epoch)
+	}
+}
+
 func TestStartBootstrapsIntakeArtifactByDefault(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
