@@ -156,6 +156,20 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	if err := bootstrapStartWorkspace(state, cfg, selectionSnapshot, metaPatch); err != nil {
 		return err
 	}
+	if _, err := EnsureRuntimeState(state.runDir, cfg); err != nil {
+		return fmt.Errorf("init runtime state: %w", err)
+	}
+	if err := applyOperationUpsertTargetOp(state.runDir, controlOperationUpsertTargetBody{
+		Target: RunBootstrapOperationKey(),
+		Operation: ControlOperationTarget{
+			Kind:              ControlOperationKindRunBootstrap,
+			State:             ControlOperationStatePreparing,
+			Summary:           "launching master runtime",
+			PendingConditions: []string{"master_window_ready", "master_pane_pid_persisted"},
+		},
+	}); err != nil {
+		return err
+	}
 
 	masterCmd, masterPrompt, meta, checkSec, warning, err := bootstrapStartDurables(projectRoot, state, cfg, engines, metaPatch, snapshotCommit)
 	if err != nil {
@@ -163,14 +177,6 @@ func startWithConfig(projectRoot string, cfg *goalx.Config, engines map[string]g
 	}
 	if warning != "" {
 		fmt.Fprint(os.Stderr, warning)
-	}
-	if err := submitControlOperationTarget(state.runDir, RunBootstrapOperationKey(), ControlOperationTarget{
-		Kind:              ControlOperationKindRunBootstrap,
-		State:             ControlOperationStatePreparing,
-		Summary:           "launching master runtime",
-		PendingConditions: []string{"master_window_ready", "master_pane_pid_persisted"},
-	}); err != nil {
-		return err
 	}
 	if err := refreshBoundaryEstablishmentOperation(state.runDir); err != nil {
 		return err
