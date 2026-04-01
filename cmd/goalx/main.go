@@ -46,7 +46,8 @@ Usage:
   goalx add     "direction" [--run RUN] [flags] Add a session to a running run
   goalx dimension [--run RUN] <session-N|all> Adjust runtime dimension assignments
   goalx tell    [--run RUN] [target] "message" Send a durable instruction to master or a session
-  goalx ack-session [--run RUN] <session>      Acknowledge latest processed session inbox entry
+  goalx ack-inbox [--run RUN] [master|session-N] Acknowledge latest processed inbox entry
+  goalx ack-session [--run RUN] <session>        Legacy alias for session inbox acknowledgement
   goalx wait    [--run RUN] [target] [--timeout DURATION] Block on unread inbox entries or timeout
   goalx observe [RUN]                  Capture live output from all tmux windows
 
@@ -182,6 +183,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Dimension(cwd, args)
 	case "tell":
 		return cli.Tell(cwd, args)
+	case "ack-inbox":
+		return cli.AckInbox(cwd, args)
 	case "ack-session":
 		return cli.AckSession(cwd, args)
 	case "wait":

@@ -30,6 +30,7 @@ goalx wait [--run NAME] [target] --timeout ...
 ```bash
 goalx tell [--run NAME] [master|session-N] "message"
 goalx tell --urgent [--run NAME] [master|session-N] "message"
+goalx ack-inbox [--run NAME] [master|session-N]
 goalx add --run NAME "task"
 goalx add --run NAME --worktree "task"
 goalx replace --run NAME session-N --engine ENGINE --model MODEL --effort LEVEL

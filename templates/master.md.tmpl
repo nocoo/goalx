@@ -284,7 +284,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Record them, recover, reroute, and continue.
 - Prefer reroute, delegation, replacement, or relaunch over waiting. Use direct shell/tmux intervention only as emergency transport work.
 - Read the inbox every control cycle before making decisions.
-- Process every inbox entry with `id > last_seen_id`, then update `{{.MasterCursorPath}}` after you have handled it.
+- Process every inbox entry with `id > last_seen_id`, then acknowledge the handled boundary with `goalx ack-inbox --run {{.RunName}} master` instead of editing `{{.MasterCursorPath}}` directly.
 - Treat `status=sent` in `{{.ControlDeliveriesPath}}` as transport success: the input was submitted to the target engine.
 - `status=sent` is not the same as cursor advancement. It means "submitted", not "durably consumed".
 - `status=buffered` means the wake text is still sitting in the target input buffer. That is not transport acceptance yet.

@@ -19,9 +19,9 @@ func TestRenderSubagentProtocolIncludesResumeInstructions(t *testing.T) {
 		Engine:                    "codex",
 		ProjectRoot:               "/tmp/project",
 		Target:                    goalx.TargetConfig{Files: []string{"main.go"}},
-		ObligationModelPath:                  "/tmp/obligation-model.json",
+		ObligationModelPath:       "/tmp/obligation-model.json",
 		IntegrationStatePath:      "/tmp/integration.json",
-		AssurancePlanPath:       "/tmp/assurance-plan.json",
+		AssurancePlanPath:         "/tmp/assurance-plan.json",
 		LocalValidationCommand:    "go test ./...",
 		SessionName:               "session-1",
 		JournalPath:               "/tmp/journal.jsonl",
@@ -621,18 +621,18 @@ func TestRenderSubagentProtocolDeclaresReadonlyBoundary(t *testing.T) {
 func TestRenderMasterProtocolDeclaresReadonlyBoundaryToMaster(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		RunName:         "demo",
-		Objective:       "investigate auth",
-		Mode:            goalx.ModeWorker,
-		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		Target:          goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
-		TmuxSession:     "ar-demo",
-		SummaryPath:     "/tmp/summary.md",
-		StatusPath:      "/tmp/status.json",
-		ObligationModelPath:        "/tmp/obligation-model.json",
-		ReportsDir:      "/tmp/run/reports",
-		EngineCommand:   "codex exec",
-		RunWorktreePath: "/tmp/run-root",
+		RunName:             "demo",
+		Objective:           "investigate auth",
+		Mode:                goalx.ModeWorker,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		Target:              goalx.TargetConfig{Files: []string{"report.md"}, Readonly: []string{"."}},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		StatusPath:          "/tmp/status.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
+		ReportsDir:          "/tmp/run/reports",
+		EngineCommand:       "codex exec",
+		RunWorktreePath:     "/tmp/run-root",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -854,8 +854,8 @@ func TestRenderSubagentProtocolIncludesTeamContext(t *testing.T) {
 		JournalPath:         "/tmp/journal.jsonl",
 		SessionInboxPath:    "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath:   "/tmp/control/session-1-cursor.json",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		Sessions: []SessionData{
 			{Name: "session-1", WorktreePath: "/tmp/worktree-1"},
 			{Name: "session-2", WorktreePath: "/tmp/worktree-2"},
@@ -898,8 +898,8 @@ func TestRenderSubagentProtocolMakesGoalBoundaryExplicit(t *testing.T) {
 		JournalPath:            "/tmp/journal.jsonl",
 		SessionInboxPath:       "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath:      "/tmp/control/session-1-cursor.json",
-		ObligationModelPath:               "/tmp/obligation-model.json",
-		AssurancePlanPath:    "/tmp/assurance-plan.json",
+		ObligationModelPath:    "/tmp/obligation-model.json",
+		AssurancePlanPath:      "/tmp/assurance-plan.json",
 		Sessions: []SessionData{
 			{Name: "session-1", WorktreePath: "/tmp/worktree-1", Mode: goalx.ModeWorker},
 		},
@@ -1324,8 +1324,8 @@ func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
-		AssurancePlanPath:   "/tmp/assurance-plan.json",
-		ObligationModelPath:              "/tmp/obligation-model.json",
+		AssurancePlanPath:     "/tmp/assurance-plan.json",
+		ObligationModelPath:   "/tmp/obligation-model.json",
 		RunStatePath:          "/tmp/state/run.json",
 		SessionsStatePath:     "/tmp/state/sessions.json",
 		MasterInboxPath:       "/tmp/control/master-inbox.jsonl",
@@ -1366,12 +1366,12 @@ func TestRenderMasterProtocolDefinesGenericLastMileAutonomy(t *testing.T) {
 func TestRenderMasterProtocolIncludesIntentAndWorkerLaunchGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:           "audit auth",
-		RunName:             "demo",
-		Mode:                goalx.ModeWorker,
-		TmuxSession:         "ar-demo",
-		SummaryPath:         "/tmp/summary.md",
-		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+		Objective:     "audit auth",
+		RunName:       "demo",
+		Mode:          goalx.ModeWorker,
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1624,15 +1624,15 @@ func TestRenderMasterProtocolOmitsLegacyPlannedSessionsAndPresetDisplays(t *test
 func TestRenderMasterProtocolIncludesTransitionRecommendationInstructions(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:           "ship it",
-		RunName:             "demo",
-		Mode:                goalx.ModeWorker,
-		Engines:             goalx.BuiltinEngines,
-		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
-		TmuxSession:         "ar-demo",
-		SummaryPath:         "/tmp/summary.md",
-		StatusPath:          "/tmp/status.json",
-		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
+		Objective:     "ship it",
+		RunName:       "demo",
+		Mode:          goalx.ModeWorker,
+		Engines:       goalx.BuiltinEngines,
+		Master:        goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		TmuxSession:   "ar-demo",
+		SummaryPath:   "/tmp/summary.md",
+		StatusPath:    "/tmp/status.json",
+		EngineCommand: "claude --model claude-opus-4-6 --permission-mode auto",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -1740,7 +1740,7 @@ func TestRenderMasterProtocolIncludesNoChangeFastPathGuidance(t *testing.T) {
 		SummaryPath:         "/tmp/summary.md",
 		CompletionProofPath: "/tmp/proof/completion.json",
 		StatusPath:          "/tmp/status.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		MasterInboxPath:     "/tmp/control/inbox/master.jsonl",
 		RunStatePath:        "/tmp/state/run.json",
@@ -1810,16 +1810,16 @@ func TestRenderMasterProtocolBindsRequiredFrontierFactsToImmediateIntervention(t
 func TestRenderMasterProtocolIncludesReportsAndCompletionGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:      "audit auth",
-		RunName:        "demo",
-		Mode:           goalx.ModeWorker,
-		Master:         goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		TmuxSession:    "ar-demo",
-		SummaryPath:    "/tmp/summary.md",
-		StatusPath:     "/tmp/status.json",
+		Objective:           "audit auth",
+		RunName:             "demo",
+		Mode:                goalx.ModeWorker,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		StatusPath:          "/tmp/status.json",
 		ObligationModelPath: "/tmp/obligation-model.json",
-		ReportsDir:     "/tmp/run/reports",
-		DimensionsPath: "/tmp/control/dimensions.json",
+		ReportsDir:          "/tmp/run/reports",
+		DimensionsPath:      "/tmp/control/dimensions.json",
 		DimensionsCatalog: map[string]string{
 			"depth":    "Depth focus",
 			"evidence": "Evidence focus",
@@ -1866,13 +1866,13 @@ func TestRenderMasterProtocolIncludesReportsAndCompletionGuidance(t *testing.T) 
 func TestRenderMasterProtocolOmitsDuplicatedColdTablesButKeepsDispatchGuidance(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective:   "audit auth",
-		RunName:     "demo",
-		Mode:        goalx.ModeWorker,
-		Master:      goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
-		TmuxSession: "ar-demo",
-		SummaryPath: "/tmp/summary.md",
-		StatusPath:  "/tmp/status.json",
+		Objective:           "audit auth",
+		RunName:             "demo",
+		Mode:                goalx.ModeWorker,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		TmuxSession:         "ar-demo",
+		SummaryPath:         "/tmp/summary.md",
+		StatusPath:          "/tmp/status.json",
 		ObligationModelPath: "/tmp/obligation-model.json",
 		Sessions: []SessionData{
 			{Name: "session-1", WorktreePath: "/tmp/wt-1"},
@@ -1965,8 +1965,8 @@ func TestRenderMasterProtocolIncludesMixedModeCoordinationGuidance(t *testing.T)
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
-		AssurancePlanPath:   "/tmp/assurance-plan.json",
-		ObligationModelPath:              "/tmp/obligation-model.json",
+		AssurancePlanPath:     "/tmp/assurance-plan.json",
+		ObligationModelPath:   "/tmp/obligation-model.json",
 		MasterJournalPath:     "/tmp/master.jsonl",
 		StatusPath:            "/tmp/status.json",
 		CoordinationPath:      "/tmp/coordination.json",
@@ -2060,8 +2060,8 @@ func TestRenderMasterProtocolOmitsOldSyncOnlyLivenessGuidance(t *testing.T) {
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "best"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		StatusPath:          "/tmp/status.json",
 		MasterJournalPath:   "/tmp/master.jsonl",
@@ -2096,8 +2096,8 @@ func TestRenderMasterProtocolIncludesOptimizationDoctrine(t *testing.T) {
 		Master:              goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		StatusPath:          "/tmp/status.json",
 		EngineCommand:       "claude --model claude-opus-4-6 --permission-mode auto",
@@ -2144,8 +2144,8 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 		Master:               goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:          "ar-demo",
 		SummaryPath:          "/tmp/summary.md",
-		AssurancePlanPath:  "/tmp/assurance-plan.json",
-		ObligationModelPath:             "/tmp/obligation-model.json",
+		AssurancePlanPath:    "/tmp/assurance-plan.json",
+		ObligationModelPath:  "/tmp/obligation-model.json",
 		StatusPath:           "/tmp/status.json",
 		CoordinationPath:     "/tmp/coordination.json",
 		EngineCommand:        "codex --model gpt-5.4",
@@ -2207,8 +2207,8 @@ func TestRenderMasterProtocolIncludesBudgetExhaustionGracefulStopDoctrine(t *tes
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		ActivityPath:        "/tmp/activity.json",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		StatusPath:          "/tmp/status.json",
 	}
 
@@ -2306,8 +2306,8 @@ func TestRenderMasterProtocolIncludesExploreIntentFacts(t *testing.T) {
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		StatusPath:          "/tmp/status.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		EngineCommand:       "codex --model gpt-5.4",
@@ -2347,8 +2347,8 @@ func TestRenderMasterProtocolIncludesDebateIntentFacts(t *testing.T) {
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		StatusPath:          "/tmp/status.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		EngineCommand:       "codex --model gpt-5.4",
@@ -2387,8 +2387,8 @@ func TestRenderMasterProtocolIncludesImplementIntentFacts(t *testing.T) {
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		StatusPath:          "/tmp/status.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		EngineCommand:       "codex --model gpt-5.4",
@@ -2426,8 +2426,8 @@ func TestRenderMasterProtocolUsesCondensedOperatingSections(t *testing.T) {
 		Master:                goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		TmuxSession:           "ar-demo",
 		SummaryPath:           "/tmp/summary.md",
-		AssurancePlanPath:   "/tmp/assurance-plan.json",
-		ObligationModelPath:              "/tmp/obligation-model.json",
+		AssurancePlanPath:     "/tmp/assurance-plan.json",
+		ObligationModelPath:   "/tmp/obligation-model.json",
 		StatusPath:            "/tmp/status.json",
 		CoordinationPath:      "/tmp/coordination.json",
 		MasterInboxPath:       "/tmp/control/inbox/master.jsonl",
@@ -2518,12 +2518,12 @@ func TestRenderMasterProtocolUsesInspectFirstStaleEscalation(t *testing.T) {
 func TestRenderMasterProtocolRequiresActionOnBlockedOwnerFacts(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		RunName:     "demo",
-		Objective:   "ship it",
-		Mode:        goalx.ModeWorker,
-		Engine:      "codex",
-		ProjectRoot: "/tmp/project",
-		ObligationModelPath:    "/tmp/obligation-model.json",
+		RunName:             "demo",
+		Objective:           "ship it",
+		Mode:                goalx.ModeWorker,
+		Engine:              "codex",
+		ProjectRoot:         "/tmp/project",
+		ObligationModelPath: "/tmp/obligation-model.json",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -2589,8 +2589,8 @@ func TestRenderMasterProtocolIncludesExplicitCoverageOwnershipGuidance(t *testin
 		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 		TmuxSession:         "ar-demo",
 		SummaryPath:         "/tmp/summary.md",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
-		ObligationModelPath:            "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
 		CoordinationPath:    "/tmp/coordination.json",
 		StatusPath:          "/tmp/status.json",
 		MasterJournalPath:   "/tmp/master.jsonl",
@@ -3010,10 +3010,11 @@ func TestRenderMasterProtocolIncludesSelectionFacts(t *testing.T) {
 func TestRenderMasterProtocolUsesContextInsteadOfCharterForStartup(t *testing.T) {
 	runDir := t.TempDir()
 	data := ProtocolData{
-		Objective: "ship it",
-		RunName:   "demo",
-		Mode:      goalx.ModeWorker,
-		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		Objective:        "ship it",
+		RunName:          "demo",
+		Mode:             goalx.ModeWorker,
+		Master:           goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		MasterCursorPath: "/tmp/control/master-cursor.json",
 	}
 
 	if err := RenderMasterProtocol(data, runDir); err != nil {
@@ -3060,6 +3061,36 @@ func TestRenderMasterProtocolRoutesSessionDispatchThroughTell(t *testing.T) {
 		"`status=buffered` means the wake text is still sitting in the target input buffer.",
 		"`queued_message_visible=true` means the provider queue accepted the transport.",
 		"Do not take over or reassign immediately just because the session cursor has not advanced yet after a `sent` delivery.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolUsesAckInboxForMasterCursorAdvance(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:        "ship it",
+		RunName:          "demo",
+		Mode:             goalx.ModeWorker,
+		Master:           goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		MasterCursorPath: "/tmp/control/master-cursor.json",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"`goalx ack-inbox --run demo master`",
+		"instead of editing `",
+		"master-cursor.json",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
@@ -3164,8 +3195,8 @@ func TestRenderMasterProtocolIncludesPriorPromotionBoundary(t *testing.T) {
 		Mode:                goalx.ModeWorker,
 		Engine:              "codex",
 		ProjectRoot:         "/tmp/project",
-		ObligationModelPath:            "/tmp/obligation-model.json",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
 		StatusPath:          "/tmp/status.json",
 	}
 
@@ -3192,8 +3223,8 @@ func TestRenderMasterProtocolIncludesCompilerReportGuidance(t *testing.T) {
 		Mode:                goalx.ModeWorker,
 		Engine:              "codex",
 		ProjectRoot:         "/tmp/project",
-		ObligationModelPath:            "/tmp/obligation-model.json",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
 		StatusPath:          "/tmp/status.json",
 		CoordinationPath:    "/tmp/coordination.json",
 	}
@@ -3230,8 +3261,8 @@ func TestRenderSubagentProtocolIncludesCriticFinisherAndPriorGuidance(t *testing
 		SessionInboxPath:    "/tmp/control/inbox/session-1.jsonl",
 		SessionCursorPath:   "/tmp/control/session-1-cursor.json",
 		JournalPath:         "/tmp/journal.jsonl",
-		ObligationModelPath:            "/tmp/obligation-model.json",
-		AssurancePlanPath: "/tmp/assurance-plan.json",
+		ObligationModelPath: "/tmp/obligation-model.json",
+		AssurancePlanPath:   "/tmp/assurance-plan.json",
 		WorktreePath:        "/tmp/worktree",
 	}
 

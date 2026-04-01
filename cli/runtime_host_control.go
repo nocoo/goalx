@@ -291,10 +291,7 @@ func runRuntimeHostMaintenanceCycle(projectRoot, runName, runDir, tmuxSession st
 	if err := refreshRuntimeHostTransportFacts(runDir, tmuxSession, cfg.Master.Engine, watcher, controlState, "snapshot"); err != nil {
 		return err
 	}
-	if err := refreshActivityFacts(runDir, projectRoot, runName); err != nil {
-		return err
-	}
-	if err := RefreshEvolveFacts(runDir); err != nil {
+	if err := refreshComputedControlFacts(projectRoot, runName, runDir); err != nil {
 		return err
 	}
 	if _, err := processMasterAlerts(runDir, tmuxSession, cfg.Master.Engine, presence); err != nil {

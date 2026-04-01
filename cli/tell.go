@@ -3,6 +3,7 @@ package cli
 import "fmt"
 
 const tellUsage = `usage: goalx tell [--run NAME] [--urgent] [master|session-N] "message"`
+const ackInboxUsage = `usage: goalx ack-inbox [--run NAME] [master|session-N]`
 
 // Tell writes a durable instruction for the master or a session, then best-effort nudges the target pane.
 func Tell(projectRoot string, args []string) error {
@@ -38,27 +39,59 @@ func AckSession(projectRoot string, args []string) error {
 	if len(rest) != 1 {
 		return fmt.Errorf("usage: goalx ack-session [--run NAME] <session-name>")
 	}
-	sessionName := rest[0]
+	if runName == "" {
+		return AckInbox(projectRoot, []string{rest[0]})
+	}
+	return AckInbox(projectRoot, []string{"--run", runName, rest[0]})
+}
+
+func AckInbox(projectRoot string, args []string) error {
+	runName, rest, err := extractRunFlag(args)
+	if err != nil {
+		return err
+	}
+	for _, arg := range rest {
+		if isHelpToken(arg) {
+			fmt.Println(ackInboxUsage)
+			return nil
+		}
+	}
+	if len(rest) > 1 {
+		return fmt.Errorf(ackInboxUsage)
+	}
+	target := "master"
+	if len(rest) == 1 {
+		target = rest[0]
+	}
 
 	rc, err := ResolveRun(projectRoot, runName)
 	if err != nil {
 		return err
 	}
-	idx, err := parseSessionIndex(sessionName)
-	if err != nil {
+	if target != "master" {
+		idx, err := parseSessionIndex(target)
+		if err != nil {
+			return err
+		}
+		ok, err := hasSessionIndex(rc.RunDir, idx)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("session %q out of range for run %q", target, rc.Name)
+		}
+	}
+	if _, err := AckControlInbox(rc.RunDir, target); err != nil {
 		return err
 	}
-	ok, err := hasSessionIndex(rc.RunDir, idx)
-	if err != nil {
+	if err := refreshDisplayFacts(rc); err != nil {
 		return err
 	}
-	if !ok {
-		return fmt.Errorf("session %q out of range for run %q", sessionName, rc.Name)
+	if target == "master" {
+		fmt.Printf("Acknowledged master inbox in run '%s'\n", rc.Name)
+		return nil
 	}
-	if _, err := AckControlInbox(rc.RunDir, sessionName); err != nil {
-		return err
-	}
-	fmt.Printf("Acknowledged session inbox for %s in run '%s'\n", sessionName, rc.Name)
+	fmt.Printf("Acknowledged session inbox for %s in run '%s'\n", target, rc.Name)
 	return nil
 }
 

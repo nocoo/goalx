@@ -50,16 +50,23 @@ func refreshDisplayFacts(rc *RunContext) error {
 			return err
 		}
 	}
-	snapshot, err := BuildActivitySnapshot(rc.ProjectRoot, rc.Name, rc.RunDir)
+	if err := refreshComputedControlFacts(rc.ProjectRoot, rc.Name, rc.RunDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func refreshComputedControlFacts(projectRoot, runName, runDir string) error {
+	snapshot, err := BuildActivitySnapshot(projectRoot, runName, runDir)
 	if err != nil {
 		return err
 	}
 	if snapshot != nil {
-		if err := SaveActivitySnapshot(rc.RunDir, snapshot); err != nil {
+		if err := SaveActivitySnapshot(runDir, snapshot); err != nil {
 			return err
 		}
 	}
-	if err := RefreshEvolveFacts(rc.RunDir); err != nil {
+	if err := RefreshEvolveFacts(runDir); err != nil {
 		return err
 	}
 	return nil
