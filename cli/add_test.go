@@ -30,7 +30,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -101,7 +100,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
 target:
@@ -153,7 +151,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -217,7 +214,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -273,7 +269,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -345,7 +340,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -405,7 +399,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -467,7 +460,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -523,7 +515,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -580,7 +571,6 @@ roles:
   worker:
     engine: codex
     model: gpt-5.4
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -678,7 +668,6 @@ roles:
   worker:
     engine: codex
     model: gpt-5.4
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -725,7 +714,6 @@ roles:
   worker:
     engine: codex
     model: gpt-5.4
-parallel: 0
 target:
   files: ["src/"]
 local_validation:
@@ -775,7 +763,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -860,7 +847,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -953,7 +939,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1022,7 +1007,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1073,7 +1057,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 master:
   engine: codex
   model: gpt-5.4
@@ -1154,7 +1137,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1226,7 +1208,6 @@ roles:
   worker:
     engine: codex
     model: fast
-parallel: 3
 target:
   files: ["."]
 local_validation:
@@ -1280,7 +1261,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1356,7 +1336,6 @@ roles:
     engine: claude-code
     model: opus
     effort: high
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1414,7 +1393,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 0
 target:
   files: ["src/"]
 local_validation:
@@ -1466,7 +1444,6 @@ roles:
   worker:
     engine: codex
     model: gpt-5.4
-parallel: 0
 target:
   files: ["src/"]
 local_validation:
@@ -1516,7 +1493,6 @@ roles:
   worker:
     engine: codex
     model: gpt-5.4
-parallel: 0
 target:
   files: ["src/"]
 local_validation:
@@ -1548,7 +1524,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1605,7 +1580,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1709,7 +1683,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker
@@ -1794,7 +1767,6 @@ roles:
   worker:
     engine: claude-code
     model: opus
-parallel: 1
 target:
   files: ["src/"]
 local_validation:
@@ -1905,7 +1877,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker

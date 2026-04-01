@@ -78,7 +78,6 @@ roles:
   worker:
     engine: codex
     model: codex
-parallel: 1
 sessions:
   - hint: first
     mode: worker

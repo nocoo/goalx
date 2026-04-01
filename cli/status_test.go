@@ -267,6 +267,83 @@ func TestStatusDoesNotReviveStaleActivityUnreadWhenCanonicalQueueIsZero(t *testi
 	}
 }
 
+func TestStatusOmitsHealthyResourceSummaryByDefault(t *testing.T) {
+	repo, _, cfg, _ := writeGuidanceRunFixture(t)
+	_ = cfg
+	prev := resourceReadFile
+	t.Cleanup(func() { resourceReadFile = prev })
+	resourceReadFile = func(path string) ([]byte, error) {
+		switch path {
+		case "/proc/meminfo":
+			return []byte("MemTotal: 32768 kB\nMemAvailable: 20971520 kB\nSwapTotal: 16384 kB\nSwapFree: 16384 kB\n"), nil
+		case "/proc/pressure/memory":
+			return []byte("some avg10=0.25 avg60=0 avg300=0 total=0\nfull avg10=0 avg60=0 avg300=0 total=0\n"), nil
+		case "/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.high", "/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.swap.current", "/sys/fs/cgroup/memory.swap.max":
+			return []byte("0\n"), nil
+		case "/sys/fs/cgroup/memory.events":
+			return []byte("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n"), nil
+		}
+		if strings.HasSuffix(path, "/status") {
+			return []byte("Name:\tgoalx\nVmRSS:\t1048576 kB\n"), nil
+		}
+		return nil, os.ErrNotExist
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", "guidance-run"}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+	for _, unwanted := range []string{
+		"Resources:",
+		"state=healthy",
+		"mem_available_bytes=",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("status output should omit %q when healthy:\n%s", unwanted, out)
+		}
+	}
+}
+
+func TestStatusShowsAbnormalResourceSummary(t *testing.T) {
+	repo, _, cfg, _ := writeGuidanceRunFixture(t)
+	_ = cfg
+	prev := resourceReadFile
+	t.Cleanup(func() { resourceReadFile = prev })
+	resourceReadFile = func(path string) ([]byte, error) {
+		switch path {
+		case "/proc/meminfo":
+			return []byte("MemTotal: 32768 kB\nMemAvailable: 1048576 kB\nSwapTotal: 16384 kB\nSwapFree: 16384 kB\n"), nil
+		case "/proc/pressure/memory":
+			return []byte("some avg10=6.50 avg60=0 avg300=0 total=0\nfull avg10=0 avg60=0 avg300=0 total=0\n"), nil
+		case "/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.high", "/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.swap.current", "/sys/fs/cgroup/memory.swap.max":
+			return []byte("0\n"), nil
+		case "/sys/fs/cgroup/memory.events":
+			return []byte("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n"), nil
+		}
+		if strings.HasSuffix(path, "/status") {
+			return []byte("Name:\tgoalx\nVmRSS:\t1048576 kB\n"), nil
+		}
+		return nil, os.ErrNotExist
+	}
+
+	out := captureStdout(t, func() {
+		if err := Status(repo, []string{"--run", "guidance-run"}); err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"Resources:",
+		"state=critical",
+		"headroom_bytes=",
+		"reasons=",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("status output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStatusPrintsObjectiveIntegritySummary(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), &ObjectiveContract{
@@ -767,8 +844,6 @@ func TestStatusWarnsAboutEvolveManagementGapsAndMissingCloseoutArtifacts(t *test
 	for _, want := range []string{
 		"### advisories",
 		"review_without_managed_stop:",
-		"frontier_state=active",
-		"open_candidate_count=1",
 		"Closeout artifacts missing:",
 		"required_remaining=0",
 	} {
@@ -809,9 +884,8 @@ func TestStatusWarnsAboutRunStatusGoalDrift(t *testing.T) {
 
 	for _, want := range []string{
 		"### advisories",
-		"Status drift:",
-		"status_required_remaining=0",
-		"boundary_required_remaining=1",
+		"Control gap: status_drift",
+		"additional_advisories=",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -873,9 +947,8 @@ func TestStatusWarnsAboutOpenRequiredIDDriftEvenWhenCountsMatch(t *testing.T) {
 
 	for _, want := range []string{
 		"### advisories",
-		"Status drift:",
-		"status_open_required_ids=req-2",
-		"boundary_remaining_ids=req-1",
+		"Control gap: status_drift",
+		"additional_advisories=",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1272,8 +1345,8 @@ func TestStatusShowsBlockedRequiredFrontierFacts(t *testing.T) {
 		"session-1:transport_blocked",
 		"### advisories",
 		"Target attention:",
-		"Required frontier:",
-		"req-1 owner=session-1 execution_state=probing owner_attention=transport_blocked",
+		"Required frontier facts:",
+		"probing_required=req-1",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1532,10 +1605,9 @@ func TestStatusWarnsAboutBlockedRequiredFrontier(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		"Required frontier:",
-		"req-1 owner=session-1",
-		"execution_state=probing",
-		"owner_attention=transport_blocked",
+		"Required frontier facts:",
+		"probing_required=req-1",
+		"Target attention:",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1586,8 +1658,6 @@ func TestStatusWarnsAboutMasterOrphanedRequiredFrontier(t *testing.T) {
 		"Required frontier facts:",
 		"master_orphaned=req-1",
 		"reusable_sessions=session-4",
-		"Required frontier:",
-		"req-1 owner=master execution_state=probing",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1635,8 +1705,6 @@ func TestStatusWarnsAboutPrematureBlockedRequiredFrontier(t *testing.T) {
 		"### advisories",
 		"Required frontier facts:",
 		"premature_blocked=req-1",
-		"Required frontier:",
-		"req-1 owner=master execution_state=blocked blocked_by=claimed blocker before runtime exhausted",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1714,10 +1782,7 @@ func TestStatusWarnsAboutControlGapFacts(t *testing.T) {
 	for _, want := range []string{
 		"### advisories",
 		"Control gap: status_drift",
-		"Control gap: coordination_stale",
-		"Control gap: serialized_required_frontier",
-		"active_required_owners=session-5",
-		"reusable_sessions=session-4",
+		"additional_advisories=",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)

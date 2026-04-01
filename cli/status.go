@@ -33,7 +33,7 @@ func Status(projectRoot string, args []string) error {
 
 	fmt.Printf("Run: %s\n", rc.Name)
 	printStatusControlSummary(rc)
-	if err := printRunAdvisories(rc); err != nil {
+	if err := printRunAdvisoriesCompact(rc); err != nil {
 		return err
 	}
 
@@ -286,10 +286,32 @@ func printStatusControlSummary(rc *RunContext) {
 	if memory := formatMemorySummary(rc.RunDir); memory != "" {
 		fmt.Printf("Memory: %s\n", memory)
 	}
+	if resource := formatResourceSummary(rc.RunDir); resource != "" {
+		fmt.Printf("Resources: %s\n", resource)
+	}
 	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
 		fmt.Printf("Objective: %s\n", objective)
 	}
 	fmt.Println()
+}
+
+func formatResourceSummary(runDir string) string {
+	state, err := LoadResourceState(ResourceStatePath(runDir))
+	if err != nil || state == nil || !resourceStateNeedsAttention(state) {
+		return ""
+	}
+	parts := []string{"state=" + blankAsUnknown(state.State)}
+	if state.HeadroomBytes > 0 {
+		parts = append(parts, fmt.Sprintf("headroom_bytes=%d", state.HeadroomBytes))
+	}
+	if state.PSI != nil && (state.PSI.MemorySomeAvg10 > 0 || state.PSI.MemoryFullAvg10 > 0) {
+		parts = append(parts, fmt.Sprintf("memory_some_avg10=%.2f", state.PSI.MemorySomeAvg10))
+		parts = append(parts, fmt.Sprintf("memory_full_avg10=%.2f", state.PSI.MemoryFullAvg10))
+	}
+	if len(state.Reasons) > 0 {
+		parts = append(parts, "reasons="+strings.Join(state.Reasons, ","))
+	}
+	return strings.Join(parts, " ")
 }
 
 func formatEvolveStatusSummary(runDir string) string {

@@ -31,6 +31,9 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
 	}
+	if err := requireResourceAdmission(runDir, effectiveCfg.Master.Engine, effectiveCfg.Master.Model, "master relaunch"); err != nil {
+		return err
+	}
 	engineCmd := spec.Command
 	protocolPath := filepath.Join(runDir, "master.md")
 	prompt := goalx.ResolvePrompt(engines, effectiveCfg.Master.Engine, protocolPath)
@@ -110,6 +113,10 @@ func relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession string, cfg *g
 	})
 	if err != nil {
 		return fmt.Errorf("resolve engine: %w", err)
+	}
+	if err := requireResourceAdmission(runDir, effectiveCfg.Master.Engine, effectiveCfg.Master.Model, "master relaunch"); err != nil {
+		appendAuditLog(runDir, "target_relaunch_result target=master result=failure cause=%s err=%v", blankAsUnknown(masterPresence.State), err)
+		return err
 	}
 	engineCmd := spec.Command
 	protocolPath := filepath.Join(runDir, "master.md")

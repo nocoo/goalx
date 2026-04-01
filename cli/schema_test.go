@@ -190,6 +190,29 @@ func TestSchemaPrintsFreshnessStateContract(t *testing.T) {
 	}
 }
 
+func TestSchemaPrintsResourceStateContract(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Schema(t.TempDir(), []string{"resource-state"}); err != nil {
+			t.Fatalf("Schema: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"# GoalX Schema: resource-state",
+		`"host": {`,
+		`"psi": {`,
+		`"cgroup": {`,
+		`"goalx_processes": {`,
+		`"headroom_bytes": 17179869184`,
+		`"state": "healthy"`,
+		"goalx durable write resource-state --run NAME --body-file /abs/path.json",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("schema output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestSchemaPrintsProofPlanContract(t *testing.T) {
 	out := captureStdout(t, func() {
 		if err := Schema(t.TempDir(), []string{"proof-plan"}); err != nil {

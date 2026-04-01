@@ -206,6 +206,14 @@ func TestDurableCommandReplacesAdvertisedStructuredSurfaces(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:    "resource-state",
+			surface: "resource-state",
+			parse: func(data []byte) error {
+				_, err := parseResourceState(data)
+				return err
+			},
+		},
 	}
 
 	for _, tc := range cases {

@@ -97,7 +97,6 @@ func TestBuildContextIndexIncludesCognitionProviderFacts(t *testing.T) {
 		"Provider: `repo-native invocation=builtin available=true index_state=fresh",
 		"Provider: `gitnexus invocation=npx available=true version=" + gitNexusPinnedVersion + " index_state=missing",
 		"read_transports=cli,mcp",
-		"mcp_server_command=npx -y gitnexus@" + gitNexusPinnedVersion + " mcp",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered context missing %q:\n%s", want, rendered)

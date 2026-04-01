@@ -84,6 +84,14 @@ Rules:
 - `save + run --from` starts a new phase from saved artifacts
 - phase continuation now requires canonical saved surfaces
 
+## Resource Safety
+
+- `goalx status` stays compact under healthy conditions
+- `goalx observe` is the full diagnostic path for transport and runtime/resource facts
+- GoalX records framework-owned resource facts in `control/resource-state.json`
+- `add`, `resume`, `replace`, and `recover` can fail explicitly when new execution would be obviously unsafe
+- GoalX does not silently downgrade effort or shrink fan-out
+
 ## Durable Surface Schemas
 
 ```bash

@@ -43,6 +43,7 @@ type ContextIndex struct {
 	WorktreeSnapshotPath  string                      `json:"worktree_snapshot_path,omitempty"`
 	SelectionSnapshotPath string                      `json:"selection_snapshot_path,omitempty"`
 	TransportFactsPath    string                      `json:"transport_facts_path,omitempty"`
+	ResourceStatePath     string                      `json:"resource_state_path,omitempty"`
 	MemoryQueryPath       string                      `json:"memory_query_path,omitempty"`
 	MemoryContextPath     string                      `json:"memory_context_path,omitempty"`
 	IntakePath            string                      `json:"intake_path,omitempty"`
@@ -60,6 +61,7 @@ type ContextIndex struct {
 	GoalBoundary          *ContextGoalBoundary        `json:"obligation_boundary,omitempty"`
 	RunStatus             *ContextRunStatus           `json:"run_status,omitempty"`
 	Acceptance            *ContextAcceptance          `json:"assurance,omitempty"`
+	Resource              *ContextResourceSummary     `json:"resource,omitempty"`
 	QualityDebt           *ContextQualityDebt         `json:"quality_debt,omitempty"`
 	Closeout              *ContextCloseout            `json:"closeout,omitempty"`
 	Selection             *ContextSelection           `json:"selection,omitempty"`
@@ -121,6 +123,12 @@ type ContextAcceptance struct {
 	LastCheckedAt    string `json:"last_checked_at,omitempty"`
 	LastExitCode     *int   `json:"last_exit_code,omitempty"`
 	EvidencePath     string `json:"evidence_path,omitempty"`
+}
+
+type ContextResourceSummary struct {
+	State         string   `json:"state,omitempty"`
+	HeadroomBytes int64    `json:"headroom_bytes,omitempty"`
+	Reasons       []string `json:"reasons,omitempty"`
 }
 
 type ContextQualityDebt struct {
@@ -311,6 +319,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		ActivityPath:          ActivityPath(runDir),
 		WorktreeSnapshotPath:  WorktreeSnapshotPath(runDir),
 		TransportFactsPath:    TransportFactsPath(runDir),
+		ResourceStatePath:     ResourceStatePath(runDir),
 		MemoryQueryPath:       MemoryQueryPath(runDir),
 		MemoryContextPath:     MemoryContextPath(runDir),
 		IntakePath:            IntakePath(runDir),
@@ -359,6 +368,11 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		return nil, err
 	} else if acceptanceSummary != nil {
 		index.Acceptance = acceptanceSummary
+	}
+	if resourceSummary, err := contextResourceSummary(runDir); err != nil {
+		return nil, err
+	} else if resourceSummary != nil {
+		index.Resource = resourceSummary
 	}
 	if qualityDebt, err := contextQualityDebt(runDir); err != nil {
 		return nil, err
@@ -590,6 +604,18 @@ func contextAcceptance(runDir string) (*ContextAcceptance, error) {
 		LastCheckedAt:    summary.LastCheckedAt,
 		LastExitCode:     summary.LastExitCode,
 		EvidencePath:     summary.EvidencePath,
+	}, nil
+}
+
+func contextResourceSummary(runDir string) (*ContextResourceSummary, error) {
+	state, err := LoadResourceState(ResourceStatePath(runDir))
+	if err != nil || state == nil || !resourceStateNeedsAttention(state) {
+		return nil, err
+	}
+	return &ContextResourceSummary{
+		State:         strings.TrimSpace(state.State),
+		HeadroomBytes: state.HeadroomBytes,
+		Reasons:       append([]string(nil), state.Reasons...),
 	}, nil
 }
 

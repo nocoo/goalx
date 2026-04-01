@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 type launchOptions struct {
 	Objective    string
 	Mode         goalx.Mode
-	Parallel     int
 	Name         string
 	Readonly     bool
 	ContextPaths []string
@@ -51,7 +49,7 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
        goalx start --objective TEXT [flags]
        goalx start --objective-file PATH [flags]
        goalx start --config PATH
@@ -62,10 +60,9 @@ advanced/manual path:
 notes:
   use one comma-delimited --context value for multiple items; escape literal commas inside one item as \\,.
   selection uses detected candidate pools by default.
-  --parallel is optional initial fan-out, not a permanent cap on later dispatch.
  role defaults are separate: --master and --worker.`
 	case "init":
-		return `usage: goalx init "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
        goalx init --objective TEXT [flags]
        goalx init --objective-file PATH [flags]
 
@@ -73,7 +70,6 @@ notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
   use one comma-delimited --context value for multiple items; escape literal commas inside one item as \\,.
   selection uses detected candidate pools by default.
-  --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master and --worker.`
 	default:
 		return `usage: goalx <start|init> "objective" [flags]`
@@ -101,16 +97,6 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 			}
 			i++
 			objectiveFile = args[i]
-		case "--parallel":
-			if i+1 >= len(args) {
-				return opts, fmt.Errorf("missing value for --parallel")
-			}
-			i++
-			n, err := strconv.Atoi(args[i])
-			if err != nil || n < 1 {
-				return opts, fmt.Errorf("invalid --parallel value %q", args[i])
-			}
-			opts.Parallel = n
 		case "--name":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --name")

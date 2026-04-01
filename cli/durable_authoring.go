@@ -95,6 +95,16 @@ type freshnessStateAuthoringBody struct {
 	Evidence  []EvidenceFreshnessItem  `json:"evidence,omitempty"`
 }
 
+type resourceStateAuthoringBody struct {
+	Host           *ResourceHostFacts   `json:"host,omitempty"`
+	PSI            *ResourcePSIFacts    `json:"psi,omitempty"`
+	Cgroup         *ResourceCgroupFacts `json:"cgroup,omitempty"`
+	GoalxProcesses *GoalXProcessFacts   `json:"goalx_processes,omitempty"`
+	HeadroomBytes  int64                `json:"headroom_bytes"`
+	State          string               `json:"state"`
+	Reasons        []string             `json:"reasons,omitempty"`
+}
+
 type coordinationAuthoringBody struct {
 	PlanSummary   []string                            `json:"plan_summary,omitempty"`
 	Required      map[string]CoordinationRequiredItem `json:"required,omitempty"`
@@ -250,6 +260,12 @@ func applyDurableStructuredMutation(runDir string, spec DurableSurfaceSpec, body
 				return err
 			}
 			return SaveFreshnessState(path, state)
+		case DurableSurfaceResourceState:
+			state, err := parseResourceStateAuthoringBody(body)
+			if err != nil {
+				return err
+			}
+			return SaveResourceState(path, state)
 		case DurableSurfaceCoordination:
 			state, err := parseCoordinationAuthoringBody(body)
 			if err != nil {
@@ -588,6 +604,28 @@ func parseFreshnessStateAuthoringBody(data []byte) (*FreshnessState, error) {
 		return nil, durableSchemaHintError(DurableSurfaceFreshnessState, err)
 	}
 	normalizeFreshnessState(state)
+	return state, nil
+}
+
+func parseResourceStateAuthoringBody(data []byte) (*ResourceState, error) {
+	var body resourceStateAuthoringBody
+	if err := decodeStrictJSON(data, &body); err != nil {
+		return nil, durableSchemaHintError(DurableSurfaceResourceState, err)
+	}
+	state := &ResourceState{
+		Version:        1,
+		Host:           body.Host,
+		PSI:            body.PSI,
+		Cgroup:         body.Cgroup,
+		GoalxProcesses: body.GoalxProcesses,
+		HeadroomBytes:  body.HeadroomBytes,
+		State:          body.State,
+		Reasons:        body.Reasons,
+	}
+	if err := validateResourceStateInput(state); err != nil {
+		return nil, durableSchemaHintError(DurableSurfaceResourceState, err)
+	}
+	normalizeResourceState(state)
 	return state, nil
 }
 

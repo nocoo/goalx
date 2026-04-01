@@ -129,7 +129,7 @@ func TestMergeWorktreeAllowsLocalAutoresearchFiles(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".goalx"), 0o755); err != nil {
 		t.Fatalf("mkdir .goalx: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(repo, ".goalx", "config.yaml"), []byte("parallel: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, ".goalx", "config.yaml"), []byte("master:\n  engine: codex\n  model: gpt-5.4\n"), 0o644); err != nil {
 		t.Fatalf("write .goalx/config.yaml: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(repo, ".claude"), 0o755); err != nil {

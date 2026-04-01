@@ -45,7 +45,8 @@ func Observe(projectRoot string, args []string) error {
 
 	printObserveStatusSection("### Run runtime state", RunRuntimeStatePath(rc.RunDir))
 	printObserveStatusSection("### Run status record", RunStatusPath(rc.RunDir))
-	if err := printRunAdvisories(rc); err != nil {
+	printObserveStatusSection("### Resource state", ResourceStatePath(rc.RunDir))
+	if err := printRunAdvisoriesFull(rc); err != nil {
 		return err
 	}
 	printObserveOperationsSection(rc.RunDir)

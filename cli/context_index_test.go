@@ -770,10 +770,7 @@ func TestBuildContextIndexIncludesExecutionSurfaceFacts(t *testing.T) {
 		"Mergeable output surface: `false`",
 		"Requested effort: `high`",
 		"Effective effort: `high`",
-		"role: `develop`",
-		"surface: `durable_session`",
-		"worktree kind: `dedicated`",
-		"mergeable output: `true`",
+		"- session-1 (worker role=develop codex/gpt-5.4-mini worktree=dedicated)",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered context missing %q:\n%s", want, rendered)

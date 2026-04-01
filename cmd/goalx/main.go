@@ -52,7 +52,6 @@ Usage:
 
 Notes:
   RUN selectors are local-first. Bare NAME stays in the current project; use project-id/run or run_id for cross-project targeting.
-  --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   Use --master and --worker for role-specific engine/model defaults.
   goalx run --intent debate|implement requires --from RUN.
   .goalx/config.yaml is the shared project config; .goalx/goalx.yaml is an explicit manual draft only.

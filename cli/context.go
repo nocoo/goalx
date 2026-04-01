@@ -105,6 +105,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Result", index.SummaryPath)
 	writeContextLine("Activity", index.ActivityPath)
 	writeContextLine("Worktree snapshot", index.WorktreeSnapshotPath)
+	writeContextLine("Resource state", index.ResourceStatePath)
 	writeContextLine("Selection snapshot", index.SelectionSnapshotPath)
 	writeContextLine("Memory query", index.MemoryQueryPath)
 	writeContextLine("Memory context", index.MemoryContextPath)
@@ -173,7 +174,7 @@ func renderContextIndex(index *ContextIndex) string {
 		b.WriteString("\n## Budget\n\n")
 		writeContextLine("Summary", formatBudgetSummary(*index.Budget))
 	}
-	if index.Acceptance != nil {
+	if contextShouldRenderAssurance(index.Acceptance) {
 		b.WriteString("\n## Assurance\n\n")
 		writeContextLine("Scenarios", fmt.Sprintf("%d", index.Acceptance.ActiveCheckCount))
 		writeContextLine("Last checked at", index.Acceptance.LastCheckedAt)
@@ -182,7 +183,15 @@ func renderContextIndex(index *ContextIndex) string {
 		}
 		writeContextLine("Evidence path", index.Acceptance.EvidencePath)
 	}
-	if index.QualityDebt != nil {
+	if index.Resource != nil {
+		b.WriteString("\n## Resources\n\n")
+		writeContextLine("State", index.Resource.State)
+		if index.Resource.HeadroomBytes > 0 {
+			writeContextLine("Headroom bytes", fmt.Sprintf("%d", index.Resource.HeadroomBytes))
+		}
+		writeContextLine("Reasons", strings.Join(index.Resource.Reasons, ", "))
+	}
+	if contextShouldRenderQualityDebt(index.QualityDebt) {
 		b.WriteString("\n## Quality Debt\n\n")
 		writeContextLine("Zero debt", fmt.Sprintf("%t", index.QualityDebt.Zero))
 		writeContextLine("Success dimensions unowned", strings.Join(index.QualityDebt.SuccessDimensionUnowned, ", "))
@@ -195,7 +204,7 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Required cognition unsatisfied", strings.Join(index.QualityDebt.RequiredCognitionUnsatisfied, ", "))
 		writeContextLine("Impact resolution unknown", fmt.Sprintf("%t", index.QualityDebt.ImpactResolutionUnknown))
 	}
-	if index.Closeout != nil {
+	if contextShouldRenderCloseout(index.Closeout) {
 		b.WriteString("\n## Closeout\n\n")
 		writeContextLine("Summary exists", fmt.Sprintf("%t", index.Closeout.SummaryExists))
 		writeContextLine("Completion proof exists", fmt.Sprintf("%t", index.Closeout.CompletionProofExists))
@@ -233,7 +242,6 @@ func renderContextIndex(index *ContextIndex) string {
 		b.WriteString("\n## Cognition\n\n")
 		for _, scope := range index.CognitionScopes {
 			writeContextLine("Scope", scope.Scope)
-			writeContextLine("Worktree path", scope.WorktreePath)
 			for _, provider := range scope.Providers {
 				line := fmt.Sprintf("%s invocation=%s available=%t", provider.Name, provider.InvocationKind, provider.Available)
 				if provider.Version != "" {
@@ -244,12 +252,6 @@ func renderContextIndex(index *ContextIndex) string {
 				}
 				if len(provider.ReadTransportsSupported) > 0 {
 					line += " read_transports=" + strings.Join(provider.ReadTransportsSupported, ",")
-				}
-				if provider.MCPServerCommand != "" {
-					line += " mcp_server_command=" + provider.MCPServerCommand
-				}
-				if len(provider.Capabilities) > 0 {
-					line += " capabilities=" + strings.Join(provider.Capabilities, ",")
 				}
 				writeContextLine("Provider", line)
 			}
@@ -286,7 +288,7 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("elicitation_hook_bootstrapped", fmt.Sprintf("%t", index.Master.ProviderBootstrap.ElicitationHookBootstrapped))
 		writeContextLine("notification_hook_bootstrapped", fmt.Sprintf("%t", index.Master.ProviderBootstrap.NotificationHookBootstrapped))
 	}
-	if index.Selection != nil {
+	if contextShouldRenderSelection(index.Selection) {
 		b.WriteString("\n## Selection\n\n")
 		if len(index.Selection.MasterCandidates) > 0 {
 			writeContextLine("Master candidates", strings.Join(index.Selection.MasterCandidates, ", "))
@@ -330,38 +332,67 @@ func renderContextIndex(index *ContextIndex) string {
 		b.WriteString("## Sessions\n\n")
 		for _, sess := range index.Sessions {
 			b.WriteString(fmt.Sprintf("- %s", sess.Name))
+			sessionSummary := []string{}
 			if sess.Mode != "" {
-				b.WriteString(fmt.Sprintf(" (%s)", sess.Mode))
+				sessionSummary = append(sessionSummary, sess.Mode)
+			}
+			if sess.RoleKind != "" {
+				sessionSummary = append(sessionSummary, "role="+sess.RoleKind)
+			}
+			if sess.Engine != "" {
+				engineModel := sess.Engine
+				if sess.Model != "" {
+					engineModel += "/" + sess.Model
+				}
+				sessionSummary = append(sessionSummary, engineModel)
+			}
+			if sess.WorktreeKind != "" {
+				sessionSummary = append(sessionSummary, "worktree="+sess.WorktreeKind)
+			}
+			if len(sessionSummary) > 0 {
+				b.WriteString(" (" + strings.Join(sessionSummary, " ") + ")")
 			}
 			b.WriteString("\n")
-			writeIndentedContextLine(&b, "role", sess.RoleKind)
-			writeIndentedContextLine(&b, "engine", sess.Engine)
-			writeIndentedContextLine(&b, "model", sess.Model)
-			writeIndentedContextLine(&b, "requested effort", string(sess.RequestedEffort))
-			writeIndentedContextLine(&b, "effective effort", sess.EffectiveEffort)
-			writeIndentedContextLine(&b, "surface", sess.SurfaceKind)
-			writeIndentedContextLine(&b, "worktree kind", sess.WorktreeKind)
-			writeIndentedContextLine(&b, "mergeable output", fmt.Sprintf("%t", sess.MergeableOutputSurface))
-			if sess.ProviderBootstrap != nil {
-				writeIndentedContextLine(&b, "permission mode", sess.ProviderBootstrap.PermissionMode)
-				writeIndentedContextLine(&b, "provider bootstrap verified", fmt.Sprintf("%t", sess.ProviderBootstrap.BootstrapVerified))
-				writeIndentedContextLine(&b, "permission_request_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.PermissionRequestHookBootstrapped))
-				writeIndentedContextLine(&b, "elicitation_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.ElicitationHookBootstrapped))
-				writeIndentedContextLine(&b, "notification_hook_bootstrapped", fmt.Sprintf("%t", sess.ProviderBootstrap.NotificationHookBootstrapped))
-			}
 			writeIndentedContextLine(&b, "window", sess.WindowName)
 			writeIndentedContextLine(&b, "worktree", sess.WorktreePath)
-			writeIndentedContextLine(&b, "branch", sess.Branch)
 			writeIndentedContextLine(&b, "base selector", sess.BaseBranchSelector)
 			writeIndentedContextLine(&b, "base branch", sess.BaseBranch)
-			writeIndentedContextLine(&b, "target files", strings.Join(sess.TargetFiles, ", "))
 			writeIndentedContextLine(&b, "readonly paths", strings.Join(sess.ReadonlyPaths, ", "))
-			writeIndentedContextLine(&b, "journal", sess.JournalPath)
-			writeIndentedContextLine(&b, "inbox", sess.InboxPath)
-			writeIndentedContextLine(&b, "cursor", sess.CursorPath)
 		}
 	}
 	return b.String()
+}
+
+func contextShouldRenderAssurance(acceptance *ContextAcceptance) bool {
+	if acceptance == nil {
+		return false
+	}
+	return acceptance.ActiveCheckCount > 0 || acceptance.LastExitCode != nil || strings.TrimSpace(acceptance.LastCheckedAt) != ""
+}
+
+func contextShouldRenderQualityDebt(debt *ContextQualityDebt) bool {
+	if debt == nil {
+		return false
+	}
+	return !debt.Zero
+}
+
+func contextShouldRenderCloseout(closeout *ContextCloseout) bool {
+	if closeout == nil {
+		return false
+	}
+	return closeout.SummaryExists || closeout.CompletionProofExists || closeout.ReadyToFinalize
+}
+
+func contextShouldRenderSelection(selection *ContextSelection) bool {
+	if selection == nil {
+		return false
+	}
+	return selection.ExplicitSelection ||
+		len(selection.MasterCandidates) > 0 ||
+		len(selection.WorkerCandidates) > 0 ||
+		len(selection.DisabledEngines) > 0 ||
+		len(selection.DisabledTargets) > 0
 }
 
 func formatContextValues(values []string) string {

@@ -145,8 +145,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Do not write `control/inbox/session-N.jsonl` directly.
 - Use `goalx attach --run {{.RunName}} session-N` only for inspection or emergency manual intervention.
 - If durable control is not enough and the pane is visibly stuck, you may use direct shell/tmux intervention. Treat it as emergency transport work, not durable ownership transfer, and record the takeover in journals.
-- If parallel capacity exists and independent required work remains, dispatch it now instead of waiting.
-- Treat configured `parallel` as initial fan-out guidance, not a permanent ceiling; you may still add or resume more durable workers later when the goal warrants it.
+- If independent capacity exists and required work remains, dispatch it now instead of waiting.
 - Prefer reusing a parked or idle session with fresh inbox instructions before launching another session.
 - Sessions without dedicated worktrees share the run worktree. Do not launch multiple simultaneous no-worktree sessions that modify files. Use `goalx add --worktree` for parallel isolation.
 - Worktree-based sessions may fork from the run root or from another session. Do not assume every worker branch is rooted directly on the run worktree.
@@ -278,6 +277,9 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - An active session with `active_idle`, `transport_blocked`, `progress_blocked`, or `ownership_risky` facts is **not** a no-change fast path.
 - In a no-change fast path, do not rerun broad control narration. After any truly necessary spot checks, go straight back to `goalx wait --run {{.RunName}} master --timeout 300`.
 - Do not use `goalx status` as a default heartbeat.
+- `goalx status` is the compact exception-biased control snapshot. Use it to detect abnormal changes, not to reread raw telemetry every cycle.
+- Use `goalx observe` only when you are actively diagnosing transport, runtime pressure, OOM events, or another ambiguous control incident.
+- Do not read raw resource telemetry every control cycle. Read it only when `status` shows abnormal resource facts, when a launch is refused, when recent OOM signals appear, or when you are explicitly investigating runtime pressure.
 - Do not repeatedly restate unchanged authoritative files, health summaries, or stale-threshold reasoning.
 - If `status/observe` shows `provider_dialog_visible=true`, assume the pane is blocked.
 - Treat provider dialogs and similar interruptions as path-failure or transport-incident facts.

@@ -153,7 +153,6 @@ local_validation:
 		Name:      "debate",
 		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
-		Parallel:  2,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
 			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
@@ -165,7 +164,6 @@ local_validation:
 
 	if err := Implement(projectRoot, []string{
 		"--from", "debate",
-		"--parallel", "4",
 		"--objective", "custom implement objective",
 		"--dimension", "depth,adversarial,evidence,perfectionist",
 		"--budget", "20m",
@@ -178,9 +176,6 @@ local_validation:
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if cfg.Parallel != 4 {
-		t.Fatalf("parallel = %d, want 4", cfg.Parallel)
-	}
 	if cfg.Roles.Worker.Engine != "claude-code" || cfg.Roles.Worker.Model != "opus" {
 		t.Fatalf("develop role = %s/%s, want claude-code/opus", cfg.Roles.Worker.Engine, cfg.Roles.Worker.Model)
 	}
@@ -190,11 +185,11 @@ local_validation:
 	if cfg.Budget.MaxDuration != 20*60*1_000_000_000 {
 		t.Fatalf("budget = %v, want 20m", cfg.Budget.MaxDuration)
 	}
-	if len(cfg.Sessions) != 4 {
-		t.Fatalf("sessions = %#v, want 4 seeded sessions", cfg.Sessions)
+	if len(cfg.Sessions) != 2 {
+		t.Fatalf("sessions = %#v, want 2 canonical implement lanes", cfg.Sessions)
 	}
 	for i, session := range cfg.Sessions {
-		if got, want := session.Dimensions, []string{"depth", "adversarial", "evidence", "perfectionist"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] || got[3] != want[3] {
+		if got, want := session.Dimensions, []string{"depth", "adversarial", "evidence", "perfectionist"}; len(got) != len(want) || strings.Join(got, ",") != strings.Join(want, ",") {
 			t.Fatalf("session[%d].dimensions = %#v, want %#v", i, got, want)
 		}
 	}
@@ -209,7 +204,6 @@ func TestImplementAttachesCLIProvidedDimensionsToSessions(t *testing.T) {
 		Name:      "debate",
 		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
-		Parallel:  2,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
 			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
@@ -221,7 +215,6 @@ func TestImplementAttachesCLIProvidedDimensionsToSessions(t *testing.T) {
 
 	if err := Implement(projectRoot, []string{
 		"--from", "debate",
-		"--parallel", "3",
 		"--dimension", "depth,adversarial,evidence",
 		"--write-config",
 	}); err != nil {
@@ -232,12 +225,12 @@ func TestImplementAttachesCLIProvidedDimensionsToSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load goalx.yaml: %v", err)
 	}
-	if len(cfg.Sessions) != 3 {
-		t.Fatalf("sessions = %#v, want 3 seeded sessions", cfg.Sessions)
+	if len(cfg.Sessions) != 2 {
+		t.Fatalf("sessions = %#v, want 2 canonical implement lanes", cfg.Sessions)
 	}
-	for i := range cfg.Sessions {
-		if got, want := cfg.Sessions[i].Dimensions, []string{"depth", "adversarial", "evidence"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
-			t.Fatalf("sessions[%d].dimensions = %#v, want %#v", i, got, want)
+	for i, session := range cfg.Sessions {
+		if got, want := session.Dimensions, []string{"depth", "adversarial", "evidence"}; len(got) != len(want) || strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("session[%d].dimensions = %#v, want %#v", i, got, want)
 		}
 	}
 }
@@ -251,7 +244,6 @@ func TestImplementUsesSavedManifestReportArtifacts(t *testing.T) {
 		Name:      "debate",
 		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
-		Parallel:  1,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
 			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},
@@ -308,7 +300,6 @@ func TestImplementUsesDistinctNameForLongSourceRun(t *testing.T) {
 		Name:      sourceRun,
 		Mode:      goalx.ModeWorker,
 		Objective: "consensus fixes",
-		Parallel:  1,
 		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
 		Roles: goalx.RoleDefaultsConfig{
 			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "opus"},

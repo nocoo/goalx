@@ -98,8 +98,8 @@ goalx save
 
 Meaning:
 
-- `goalx status`: durable control summary
-- `goalx observe`: transport plus current run facts
+- `goalx status`: durable control summary, kept compact by default
+- `goalx observe`: full diagnostic path for transport and runtime facts
 - `goalx context`: canonical identity, paths, cognition, and assurance facts
 - `goalx afford`: current run-scoped command surface
 - `goalx schema <surface>`: inspect the canonical authoring contract before writing machine-consumed durable state
@@ -118,6 +118,17 @@ goalx wait --run RUN master --timeout 30s
 ```
 
 Do not jump to `goalx recover` just because `master` or `runtime-host` has not published stable lease facts yet.
+
+## Resource Safety
+
+GoalX now treats obvious memory risk as framework execution safety.
+
+- GoalX records host, PSI, cgroup, and GoalX-owned RSS facts in `control/resource-state.json`
+- healthy runs keep default operator surfaces compact
+- abnormal resource pressure appears first as a short `status` summary
+- `observe` is the path for full resource diagnosis
+- unsafe new execution can be refused explicitly for `add`, `resume`, `replace`, or `recover`
+- GoalX does not silently reduce effort or shrink fan-out to hide pressure
 
 ## Write Better Goals
 

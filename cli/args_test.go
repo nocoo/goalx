@@ -33,7 +33,6 @@ func TestExtractRunFlagMissingValue(t *testing.T) {
 func TestParseStartInitArgs(t *testing.T) {
 	opts, err := parseStartInitArgs([]string{
 		"ship feature",
-		"--parallel", "3",
 		"--name", "demo-run",
 		"--master", "codex/best",
 		"--worker", "codex/fast",
@@ -46,9 +45,6 @@ func TestParseStartInitArgs(t *testing.T) {
 	}
 	if opts.Mode != goalx.ModeWorker {
 		t.Fatalf("mode = %q, want %q", opts.Mode, goalx.ModeWorker)
-	}
-	if opts.Parallel != 3 {
-		t.Fatalf("parallel = %d, want 3", opts.Parallel)
 	}
 	if opts.Name != "demo-run" {
 		t.Fatalf("name = %q, want demo-run", opts.Name)
@@ -68,23 +64,10 @@ func TestParseLaunchOptionsRejectsAmbiguousTopLevelEngineFlags(t *testing.T) {
 	}
 }
 
-func TestParseLaunchOptionsLeavesParallelUnsetWhenOmitted(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeWorker, false)
-	if err != nil {
-		t.Fatalf("parseLaunchOptions: %v", err)
-	}
-	if opts.Parallel != 0 {
-		t.Fatalf("parallel = %d, want 0 when omitted", opts.Parallel)
-	}
-}
-
-func TestParseLaunchOptionsLeavesParallelUnsetByDefault(t *testing.T) {
-	opts, err := parseLaunchOptions([]string{"audit auth"}, goalx.ModeWorker, true)
-	if err != nil {
-		t.Fatalf("parseLaunchOptions: %v", err)
-	}
-	if opts.Parallel != 0 {
-		t.Fatalf("parallel = %d, want 0 when omitted", opts.Parallel)
+func TestParseLaunchOptionsRejectsRemovedParallelFlag(t *testing.T) {
+	_, err := parseLaunchOptions([]string{"audit auth", "--parallel", "3"}, goalx.ModeWorker, true)
+	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("parseLaunchOptions error = %v, want removed --parallel to fail", err)
 	}
 }
 
@@ -302,7 +285,6 @@ func TestParseSessionIndex(t *testing.T) {
 
 func TestSessionCountPrefersExplicitSessions(t *testing.T) {
 	cfg := &goalx.Config{
-		Parallel: 1,
 		Sessions: []goalx.SessionConfig{{Hint: "a"}, {Hint: "b"}},
 	}
 	if got := sessionCount(cfg); got != 2 {

@@ -38,6 +38,8 @@
 {{if .LocalValidationCommand}}- Local validation command: `{{.LocalValidationCommand}}`{{end}}
 - Read current run context: `goalx context --run {{.RunName}}`
 - Read current GoalX affordances: `goalx afford --run {{.RunName}} {{.SessionName}}`
+- Treat default GoalX runtime surfaces as compact. Do not inspect host/resource telemetry unless your assignment is runtime/perf/ops-focused or your path is blocked by an explicit resource refusal or runtime incident.
+- If you need runtime diagnosis for your slice, prefer `goalx observe --run {{.RunName}}` over repeatedly reading raw control files.
 - If GitNexus is fresh and your current runtime already supports its MCP server, prefer MCP resources and tools for graph exploration.
 - If GitNexus is fresh but MCP is unavailable in your runtime, use the CLI cognition commands from `goalx afford`.
 - Use `goalx afford --run {{.RunName}} {{.SessionName}}` as your scope-aware cognition command surface before broad repo search.

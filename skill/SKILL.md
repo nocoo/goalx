@@ -64,8 +64,8 @@ goalx save
 
 Quick meanings:
 
-- `status`: durable control summary
-- `observe`: live transport plus run facts
+- `status`: compact durable control summary
+- `observe`: full diagnostic path for live transport and runtime facts
 - `context`: canonical identity, paths, cognition, and assurance facts
 - `afford`: current run-scoped command surface
 - `tell`: durable redirect to master or a worker
@@ -80,6 +80,13 @@ Operator guidance:
 - fresh runs can briefly show `launching` while bootstrap settles
 - in that startup window, prefer `status`, `observe`, or `goalx wait --run RUN master --timeout 30s`
 - do not default to `recover` unless the run is actually stopped or stranded
+
+Resource safety:
+
+- GoalX records resource facts itself; do not read Linux telemetry by default
+- healthy runs stay compact on `status`
+- use `observe` when you actually need runtime/resource diagnosis
+- unsafe new launches can be refused explicitly instead of silently degrading effort or fan-out
 
 ## Canonical Surfaces
 

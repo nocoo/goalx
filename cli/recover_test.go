@@ -187,6 +187,65 @@ func TestRecoverRejectsSettlingRunWithWaitGuidance(t *testing.T) {
 	}
 }
 
+func TestRecoverUsesSelectionSnapshotForResourceAdmission(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	logPath, _ := installRecoverFakeTmux(t, false)
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	withStubbedResourceRead(t, criticalResourceFixture)
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stopped",
+		UpdatedAt:       "2026-03-29T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeWorker),
+		Active:    false,
+		StartedAt: "2026-03-29T00:00:00Z",
+		StoppedAt: "2026-03-29T00:10:00Z",
+		UpdatedAt: "2026-03-29T00:10:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	writeSelectionSnapshotFixture(t, runDir, testSelectionSnapshot{
+		Version: 1,
+		Policy: goalx.EffectiveSelectionPolicy{
+			MasterCandidates: []string{"claude-code/opus", "codex/gpt-5.4"},
+		},
+		Master: goalx.MasterConfig{Engine: "claude-code", Model: "opus", Effort: goalx.EffortHigh},
+		Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4", Effort: goalx.EffortHigh},
+	})
+
+	origRuntimeSupervisor := runtimeSupervisor
+	defer func() { runtimeSupervisor = origRuntimeSupervisor }()
+	supervisor := &runtimeSupervisorStub{}
+	runtimeSupervisor = supervisor
+
+	err := Recover(repo, []string{"--run", runName})
+	if err == nil || !strings.Contains(err.Error(), "resource admission blocked master recovery") {
+		t.Fatalf("Recover error = %v, want resource admission failure", err)
+	}
+	if supervisor.stopCalls != 0 {
+		t.Fatalf("runtime supervisor stop calls = %d, want 0 before blocked recover", supervisor.stopCalls)
+	}
+	logData, err := os.ReadFile(logPath)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	if strings.Contains(string(logData), "new-session -d -s "+goalx.TmuxSessionName(repo, runName)+" -n master") {
+		t.Fatalf("recover should not relaunch master when selection snapshot makes it unsafe:\n%s", string(logData))
+	}
+}
+
 func TestRecoverRewritesLegacyLongTmuxLocator(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

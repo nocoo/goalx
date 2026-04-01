@@ -268,6 +268,9 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		if item := buildSelectionFactsAffordance(index); item != nil {
 			doc.Items = append(doc.Items, *item)
 		}
+		if item := buildResourceStateAffordance(index); item != nil {
+			doc.Items = append(doc.Items, *item)
+		}
 		if item := buildEvolveFactsAffordance(index); item != nil {
 			doc.Items = append(doc.Items, *item)
 		}
@@ -288,7 +291,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "path",
 			Summary: "Absolute run paths for durable state and reports.",
 			Command: "",
-			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.ObligationModelPath, index.ObligationLogPath, index.AssurancePlanPath, index.EvidenceLogPath, index.StatusPath, index.SummaryPath, index.CompletionProofPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
+			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.ObligationModelPath, index.ObligationLogPath, index.AssurancePlanPath, index.EvidenceLogPath, index.StatusPath, index.ResourceStatePath, index.SummaryPath, index.CompletionProofPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
 		})
 	}
 	return doc, nil
@@ -567,6 +570,19 @@ func buildSelectionFactsAffordance(index *ContextIndex) *AffordanceItem {
 	return item
 }
 
+func buildResourceStateAffordance(index *ContextIndex) *AffordanceItem {
+	if index == nil || strings.TrimSpace(index.ResourceStatePath) == "" {
+		return nil
+	}
+	item := &AffordanceItem{
+		ID:      "resource-state",
+		Kind:    "path",
+		Summary: "Framework-owned resource safety facts for this run. Use this only when launch admission, OOM events, or runtime pressure needs explicit diagnosis.",
+		Paths:   []string{index.ResourceStatePath},
+	}
+	return item
+}
+
 func buildWorktreeBoundaryAffordance(index *ContextIndex, target string) *AffordanceItem {
 	if index == nil {
 		return nil
@@ -681,10 +697,11 @@ func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
 		if item.Command != "" {
 			b.WriteString("```bash\n" + item.Command + "\n```\n\n")
 		}
-		for _, fact := range item.Facts {
+		facts := markdownFactsForAffordance(item)
+		for _, fact := range facts {
 			b.WriteString("- " + fact + "\n")
 		}
-		if len(item.Facts) > 0 {
+		if len(facts) > 0 {
 			b.WriteString("\n")
 		}
 		for _, path := range item.Paths {
@@ -695,6 +712,26 @@ func RenderAffordancesMarkdown(doc *AffordancesDocument) string {
 		}
 	}
 	return b.String()
+}
+
+func markdownFactsForAffordance(item AffordanceItem) []string {
+	if len(item.Facts) == 0 {
+		return nil
+	}
+	if item.Kind != "fact" {
+		return item.Facts
+	}
+	limit := 4
+	switch item.ID {
+	case "worktree-boundary", "resource-state":
+		return item.Facts
+	}
+	if len(item.Facts) <= limit {
+		return item.Facts
+	}
+	facts := append([]string(nil), item.Facts[:limit]...)
+	facts = append(facts, fmt.Sprintf("(%d more facts in affordances.json)", len(item.Facts)-limit))
+	return facts
 }
 
 func RefreshRunGuidance(projectRoot, runName, runDir string) (bool, error) {

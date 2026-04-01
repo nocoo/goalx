@@ -27,6 +27,7 @@ func TestDurableSurfaceRegistryResolvesKnownSurfaces(t *testing.T) {
 		{name: "compiler-report", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: CompilerReportPath(runDir)},
 		{name: "impact-state", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ImpactStatePath(runDir)},
 		{name: "freshness-state", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: FreshnessStatePath(runDir)},
+		{name: "resource-state", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ResourceStatePath(runDir)},
 		{name: "obligation-log", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: ObligationLogPath(runDir)},
 		{name: "evidence-log", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: EvidenceLogPath(runDir)},
 		{name: "experiments", class: DurableSurfaceClassEventLog, writeMode: DurableSurfaceWriteModeAppend, strict: true, wantPath: ExperimentsLogPath(runDir)},

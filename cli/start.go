@@ -399,6 +399,9 @@ func launchStartRuntime(state *startRunState, cfg *goalx.Config, meta *RunMetada
 	if err != nil {
 		return fmt.Errorf("resolve goalx executable: %w", err)
 	}
+	if err := requireResourceAdmission(state.runDir, cfg.Master.Engine, cfg.Master.Model, "fresh start"); err != nil {
+		return err
+	}
 	masterLeaseTTL := time.Duration(checkSec) * time.Second * 2
 	masterLaunch := buildMasterLaunchCommand(goalxBin, cfg.Name, state.runDir, meta.RunID, meta.Epoch, masterLeaseTTL, masterCmd, masterPrompt)
 	if err := NewSessionWithCommandInRun(state.runDir, state.tmuxSession, "master", state.runWorktree, masterLaunch); err != nil {

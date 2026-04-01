@@ -221,7 +221,6 @@ func TestStartBootstrapsSuccessCompilationBeforeMasterLaunch(t *testing.T) {
 		Roles: goalx.RoleDefaultsConfig{
 			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
 		},
-		Parallel: 2,
 		Target: goalx.TargetConfig{
 			Files: []string{"README.md"},
 		},

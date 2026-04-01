@@ -28,6 +28,7 @@ const (
 	DurableSurfaceCompilerReport    DurableSurfaceName = "compiler-report"
 	DurableSurfaceImpactState       DurableSurfaceName = "impact-state"
 	DurableSurfaceFreshnessState    DurableSurfaceName = "freshness-state"
+	DurableSurfaceResourceState     DurableSurfaceName = "resource-state"
 	DurableSurfaceObligationLog     DurableSurfaceName = "obligation-log"
 	DurableSurfaceEvidenceLog       DurableSurfaceName = "evidence-log"
 	DurableSurfaceExperiments       DurableSurfaceName = "experiments"
@@ -336,6 +337,27 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
 		},
 		Path: FreshnessStatePath,
+	},
+	DurableSurfaceResourceState: {
+		Name:               DurableSurfaceResourceState,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Canonical Linux resource facts for GoalX memory headroom, cgroup limits, PSI pressure, and GoalX process RSS.",
+			Example:         `{"host":{"mem_total_bytes":34359738368,"mem_available_bytes":21474836480,"swap_total_bytes":17179869184,"swap_free_bytes":17179869184},"psi":{"memory_some_avg10":0,"memory_some_avg60":0,"memory_some_avg300":0,"memory_full_avg10":0,"memory_full_avg60":0,"memory_full_avg300":0},"cgroup":{"memory_current_bytes":0,"memory_high_bytes":0,"memory_max_bytes":0,"memory_swap_current_bytes":0,"memory_swap_max_bytes":0,"events":{"low":0,"high":0,"max":0,"oom":0,"oom_kill":0}},"goalx_processes":{"master_rss_bytes":734003200,"runtime_host_rss_bytes":33554432,"worker_rss_bytes":{"session-1":3221225472},"total_goalx_rss_bytes":4026531840},"headroom_bytes":17179869184,"state":"healthy","reasons":[]}`,
+			FieldNotes: []string{
+				"`resource-state` is framework-owned infrastructure truth, not orchestration judgment.",
+				"`state` must stay within healthy|tight|critical|unknown.",
+				"`goalx_processes` records current GoalX process RSS facts, not future scheduling decisions.",
+				"`headroom_bytes` may be negative when projected or observed pressure exceeds safe headroom.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`checked_at`"},
+		},
+		Path: ResourceStatePath,
 	},
 	DurableSurfaceObligationLog: {
 		Name:               DurableSurfaceObligationLog,

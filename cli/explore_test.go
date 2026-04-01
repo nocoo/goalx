@@ -157,7 +157,6 @@ context:
 		Name:      "research-a",
 		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
-		Parallel:  2,
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "codex",
@@ -397,7 +396,6 @@ func writeSavedPhaseSourceFixture(t *testing.T, projectRoot, runName, phaseKind 
 		Name:      runName,
 		Mode:      goalx.ModeWorker,
 		Objective: "audit auth flow",
-		Parallel:  2,
 		Master: goalx.MasterConfig{
 			Engine: "codex",
 			Model:  "codex",

@@ -35,6 +35,13 @@ Fresh-run startup guidance:
 - during that window use `goalx status`, `goalx observe`, or `goalx wait --run RUN master --timeout 30s`
 - do not treat early missing lease facts as a recover trigger
 
+Resource guidance:
+
+- `goalx status` stays compact under healthy conditions
+- `goalx observe` is the full diagnostic path for transport and runtime/resource facts
+- GoalX may refuse obviously unsafe `add`, `resume`, `replace`, or `recover` attempts when memory headroom is not credible
+- GoalX does not silently shrink fan-out or effort to hide resource pressure
+
 ## Intent And Continuation
 
 ```bash

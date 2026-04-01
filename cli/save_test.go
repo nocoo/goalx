@@ -28,7 +28,6 @@ func TestSaveUsesConfiguredResearchTargetFile(t *testing.T) {
 		Name:      runName,
 		Mode:      goalx.ModeWorker,
 		Objective: "inspect",
-		Parallel:  1,
 		Target: goalx.TargetConfig{
 			Files: []string{"notes.md"},
 		},
