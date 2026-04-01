@@ -21,18 +21,21 @@ type CognitionScopeState struct {
 }
 
 type CognitionProviderState struct {
-	Name            string   `json:"name"`
-	InvocationKind  string   `json:"invocation_kind"`
-	Available       bool     `json:"available"`
-	Command         string   `json:"command,omitempty"`
-	Version         string   `json:"version,omitempty"`
-	RepoRoot        string   `json:"repo_root,omitempty"`
-	StoragePath     string   `json:"storage_path,omitempty"`
-	IndexedRevision string   `json:"indexed_revision,omitempty"`
-	HeadRevision    string   `json:"head_revision,omitempty"`
-	StaleCommits    int      `json:"stale_commits,omitempty"`
-	Capabilities    []string `json:"capabilities"`
-	CheckedAt       string   `json:"checked_at,omitempty"`
+	Name             string   `json:"name"`
+	InvocationKind   string   `json:"invocation_kind"`
+	Available        bool     `json:"available"`
+	Command          string   `json:"command,omitempty"`
+	Version          string   `json:"version,omitempty"`
+	RepoRoot         string   `json:"repo_root,omitempty"`
+	StoragePath      string   `json:"storage_path,omitempty"`
+	RegistryName     string   `json:"registry_name,omitempty"`
+	IndexState       string   `json:"index_state,omitempty"`
+	IndexedRevision  string   `json:"indexed_revision,omitempty"`
+	HeadRevision     string   `json:"head_revision,omitempty"`
+	StaleCommits     int      `json:"stale_commits,omitempty"`
+	LastRefreshError string   `json:"last_refresh_error,omitempty"`
+	Capabilities     []string `json:"capabilities"`
+	CheckedAt        string   `json:"checked_at,omitempty"`
 }
 
 func CognitionStatePath(runDir string) string {
@@ -108,6 +111,11 @@ func validateCognitionStateInput(state *CognitionState) error {
 			if strings.TrimSpace(provider.InvocationKind) == "" {
 				return fmt.Errorf("cognition provider %s invocation_kind is required", provider.Name)
 			}
+			switch strings.TrimSpace(provider.IndexState) {
+			case "", "missing", "fresh", "stale", "unknown":
+			default:
+				return fmt.Errorf("cognition provider %s index_state %q is invalid", provider.Name, provider.IndexState)
+			}
 			if len(compactStrings(provider.Capabilities)) == 0 {
 				return fmt.Errorf("cognition provider %s capabilities are required", provider.Name)
 			}
@@ -142,8 +150,11 @@ func normalizeCognitionState(state *CognitionState) {
 			provider.Version = strings.TrimSpace(provider.Version)
 			provider.RepoRoot = strings.TrimSpace(provider.RepoRoot)
 			provider.StoragePath = strings.TrimSpace(provider.StoragePath)
+			provider.RegistryName = strings.TrimSpace(provider.RegistryName)
+			provider.IndexState = strings.TrimSpace(provider.IndexState)
 			provider.IndexedRevision = strings.TrimSpace(provider.IndexedRevision)
 			provider.HeadRevision = strings.TrimSpace(provider.HeadRevision)
+			provider.LastRefreshError = strings.TrimSpace(provider.LastRefreshError)
 			provider.Capabilities = compactStrings(provider.Capabilities)
 			provider.CheckedAt = strings.TrimSpace(provider.CheckedAt)
 		}

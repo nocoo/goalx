@@ -266,13 +266,16 @@ Current behavior:
 - binary install is preferred
 - pinned `npx gitnexus@1.5.0` is only marked available if a real probe succeeds
 - GoalX does not auto-install GitNexus
-- the master sees provider availability as facts and decides whether to use them
+- GoalX records provider facts per worktree scope, not just one global availability boolean
+- `available` does not mean `indexed` or `fresh`
+- GoalX can best-effort refresh a missing or stale GitNexus index during run lifecycle transitions
+- both master and worker scopes can receive runnable GitNexus cognition affordances when the provider is available
 
 Typical outcomes in `goalx context --json`:
 
 - no GitNexus: only `repo-native`
-- working pinned `npx`: `gitnexus available=true invocation_kind="npx"`
-- working global install: `gitnexus available=true invocation_kind="binary"`
+- working pinned `npx`: `gitnexus available=true invocation_kind="npx" index_state=missing|fresh|stale`
+- working global install: `gitnexus available=true invocation_kind="binary" index_state=missing|fresh|stale`
 
 ## Worktree Architecture
 

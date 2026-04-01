@@ -10,7 +10,7 @@ func RefreshCognitionStateForRun(runDir, runName string) error {
 	}
 	scopes := []CognitionScopeState{}
 
-	runRootScope, err := DiscoverCognitionScope("run-root", RunWorktreePath(runDir))
+	runRootScope, err := RefreshCognitionScope("run-root", RunWorktreePath(runDir))
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func RefreshCognitionStateForRun(runDir, runName string) error {
 		if strings.TrimSpace(worktreePath) == "" || worktreePath == RunWorktreePath(runDir) {
 			continue
 		}
-		scope, err := DiscoverCognitionScope(sessionName, worktreePath)
+		scope, err := RefreshCognitionScope(sessionName, worktreePath)
 		if err != nil {
 			return err
 		}
@@ -45,4 +45,28 @@ func RefreshCognitionStateForRun(runDir, runName string) error {
 		Version: 1,
 		Scopes:  scopes,
 	})
+}
+
+func RefreshCognitionScope(scopeName, scopePath string) (CognitionScopeState, error) {
+	scopePath = strings.TrimSpace(scopePath)
+	if scopePath == "" {
+		return CognitionScopeState{}, nil
+	}
+	providers := []CognitionProvider{
+		repoNativeCognitionProvider{},
+		gitNexusCognitionProvider{},
+	}
+	scope := CognitionScopeState{
+		Scope:        strings.TrimSpace(scopeName),
+		WorktreePath: scopePath,
+		Providers:    []CognitionProviderState{},
+	}
+	for _, provider := range providers {
+		state, err := provider.Refresh(scopePath)
+		if err != nil {
+			return CognitionScopeState{}, err
+		}
+		scope.Providers = append(scope.Providers, state)
+	}
+	return scope, nil
 }

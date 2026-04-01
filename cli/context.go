@@ -239,6 +239,9 @@ func renderContextIndex(index *ContextIndex) string {
 				if provider.Version != "" {
 					line += " version=" + provider.Version
 				}
+				if provider.IndexState != "" {
+					line += " index_state=" + provider.IndexState
+				}
 				if len(provider.Capabilities) > 0 {
 					line += " capabilities=" + strings.Join(provider.Capabilities, ",")
 				}
