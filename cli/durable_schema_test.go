@@ -38,6 +38,34 @@ func TestLookupDurableContractReturnsSchemaMetadata(t *testing.T) {
 	}
 }
 
+func TestLookupDurableContractObligationModelExampleSatisfiesValidator(t *testing.T) {
+	contract, err := LookupDurableContract("obligation-model")
+	if err != nil {
+		t.Fatalf("LookupDurableContract(obligation-model): %v", err)
+	}
+	model, err := parseObligationModelAuthoringBody([]byte(contract.Example))
+	if err != nil {
+		t.Fatalf("parseObligationModelAuthoringBody(obligation-model example): %v\n%s", err, contract.Example)
+	}
+	if model.Version != 1 {
+		t.Fatalf("model.Version = %d, want 1", model.Version)
+	}
+}
+
+func TestLookupDurableContractAssurancePlanExampleSatisfiesValidator(t *testing.T) {
+	contract, err := LookupDurableContract("assurance-plan")
+	if err != nil {
+		t.Fatalf("LookupDurableContract(assurance-plan): %v", err)
+	}
+	plan, err := parseAssurancePlanAuthoringBody([]byte(contract.Example))
+	if err != nil {
+		t.Fatalf("parseAssurancePlanAuthoringBody(assurance-plan example): %v\n%s", err, contract.Example)
+	}
+	if plan.Version != 1 {
+		t.Fatalf("plan.Version = %d, want 1", plan.Version)
+	}
+}
+
 func TestLookupDurableContractSupportsEventLogs(t *testing.T) {
 	contract, err := LookupDurableContract("obligation-log")
 	if err != nil {
