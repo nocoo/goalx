@@ -17,7 +17,7 @@ const successCompilerVersion = "compiler-v2"
 type bootstrapCompilerSources struct {
 	Query            *MemoryQuery
 	Context          *MemoryContext
-	GuidedIntake     *GuidedIntake
+	Intake           *RunIntake
 	PolicySourceRefs []string
 	PriorEntryIDs    []string
 	SourceSlots      []CompilerInputSlot
@@ -218,14 +218,14 @@ func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *Objectiv
 			})
 		}
 	}
-	if sources != nil && sources.GuidedIntake != nil {
-		for i, antiGoal := range sources.GuidedIntake.AntiGoals {
+	if sources != nil && sources.Intake != nil {
+		for i, antiGoal := range sources.Intake.AntiGoals {
 			text := strings.TrimSpace(antiGoal)
 			if text == "" {
 				continue
 			}
 			model.AntiGoals = append(model.AntiGoals, SuccessAntiGoal{
-				ID:   fmt.Sprintf("guided-%d", i+1),
+				ID:   fmt.Sprintf("intake-%d", i+1),
 				Text: text,
 			})
 		}
@@ -311,14 +311,14 @@ func buildBootstrapCompilerSources(projectRoot, runDir string) (*bootstrapCompil
 	if err != nil {
 		return nil, err
 	}
-	intake, err := LoadGuidedIntake(GuidedIntakePath(runDir))
+	intake, err := LoadLiveRunIntake(runDir)
 	if err != nil {
 		return nil, err
 	}
 	sources := &bootstrapCompilerSources{
-		Query:        query,
-		Context:      context,
-		GuidedIntake: intake,
+		Query:   query,
+		Context: context,
+		Intake:  intake,
 	}
 	if query != nil {
 		selected, rejected, err := evaluateSuccessPriorCandidates(*query)
@@ -342,7 +342,7 @@ func buildBootstrapCompilerSources(projectRoot, runDir string) (*bootstrapCompil
 		runContextRefs = append(runContextRefs, filepath.Join("control", "memory-context.json"))
 	}
 	if intake != nil {
-		runContextRefs = append(runContextRefs, filepath.Join("control", "guided-intake.json"))
+		runContextRefs = append(runContextRefs, filepath.Join("control", "intake.json"))
 	}
 	if len(runContextRefs) > 0 {
 		sources.SourceSlots = append(sources.SourceSlots, CompilerInputSlot{
@@ -428,8 +428,8 @@ func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *b
 	if sources != nil && sources.Context != nil && (len(sources.Context.Facts)+len(sources.Context.Procedures)+len(sources.Context.Pitfalls)+len(sources.Context.SecretRefs)+len(sources.Context.SuccessPriors)) > 0 {
 		signals = append(signals, "memory_context_present")
 	}
-	if sources != nil && sources.GuidedIntake != nil {
-		signals = append(signals, "guided_intake_present")
+	if sources != nil && sources.Intake != nil {
+		signals = append(signals, "intake_present")
 	}
 	if len(priorEntryIDs) > 0 {
 		signals = append(signals, "success_prior_present")

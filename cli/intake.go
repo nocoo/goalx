@@ -12,10 +12,9 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-type GuidedIntake struct {
+type RunIntake struct {
 	Version       int      `json:"version"`
 	CreatedAt     string   `json:"created_at,omitempty"`
-	Guided        bool     `json:"guided"`
 	Objective     string   `json:"objective,omitempty"`
 	Intent        string   `json:"intent,omitempty"`
 	Readonly      bool     `json:"readonly,omitempty"`
@@ -27,11 +26,19 @@ type GuidedIntake struct {
 	ProofHints    []string `json:"proof_hints,omitempty"`
 }
 
-func GuidedIntakePath(runDir string) string {
+func IntakePath(runDir string) string {
+	return filepath.Join(ControlDir(runDir), "intake.json")
+}
+
+func LegacyGuidedIntakePath(runDir string) string {
 	return filepath.Join(ControlDir(runDir), "guided-intake.json")
 }
 
-func LoadGuidedIntake(path string) (*GuidedIntake, error) {
+func SavedRunIntakePath(runDir string) string {
+	return filepath.Join(runDir, "intake.json")
+}
+
+func LoadRunIntake(path string) (*RunIntake, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -42,24 +49,46 @@ func LoadGuidedIntake(path string) (*GuidedIntake, error) {
 	if len(strings.TrimSpace(string(data))) == 0 {
 		return nil, nil
 	}
-	var intake GuidedIntake
+	var intake RunIntake
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&intake); err != nil {
-		return nil, fmt.Errorf("parse guided intake: %w", err)
+		return nil, fmt.Errorf("parse intake: %w", err)
 	}
 	if err := ensureJSONEOF(decoder); err != nil {
-		return nil, fmt.Errorf("parse guided intake: %w", err)
+		return nil, fmt.Errorf("parse intake: %w", err)
 	}
-	normalizeGuidedIntake(&intake)
+	normalizeRunIntake(&intake)
 	return &intake, nil
 }
 
-func SaveGuidedIntake(path string, intake *GuidedIntake) error {
-	if intake == nil {
-		return fmt.Errorf("guided intake is nil")
+func LoadLiveRunIntake(runDir string) (*RunIntake, error) {
+	intake, err := LoadRunIntake(IntakePath(runDir))
+	if err != nil {
+		return nil, err
 	}
-	normalizeGuidedIntake(intake)
+	if intake == nil && fileExists(LegacyGuidedIntakePath(runDir)) {
+		return nil, fmt.Errorf("legacy run uses removed intake surface %s; recreate or migrate this run to %s", LegacyGuidedIntakePath(runDir), IntakePath(runDir))
+	}
+	return intake, nil
+}
+
+func RequireSavedRunIntake(savedRunDir string) (*RunIntake, error) {
+	intake, err := LoadRunIntake(SavedRunIntakePath(savedRunDir))
+	if err != nil {
+		return nil, err
+	}
+	if intake == nil {
+		return nil, fmt.Errorf("legacy saved run missing canonical intake %s", SavedRunIntakePath(savedRunDir))
+	}
+	return intake, nil
+}
+
+func SaveRunIntake(path string, intake *RunIntake) error {
+	if intake == nil {
+		return fmt.Errorf("run intake is nil")
+	}
+	normalizeRunIntake(intake)
 	if intake.Version <= 0 {
 		intake.Version = 1
 	}
@@ -73,7 +102,7 @@ func SaveGuidedIntake(path string, intake *GuidedIntake) error {
 	return writeFileAtomic(path, data, 0o644)
 }
 
-func normalizeGuidedIntake(intake *GuidedIntake) {
+func normalizeRunIntake(intake *RunIntake) {
 	if intake == nil {
 		return
 	}
@@ -91,17 +120,16 @@ func normalizeGuidedIntake(intake *GuidedIntake) {
 	intake.ProofHints = compactStrings(intake.ProofHints)
 }
 
-func BuildGuidedIntake(cfg *goalx.Config, meta *RunMetadata) *GuidedIntake {
-	if cfg == nil || meta == nil || !meta.GuidedLaunch {
+func BuildRunIntake(cfg *goalx.Config, meta *RunMetadata) *RunIntake {
+	if cfg == nil || meta == nil {
 		return nil
 	}
 	intent := strings.TrimSpace(meta.Intent)
 	if intent == "" {
 		intent = runIntentDeliver
 	}
-	intake := &GuidedIntake{
+	intake := &RunIntake{
 		Version:      1,
-		Guided:       true,
 		Objective:    strings.TrimSpace(cfg.Objective),
 		Intent:       intent,
 		Readonly:     len(cfg.Target.Readonly) > 0,
@@ -131,14 +159,14 @@ func BuildGuidedIntake(cfg *goalx.Config, meta *RunMetadata) *GuidedIntake {
 	if len(intake.ContextFiles) > 0 || len(intake.ContextRefs) > 0 {
 		intake.WorkflowHints = append(intake.WorkflowHints, "declared_context_is_part_of_initial_success_input")
 	}
-	normalizeGuidedIntake(intake)
+	normalizeRunIntake(intake)
 	return intake
 }
 
-func ensureGuidedIntake(runDir string, cfg *goalx.Config, meta *RunMetadata) error {
-	intake := BuildGuidedIntake(cfg, meta)
+func ensureRunIntake(runDir string, cfg *goalx.Config, meta *RunMetadata) error {
+	intake := BuildRunIntake(cfg, meta)
 	if intake == nil {
 		return nil
 	}
-	return SaveGuidedIntake(GuidedIntakePath(runDir), intake)
+	return SaveRunIntake(IntakePath(runDir), intake)
 }

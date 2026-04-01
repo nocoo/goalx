@@ -150,11 +150,6 @@ Quality rubric:
 
 The extra blocker fields are optional unless you are stuck. If you are blocked, append a `status:"stuck"` entry with the blocker, dependency, ownership scope, and the next smallest useful split the master could dispatch. Never list your own session name in `depends_on`. If you have actionable next steps, prefer `dispatchable_slices` over prose so the master can either dispatch them or directly adopt them.
 
-## Budget
-
-{{if .Budget.MaxRounds}}- Max rounds: {{.Budget.MaxRounds}}{{end}}
-{{if .Budget.MaxDuration}}- Max duration: {{.Budget.MaxDuration}}{{end}}
-
 ## Autonomy Persistence
 
 - If a concrete next step exists inside your current assignment, execute it before idling.

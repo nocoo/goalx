@@ -81,8 +81,8 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 	}
 	normalizedTarget := normalizedAffordanceTarget(target)
 	compilerDoctrinePaths := []string{SuccessModelPath(runDir), ProofPlanPath(runDir), WorkflowPlanPath(runDir), DomainPackPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)}
-	if fileExists(GuidedIntakePath(runDir)) {
-		compilerDoctrinePaths = append(compilerDoctrinePaths, GuidedIntakePath(runDir))
+	if fileExists(IntakePath(runDir)) {
+		compilerDoctrinePaths = append(compilerDoctrinePaths, IntakePath(runDir))
 	}
 	doc := &AffordancesDocument{
 		Version:    1,
@@ -106,6 +106,13 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Summary: "Read the live transport capture plus current run facts.",
 			Command: fmt.Sprintf("goalx observe --run %s", runName),
 			Paths:   []string{ActivityPath(runDir), TransportFactsPath(runDir)},
+		},
+		{
+			ID:      "budget",
+			Kind:    "control",
+			Summary: "Read the current run budget boundary or adjust it through the canonical budget control surface.",
+			Command: fmt.Sprintf("goalx budget --run %s", runName),
+			Paths:   []string{RunSpecPath(runDir), ActivityPath(runDir)},
 		},
 		{
 			ID:      "context",

@@ -253,6 +253,24 @@ func TestBuildAffordancesIncludesKeepCommands(t *testing.T) {
 	}
 }
 
+func TestBuildAffordancesIncludesBudgetCommand(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "master")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	commands := make([]string, 0, len(doc.Items))
+	for _, item := range doc.Items {
+		commands = append(commands, item.Command)
+	}
+	joined := strings.Join(commands, "\n")
+	if !strings.Contains(joined, "goalx budget --run guidance-run") {
+		t.Fatalf("affordance commands missing budget command:\n%s", joined)
+	}
+}
+
 func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve
@@ -450,12 +468,11 @@ func TestBuildAffordancesIncludesCompilerDoctrineFacts(t *testing.T) {
 	if err := EnsureSuccessCompilation(repo, runDir, cfg, &RunMetadata{Version: 1, ProjectRoot: repo}); err != nil {
 		t.Fatalf("EnsureSuccessCompilation: %v", err)
 	}
-	if err := SaveGuidedIntake(GuidedIntakePath(runDir), &GuidedIntake{
+	if err := SaveRunIntake(IntakePath(runDir), &RunIntake{
 		Version: 1,
-		Guided:  true,
 		Intent:  runIntentDeliver,
 	}); err != nil {
-		t.Fatalf("SaveGuidedIntake: %v", err)
+		t.Fatalf("SaveRunIntake: %v", err)
 	}
 	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
 		Version:           1,
@@ -497,7 +514,7 @@ func TestBuildAffordancesIncludesCompilerDoctrineFacts(t *testing.T) {
 		DomainPackPath(runDir),
 		CompilerInputPath(runDir),
 		CompilerReportPath(runDir),
-		GuidedIntakePath(runDir),
+		IntakePath(runDir),
 	} {
 		if !slices.Contains(item.Paths, want) {
 			t.Fatalf("compiler-doctrine paths = %v, want %q", item.Paths, want)

@@ -106,7 +106,7 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Selection snapshot", index.SelectionSnapshotPath)
 	writeContextLine("Memory query", index.MemoryQueryPath)
 	writeContextLine("Memory context", index.MemoryContextPath)
-	writeContextLine("Guided intake", index.GuidedIntakePath)
+	writeContextLine("Intake", index.IntakePath)
 	writeContextLine("Compiler input", index.CompilerInputPath)
 	writeContextLine("Compiler report", index.CompilerReportPath)
 	writeContextLine("Context index", index.ContextIndexPath)
@@ -166,6 +166,10 @@ func renderContextIndex(index *ContextIndex) string {
 		}
 		writeContextLine("Goal remaining IDs", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ", "))
 		writeContextLine("Last verified at", index.RunStatus.LastVerifiedAt)
+	}
+	if index.Budget != nil {
+		b.WriteString("\n## Budget\n\n")
+		writeContextLine("Summary", formatBudgetSummary(*index.Budget))
 	}
 	if index.Acceptance != nil {
 		b.WriteString("\n## Acceptance\n\n")

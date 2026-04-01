@@ -14,13 +14,14 @@ import (
 const usage = `goalx — autonomous goal execution CLI
 
 Usage:
-  goalx run     "objective" [--readonly] [--guided] [flags]   Primary goal entrypoint; defaults to deliver semantics
+  goalx run     "objective" [--readonly] [flags]   Primary goal entrypoint; defaults to deliver semantics
   goalx run     --from RUN --intent debate|implement|explore [--readonly] [flags] Continue a saved run with an explicit next-step intent
   goalx init    "objective" [flags]   Generate an explicit manual draft config from an objective
   goalx start   --config PATH         Create run + tmux + launch the master from an explicit manual draft
   goalx start   "objective" [flags]   Create and start a run directly from CLI flags
   goalx list                          List all runs (active / completed / archived)
   goalx status  [--run RUN] [session] Show current run progress and control summary
+  goalx budget  [--run RUN]           Show the current run budget boundary
   goalx context [--run RUN] [--json]    Show the run context index
   goalx afford  [--run RUN] [target] [--json] Show run-scoped command affordances
   goalx attach  [--run RUN] [window]  Attach to tmux session (default: master)
@@ -68,6 +69,7 @@ var (
 	mainRuntimeHost      = cli.RuntimeHostCommand
 	mainLeaseLoop        = cli.LeaseLoop
 	mainTargetRunner     = cli.TargetRunnerCommand
+	mainBudget           = cli.Budget
 	mainContext          = cli.Context
 	mainAfford           = cli.Afford
 	mainDurable          = cli.Durable
@@ -128,6 +130,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.List(cwd, args)
 	case "status":
 		return cli.Status(cwd, args)
+	case "budget":
+		return mainBudget(cwd, args)
 	case "context":
 		return mainContext(cwd, args)
 	case "afford":

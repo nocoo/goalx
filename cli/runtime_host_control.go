@@ -591,16 +591,50 @@ func processMasterAlerts(runDir, tmuxSession, masterEngine string, presence map[
 }
 
 func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert, map[string]string, error) {
+	alerts := make([]masterAlert, 0, 4)
+	current := map[string]string{}
+	if activity != nil && activity.Lifecycle.RunActive && activity.Budget.MaxDurationSeconds > 0 && activity.Budget.Exhausted {
+		summary := formatBudgetSummary(activity.Budget)
+		key := "budget_exhausted"
+		fingerprint := strings.Join([]string{
+			"budget_exhausted",
+			fmt.Sprintf("max_duration=%d", activity.Budget.MaxDurationSeconds),
+			"started_at=" + strings.TrimSpace(activity.Budget.StartedAt),
+			"deadline_at=" + strings.TrimSpace(activity.Budget.DeadlineAt),
+		}, "|")
+		body := "Budget exhausted in active GoalX run"
+		if summary != "" {
+			body += "; " + summary
+		}
+		alerts = append(alerts, masterAlert{
+			Key:         key,
+			Fingerprint: fingerprint,
+			Body:        body,
+		})
+		current[key] = fingerprint
+	}
 	if activity == nil || !activity.Coverage.RequiredPresent {
-		return buildNonFrontierMasterAlerts(runDir)
+		nonFrontierAlerts, nonFrontierCurrent, err := buildNonFrontierMasterAlerts(runDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		alerts = append(alerts, nonFrontierAlerts...)
+		for key, fingerprint := range nonFrontierCurrent {
+			current[key] = fingerprint
+		}
+		if len(alerts) == 0 {
+			return nil, nil, nil
+		}
+		sort.Slice(alerts, func(i, j int) bool {
+			return alerts[i].Key < alerts[j].Key
+		})
+		return alerts, current, nil
 	}
 	coord, err := LoadCoordinationState(CoordinationPath(runDir))
 	if err != nil {
 		return nil, nil, err
 	}
 	coverage := activity.Coverage
-	alerts := make([]masterAlert, 0, len(coverage.UnmappedRequiredIDs)+len(coverage.MasterOrphanedRequiredIDs)+len(coverage.PrematureBlockedRequiredIDs)+4)
-	current := map[string]string{}
 
 	for _, id := range coverage.UnmappedRequiredIDs {
 		key := "unmapped_required:" + id

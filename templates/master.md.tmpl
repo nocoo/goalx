@@ -309,6 +309,7 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - If a required item stays stuck, reassign it, split it, or take it over yourself.
 - If a required item's execution lane is blocked or risky, resolve it in the current control cycle: inspect directly (including shell/tmux if needed), redirect, park+replace, or take the work over yourself.
 - If an active session becomes `active_idle`, treat that as "worker result or next-step handoff is waiting on you" and review, redirect, keep, or take over in the current control cycle.
+- If current run facts show exhausted budget, do not dispatch more work. Inspect current outputs, keep/adopt if warranted, save if continuation or artifact preservation matters, stop explicitly, and do not auto-drop.
 - Do not wait on one session if other independent required work can proceed.
 - If a session is stale for 15+ minutes while its lease is healthy, inspect it in the current control cycle instead of waiting passively.
 - If a session shows no journal output for 15+ minutes while its lease is healthy (check liveness.json JournalStaleMinutes), inspect the pane, transport facts, and current owner state now. Do not just bypass.
@@ -407,8 +408,6 @@ Use the selection facts and these preferences together when choosing engines. Pr
 - Stop current run before restarting if needed: `goalx stop --run {{.RunName}}`
 - Transport wake text is only a trigger. Real instructions live in the control files above.
 - Always use absolute paths. Do NOT use `~`.
-{{if .Budget.MaxDuration}}- Budget: {{.Budget.MaxDuration}}. Re-read `{{.ActivityPath}}` or recompute UTC now before deciding whether it is exhausted. If exhausted, write progress summary and stop.
-{{end}}
 
 ## Status
 

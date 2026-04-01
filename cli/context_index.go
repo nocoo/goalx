@@ -42,7 +42,7 @@ type ContextIndex struct {
 	TransportFactsPath    string                      `json:"transport_facts_path,omitempty"`
 	MemoryQueryPath       string                      `json:"memory_query_path,omitempty"`
 	MemoryContextPath     string                      `json:"memory_context_path,omitempty"`
-	GuidedIntakePath      string                      `json:"guided_intake_path,omitempty"`
+	IntakePath            string                      `json:"intake_path,omitempty"`
 	CompilerInputPath     string                      `json:"compiler_input_path,omitempty"`
 	CompilerReportPath    string                      `json:"compiler_report_path,omitempty"`
 	EvolveFactsPath       string                      `json:"evolve_facts_path,omitempty"`
@@ -50,6 +50,7 @@ type ContextIndex struct {
 	AffordancesMarkdown   string                      `json:"affordances_markdown_path,omitempty"`
 	ContextIndexPath      string                      `json:"context_index_path,omitempty"`
 	DimensionsPath        string                      `json:"dimensions_path,omitempty"`
+	Budget                *ActivityBudget             `json:"budget,omitempty"`
 	Master                ContextMaster               `json:"master"`
 	Evolve                *ContextEvolve              `json:"evolve,omitempty"`
 	ObjectiveIntegrity    *ContextObjectiveIntegrity  `json:"objective_integrity,omitempty"`
@@ -270,6 +271,10 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 	if err != nil {
 		return nil, err
 	}
+	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	if err != nil {
+		return nil, err
+	}
 	index := &ContextIndex{
 		Version:               1,
 		CheckedAt:             time.Now().UTC().Format(time.RFC3339),
@@ -299,7 +304,7 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		TransportFactsPath:    TransportFactsPath(runDir),
 		MemoryQueryPath:       MemoryQueryPath(runDir),
 		MemoryContextPath:     MemoryContextPath(runDir),
-		GuidedIntakePath:      GuidedIntakePath(runDir),
+		IntakePath:            IntakePath(runDir),
 		CompilerInputPath:     CompilerInputPath(runDir),
 		CompilerReportPath:    CompilerReportPath(runDir),
 		AffordancesJSONPath:   AffordancesJSONPath(runDir),
@@ -310,6 +315,9 @@ func BuildContextIndex(projectRoot, runName, runDir string) (*ContextIndex, erro
 		CodexAvailable:        toolAvailable("codex"),
 		GitAvailable:          toolAvailable("git"),
 		TmuxAvailable:         toolAvailable("tmux"),
+	}
+	if budget := buildActivityBudget(cfg, runtimeState, meta, index.CheckedAt); budget.MaxDurationSeconds > 0 {
+		index.Budget = &budget
 	}
 	if goalState, err := LoadGoalState(GoalPath(runDir)); err != nil {
 		return nil, err

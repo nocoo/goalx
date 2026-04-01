@@ -218,6 +218,127 @@ func TestRecoverRequiresExistingRun(t *testing.T) {
 	}
 }
 
+func TestRecoverRejectsLegacyGuidedIntakeRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	_, _ = installRecoverFakeTmux(t, false)
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	runWT := RunWorktreePath(runDir)
+	if err := os.MkdirAll(runWT, 0o755); err != nil {
+		t.Fatalf("mkdir run worktree: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stopped",
+		UpdatedAt:       "2026-03-29T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeWorker),
+		Active:    false,
+		StartedAt: "2026-03-29T00:00:00Z",
+		StoppedAt: "2026-03-29T00:10:00Z",
+		UpdatedAt: "2026-03-29T00:10:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := os.MkdirAll(ControlDir(runDir), 0o755); err != nil {
+		t.Fatalf("mkdir control dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ControlDir(runDir), "guided-intake.json"), []byte(`{"version":1,"guided":true,"objective":"legacy","intent":"deliver"}`), 0o644); err != nil {
+		t.Fatalf("write legacy guided intake: %v", err)
+	}
+
+	err := Recover(repo, []string{"--run", runName})
+	if err == nil {
+		t.Fatal("Recover unexpectedly succeeded for legacy guided-intake run")
+	}
+	if !strings.Contains(err.Error(), "legacy") || !strings.Contains(err.Error(), "guided-intake.json") {
+		t.Fatalf("Recover error = %v, want legacy guided-intake rejection", err)
+	}
+}
+
+func TestRecoverStaysBlockedUntilBudgetChanges(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	logPath, stateDir := installRecoverFakeTmux(t, false)
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	runWT := RunWorktreePath(runDir)
+	if err := os.MkdirAll(runWT, 0o755); err != nil {
+		t.Fatalf("mkdir run worktree: %v", err)
+	}
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	cfg.Budget.MaxDuration = time.Second
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stopped",
+		UpdatedAt:       "2026-03-29T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       runName,
+		Mode:      string(goalx.ModeWorker),
+		Active:    false,
+		StartedAt: "2000-01-01T00:00:00Z",
+		StoppedAt: "2000-01-01T01:00:00Z",
+		UpdatedAt: "2000-01-01T01:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	err = Recover(repo, []string{"--run", runName})
+	if err == nil || !strings.Contains(err.Error(), "budget exhausted") {
+		t.Fatalf("Recover error = %v, want budget exhausted", err)
+	}
+
+	if err := Budget(repo, []string{"--run", runName, "--clear"}); err != nil {
+		t.Fatalf("Budget --clear: %v", err)
+	}
+
+	origRuntimeSupervisor := runtimeSupervisor
+	defer func() { runtimeSupervisor = origRuntimeSupervisor }()
+	supervisor := &runtimeSupervisorStub{}
+	runtimeSupervisor = supervisor
+
+	if err := Recover(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Recover after budget clear: %v", err)
+	}
+	if supervisor.startCalls != 1 {
+		t.Fatalf("runtime supervisor start calls = %d, want 1", supervisor.startCalls)
+	}
+	if _, err := os.Stat(filepath.Join(stateDir, "session_"+goalx.TmuxSessionName(repo, runName))); err != nil {
+		t.Fatalf("tmux session marker missing after recover: %v", err)
+	}
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read tmux log: %v", err)
+	}
+	if !strings.Contains(string(logData), filepath.Join(runDir, "master.md")) {
+		t.Fatalf("tmux log missing master relaunch:\n%s", string(logData))
+	}
+}
+
 func TestRecoverRejectsBootstrapInProgress(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

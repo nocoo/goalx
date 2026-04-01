@@ -504,7 +504,7 @@ esac
 	}
 }
 
-func TestStartBootstrapsGuidedIntakeArtifactWhenRequested(t *testing.T) {
+func TestStartBootstrapsIntakeArtifactByDefault(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -590,21 +590,17 @@ esac
 	if err := startResolvedLaunch(repo, launchOptions{
 		Objective: "audit auth flow",
 		Mode:      goalx.ModeAuto,
-		Guided:    true,
 	}); err != nil {
 		t.Fatalf("startResolvedLaunch: %v", err)
 	}
 
 	runDir := goalx.RunDir(repo, goalx.Slugify("audit auth flow"))
-	intake, err := LoadGuidedIntake(GuidedIntakePath(runDir))
+	intake, err := LoadRunIntake(IntakePath(runDir))
 	if err != nil {
-		t.Fatalf("LoadGuidedIntake: %v", err)
+		t.Fatalf("LoadRunIntake: %v", err)
 	}
 	if intake == nil {
-		t.Fatal("guided intake missing")
-	}
-	if !intake.Guided {
-		t.Fatal("intake.Guided = false, want true")
+		t.Fatal("run intake missing")
 	}
 	if intake.Intent != runIntentDeliver {
 		t.Fatalf("intake.Intent = %q, want %q", intake.Intent, runIntentDeliver)

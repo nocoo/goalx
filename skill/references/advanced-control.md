@@ -16,7 +16,6 @@ Do not choose this path by default. Prefer:
 
 ```bash
 goalx run "goal"
-goalx run "goal" --guided
 goalx run "goal" --intent explore
 goalx run "goal" --intent explore --readonly
 goalx run "goal" --intent evolve --budget 8h
@@ -121,9 +120,8 @@ Prefer durable GoalX commands over direct transport input:
 - `goalx add --run NAME --effort high "question"` to add a deeper worker using the current selection policy
 - `goalx add --run NAME --engine ENGINE --model MODEL --effort LEVEL "task"` only when you intentionally want to bypass the current selection policy
 - `goalx run "goal" --effort high` to start a deeper default-deliver run with explicit reasoning depth
-- `goalx run "goal" --guided` to materialize a richer launch-time intake artifact before the run compiles success/proof/workflow surfaces
-- repeat `--context ITEM` for multiple context items; each flag carries one full file/dir, URL, `ref:...`, or `note:...` value
-- keep commas inside a single `note:` value; GoalX no longer treats commas as a context-item separator
+- fresh `goalx run "goal"` already materializes launch intake before the run compiles success/proof/workflow surfaces
+- use one comma-delimited `--context` value for multiple items; escape literal commas inside one item as `\,`
 - `goalx run "goal" --intent explore` to start a fresh evidence-first run
 - `goalx run "goal" --intent explore --readonly` to declare an investigation-only no-edit boundary and surface it through GoalX guidance
 - `goalx run --from RUN --intent debate` to start a debate phase from a saved run
@@ -149,6 +147,7 @@ Prefer durable GoalX commands over direct transport input:
 Recovery boundary:
 
 - `goalx recover --run NAME` = same run, same run directory, runtime relaunch after `stop` or stranded failure
+- `goalx budget --run NAME --extend ...` or `--clear`, then `goalx recover --run NAME` = same run after exhausted-budget stop
 - `goalx save --run NAME` plus `goalx run --from NAME --intent ...` = new phase from saved artifacts
 - do not substitute `run --from` for same-run recovery
 

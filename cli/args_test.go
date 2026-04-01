@@ -129,23 +129,29 @@ func TestParseLaunchOptionsSupportsRepeatedDimensions(t *testing.T) {
 	}
 }
 
-func TestParseLaunchOptionsPreservesSingleContextValueWithCommas(t *testing.T) {
+func TestParseLaunchOptionsSplitsCommaDelimitedContextItems(t *testing.T) {
 	opts, err := parseLaunchOptions([]string{
 		"audit auth",
-		"--context", "note:program centric owner scoped no demo drift",
-		"--context", "note:commas, should, stay, inside",
+		"--context", "README.md,docs/arch.md,ref:ticket-123,https://example.com/spec,note:commas\\, stay inside",
 	}, goalx.ModeWorker, true)
 	if err != nil {
 		t.Fatalf("parseLaunchOptions: %v", err)
 	}
-	if got, want := len(opts.ContextPaths), 2; got != want {
-		t.Fatalf("context paths len = %d, want %d: %#v", got, want, opts.ContextPaths)
+	want := []string{
+		"README.md",
+		"docs/arch.md",
+		"ref:ticket-123",
+		"https://example.com/spec",
+		"note:commas, stay inside",
 	}
-	if opts.ContextPaths[0] != "note:program centric owner scoped no demo drift" {
-		t.Fatalf("context[0] = %q", opts.ContextPaths[0])
-	}
-	if opts.ContextPaths[1] != "note:commas, should, stay, inside" {
-		t.Fatalf("context[1] = %q", opts.ContextPaths[1])
+	if got := opts.ContextPaths; len(got) != len(want) {
+		t.Fatalf("context paths len = %d, want %d: %#v", len(got), len(want), got)
+	} else {
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("context[%d] = %q, want %q (all=%#v)", i, got[i], want[i], got)
+			}
+		}
 	}
 }
 

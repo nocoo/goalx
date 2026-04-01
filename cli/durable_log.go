@@ -34,9 +34,12 @@ var durableLogKinds = map[DurableSurfaceName]map[string]struct{}{
 		"evolve.stopped":        {},
 	},
 	DurableSurfaceInterventionLog: {
-		"user_redirect":  {},
-		"user_tell":      {},
-		"master_reframe": {},
+		"user_redirect":    {},
+		"user_tell":        {},
+		"master_reframe":   {},
+		"budget_extend":    {},
+		"budget_set_total": {},
+		"budget_clear":     {},
 	},
 }
 

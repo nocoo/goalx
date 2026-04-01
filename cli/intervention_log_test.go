@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestInterventionLogRoundTripsSuccessDeltaEvent(t *testing.T) {
@@ -113,5 +115,41 @@ func TestTellAppendsSuccessDeltaInterventionEvent(t *testing.T) {
 	}
 	if event.Body.Before.SuccessModelHash == "" {
 		t.Fatalf("success model hash missing: %+v", event.Body.Before)
+	}
+}
+
+func TestBudgetMutationAppendsStructuredInterventionEvent(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Budget.MaxDuration = time.Hour
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+
+	if err := Budget(repo, []string{"--run", cfg.Name, "--extend", "2h"}); err != nil {
+		t.Fatalf("Budget: %v", err)
+	}
+
+	events, err := LoadInterventionLog(InterventionLogPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadInterventionLog: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events len = %d, want 1", len(events))
+	}
+	event := events[0]
+	if event.Kind != "budget_extend" {
+		t.Fatalf("kind = %q, want budget_extend", event.Kind)
+	}
+	if event.Body.BudgetAction != "extend" {
+		t.Fatalf("budget_action = %q, want extend", event.Body.BudgetAction)
+	}
+	if event.Body.BudgetBeforeSeconds != int64(time.Hour/time.Second) {
+		t.Fatalf("budget_before_seconds = %d, want %d", event.Body.BudgetBeforeSeconds, int64(time.Hour/time.Second))
+	}
+	if event.Body.BudgetAfterSeconds != int64((3*time.Hour)/time.Second) {
+		t.Fatalf("budget_after_seconds = %d, want %d", event.Body.BudgetAfterSeconds, int64((3*time.Hour)/time.Second))
+	}
+	if !strings.Contains(event.Body.Message, "3h0m0s") {
+		t.Fatalf("message = %q, want new budget summary", event.Body.Message)
 	}
 }

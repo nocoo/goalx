@@ -58,7 +58,6 @@ The normal loop is:
 
 ```bash
 goalx run "goal"
-goalx run "goal" --guided
 goalx status
 goalx observe
 goalx schema status
@@ -121,7 +120,6 @@ Use intent to express the kind of outcome the user wants.
 
 ```bash
 goalx run "goal"
-goalx run "goal" --guided
 goalx run "goal" --intent explore
 goalx run "goal" --intent explore --readonly
 goalx run "goal" --intent evolve --budget 8h
@@ -143,15 +141,14 @@ Intent mapping:
 Boundary flag:
 
 - **--readonly**: declare a no-edit execution boundary in `target.readonly` for report-first or investigation-only runs; GoalX exposes it in protocol/context/affordances instead of pretending it is an OS sandbox
-- **--guided**: write a richer launch-time intake artifact and feed it into the success compiler when the goal is non-trivial or the hidden success bar matters
+- fresh `goalx run` always writes intake and feeds it into the success compiler
 
 Context injection:
 
-- repeat `--context` for multiple items; each flag carries one complete item
 - use `--context` for extra evidence at launch or phase continuation
 - existing files/dirs are recorded in `context.files`
 - URLs and explicit `ref:` / `note:` items are recorded in `context.refs`
-- values are not comma-split; if you need commas inside a `note:` item, keep them in the same single `--context` value
+- use one comma-delimited `--context` value; escape literal commas inside one item as `\,`
 - phase runs preserve saved-run boundary/evidence surfaces and merge any extra `--context` items on top
 
 Run naming:
@@ -208,8 +205,20 @@ goalx run --from RUN --intent implement
 ```
 
 - `goalx recover --run RUN` relaunches the same stopped or stranded run in place
+- `goalx recover --run RUN` does not change budget; if budget is exhausted, run `goalx budget --run RUN --extend ...` or `--clear` first, then recover
 - `goalx save --run RUN` plus `goalx run --from RUN --intent ...` creates a new phase from saved artifacts
 - do not suggest `save + run --from` when the user wants to continue the same run after `stop`, tmux loss, or a stranded state
+
+## Runtime Budget Control
+
+Use the dedicated budget surface instead of overloading recover:
+
+```bash
+goalx budget --run RUN
+goalx budget --run RUN --extend 2h
+goalx budget --run RUN --set-total 10h
+goalx budget --run RUN --clear
+```
 
 ## Worktree And Merge Boundaries
 

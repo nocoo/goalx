@@ -74,16 +74,23 @@ func TestParsePhaseOptionsRequiresFrom(t *testing.T) {
 	}
 }
 
-func TestParsePhaseOptionsPreservesSingleContextValueWithCommas(t *testing.T) {
+func TestParsePhaseOptionsSplitsCommaDelimitedContextItems(t *testing.T) {
 	opts, err := parsePhaseOptions("debate", []string{
 		"--from", "research-a",
-		"--context", "note:program centric, owner scoped, no demo drift",
+		"--context", "README.md,docs/arch.md,note:program centric\\, owner scoped\\, no demo drift",
 	})
 	if err != nil {
 		t.Fatalf("parsePhaseOptions: %v", err)
 	}
-	if got, want := opts.ContextPaths, []string{"note:program centric, owner scoped, no demo drift"}; len(got) != len(want) || got[0] != want[0] {
+	want := []string{"README.md", "docs/arch.md", "note:program centric, owner scoped, no demo drift"}
+	if got := opts.ContextPaths; len(got) != len(want) {
 		t.Fatalf("context = %#v, want %#v", got, want)
+	} else {
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("context[%d] = %q, want %q (all=%#v)", i, got[i], want[i], got)
+			}
+		}
 	}
 }
 

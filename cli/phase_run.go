@@ -47,6 +47,9 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	if err != nil {
 		return nil, fmt.Errorf("load saved run %q: %w", runName, err)
 	}
+	if _, err := RequireSavedRunIntake(runDir); err != nil {
+		return nil, fmt.Errorf("load saved run %q intake: %w", runName, err)
+	}
 	parallel := cfg.Parallel
 	if parallel < len(cfg.Sessions) {
 		parallel = len(cfg.Sessions)

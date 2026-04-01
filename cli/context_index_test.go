@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -793,28 +794,63 @@ func TestBuildContextIndexIncludesCompilerReportPath(t *testing.T) {
 	}
 }
 
-func TestBuildContextIndexIncludesGuidedIntakePathWhenPresent(t *testing.T) {
+func TestBuildContextIndexIncludesIntakePathWhenPresent(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGuidedIntake(GuidedIntakePath(runDir), &GuidedIntake{
+	if err := SaveRunIntake(IntakePath(runDir), &RunIntake{
 		Version:   1,
-		Guided:    true,
 		Objective: cfg.Objective,
 		Intent:    runIntentDeliver,
 	}); err != nil {
-		t.Fatalf("SaveGuidedIntake: %v", err)
+		t.Fatalf("SaveRunIntake: %v", err)
 	}
 
 	index, err := BuildContextIndex(repo, cfg.Name, runDir)
 	if err != nil {
 		t.Fatalf("BuildContextIndex: %v", err)
 	}
-	if index.GuidedIntakePath != GuidedIntakePath(runDir) {
-		t.Fatalf("guided_intake_path = %q, want %q", index.GuidedIntakePath, GuidedIntakePath(runDir))
+	if index.IntakePath != IntakePath(runDir) {
+		t.Fatalf("intake_path = %q, want %q", index.IntakePath, IntakePath(runDir))
 	}
 
 	rendered := renderContextIndex(index)
-	if !strings.Contains(rendered, "Guided intake") {
-		t.Fatalf("rendered context missing guided intake line:\n%s", rendered)
+	if !strings.Contains(rendered, "Intake") {
+		t.Fatalf("rendered context missing intake line:\n%s", rendered)
+	}
+}
+
+func TestBuildContextIndexIncludesBudgetSummary(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	cfg.Budget.MaxDuration = 2 * time.Hour
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	startedAt := time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Second)
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: startedAt.Format(time.RFC3339),
+		UpdatedAt: startedAt.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	index, err := BuildContextIndex(repo, cfg.Name, runDir)
+	if err != nil {
+		t.Fatalf("BuildContextIndex: %v", err)
+	}
+	if index.Budget == nil {
+		t.Fatal("context index budget missing")
+	}
+	if index.Budget.MaxDurationSeconds != int64((2*time.Hour)/time.Second) {
+		t.Fatalf("budget max_duration_seconds = %d, want %d", index.Budget.MaxDurationSeconds, int64((2*time.Hour)/time.Second))
+	}
+	rendered := renderContextIndex(index)
+	for _, want := range []string{"## Budget", "max_duration", "deadline_at"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
 	}
 }
 

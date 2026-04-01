@@ -17,11 +17,14 @@ type InterventionBeforeState struct {
 }
 
 type InterventionEventBody struct {
-	Run             string                  `json:"run,omitempty"`
-	Message         string                  `json:"message,omitempty"`
-	Urgent          bool                    `json:"urgent,omitempty"`
-	AffectedTargets []string                `json:"affected_targets,omitempty"`
-	Before          InterventionBeforeState `json:"before,omitempty"`
+	Run                 string                  `json:"run,omitempty"`
+	Message             string                  `json:"message,omitempty"`
+	Urgent              bool                    `json:"urgent,omitempty"`
+	AffectedTargets     []string                `json:"affected_targets,omitempty"`
+	BudgetAction        string                  `json:"budget_action,omitempty"`
+	BudgetBeforeSeconds int64                   `json:"budget_before_seconds,omitempty"`
+	BudgetAfterSeconds  int64                   `json:"budget_after_seconds,omitempty"`
+	Before              InterventionBeforeState `json:"before,omitempty"`
 }
 
 type InterventionLogEvent struct {
@@ -172,6 +175,7 @@ func normalizeInterventionEventBody(body *InterventionEventBody) {
 	body.Run = strings.TrimSpace(body.Run)
 	body.Message = strings.TrimSpace(body.Message)
 	body.AffectedTargets = compactStrings(body.AffectedTargets)
+	body.BudgetAction = strings.TrimSpace(body.BudgetAction)
 	body.Before.GoalHash = strings.TrimSpace(body.Before.GoalHash)
 	body.Before.StatusHash = strings.TrimSpace(body.Before.StatusHash)
 	body.Before.CoordinationHash = strings.TrimSpace(body.Before.CoordinationHash)

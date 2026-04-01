@@ -27,7 +27,6 @@ type launchOptions struct {
 	BudgetSet    bool
 	Budget       time.Duration
 	NoSnapshot   bool
-	Guided       bool
 }
 
 type startInitOptions = launchOptions
@@ -51,23 +50,23 @@ func wantsHelp(args []string) bool {
 func launchUsage(command string) string {
 	switch command {
 	case "start":
-		return `usage: goalx start "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--guided] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx start "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
        goalx start --config PATH
 
 advanced/manual path:
   goalx start --config .goalx/goalx.yaml
 
 notes:
-  repeat --context for multiple items; each value may be a file/dir, URL, or explicit ref:/note: item.
+  use one comma-delimited --context value for multiple items; escape literal commas inside one item as \\,.
   selection uses detected candidate pools by default.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master and --worker.`
 	case "init":
-		return `usage: goalx init "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--guided] [--sub ENGINE/MODEL[:N]]
+		return `usage: goalx init "objective" [--parallel N] [--name NAME] [--master ENGINE/MODEL] [--worker ENGINE/MODEL] [--context ITEMS] [--dimension SPEC]... [--effort LEVEL] [--master-effort LEVEL] [--worker-effort LEVEL] [--budget DURATION] [--readonly] [--sub ENGINE/MODEL[:N]]
 
 notes:
   this is the advanced config-first path and writes the explicit manual draft .goalx/goalx.yaml.
-  repeat --context for multiple items; each value may be a file/dir, URL, or explicit ref:/note: item.
+  use one comma-delimited --context value for multiple items; escape literal commas inside one item as \\,.
   selection uses detected candidate pools by default.
   --parallel is optional initial fan-out, not a permanent cap on later dispatch.
   role defaults are separate: --master and --worker.`
@@ -108,7 +107,11 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 				return opts, fmt.Errorf("missing value for --context")
 			}
 			i++
-			opts.ContextPaths = append(opts.ContextPaths, args[i])
+			items, err := splitContextFlagValue(args[i])
+			if err != nil {
+				return opts, err
+			}
+			opts.ContextPaths = append(opts.ContextPaths, items...)
 		case "--dimension":
 			if i+1 >= len(args) {
 				return opts, fmt.Errorf("missing value for --dimension")
@@ -178,8 +181,6 @@ func parseLaunchOptions(args []string, defaultMode goalx.Mode, allowModeSwitch b
 			opts.Readonly = true
 		case "--no-snapshot":
 			opts.NoSnapshot = true
-		case "--guided":
-			opts.Guided = true
 		case "--engine", "--model":
 			return opts, fmt.Errorf("%s is ambiguous; use --master, --worker, or --sub", args[i])
 		default:

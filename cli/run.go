@@ -75,7 +75,7 @@ func Run(projectRoot string, args []string) error {
 }
 
 func runUsage() string {
-	return `usage: goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [--guided] [flags]
+	return `usage: goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [flags]
        goalx run --from RUN --intent debate|implement|explore [--readonly] [flags]
 
 notes:

@@ -332,7 +332,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 				"The framework stores the canonical JSONL envelope; extraction and promotion happen elsewhere.",
 			},
 			FrameworkOwnedFields: []string{"storage envelope `version`", "storage envelope `at`", "storage envelope `kind`", "storage envelope `actor`"},
-			AllowedKinds:         []string{"user_redirect", "user_tell", "master_reframe"},
+			AllowedKinds:         []string{"user_redirect", "user_tell", "master_reframe", "budget_extend", "budget_set_total", "budget_clear"},
 		},
 		Path: InterventionLogPath,
 	},

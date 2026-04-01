@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	goalx "github.com/vonbai/goalx"
 )
@@ -2103,6 +2104,105 @@ func TestRenderMasterProtocolIncludesCurrentTimeAndEvolveIntentFacts(t *testing.
 	} {
 		if strings.Contains(text, unwanted) {
 			t.Fatalf("rendered master protocol should omit legacy evolve wording %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolIncludesBudgetExhaustionGracefulStopDoctrine(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:           "ship it",
+		RunName:             "demo",
+		Mode:                goalx.ModeAuto,
+		Intent:              runIntentDeliver,
+		Master:              goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		ActivityPath:        "/tmp/activity.json",
+		SummaryPath:         "/tmp/summary.md",
+		AcceptanceStatePath: "/tmp/acceptance.json",
+		GoalPath:            "/tmp/goal.json",
+		StatusPath:          "/tmp/status.json",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"do not dispatch more work",
+		"Inspect current outputs",
+		"keep/adopt if warranted",
+		"save if continuation or artifact preservation matters",
+		"stop explicitly",
+		"do not auto-drop",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered master protocol missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestRenderMasterProtocolOmitsStaticBudgetLiteral(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		Objective:    "ship it",
+		RunName:      "demo",
+		Mode:         goalx.ModeAuto,
+		Intent:       runIntentDeliver,
+		Master:       goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+		ActivityPath: "/tmp/activity.json",
+		Budget:       goalx.BudgetConfig{MaxDuration: 8 * time.Hour},
+		SummaryPath:  "/tmp/summary.md",
+		StatusPath:   "/tmp/status.json",
+	}
+
+	if err := RenderMasterProtocol(data, runDir); err != nil {
+		t.Fatalf("RenderMasterProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "master.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	if strings.Contains(text, "Budget: 8h0m0s") {
+		t.Fatalf("rendered master protocol should omit static budget literal:\n%s", text)
+	}
+	if !strings.Contains(text, "current run facts show exhausted budget") {
+		t.Fatalf("rendered master protocol missing budget-facts doctrine:\n%s", text)
+	}
+}
+
+func TestRenderSubagentProtocolOmitsBudgetSection(t *testing.T) {
+	runDir := t.TempDir()
+	data := ProtocolData{
+		RunName:      "demo",
+		Objective:    "ship it",
+		Mode:         goalx.ModeWorker,
+		Engine:       "codex",
+		SessionName:  "session-1",
+		SessionInboxPath: "/tmp/control/inbox/session-1.jsonl",
+		SessionCursorPath: "/tmp/control/session-1-cursor.json",
+		JournalPath:  "/tmp/journal.jsonl",
+		Budget:       goalx.BudgetConfig{MaxDuration: 8 * time.Hour, MaxRounds: 5},
+	}
+
+	if err := RenderSubagentProtocol(data, runDir, 0); err != nil {
+		t.Fatalf("RenderSubagentProtocol: %v", err)
+	}
+
+	out, err := os.ReadFile(filepath.Join(runDir, "program-1.md"))
+	if err != nil {
+		t.Fatalf("read rendered protocol: %v", err)
+	}
+	text := string(out)
+	for _, unwanted := range []string{"## Budget", "Max rounds:", "Max duration:"} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("rendered subagent protocol should omit %q:\n%s", unwanted, text)
 		}
 	}
 }

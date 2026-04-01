@@ -1874,6 +1874,65 @@ func TestRunRuntimeHostTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 	}
 }
 
+func TestRunRuntimeHostTickAlertsBudgetExhaustionOnce(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	cfg.Budget.MaxDuration = time.Second
+	if err := SaveRunSpec(runDir, cfg); err != nil {
+		t.Fatalf("SaveRunSpec: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    true,
+		StartedAt: "2000-01-01T00:00:00Z",
+		UpdatedAt: "2000-01-01T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	installGuidanceFakeTmux(t, nil)
+
+	orig := sendAgentNudgeDetailedInRunFunc
+	defer func() { sendAgentNudgeDetailedInRunFunc = orig }()
+	sendAgentNudgeDetailedInRunFunc = func(_ string, target, engine string) (TransportDeliveryOutcome, error) {
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+	}
+
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick first: %v", err)
+	}
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick second: %v", err)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), `"type":"master-alert"`); got != 1 {
+		t.Fatalf("master inbox master-alert count = %d, want 1\n%s", got, string(inboxData))
+	}
+	if !strings.Contains(string(inboxData), "Budget exhausted") {
+		t.Fatalf("master inbox missing budget exhausted alert:\n%s", string(inboxData))
+	}
+
+	controlState, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlRunState: %v", err)
+	}
+	if len(controlState.MasterAlerts) != 1 {
+		t.Fatalf("master alerts = %+v, want 1 entry", controlState.MasterAlerts)
+	}
+	for _, fingerprint := range controlState.MasterAlerts {
+		if !strings.Contains(fingerprint, "budget_exhausted") {
+			t.Fatalf("unexpected budget alert fingerprint: %q", fingerprint)
+		}
+	}
+}
+
 func TestRunRuntimeHostTickRealertsRequiredFrontierWhenStateChanges(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -130,30 +130,25 @@ func TestRunIntentExploreUsesAutoLaunchModeWithoutFrom(t *testing.T) {
 	}
 }
 
-func TestRunGuidedFlagPassesThroughToLaunchOptions(t *testing.T) {
+func TestRunRejectsRemovedGuidedFlag(t *testing.T) {
 	oldAuto := runAutoWithOptions
 	defer func() { runAutoWithOptions = oldAuto }()
 
 	calls := 0
 	runAutoWithOptions = func(projectRoot string, opts launchOptions) error {
 		calls++
-		if !opts.Guided {
-			t.Fatal("opts.Guided = false, want true")
-		}
-		if opts.Intent != runIntentDeliver {
-			t.Fatalf("intent = %q, want deliver", opts.Intent)
-		}
-		if opts.Objective != "ship it" {
-			t.Fatalf("objective = %q, want ship it", opts.Objective)
-		}
 		return nil
 	}
 
-	if err := Run(t.TempDir(), []string{"ship it", "--guided"}); err != nil {
-		t.Fatalf("Run: %v", err)
+	err := Run(t.TempDir(), []string{"ship it", "--guided"})
+	if err == nil {
+		t.Fatal("Run unexpectedly succeeded with removed --guided flag")
 	}
-	if calls != 1 {
-		t.Fatalf("auto calls = %d, want 1", calls)
+	if !strings.Contains(err.Error(), `unknown flag "--guided"`) {
+		t.Fatalf("Run error = %v, want unknown flag --guided", err)
+	}
+	if calls != 0 {
+		t.Fatalf("auto calls = %d, want 0", calls)
 	}
 }
 
@@ -271,14 +266,16 @@ func TestRunHelpPrintsUsage(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [--guided] [flags]`,
+		`goalx run "objective" [--intent deliver|evolve|explore] [--readonly] [flags]`,
 		`goalx run --from RUN --intent debate|implement|explore [--readonly] [flags]`,
 		`--readonly`,
-		`--guided`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("run help missing %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "--guided") {
+		t.Fatalf("run help should omit removed --guided flag:\n%s", out)
 	}
 	if strings.Contains(out, "legacy command names remain temporary aliases") {
 		t.Fatalf("run help should not mention legacy aliases:\n%s", out)

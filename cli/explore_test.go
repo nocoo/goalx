@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	goalx "github.com/vonbai/goalx"
+	"gopkg.in/yaml.v3"
 )
 
 func TestExploreStartCreatesFreshCharterWithPreservedRootLineage(t *testing.T) {
@@ -206,6 +207,93 @@ context:
 		if !containsPathWithSuffix(cfg.Context.Files, suffix) {
 			t.Fatalf("context.files = %#v, want entry matching %q", cfg.Context.Files, suffix)
 		}
+	}
+}
+
+func TestExploreRejectsSavedRunMissingCanonicalIntake(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runDir := SavedRunDir(projectRoot, "research-a")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir saved run: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeWorker,
+		Objective: "audit auth flow",
+		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		Roles: goalx.RoleDefaultsConfig{
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+
+	err = Explore(projectRoot, []string{"--from", "research-a", "--write-config"})
+	if err == nil {
+		t.Fatal("Explore unexpectedly succeeded without canonical intake")
+	}
+	if !strings.Contains(err.Error(), "intake") || !strings.Contains(err.Error(), "legacy") {
+		t.Fatalf("Explore error = %v, want legacy intake rejection", err)
+	}
+}
+
+func TestExploreWriteConfigPreservesSavedRunIntakeArtifact(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := t.TempDir()
+	runDir := SavedRunDir(projectRoot, "research-a")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir saved run: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "research-a",
+		Mode:      goalx.ModeWorker,
+		Objective: "audit auth flow",
+		Master:    goalx.MasterConfig{Engine: "claude-code", Model: "opus"},
+		Roles: goalx.RoleDefaultsConfig{
+			Worker: goalx.SessionConfig{Engine: "claude-code", Model: "sonnet"},
+		},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
+		t.Fatalf("write run spec: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
+		t.Fatalf("write summary: %v", err)
+	}
+	if err := SaveRunIntake(SavedRunIntakePath(runDir), &RunIntake{
+		Version:   1,
+		Objective: cfg.Objective,
+		Intent:    runIntentExplore,
+	}); err != nil {
+		t.Fatalf("SaveRunIntake: %v", err)
+	}
+
+	if err := Explore(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
+		t.Fatalf("Explore: %v", err)
+	}
+
+	nextCfg, err := goalx.LoadYAML[goalx.Config](filepath.Join(projectRoot, ".goalx", "goalx.yaml"))
+	if err != nil {
+		t.Fatalf("load goalx.yaml: %v", err)
+	}
+	if !containsPathWithSuffix(nextCfg.Context.Files, "intake.json") {
+		t.Fatalf("context.files = %#v, want saved intake artifact", nextCfg.Context.Files)
 	}
 }
 
