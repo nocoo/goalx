@@ -473,7 +473,7 @@ func TestStatusDoesNotSurfaceAckSessionAsSessionLifecycleState(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
-	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte("{\"round\":1,\"status\":\"ack-session\",\"desc\":\"read inbox\"}\n"), 0o644); err != nil {
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte("{\"round\":1,\"status\":\"ack-inbox\",\"desc\":\"read inbox\"}\n"), 0o644); err != nil {
 		t.Fatalf("write session journal: %v", err)
 	}
 

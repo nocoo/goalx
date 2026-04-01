@@ -30,21 +30,6 @@ func Tell(projectRoot string, args []string) error {
 	return nil
 }
 
-// AckSession marks the current session inbox as observed by the subagent.
-func AckSession(projectRoot string, args []string) error {
-	runName, rest, err := extractRunFlag(args)
-	if err != nil {
-		return err
-	}
-	if len(rest) != 1 {
-		return fmt.Errorf("usage: goalx ack-session [--run NAME] <session-name>")
-	}
-	if runName == "" {
-		return AckInbox(projectRoot, []string{rest[0]})
-	}
-	return AckInbox(projectRoot, []string{"--run", runName, rest[0]})
-}
-
 func AckInbox(projectRoot string, args []string) error {
 	runName, rest, err := extractRunFlag(args)
 	if err != nil {

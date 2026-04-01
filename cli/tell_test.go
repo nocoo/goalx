@@ -339,7 +339,7 @@ func TestAckInboxAcknowledgesMasterAndRefreshesActivity(t *testing.T) {
 	}
 }
 
-func TestAckInboxAcknowledgesSessionAndAckSessionRemainsAlias(t *testing.T) {
+func TestAckInboxAcknowledgesSession(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -362,24 +362,9 @@ func TestAckInboxAcknowledgesSessionAndAckSessionRemainsAlias(t *testing.T) {
 	if cursor == nil || cursor.LastSeenID != msg.ID {
 		t.Fatalf("session cursor after ack-inbox = %+v, want last_seen_id=%d", cursor, msg.ID)
 	}
-
-	msg2, err := AppendControlInboxMessage(runDir, "session-1", "develop", "master", "take another slice")
-	if err != nil {
-		t.Fatalf("AppendControlInboxMessage second: %v", err)
-	}
-	if err := AckSession(repo, []string{"--run", runName, "session-1"}); err != nil {
-		t.Fatalf("AckSession alias: %v", err)
-	}
-	cursor, err = LoadMasterCursorState(SessionCursorPath(runDir, "session-1"))
-	if err != nil {
-		t.Fatalf("LoadMasterCursorState(session): %v", err)
-	}
-	if cursor == nil || cursor.LastSeenID != msg2.ID {
-		t.Fatalf("session cursor after ack-session alias = %+v, want last_seen_id=%d", cursor, msg2.ID)
-	}
 }
 
-func TestAckSessionMarksLatestInboxEntryConsumed(t *testing.T) {
+func TestAckInboxMarksLatestInboxEntryConsumed(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
@@ -391,8 +376,8 @@ func TestAckSessionMarksLatestInboxEntryConsumed(t *testing.T) {
 		t.Fatalf("AppendControlInboxMessage: %v", err)
 	}
 
-	if err := AckSession(repo, []string{"--run", runName, "session-1"}); err != nil {
-		t.Fatalf("AckSession: %v", err)
+	if err := AckInbox(repo, []string{"--run", runName, "session-1"}); err != nil {
+		t.Fatalf("AckInbox: %v", err)
 	}
 
 	state, err := LoadMasterCursorState(SessionCursorPath(runDir, "session-1"))

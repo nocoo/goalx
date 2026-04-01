@@ -376,7 +376,7 @@ func TestUsageDescribesDurableAsWritePath(t *testing.T) {
 }
 
 func TestRunCommandRejectsLegacyTopLevelAliases(t *testing.T) {
-	for _, legacy := range []string{"auto", "research", "develop", "debate", "implement", "explore"} {
+	for _, legacy := range []string{"auto", "research", "develop", "debate", "implement", "explore", "ack-session"} {
 		if err := runCommand(t.TempDir(), legacy, []string{"demo"}); !errors.Is(err, errUnknownCommand) {
 			t.Fatalf("runCommand %s error = %v, want errUnknownCommand", legacy, err)
 		}
