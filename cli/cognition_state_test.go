@@ -25,21 +25,23 @@ func TestSaveCognitionStateRoundTrip(t *testing.T) {
 						Capabilities:   []string{"file_search", "git_diff"},
 					},
 					{
-						Name:             "gitnexus",
-						InvocationKind:   "binary",
-						Available:        true,
-						Command:          "gitnexus",
-						Version:          "1.5.0",
-						RepoRoot:         "/abs/run-root",
-						StoragePath:      "/abs/run-root/.gitnexus",
-						RegistryName:     "demo-repo",
-						IndexState:       "stale",
-						IndexedRevision:  "abc123",
-						HeadRevision:     "def456",
-						StaleCommits:     2,
-						LastRefreshError: "status parse warning",
-						Capabilities:     []string{"query", "context", "impact"},
-						CheckedAt:        "2026-04-01T00:00:00Z",
+						Name:              "gitnexus",
+						InvocationKind:    "binary",
+						Available:         true,
+						Command:           "gitnexus",
+						Version:           "1.5.0",
+						RepoRoot:          "/abs/run-root",
+						StoragePath:       "/abs/run-root/.gitnexus",
+						RegistryName:      "demo-repo",
+						IndexState:        "stale",
+						IndexProvenance:   "seeded",
+						IndexedRevision:   "abc123",
+						HeadRevision:      "def456",
+						StaleCommits:      2,
+						LastRefreshError:  "status parse warning",
+						AnalyzedInScopeAt: "2026-04-01T00:00:00Z",
+						Capabilities:      []string{"query", "context", "impact"},
+						CheckedAt:         "2026-04-01T00:00:00Z",
 					},
 				},
 			},
@@ -60,7 +62,7 @@ func TestSaveCognitionStateRoundTrip(t *testing.T) {
 		t.Fatalf("scopes = %#v, want one scope with two providers", loaded.Scopes)
 	}
 	got := loaded.Scopes[0].Providers[1]
-	if got.IndexState != "stale" || got.RegistryName != "demo-repo" || got.LastRefreshError == "" {
+	if got.IndexState != "stale" || got.RegistryName != "demo-repo" || got.LastRefreshError == "" || got.IndexProvenance != "seeded" || got.AnalyzedInScopeAt == "" {
 		t.Fatalf("gitnexus provider = %+v, want enriched provider state facts", got)
 	}
 }
@@ -122,5 +124,37 @@ func TestLoadCognitionStateRejectsInvalidIndexState(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "index_state") {
 		t.Fatalf("LoadCognitionState error = %v, want index_state hint", err)
+	}
+}
+
+func TestLoadCognitionStateRejectsInvalidIndexProvenance(t *testing.T) {
+	path := CognitionStatePath(t.TempDir())
+	if err := os.WriteFile(path, []byte(`{
+  "version": 1,
+  "scopes": [
+    {
+      "scope": "run-root",
+      "providers": [
+        {
+          "name": "gitnexus",
+          "invocation_kind": "binary",
+          "available": true,
+          "index_state": "fresh",
+          "index_provenance": "borrowed",
+          "capabilities": ["query"]
+        }
+      ]
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	_, err := LoadCognitionState(path)
+	if err == nil {
+		t.Fatal("LoadCognitionState should reject invalid index_provenance")
+	}
+	if !strings.Contains(err.Error(), "index_provenance") {
+		t.Fatalf("LoadCognitionState error = %v, want index_provenance hint", err)
 	}
 }

@@ -24,6 +24,9 @@ func EvaluateFreshnessState(runDir string) (*FreshnessState, error) {
 				case !provider.Available:
 					item.State = freshnessStateUnknown
 					item.Reason = "provider_unavailable"
+				case provider.Name == "gitnexus" && provider.IndexProvenance == "seeded" && strings.TrimSpace(provider.AnalyzedInScopeAt) == "":
+					item.State = freshnessStateUnknown
+					item.Reason = "seeded_cache_unverified"
 				case provider.StaleCommits > 0:
 					item.State = freshnessStateStale
 					item.Reason = "stale_commits"

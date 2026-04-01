@@ -107,7 +107,13 @@ func (provider gitNexusCognitionProvider) Refresh(scopePath string) (CognitionPr
 			state.LastRefreshError = err.Error()
 			return state, nil
 		}
-		return provider.Discover(scopePath)
+		state, err = provider.Discover(scopePath)
+		if err != nil {
+			return state, err
+		}
+		state.IndexProvenance = "local"
+		state.AnalyzedInScopeAt = time.Now().UTC().Format(time.RFC3339)
+		return state, nil
 	default:
 		return state, nil
 	}

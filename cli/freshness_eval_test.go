@@ -60,3 +60,38 @@ func TestEvaluateFreshnessStateMarksRequiredEvidenceStaleOnTouchpointOverlap(t *
 		t.Fatalf("evidence freshness = %#v, want stale", state.Evidence)
 	}
 }
+
+func TestEvaluateFreshnessStateMarksSeededGitNexusCacheUnknownUntilLocallyAnalyzed(t *testing.T) {
+	_, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := SaveCognitionState(CognitionStatePath(runDir), &CognitionState{
+		Version: 1,
+		Scopes: []CognitionScopeState{
+			{
+				Scope: "run-root",
+				Providers: []CognitionProviderState{
+					{Name: "repo-native", InvocationKind: "builtin", Available: true, IndexState: "fresh", HeadRevision: "def456", Capabilities: []string{"git_diff"}},
+					{Name: "gitnexus", InvocationKind: "binary", Available: true, IndexState: "fresh", IndexProvenance: "seeded", IndexedRevision: "def456", HeadRevision: "def456", Capabilities: []string{"query", "context", "impact"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCognitionState: %v", err)
+	}
+
+	state, err := EvaluateFreshnessState(runDir)
+	if err != nil {
+		t.Fatalf("EvaluateFreshnessState: %v", err)
+	}
+	if len(state.Cognition) != 2 {
+		t.Fatalf("cognition freshness = %#v, want repo-native and gitnexus entries", state.Cognition)
+	}
+	var gitnexusItem CognitionFreshnessItem
+	for _, item := range state.Cognition {
+		if item.Provider == "gitnexus" {
+			gitnexusItem = item
+		}
+	}
+	if gitnexusItem.State != freshnessStateUnknown || gitnexusItem.Reason != "seeded_cache_unverified" {
+		t.Fatalf("gitnexus freshness = %+v, want unknown seeded_cache_unverified", gitnexusItem)
+	}
+}

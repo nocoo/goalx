@@ -91,8 +91,10 @@ func TestSchemaPrintsCognitionStateContract(t *testing.T) {
 		`"providers": [`,
 		`"invocation_kind": "builtin"`,
 		`"index_state": "fresh"`,
+		`"index_provenance": "seeded"`,
 		`"registry_name": "demo-repo"`,
 		`"last_refresh_error": "status parse warning"`,
+		`"analyzed_in_scope_at": "2026-04-01T00:00:00Z"`,
 		`"capabilities": [`,
 		"goalx durable write cognition-state --run NAME --body-file /abs/path.json",
 	} {
