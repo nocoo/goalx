@@ -37,7 +37,7 @@ Usage:
   goalx focus   [--run NAME]           Set the default run for this project
   goalx archive [--run RUN] <session> Git tag + preserve
   goalx save    [--run RUN]           Save run artifacts to user-scoped durable storage
-  goalx verify  [--run RUN]           Run the effective acceptance command and record exit code + output
+  goalx verify  [--run RUN] [--lane quick|required|full] Run assurance scenarios or fallback acceptance checks and record evidence
   goalx durable write <surface> ...   Apply structured durable authoring payloads
   goalx schema  <surface> [--json]    Show the authoring contract for a durable surface
   goalx drop    [--run RUN]           Cleanup branch + worktree

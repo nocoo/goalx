@@ -168,10 +168,10 @@ func TestResumeRelaunchesParkedSessionAndMarksActive(t *testing.T) {
 	if !strings.Contains(logText, "new-window -t "+wantSession+" -n session-1 -c "+WorktreePath(runDir, runName, 1)+" env ") {
 		t.Fatalf("tmux log missing new-window:\n%s", logText)
 	}
-		for _, want := range []string{"target-runner --run", "--holder", "session-1"} {
-			if !strings.Contains(logText, want) {
-				t.Fatalf("tmux log missing %q:\n%s", want, logText)
-			}
+	for _, want := range []string{"target-runner --run", "--holder", "session-1"} {
+		if !strings.Contains(logText, want) {
+			t.Fatalf("tmux log missing %q:\n%s", want, logText)
+		}
 	}
 	if strings.Contains(logText, "send-keys -t "+wantSession+":session-1") {
 		t.Fatalf("resume should launch directly, not via send-keys:\n%s", logText)
@@ -593,6 +593,20 @@ func TestReplaceCreatesReplacementSessionWithExplicitOverrideAndLineage(t *testi
 	}
 	if !found {
 		t.Fatalf("context index missing replacement session: %+v", index.Sessions)
+	}
+	cognition, err := LoadCognitionState(CognitionStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCognitionState: %v", err)
+	}
+	found = false
+	for _, scope := range cognition.Scopes {
+		if scope.Scope == "session-2" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("cognition scopes = %#v, want session-2 replacement scope", cognition.Scopes)
 	}
 	affordances, err := LoadAffordances(AffordancesJSONPath(runDir))
 	if err != nil {
@@ -1341,15 +1355,14 @@ func writeLifecycleRunFixture(t *testing.T, repo string) (string, string) {
 	if err != nil {
 		t.Fatalf("EnsureRunMetadata: %v", err)
 	}
-	goalState, err := EnsureGoalState(runDir)
-	if err != nil {
-		t.Fatalf("EnsureGoalState: %v", err)
+	if _, err := EnsureObligationModel(runDir, nil, nil, "bootstrap-objective", cfg.Objective); err != nil {
+		t.Fatalf("EnsureObligationModel: %v", err)
 	}
-	if err := EnsureGoalLog(runDir); err != nil {
-		t.Fatalf("EnsureGoalLog: %v", err)
+	if err := EnsureObligationLog(runDir); err != nil {
+		t.Fatalf("EnsureObligationLog: %v", err)
 	}
-	if _, err := EnsureAcceptanceState(runDir, &cfg, goalState.Version); err != nil {
-		t.Fatalf("EnsureAcceptanceState: %v", err)
+	if _, err := EnsureAssurancePlan(runDir, NewAcceptanceState(&cfg, 0)); err != nil {
+		t.Fatalf("EnsureAssurancePlan: %v", err)
 	}
 	charter, err := NewRunCharter(runDir, runName, cfg.Objective, meta)
 	if err != nil {

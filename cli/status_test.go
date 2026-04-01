@@ -292,7 +292,7 @@ func TestStatusPrintsObjectiveIntegritySummary(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveObjectiveContract: %v", err)
 	}
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Version: 1,
 		Required: []GoalItem{
 			{ID: "req-1", Text: "ship the outcome", Source: goalItemSourceUser, Role: goalItemRoleOutcome, Covers: []string{"ucl-goal"}, State: goalItemStateOpen},
@@ -300,7 +300,7 @@ func TestStatusPrintsObjectiveIntegritySummary(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
 	}
-	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+	if err := writeAssuranceFixture(t, runDir, &AcceptanceState{
 		Version:     2,
 		GoalVersion: 1,
 		Checks: []AcceptanceCheck{
@@ -317,8 +317,8 @@ func TestStatusPrintsObjectiveIntegritySummary(t *testing.T) {
 	})
 	for _, want := range []string{
 		"Objective: contract_state=locked",
-		"goal_coverage=1/1",
-		"acceptance_coverage=1/1",
+		"obligation_coverage=1/1",
+		"assurance_coverage=1/1",
 		"integrity_ok=true",
 	} {
 		if !strings.Contains(out, want) {
@@ -783,7 +783,7 @@ func TestStatusWarnsAboutEvolveManagementGapsAndMissingCloseoutArtifacts(t *test
 
 func TestStatusWarnsAboutRunStatusGoalDrift(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Version: 1,
 		Required: []GoalItem{
 			{
@@ -811,7 +811,7 @@ func TestStatusWarnsAboutRunStatusGoalDrift(t *testing.T) {
 		"### advisories",
 		"Status drift:",
 		"status_required_remaining=0",
-		"goal_required_remaining=1",
+		"boundary_required_remaining=1",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -847,7 +847,7 @@ func TestStatusDoesNotWarnAboutActiveSessionDriftWhenStatusOmitsActiveSessions(t
 
 func TestStatusWarnsAboutOpenRequiredIDDriftEvenWhenCountsMatch(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Version: 1,
 		Required: []GoalItem{
 			{
@@ -875,7 +875,7 @@ func TestStatusWarnsAboutOpenRequiredIDDriftEvenWhenCountsMatch(t *testing.T) {
 		"### advisories",
 		"Status drift:",
 		"status_open_required_ids=req-2",
-		"goal_remaining_ids=req-1",
+		"boundary_remaining_ids=req-1",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)
@@ -1060,7 +1060,7 @@ func TestStatusShowsExperimentLineageFacts(t *testing.T) {
 
 func TestStatusShowsCoverageUnknownWhenRequiredFrontierMissing(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{
 			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 		},
@@ -1087,7 +1087,7 @@ func TestStatusShowsCoverageUnknownWhenRequiredFrontierMissing(t *testing.T) {
 
 func TestStatusShowsExplicitCoverageFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{
 			{ID: "req-1", Text: "first open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 			{ID: "req-2", Text: "second open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
@@ -1146,7 +1146,7 @@ func TestStatusWarnsAboutRequiredFrontierGapOutsideEvolve(t *testing.T) {
 	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":2,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{
 			{ID: "req-1", Text: "first open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 			{ID: "req-2", Text: "second open item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
@@ -1215,7 +1215,7 @@ func TestStatusShowsBlockedRequiredFrontierFacts(t *testing.T) {
 			t.Fatalf("RenewControlLease %s: %v", holder, err)
 		}
 	}
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{{ID: "req-1", Text: "blocked item", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -1426,7 +1426,7 @@ func TestStatusWarnsAboutBlockedRequiredFrontier(t *testing.T) {
 	t.Setenv("TMUX_SESSION1_CAPTURE", sessionCapture)
 	installGuidanceFakeTmux(t, []string{"session-1"})
 
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{{ID: "req-1", Text: "ship UI polish", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -1493,7 +1493,7 @@ func TestStatusWarnsAboutMasterOrphanedRequiredFrontier(t *testing.T) {
 	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":1,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{{ID: "req-1", Text: "finish integration", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -1545,7 +1545,7 @@ func TestStatusWarnsAboutPrematureBlockedRequiredFrontier(t *testing.T) {
 	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":1,"active_sessions":[],"updated_at":"2026-03-28T10:00:00Z"}`), 0o644); err != nil {
 		t.Fatalf("write status record: %v", err)
 	}
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{{ID: "req-1", Text: "verify remote system", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
 	}); err != nil {
 		t.Fatalf("SaveGoalState: %v", err)
@@ -1591,7 +1591,7 @@ func TestStatusWarnsAboutPrematureBlockedRequiredFrontier(t *testing.T) {
 
 func TestStatusWarnsAboutControlGapFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Required: []GoalItem{
 			{ID: "req-1", Text: "ship cockpit", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
 			{ID: "req-2", Text: "ship research spine", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
@@ -1672,7 +1672,7 @@ func TestStatusWarnsAboutControlGapFacts(t *testing.T) {
 
 func TestStatusWarnsAboutQualityDebt(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Version: 1,
 		Required: []GoalItem{
 			{ID: "req-1", Text: "ship cockpit", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
@@ -1699,7 +1699,7 @@ func TestStatusWarnsAboutQualityDebt(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
-	if err := SaveAcceptanceState(AcceptanceStatePath(runDir), &AcceptanceState{
+	if err := writeAssuranceFixture(t, runDir, &AcceptanceState{
 		Version:     2,
 		GoalVersion: 1,
 		Checks: []AcceptanceCheck{
@@ -1712,7 +1712,7 @@ func TestStatusWarnsAboutQualityDebt(t *testing.T) {
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		GoalHash:              "sha256:goal",
+		ObligationModelHash:              "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "outcome", Text: "ship cockpit", Required: true},
 			{ID: "req-2", Kind: "outcome", Text: "ship research spine", Required: true},
@@ -1754,9 +1754,6 @@ func TestStatusWarnsAboutQualityDebt(t *testing.T) {
 		"Quality debt:",
 		"success_dimension_unowned=req-2",
 		"proof_plan_gap=proof-report",
-		"critic_gate_missing",
-		"finisher_gate_missing",
-		"only_correctness_evidence_present",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("status output missing %q:\n%s", want, out)

@@ -36,7 +36,7 @@ func TestBuildAffordancesIncludesRunScopedCommands(t *testing.T) {
 	}
 }
 
-func TestBuildAffordancesIncludesCloseoutAndAcceptancePaths(t *testing.T) {
+func TestBuildAffordancesIncludesCloseoutAndAssurancePaths(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 
 	doc, err := BuildAffordances(repo, cfg.Name, runDir, "")
@@ -56,7 +56,8 @@ func TestBuildAffordancesIncludesCloseoutAndAcceptancePaths(t *testing.T) {
 	}
 	joinedPaths := strings.Join(closeoutItem.Paths, "\n")
 	for _, want := range []string{
-		AcceptanceStatePath(runDir),
+		AssurancePlanPath(runDir),
+		EvidenceLogPath(runDir),
 		RunStatusPath(runDir),
 		SummaryPath(runDir),
 		CompletionStatePath(runDir),

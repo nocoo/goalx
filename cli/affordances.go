@@ -138,16 +138,16 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		{
 			ID:      "verify",
 			Kind:    "control",
-			Summary: "Run the active acceptance checks and refresh recorded evidence before review or closeout.",
+			Summary: "Run the active assurance scenarios and refresh recorded evidence before review or closeout.",
 			Command: fmt.Sprintf("goalx verify --run %s", runName),
-			Paths:   []string{AcceptanceStatePath(runDir), RunStatusPath(runDir), AcceptanceEvidencePath(runDir)},
+			Paths:   []string{AssurancePlanPath(runDir), EvidenceLogPath(runDir), RunStatusPath(runDir)},
 		},
 		{
 			ID:      "closeout",
 			Kind:    "fact",
-			Summary: "Status, acceptance, and closeout surfaces for final review and run completion.",
+			Summary: "Status, assurance, and closeout surfaces for final review and run completion.",
 			Facts:   buildCloseoutAffordanceFacts(index),
-			Paths:   []string{AcceptanceStatePath(runDir), RunStatusPath(runDir), SummaryPath(runDir), CompletionStatePath(runDir)},
+			Paths:   []string{AssurancePlanPath(runDir), EvidenceLogPath(runDir), RunStatusPath(runDir), SummaryPath(runDir), CompletionStatePath(runDir)},
 		},
 		{
 			ID:      "tell",
@@ -161,14 +161,14 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "control",
 			Summary: "Write a machine-consumed structured durable surface through the authoring plane. Inspect the contract with `goalx schema <surface>` first.",
 			Command: fmt.Sprintf("goalx durable write status --run %s --body-file /abs/path.json", runName),
-			Paths:   []string{GoalPath(runDir), AcceptanceStatePath(runDir), CoordinationPath(runDir), RunStatusPath(runDir)},
+			Paths:   []string{ObligationModelPath(runDir), AssurancePlanPath(runDir), CoordinationPath(runDir), RunStatusPath(runDir)},
 		},
 		{
 			ID:      "durable-write-event",
 			Kind:    "control",
 			Summary: "Write a machine-consumed durable event through the authoring plane. Inspect the contract with `goalx schema <surface>` first.",
-			Command: fmt.Sprintf("goalx durable write goal-log --run %s --kind decision --actor master --body-file /abs/path.json", runName),
-			Paths:   []string{GoalLogPath(runDir), ExperimentsLogPath(runDir)},
+			Command: fmt.Sprintf("goalx durable write obligation-log --run %s --kind decision --actor master --body-file /abs/path.json", runName),
+			Paths:   []string{ObligationLogPath(runDir), ExperimentsLogPath(runDir)},
 		},
 		{
 			ID:      "schema",
@@ -250,6 +250,9 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		)
 	}
 	if index != nil {
+		if item := buildCognitionAffordance(index); item != nil {
+			doc.Items = append(doc.Items, *item)
+		}
 		if facts, err := experimentAffordanceFacts(runDir); err != nil {
 			return nil, err
 		} else if len(facts) > 0 {
@@ -284,7 +287,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 			Kind:    "path",
 			Summary: "Absolute run paths for durable state and reports.",
 			Command: "",
-			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.GoalPath, index.StatusPath, index.AcceptanceStatePath, index.SummaryPath, index.CompletionProofPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
+			Paths:   dedupeStrings([]string{index.RunDir, index.ControlDir, index.CharterPath, index.ObligationModelPath, index.ObligationLogPath, index.AssurancePlanPath, index.EvidenceLogPath, index.StatusPath, index.SummaryPath, index.CompletionProofPath, index.ExperimentsLogPath, index.IntegrationStatePath, index.EvolveFactsPath}),
 		})
 	}
 	return doc, nil
@@ -299,7 +302,7 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 		facts = append(facts,
 			fmt.Sprintf("status.phase=`%s`.", blankAsUnknown(index.RunStatus.Phase)),
 			fmt.Sprintf("status.required_remaining=`%d`.", index.RunStatus.RequiredRemaining),
-			fmt.Sprintf("goal.required_remaining=`%d`.", index.RunStatus.GoalRequiredRemaining),
+			fmt.Sprintf("obligation.required_remaining=`%d`.", index.RunStatus.GoalRequiredRemaining),
 			fmt.Sprintf("required_remaining_match=`%t`.", index.RunStatus.RequiredRemainingMatch),
 			fmt.Sprintf("status_open_required_ids_recorded=`%t`.", index.RunStatus.StatusOpenRequiredIDsRecorded),
 		)
@@ -310,16 +313,16 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 			)
 		}
 		if len(index.RunStatus.GoalRemainingRequiredIDs) > 0 {
-			facts = append(facts, fmt.Sprintf("goal.remaining_ids=`%s`.", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ",")))
+			facts = append(facts, fmt.Sprintf("obligation.remaining_ids=`%s`.", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ",")))
 		}
 	}
 	if index.Acceptance != nil {
-		facts = append(facts, fmt.Sprintf("acceptance.active_checks=`%d`.", index.Acceptance.ActiveCheckCount))
+		facts = append(facts, fmt.Sprintf("assurance.active_scenarios=`%d`.", index.Acceptance.ActiveCheckCount))
 		if index.Acceptance.LastExitCode != nil {
-			facts = append(facts, fmt.Sprintf("acceptance.last_exit_code=`%d`.", *index.Acceptance.LastExitCode))
+			facts = append(facts, fmt.Sprintf("assurance.last_exit_code=`%d`.", *index.Acceptance.LastExitCode))
 		}
 		if index.Acceptance.LastCheckedAt != "" {
-			facts = append(facts, fmt.Sprintf("acceptance.last_checked_at=`%s`.", index.Acceptance.LastCheckedAt))
+			facts = append(facts, fmt.Sprintf("assurance.last_checked_at=`%s`.", index.Acceptance.LastCheckedAt))
 		}
 	}
 	if index.Closeout != nil {
@@ -333,6 +336,28 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 		return nil
 	}
 	return facts
+}
+
+func buildCognitionAffordance(index *ContextIndex) *AffordanceItem {
+	if index == nil || len(index.CognitionScopes) == 0 {
+		return nil
+	}
+	item := &AffordanceItem{
+		ID:      "cognition",
+		Kind:    "fact",
+		Summary: "Available code cognition providers and invocation paths for this run scope.",
+		Paths:   []string{index.ContextIndexPath},
+	}
+	for _, scope := range index.CognitionScopes {
+		for _, provider := range scope.Providers {
+			fact := fmt.Sprintf("scope=%s provider=%s invocation=%s available=%t", scope.Scope, provider.Name, provider.InvocationKind, provider.Available)
+			if provider.Version != "" {
+				fact += " version=" + provider.Version
+			}
+			item.Facts = append(item.Facts, fact)
+		}
+	}
+	return item
 }
 
 func buildCompilerDoctrineFacts(index *ContextIndex) []string {
@@ -555,6 +580,15 @@ func RefreshRunGuidance(projectRoot, runName, runDir string) (bool, error) {
 		return false, err
 	}
 	if err := RefreshWorktreeSnapshot(runDir); err != nil {
+		return false, err
+	}
+	if err := RefreshCognitionStateForRun(runDir, runName); err != nil {
+		return false, err
+	}
+	if err := RefreshImpactState(runDir, "run-root"); err != nil {
+		return false, err
+	}
+	if err := RefreshFreshnessState(runDir); err != nil {
 		return false, err
 	}
 	successContextChanged, err := RefreshRunSuccessContextForRun(projectRoot, runDir)

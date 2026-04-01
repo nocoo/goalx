@@ -349,16 +349,16 @@ func formatObjectiveIntegritySummary(runDir string) string {
 	parts := []string{
 		"contract_state=" + summary.ContractState,
 		fmt.Sprintf("clauses=%d", summary.ClauseCount),
-		fmt.Sprintf("goal_coverage=%d/%d", summary.GoalCoveredCount, summary.GoalClauseCount),
-		fmt.Sprintf("acceptance_coverage=%d/%d", summary.AcceptanceCoveredCount, summary.AcceptanceClauseCount),
+		fmt.Sprintf("obligation_coverage=%d/%d", summary.GoalCoveredCount, summary.GoalClauseCount),
+		fmt.Sprintf("assurance_coverage=%d/%d", summary.AcceptanceCoveredCount, summary.AcceptanceClauseCount),
 		fmt.Sprintf("integrity_ready=%t", summary.ReadyForNoShrinkEnforcement()),
 		fmt.Sprintf("integrity_ok=%t", summary.IntegrityOK()),
 	}
 	if len(summary.MissingGoalClauseIDs) > 0 {
-		parts = append(parts, "missing_goal="+strings.Join(summary.MissingGoalClauseIDs, ","))
+		parts = append(parts, "missing_obligation="+strings.Join(summary.MissingGoalClauseIDs, ","))
 	}
 	if len(summary.MissingAcceptanceClauseIDs) > 0 {
-		parts = append(parts, "missing_acceptance="+strings.Join(summary.MissingAcceptanceClauseIDs, ","))
+		parts = append(parts, "missing_assurance="+strings.Join(summary.MissingAcceptanceClauseIDs, ","))
 	}
 	return strings.Join(parts, " ")
 }

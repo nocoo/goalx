@@ -92,12 +92,14 @@ func renderContextIndex(index *ContextIndex) string {
 	writeContextLine("Reports dir", index.ReportsDir)
 	writeContextLine("Charter", index.CharterPath)
 	writeContextLine("Objective contract", index.ObjectiveContractPath)
-	writeContextLine("Goal", index.GoalPath)
+	writeContextLine("Obligation model", index.ObligationModelPath)
+	writeContextLine("Obligation log", index.ObligationLogPath)
+	writeContextLine("Assurance plan", index.AssurancePlanPath)
+	writeContextLine("Evidence log", index.EvidenceLogPath)
 	writeContextLine("Status", index.StatusPath)
 	writeContextLine("Experiment ledger", index.ExperimentsLogPath)
 	writeContextLine("Integration state", index.IntegrationStatePath)
 	writeContextLine("Evolve facts", index.EvolveFactsPath)
-	writeContextLine("Acceptance", index.AcceptanceStatePath)
 	writeContextLine("Closeout/evidence surface", index.CompletionProofPath)
 	writeContextLine("Coordination", index.CoordinationPath)
 	writeContextLine("Result", index.SummaryPath)
@@ -146,25 +148,25 @@ func renderContextIndex(index *ContextIndex) string {
 		}
 	}
 	if index.GoalBoundary != nil {
-		b.WriteString("\n## Goal Boundary\n\n")
+		b.WriteString("\n## Obligation Boundary\n\n")
 		writeContextLine("Required items", fmt.Sprintf("%d", index.GoalBoundary.RequiredCount))
 		writeContextLine("Optional items", fmt.Sprintf("%d", index.GoalBoundary.OptionalCount))
 		writeContextLine("Required by source", formatContextCountMap(index.GoalBoundary.RequiredBySource))
-		writeContextLine("Required by role", formatContextCountMap(index.GoalBoundary.RequiredByRole))
+		writeContextLine("Required by kind", formatContextCountMap(index.GoalBoundary.RequiredByRole))
 		writeContextLine("Required by state", formatContextCountMap(index.GoalBoundary.RequiredByState))
 	}
 	if index.RunStatus != nil {
 		b.WriteString("\n## Run Status\n\n")
 		writeContextLine("Phase", index.RunStatus.Phase)
 		writeContextLine("Required remaining (status)", fmt.Sprintf("%d", index.RunStatus.RequiredRemaining))
-		writeContextLine("Required remaining (goal)", fmt.Sprintf("%d", index.RunStatus.GoalRequiredRemaining))
+		writeContextLine("Required remaining (boundary)", fmt.Sprintf("%d", index.RunStatus.GoalRequiredRemaining))
 		writeContextLine("Required remaining match", fmt.Sprintf("%t", index.RunStatus.RequiredRemainingMatch))
 		writeContextLine("Status open required IDs recorded", fmt.Sprintf("%t", index.RunStatus.StatusOpenRequiredIDsRecorded))
 		if index.RunStatus.StatusOpenRequiredIDsRecorded {
 			writeContextLine("Status open required IDs", strings.Join(index.RunStatus.StatusOpenRequiredIDs, ", "))
 			writeContextLine("Open required IDs match", fmt.Sprintf("%t", index.RunStatus.OpenRequiredIDsMatch))
 		}
-		writeContextLine("Goal remaining IDs", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ", "))
+		writeContextLine("Boundary remaining IDs", strings.Join(index.RunStatus.GoalRemainingRequiredIDs, ", "))
 		writeContextLine("Last verified at", index.RunStatus.LastVerifiedAt)
 	}
 	if index.Budget != nil {
@@ -172,8 +174,8 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Summary", formatBudgetSummary(*index.Budget))
 	}
 	if index.Acceptance != nil {
-		b.WriteString("\n## Acceptance\n\n")
-		writeContextLine("Active checks", fmt.Sprintf("%d", index.Acceptance.ActiveCheckCount))
+		b.WriteString("\n## Assurance\n\n")
+		writeContextLine("Scenarios", fmt.Sprintf("%d", index.Acceptance.ActiveCheckCount))
 		writeContextLine("Last checked at", index.Acceptance.LastCheckedAt)
 		if index.Acceptance.LastExitCode != nil {
 			writeContextLine("Last exit code", fmt.Sprintf("%d", *index.Acceptance.LastExitCode))
@@ -189,6 +191,9 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("Finisher gate missing", fmt.Sprintf("%t", index.QualityDebt.FinisherGateMissing))
 		writeContextLine("Only correctness evidence present", fmt.Sprintf("%t", index.QualityDebt.OnlyCorrectnessEvidence))
 		writeContextLine("Domain pack missing", fmt.Sprintf("%t", index.QualityDebt.DomainPackMissing))
+		writeContextLine("Required evidence stale", strings.Join(index.QualityDebt.RequiredEvidenceStale, ", "))
+		writeContextLine("Required cognition unsatisfied", strings.Join(index.QualityDebt.RequiredCognitionUnsatisfied, ", "))
+		writeContextLine("Impact resolution unknown", fmt.Sprintf("%t", index.QualityDebt.ImpactResolutionUnknown))
 	}
 	if index.Closeout != nil {
 		b.WriteString("\n## Closeout\n\n")
@@ -201,15 +206,15 @@ func renderContextIndex(index *ContextIndex) string {
 		writeContextLine("State", index.ObjectiveIntegrity.ContractState)
 		writeContextLine("Locked", fmt.Sprintf("%t", index.ObjectiveIntegrity.ContractLocked))
 		writeContextLine("Clauses", fmt.Sprintf("%d", index.ObjectiveIntegrity.ClauseCount))
-		writeContextLine("Goal clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.GoalCoveredCount, index.ObjectiveIntegrity.GoalClauseCount))
-		writeContextLine("Acceptance clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.AcceptanceCoveredCount, index.ObjectiveIntegrity.AcceptanceClauseCount))
+		writeContextLine("Obligation clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.GoalCoveredCount, index.ObjectiveIntegrity.GoalClauseCount))
+		writeContextLine("Assurance clause coverage", fmt.Sprintf("%d/%d", index.ObjectiveIntegrity.AcceptanceCoveredCount, index.ObjectiveIntegrity.AcceptanceClauseCount))
 		writeContextLine("Integrity ready", fmt.Sprintf("%t", index.ObjectiveIntegrity.IntegrityReady))
 		writeContextLine("Integrity OK", fmt.Sprintf("%t", index.ObjectiveIntegrity.IntegrityOK))
 		if len(index.ObjectiveIntegrity.MissingGoalClauseIDs) > 0 {
-			writeContextLine("Missing goal clauses", strings.Join(index.ObjectiveIntegrity.MissingGoalClauseIDs, ", "))
+			writeContextLine("Missing obligation clauses", strings.Join(index.ObjectiveIntegrity.MissingGoalClauseIDs, ", "))
 		}
 		if len(index.ObjectiveIntegrity.MissingAcceptanceClauseIDs) > 0 {
-			writeContextLine("Missing acceptance clauses", strings.Join(index.ObjectiveIntegrity.MissingAcceptanceClauseIDs, ", "))
+			writeContextLine("Missing assurance clauses", strings.Join(index.ObjectiveIntegrity.MissingAcceptanceClauseIDs, ", "))
 		}
 	}
 	if index.EvolveFactsPath != "" || index.Evolve != nil {
@@ -222,6 +227,23 @@ func renderContextIndex(index *ContextIndex) string {
 			writeContextLine("Open candidate IDs", strings.Join(index.Evolve.OpenCandidateIDs, ", "))
 			writeContextLine("Last stop reason", index.Evolve.LastStopReasonCode)
 			writeContextLine("Last management event", index.Evolve.LastManagementEventAt)
+		}
+	}
+	if len(index.CognitionScopes) > 0 {
+		b.WriteString("\n## Cognition\n\n")
+		for _, scope := range index.CognitionScopes {
+			writeContextLine("Scope", scope.Scope)
+			writeContextLine("Worktree path", scope.WorktreePath)
+			for _, provider := range scope.Providers {
+				line := fmt.Sprintf("%s invocation=%s available=%t", provider.Name, provider.InvocationKind, provider.Available)
+				if provider.Version != "" {
+					line += " version=" + provider.Version
+				}
+				if len(provider.Capabilities) > 0 {
+					line += " capabilities=" + strings.Join(provider.Capabilities, ",")
+				}
+				writeContextLine("Provider", line)
+			}
 		}
 	}
 	if len(index.ProviderRuntimeFacts) > 0 {

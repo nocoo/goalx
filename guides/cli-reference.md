@@ -54,6 +54,8 @@ goalx archive --run NAME session-N
 
 ```bash
 goalx verify --run NAME
+goalx verify --run NAME --lane quick
+goalx verify --run NAME --lane full
 goalx result [--full]
 goalx save NAME
 goalx diff
@@ -84,11 +86,14 @@ goalx recover [--run RUN]
 ## Durable Surface Schemas
 
 ```bash
-goalx schema goal
-goalx schema acceptance
+goalx schema obligation-model
+goalx schema assurance-plan
+goalx schema cognition-state
+goalx schema impact-state
+goalx schema freshness-state
 goalx schema coordination
 goalx schema status
-goalx schema goal-log
+goalx schema obligation-log
 goalx schema experiments
 ```
 
@@ -97,12 +102,12 @@ Use `goalx schema <surface>` as the canonical machine-consumed durable authoring
 ## Durable Surface Writes
 
 ```bash
-goalx durable write goal --run NAME --body-file /abs/path.json
-goalx durable write acceptance --run NAME --body-file /abs/path.json
+goalx durable write obligation-model --run NAME --body-file /abs/path.json
+goalx durable write assurance-plan --run NAME --body-file /abs/path.json
 goalx durable write coordination --run NAME --body-file /abs/path.json
 goalx durable write status --run NAME --body-file /abs/path.json
 
-goalx durable write goal-log --run NAME --kind decision --actor master --body-file /abs/path.json
+goalx durable write obligation-log --run NAME --kind decision --actor master --body-file /abs/path.json
 goalx durable write experiments --run NAME --kind experiment.created --actor master --body-file /abs/path.json
 ```
 

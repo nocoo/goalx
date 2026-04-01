@@ -69,6 +69,16 @@ func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.C
 	}); err != nil {
 		t.Fatalf("write intake.json: %v", err)
 	}
+	objectiveHash := "sha256:demo"
+	if _, ok := files["objective-contract.json"]; !ok {
+		files["objective-contract.json"] = "{\n  \"version\": 1,\n  \"objective_hash\": \"" + objectiveHash + "\",\n  \"state\": \"locked\",\n  \"clauses\": []\n}\n"
+	}
+	if _, ok := files["obligation-model.json"]; !ok {
+		files["obligation-model.json"] = "{\n  \"version\": 1,\n  \"objective_contract_hash\": \"" + objectiveHash + "\",\n  \"required\": [],\n  \"optional\": [],\n  \"guardrails\": []\n}\n"
+	}
+	if _, ok := files["assurance-plan.json"]; !ok {
+		files["assurance-plan.json"] = "{\n  \"version\": 1,\n  \"scenarios\": []\n}\n"
+	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(runDir, name), []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", name, err)

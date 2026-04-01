@@ -360,14 +360,14 @@ esac
 		filepath.Join(runDir, "master.jsonl"),
 		filepath.Join(runDir, "run-charter.json"),
 		testSelectionSnapshotPath(runDir),
-		filepath.Join(runDir, "acceptance.json"),
-		filepath.Join(runDir, "goal.json"),
+		filepath.Join(runDir, "assurance-plan.json"),
+		filepath.Join(runDir, "obligation-model.json"),
 		filepath.Join(runDir, "success-model.json"),
 		filepath.Join(runDir, "proof-plan.json"),
 		filepath.Join(runDir, "workflow-plan.json"),
 		filepath.Join(runDir, "domain-pack.json"),
 		filepath.Join(runDir, "compiler-input.json"),
-		filepath.Join(runDir, "goal-log.jsonl"),
+		filepath.Join(runDir, "obligation-log.jsonl"),
 		filepath.Join(runDir, "reports"),
 		RunMetadataPath(runDir),
 		filepath.Join(runDir, "control", "identity-fence.json"),
@@ -397,8 +397,14 @@ esac
 	if compilerInput == nil {
 		t.Fatal("compiler input missing")
 	}
-	if compilerInput.ObjectiveContractRef != "objective-contract.json" || compilerInput.GoalRef != "goal.json" {
-		t.Fatalf("compiler input refs = %+v, want objective-contract.json and goal.json", compilerInput)
+	if compilerInput.ObjectiveContractRef != "objective-contract.json" || compilerInput.ObligationModelRef != "obligation-model.json" {
+		t.Fatalf("compiler input refs = %+v, want objective-contract.json and obligation-model.json", compilerInput)
+	}
+	if _, err := LoadObligationModel(ObligationModelPath(runDir)); err != nil {
+		t.Fatalf("LoadObligationModel: %v", err)
+	}
+	if _, err := LoadAssurancePlan(AssurancePlanPath(runDir)); err != nil {
+		t.Fatalf("LoadAssurancePlan: %v", err)
 	}
 	if compilerInput.MemoryQueryRef != filepath.Join("control", "memory-query.json") {
 		t.Fatalf("memory_query_ref = %q, want control/memory-query.json", compilerInput.MemoryQueryRef)
@@ -479,28 +485,103 @@ esac
 		t.Fatalf("boundary pending_conditions empty: %+v", boundaryTarget)
 	}
 
-	stateData, err := os.ReadFile(filepath.Join(runDir, "acceptance.json"))
+	plan, err := LoadAssurancePlan(filepath.Join(runDir, "assurance-plan.json"))
 	if err != nil {
-		t.Fatalf("read acceptance state: %v", err)
+		t.Fatalf("read assurance plan: %v", err)
 	}
-	stateText := string(stateData)
-	if strings.Contains(stateText, `"default_command"`) {
-		t.Fatalf("acceptance state must not synthesize default_command from local_validation:\n%s", stateText)
+	if plan == nil {
+		t.Fatal("assurance plan missing")
 	}
-	if strings.Contains(stateText, `"effective_command"`) {
-		t.Fatalf("acceptance state must not synthesize effective_command from local_validation:\n%s", stateText)
+	if len(plan.Scenarios) != 0 {
+		t.Fatalf("assurance scenarios = %d, want 0 without explicit acceptance command", len(plan.Scenarios))
 	}
-	if !strings.Contains(stateText, `"goal_version": 1`) {
-		t.Fatalf("acceptance state missing goal_version:\n%s", stateText)
-	}
-	// Framework must not auto-derive status or governance fields.
-	if strings.Contains(stateText, `"status"`) {
-		t.Fatalf("acceptance state must not contain derived status field:\n%s", stateText)
-	}
-	for _, unwanted := range []string{`"change_kind"`, `"change_reason"`, `"user_approved"`} {
-		if strings.Contains(stateText, unwanted) {
-			t.Fatalf("acceptance state must not contain governance field %q:\n%s", unwanted, stateText)
+}
+
+func TestStartRefreshesRunRootCognitionState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	prev := lookPathFunc
+	defer func() { lookPathFunc = prev }()
+	lookPathFunc = func(name string) (string, error) {
+		switch name {
+		case "git", "npx":
+			return "/usr/bin/" + name, nil
+		default:
+			return "", exec.ErrNotFound
 		}
+	}
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "demo", "base commit")
+	if err := os.WriteFile(filepath.Join(repo, "AGENTS.md"), []byte("repo policy"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
+
+	goalxDir := filepath.Join(repo, ".goalx")
+	if err := os.MkdirAll(goalxDir, 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	cfg := goalx.Config{
+		Name:      "demo",
+		Mode:      goalx.ModeWorker,
+		Objective: "audit auth flow",
+		Roles: goalx.RoleDefaultsConfig{
+			Worker: goalx.SessionConfig{Engine: "codex", Model: "gpt-5.4"},
+		},
+		Target:          goalx.TargetConfig{Files: []string{"README.md"}},
+		LocalValidation: goalx.LocalValidationConfig{Command: "test -f README.md"},
+		Master:          goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goalxDir, "goalx.yaml"), data, 0o644); err != nil {
+		t.Fatalf("write goalx.yaml: %v", err)
+	}
+
+	binDir := t.TempDir()
+	stateDir := t.TempDir()
+	tmuxPath := filepath.Join(binDir, "tmux")
+	script := `#!/bin/sh
+set -eu
+state="${GOALX_FAKE_TMUX_STATE:?}"
+mkdir -p "$state"
+cmd="$1"
+shift
+case "$cmd" in
+  has-session)
+    exit 1
+    ;;
+  new-session|new-window|kill-session|kill-window|set-option|display-message|capture-pane|list-panes)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+	t.Setenv("GOALX_FAKE_TMUX_STATE", stateDir)
+
+	if err := Start(repo, []string{"--config", filepath.Join(goalxDir, "goalx.yaml")}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	runDir := goalx.RunDir(repo, cfg.Name)
+	state, err := LoadCognitionState(CognitionStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCognitionState: %v", err)
+	}
+	if state == nil || len(state.Scopes) == 0 {
+		t.Fatalf("cognition state = %#v, want run-root scope", state)
+	}
+	if state.Scopes[0].Scope != "run-root" {
+		t.Fatalf("scope = %q, want run-root", state.Scopes[0].Scope)
 	}
 }
 

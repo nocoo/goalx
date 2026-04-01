@@ -286,7 +286,7 @@ Runtime state lives under `~/.goalx/runs/<project>/<run>/`.
 GoalX the framework is intentionally narrow:
 
 - **Storage**: durable run state and artifacts
-- **Execution**: processes, tmux windows, worktrees, acceptance commands
+- **Execution**: processes, tmux windows, worktrees, assurance scenarios, and acceptance compatibility commands
 - **Connectivity**: inbox/outbox, leases, nudges, saved-run continuation
 
 The framework records facts. The agents make judgments.
@@ -312,7 +312,8 @@ goalx save
 - `goalx schema <surface>` shows the canonical contract for a machine-consumed durable surface
 - `goalx tell` redirects the master or a session durably
 - `goalx recover --run NAME` relaunches a stopped or stranded run in place
-- `goalx verify` records acceptance facts; it does not declare completion
+- `goalx verify` records assurance evidence; by default it runs the `required` lane and does not declare completion
+- advanced durable authoring now centers `obligation-model`, `assurance-plan`, `obligation-log`, and `evidence-log`
 - `goalx result` reads the canonical final result surface in `summary.md`; if `summary.md` is missing, the run is not closed out yet
 - `goalx save` exports the run into durable saved-run storage for later phase continuation
 

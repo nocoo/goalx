@@ -792,11 +792,7 @@ func buildNonFrontierMasterAlerts(runDir string) ([]masterAlert, map[string]stri
 	if err != nil {
 		return nil, nil, err
 	}
-	acceptance, err := LoadAcceptanceState(AcceptanceStatePath(runDir))
-	if err != nil {
-		return nil, nil, err
-	}
-	if qualityDebt != nil && !qualityDebt.Zero() && hasBuilderEvidence(runDir, acceptance) {
+	if qualityDebt != nil && !qualityDebt.Zero() && hasBuilderEvidence(runDir, nil) {
 		parts := qualityDebtAlertParts(qualityDebt)
 		if len(parts) > 0 {
 			key := "quality_debt:open"

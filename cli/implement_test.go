@@ -361,6 +361,15 @@ func TestImplementRejectsSavedRunMissingCanonicalIntake(t *testing.T) {
 	if err := os.WriteFile(RunSpecPath(runDir), data, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
+	if err := os.WriteFile(ObjectiveContractPath(runDir), []byte("{\n  \"version\": 1,\n  \"objective_hash\": \"sha256:demo\",\n  \"state\": \"locked\",\n  \"clauses\": []\n}\n"), 0o644); err != nil {
+		t.Fatalf("write objective contract: %v", err)
+	}
+	if err := os.WriteFile(ObligationModelPath(runDir), []byte("{\n  \"version\": 1,\n  \"objective_contract_hash\": \"sha256:demo\",\n  \"required\": [],\n  \"optional\": [],\n  \"guardrails\": []\n}\n"), 0o644); err != nil {
+		t.Fatalf("write obligation model: %v", err)
+	}
+	if err := os.WriteFile(AssurancePlanPath(runDir), []byte("{\n  \"version\": 1,\n  \"scenarios\": []\n}\n"), 0o644); err != nil {
+		t.Fatalf("write assurance plan: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(runDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
 		t.Fatalf("write summary: %v", err)
 	}
@@ -369,8 +378,8 @@ func TestImplementRejectsSavedRunMissingCanonicalIntake(t *testing.T) {
 	if err == nil {
 		t.Fatal("Implement unexpectedly succeeded without canonical intake")
 	}
-	if !strings.Contains(err.Error(), "intake") || !strings.Contains(err.Error(), "legacy") {
-		t.Fatalf("Implement error = %v, want legacy intake rejection", err)
+	if !strings.Contains(err.Error(), "intake") || !strings.Contains(err.Error(), "canonical") {
+		t.Fatalf("Implement error = %v, want canonical intake rejection", err)
 	}
 }
 

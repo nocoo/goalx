@@ -271,18 +271,22 @@ func bootstrapStartDurables(projectRoot string, state *startRunState, cfg *goalx
 		return "", "", nil, 0, "", fmt.Errorf("trust bootstrap master: %w", err)
 	}
 
-	goalState, err := EnsureGoalState(state.runDir)
+	objectiveContract, err := EnsureObjectiveContract(state.runDir, cfg.Objective)
 	if err != nil {
-		return "", "", nil, 0, "", fmt.Errorf("init goal state: %w", err)
-	}
-	if _, err := EnsureObjectiveContract(state.runDir, cfg.Objective); err != nil {
 		return "", "", nil, 0, "", fmt.Errorf("init objective contract: %w", err)
 	}
-	if err := EnsureGoalLog(state.runDir); err != nil {
-		return "", "", nil, 0, "", fmt.Errorf("init goal log: %w", err)
+	objectiveContractHash, err := hashFileSHA256(ObjectiveContractPath(state.runDir))
+	if err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("hash objective contract: %w", err)
 	}
-	if _, err := EnsureAcceptanceState(state.runDir, cfg, goalState.Version); err != nil {
-		return "", "", nil, 0, "", fmt.Errorf("init acceptance state: %w", err)
+	if _, err := EnsureObligationModel(state.runDir, nil, objectiveContract, objectiveContractHash, cfg.Objective); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init obligation model: %w", err)
+	}
+	if err := EnsureObligationLog(state.runDir); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init obligation log: %w", err)
+	}
+	if _, err := EnsureAssurancePlan(state.runDir, NewAcceptanceState(cfg, 0)); err != nil {
+		return "", "", nil, 0, "", fmt.Errorf("init assurance plan: %w", err)
 	}
 	meta, err := EnsureRunMetadata(state.runDir, projectRoot, cfg.Objective)
 	if err != nil {
@@ -530,12 +534,12 @@ func buildMasterProtocolData(projectRoot, runDir, tmuxSession string, cfg *goalx
 		SummaryPath:            SummaryPath(runDir),
 		CharterPath:            RunCharterPath(runDir),
 		ObjectiveContractPath:  ObjectiveContractPath(runDir),
-		GoalPath:               GoalPath(runDir),
-		GoalLogPath:            GoalLogPath(runDir),
+		ObligationModelPath:    ObligationModelPath(runDir),
+		ObligationLogPath:      ObligationLogPath(runDir),
+		AssurancePlanPath:      AssurancePlanPath(runDir),
+		EvidenceLogPath:        EvidenceLogPath(runDir),
 		IntegrationStatePath:   IntegrationStatePath(runDir),
 		IdentityFencePath:      IdentityFencePath(runDir),
-		AcceptanceNotesPath:    existingProtocolPath(AcceptanceNotesPath(runDir)),
-		AcceptanceStatePath:    AcceptanceStatePath(runDir),
 		CompletionProofPath:    CompletionStatePath(runDir),
 		RunStatePath:           RunRuntimeStatePath(runDir),
 		SessionsStatePath:      SessionsRuntimeStatePath(runDir),

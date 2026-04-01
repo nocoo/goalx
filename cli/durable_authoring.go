@@ -122,18 +122,6 @@ func applyDurableStructuredMutation(runDir string, spec DurableSurfaceSpec, body
 				return err
 			}
 			return SaveObjectiveContract(path, contract)
-		case DurableSurfaceGoal:
-			state, err := parseGoalAuthoringBody(body)
-			if err != nil {
-				return err
-			}
-			return SaveGoalState(path, state)
-		case DurableSurfaceAcceptance:
-			state, err := parseAcceptanceAuthoringBody(body)
-			if err != nil {
-				return err
-			}
-			return SaveAcceptanceState(path, state)
 		case DurableSurfaceCoordination:
 			state, err := parseCoordinationAuthoringBody(body)
 			if err != nil {
@@ -212,8 +200,18 @@ func buildDurableEventLine(surface DurableSurfaceName, mutation DurableMutation)
 
 func compileDurableEventBody(surface DurableSurfaceName, kind string, bodyData []byte, eventAt string) (json.RawMessage, error) {
 	switch surface {
-	case DurableSurfaceGoalLog:
+	case DurableSurfaceObligationLog:
 		return parseOpaqueJSONObjectBody(bodyData)
+	case DurableSurfaceEvidenceLog:
+		body, err := parseEvidenceEventBody(bodyData)
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		return json.RawMessage(encoded), nil
 	case DurableSurfaceExperiments:
 		return compileExperimentAuthoringBody(kind, bodyData, eventAt)
 	case DurableSurfaceInterventionLog:
@@ -264,7 +262,7 @@ func parseObjectiveContractAuthoringBody(data []byte) (*ObjectiveContract, error
 func parseGoalAuthoringBody(data []byte) (*GoalState, error) {
 	var body goalAuthoringBody
 	if err := decodeStrictJSON(data, &body); err != nil {
-		return nil, durableSchemaHintError(DurableSurfaceGoal, err)
+		return nil, durableSchemaHintError(DurableSurfaceObligationModel, err)
 	}
 	state := &GoalState{
 		Version:  1,
@@ -272,7 +270,7 @@ func parseGoalAuthoringBody(data []byte) (*GoalState, error) {
 		Optional: body.Optional,
 	}
 	if err := validateGoalStateInput(state); err != nil {
-		return nil, durableSchemaHintError(DurableSurfaceGoal, err)
+		return nil, durableSchemaHintError(DurableSurfaceObligationModel, err)
 	}
 	normalizeGoalState(state)
 	return state, nil
@@ -281,7 +279,7 @@ func parseGoalAuthoringBody(data []byte) (*GoalState, error) {
 func parseAcceptanceAuthoringBody(data []byte) (*AcceptanceState, error) {
 	var body acceptanceAuthoringBody
 	if err := decodeStrictJSON(data, &body); err != nil {
-		return nil, durableSchemaHintError(DurableSurfaceAcceptance, err)
+		return nil, durableSchemaHintError(DurableSurfaceAssurancePlan, err)
 	}
 	state := &AcceptanceState{
 		Version:     2,
@@ -290,7 +288,7 @@ func parseAcceptanceAuthoringBody(data []byte) (*AcceptanceState, error) {
 		LastResult:  AcceptanceResult{},
 	}
 	if err := validateAcceptanceState(state); err != nil {
-		return nil, durableSchemaHintError(DurableSurfaceAcceptance, err)
+		return nil, durableSchemaHintError(DurableSurfaceAssurancePlan, err)
 	}
 	normalizeAcceptanceState(state)
 	return state, nil

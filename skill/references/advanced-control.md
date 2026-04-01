@@ -203,7 +203,7 @@ Use this as the public operator-facing command matrix. Internal plumbing command
 - `goalx integrate --run NAME --method ... --from ...` to record manual run-root integration
 - `goalx result` to read the current result surfaces
 - `goalx report` to synthesize markdown from journals
-- `goalx verify` to record acceptance facts
+- `goalx verify` to record assurance evidence (`required` lane by default; use `--lane quick|full` only when the user explicitly wants a different verification scope)
 
 ### Lifecycle And Persistence
 
@@ -218,6 +218,9 @@ Use this as the public operator-facing command matrix. Internal plumbing command
 
 - `goalx schema <surface>` before writing machine-consumed surfaces
 - `goalx durable write <surface> ...` when the operator or master needs to author canonical durable state explicitly
+- canonical mutable boundary authoring now centers `obligation-model`
+- canonical verification strategy authoring now centers `assurance-plan`
+- canonical boundary event logging now centers `obligation-log`
 
 ## Effort, Selection, and Runtime Dimensions
 

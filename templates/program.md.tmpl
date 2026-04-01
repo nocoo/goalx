@@ -62,20 +62,20 @@ You are **{{.SessionName}}** of {{len .Sessions}} sessions working in parallel o
 Parallel sessions: {{range $i, $s := .Sessions}}{{if $i}}, {{end}}`{{$s.Name}}`{{end}}
 {{end}}
 
-{{if .GoalPath}}## Goal Boundary
+{{if .ObligationModelPath}}## Obligation Boundary
 
-Goal boundary: `{{.GoalPath}}` (read-only — this defines required current-goal outcomes and optional improvements)
-The goal boundary defines what must be true before the overall goal can be considered complete. Your current assignment defines what to do next, not what counts as full completion.
-Required goal items are the canonical current-goal obligations for the overall run. Your assignment is the decomposition; the goal boundary is not.
-Run identity stays immutable for the life of the run. `{{.GoalPath}}` may evolve, but it may not silently shrink user-required outcomes.
+Obligation boundary: `{{.ObligationModelPath}}` (read-only — this defines the canonical mutable obligations for the run)
+The obligation boundary defines what must be true before the overall objective can be considered complete. Your current assignment defines what to do next, not what counts as full completion.
+Required obligations are the canonical mutable obligations for the overall run. Your assignment is the decomposition; the obligation boundary is not.
+Run identity stays immutable for the life of the run. `{{.ObligationModelPath}}` may evolve, but it may not silently shrink user-required outcomes.
 If your assignment is only gathering proof while the underlying outcome or enabler still appears unmet, record that risk in the journal or dispatchable_slices for the master.
 {{end}}
 
-{{if .AcceptanceStatePath}}## Acceptance State
+{{if .AssurancePlanPath}}## Assurance State
 
-Machine-readable acceptance state: `{{.AcceptanceStatePath}}` (read-only — verification-only; it does not define scope)
+Machine-readable assurance plan: `{{.AssurancePlanPath}}` (read-only — verification-only; it does not define scope)
+{{if .EvidenceLogPath}}Recorded assurance evidence log: `{{.EvidenceLogPath}}` (read-only — inspect it when you need to understand current coverage or freshness){{end}}
 {{if .CompletionProofPath}}Agent-owned closeout/evidence surface: `{{.CompletionProofPath}}` (read-only — inspect it when you need to understand current closeout coverage or proof gaps; GoalX does not validate verdict structure there){{end}}
-{{if .AcceptanceNotesPath}}Optional acceptance notes: `{{.AcceptanceNotesPath}}`{{end}}
 {{end}}
 
 ## Optimization Doctrine

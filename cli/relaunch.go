@@ -65,11 +65,17 @@ func relaunchMaster(projectRoot, runDir, tmuxSession string, cfg *goalx.Config) 
 		if err := NewSessionWithCommandInRun(runDir, tmuxSession, "master", workdir, launchCmd); err != nil {
 			return fmt.Errorf("create master session: %w", err)
 		}
+		if _, err := RefreshRunGuidance(projectRoot, cfg.Name, runDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)
+		}
 		return nil
 	}
 	_ = KillWindowInRun(runDir, tmuxSession, "master")
 	if err := NewWindowWithCommandInRun(runDir, tmuxSession, "master", workdir, launchCmd); err != nil {
 		return fmt.Errorf("create master window: %w", err)
+	}
+	if _, err := RefreshRunGuidance(projectRoot, cfg.Name, runDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)
 	}
 	return nil
 }
@@ -139,6 +145,9 @@ func relaunchMissingMasterWindow(projectRoot, runDir, tmuxSession string, cfg *g
 	if err := NewWindowWithCommandInRun(runDir, tmuxSession, "master", workdir, launchCmd); err != nil {
 		appendAuditLog(runDir, "target_relaunch_result target=master result=failure cause=%s err=%v", blankAsUnknown(masterPresence.State), err)
 		return fmt.Errorf("create master window: %w", err)
+	}
+	if _, err := RefreshRunGuidance(projectRoot, cfg.Name, runDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refresh run guidance: %v\n", err)
 	}
 	appendAuditLog(runDir, "target_relaunch_result target=master result=success cause=%s", blankAsUnknown(masterPresence.State))
 	return nil

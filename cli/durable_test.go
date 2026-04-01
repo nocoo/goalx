@@ -148,7 +148,7 @@ func TestDurableHelpPointsToSchemaAuthority(t *testing.T) {
 	}
 }
 
-func TestDurableReplaceGoalRespectsLockedObjectiveContractIntegrity(t *testing.T) {
+func TestDurableRejectsLegacyGoalSurface(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	repo := initNamedGitRepo(t, "durable-goal-integrity")
@@ -157,34 +157,15 @@ func TestDurableReplaceGoalRespectsLockedObjectiveContractIntegrity(t *testing.T
 		Objective: "ship it",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
-	runDir := writeRunSpecFixture(t, repo, cfg)
-	if err := SaveObjectiveContract(ObjectiveContractPath(runDir), &ObjectiveContract{
-		Version:       1,
-		ObjectiveHash: "sha256:demo",
-		State:         objectiveContractStateLocked,
-		Clauses: []ObjectiveClause{
-			{
-				ID:               "ucl-1",
-				Text:             "ship feature",
-				Kind:             objectiveClauseKindDelivery,
-				SourceExcerpt:    "ship feature",
-				RequiredSurfaces: []ObjectiveRequiredSurface{objectiveRequiredSurfaceGoal},
-			},
-		},
-	}); err != nil {
-		t.Fatalf("SaveObjectiveContract: %v", err)
-	}
+	_ = writeRunSpecFixture(t, repo, cfg)
 	payloadPath := filepath.Join(t.TempDir(), "goal.body.json")
 	if err := os.WriteFile(payloadPath, []byte(`{"required":[{"id":"req-1","text":"ship feature","source":"user","role":"outcome","state":"open"}],"optional":[]}`), 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
 
 	err := Durable(repo, []string{"write", "goal", "--run", cfg.Name, "--body-file", payloadPath})
-	if err == nil {
-		t.Fatal("Durable write should reject goal payload that bypasses locked contract coverage")
-	}
-	if !strings.Contains(err.Error(), "missing covers") {
-		t.Fatalf("Durable replace error = %v, want missing covers", err)
+	if err == nil || !strings.Contains(err.Error(), "obligation-model") {
+		t.Fatalf("Durable write error = %v, want obligation-model migration hint", err)
 	}
 }
 
@@ -232,8 +213,8 @@ func TestDurableCommandRejectsEventLogWriteWithoutKind(t *testing.T) {
 	}
 
 	err := Durable(repo, []string{"write", "goal-log", "--run", cfg.Name, "--actor", "master", "--body-file", payloadPath})
-	if err == nil || !strings.Contains(err.Error(), `requires --kind`) {
-		t.Fatalf("Durable write error = %v, want missing kind failure", err)
+	if err == nil || !strings.Contains(err.Error(), "obligation-log") {
+		t.Fatalf("Durable write error = %v, want obligation-log migration hint", err)
 	}
 }
 
@@ -310,7 +291,7 @@ func TestApplyDurableMutationConcurrentStructuredWritesRemainValid(t *testing.T)
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "gpt-5.4"},
 	}
 	runDir := writeRunSpecFixture(t, repo, cfg)
-	if err := SaveGoalState(GoalPath(runDir), &GoalState{
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
 		Version: 1,
 		Required: []GoalItem{
 			{ID: "req-1", Text: "ship it", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},

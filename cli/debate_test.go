@@ -413,8 +413,12 @@ func TestDebateReadsLegacyProjectScopedSavedRun(t *testing.T) {
 		t.Fatalf("write intake: %v", err)
 	}
 
-	if err := Debate(projectRoot, []string{"--from", "research-a", "--write-config"}); err != nil {
-		t.Fatalf("Debate: %v", err)
+	err = Debate(projectRoot, []string{"--from", "research-a", "--write-config"})
+	if err == nil {
+		t.Fatal("Debate unexpectedly accepted legacy project-scoped saved run")
+	}
+	if !strings.Contains(err.Error(), "missing canonical") {
+		t.Fatalf("Debate error = %v, want canonical surface failure", err)
 	}
 }
 
@@ -451,8 +455,8 @@ func TestDebateRejectsSavedRunMissingCanonicalIntake(t *testing.T) {
 	if err == nil {
 		t.Fatal("Debate unexpectedly succeeded without canonical intake")
 	}
-	if !strings.Contains(err.Error(), "intake") || !strings.Contains(err.Error(), "legacy") {
-		t.Fatalf("Debate error = %v, want legacy intake rejection", err)
+	if !strings.Contains(err.Error(), "intake") || !strings.Contains(err.Error(), "canonical") {
+		t.Fatalf("Debate error = %v, want canonical intake rejection", err)
 	}
 }
 

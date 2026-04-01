@@ -103,10 +103,10 @@ func collectRunAdvisories(rc *RunContext) ([]string, error) {
 		return nil, err
 	}
 	if statusComparison != nil && statusComparison.StatusRequiredRemaining != nil && statusComparison.GoalRequiredRemaining != nil && !statusComparison.RequiredRemainingMatch {
-		advisories = append(advisories, fmt.Sprintf("Status drift: status_required_remaining=%d goal_required_remaining=%d goal_remaining_ids=%s", *statusComparison.StatusRequiredRemaining, *statusComparison.GoalRequiredRemaining, strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
+		advisories = append(advisories, fmt.Sprintf("Status drift: status_required_remaining=%d boundary_required_remaining=%d boundary_remaining_ids=%s", *statusComparison.StatusRequiredRemaining, *statusComparison.GoalRequiredRemaining, strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
 	}
 	if statusComparison != nil && statusComparison.StatusOpenRequiredIDsRecorded && !statusComparison.OpenRequiredIDsMatch {
-		advisories = append(advisories, fmt.Sprintf("Status drift: status_open_required_ids=%s goal_remaining_ids=%s", strings.Join(statusComparison.StatusOpenRequiredIDs, ","), strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
+		advisories = append(advisories, fmt.Sprintf("Status drift: status_open_required_ids=%s boundary_remaining_ids=%s", strings.Join(statusComparison.StatusOpenRequiredIDs, ","), strings.Join(statusComparison.GoalRemainingRequiredIDs, ",")))
 	}
 	if statusComparison != nil && statusComparison.StatusActiveSessionsRecorded && !statusComparison.ActiveSessionsMatch {
 		advisories = append(advisories, fmt.Sprintf("Status drift: status_active_sessions=%s runtime_active_sessions=%s", strings.Join(statusComparison.StatusActiveSessions, ","), strings.Join(statusComparison.RuntimeActiveSessions, ",")))

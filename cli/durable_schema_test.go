@@ -39,9 +39,9 @@ func TestLookupDurableContractReturnsSchemaMetadata(t *testing.T) {
 }
 
 func TestLookupDurableContractSupportsEventLogs(t *testing.T) {
-	contract, err := LookupDurableContract("goal-log")
+	contract, err := LookupDurableContract("obligation-log")
 	if err != nil {
-		t.Fatalf("LookupDurableContract(goal-log): %v", err)
+		t.Fatalf("LookupDurableContract(obligation-log): %v", err)
 	}
 	if contract.Class != DurableSurfaceClassEventLog {
 		t.Fatalf("contract.Class = %s, want %s", contract.Class, DurableSurfaceClassEventLog)
@@ -49,13 +49,13 @@ func TestLookupDurableContractSupportsEventLogs(t *testing.T) {
 	if contract.WriteMode != DurableSurfaceWriteModeAppend {
 		t.Fatalf("contract.WriteMode = %s, want %s", contract.WriteMode, DurableSurfaceWriteModeAppend)
 	}
-	if !strings.Contains(contract.Example, `"decision": "initial_boundary_shape_selection"`) {
+	if !strings.Contains(contract.Example, `"decision": "initial_obligation_boundary"`) {
 		t.Fatalf("contract.Example missing decision body:\n%s", contract.Example)
 	}
-	if !strings.Contains(contract.Example, `"boundary_shapes_compared"`) {
-		t.Fatalf("contract.Example missing goal-log body:\n%s", contract.Example)
+	if !strings.Contains(contract.Example, `"chosen_shape"`) {
+		t.Fatalf("contract.Example missing obligation-log body:\n%s", contract.Example)
 	}
-	if !slices.Equal(contract.AllowedKinds, []string{"decision", "checkpoint", "blocker", "handoff", "closeout", "note", "update"}) {
+	if !slices.Equal(contract.AllowedKinds, []string{"decision", "checkpoint", "waiver", "closeout", "update"}) {
 		t.Fatalf("contract.AllowedKinds = %v", contract.AllowedKinds)
 	}
 }

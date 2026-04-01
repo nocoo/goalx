@@ -47,6 +47,12 @@ func loadSavedPhaseSource(projectRoot, runName string) (*savedPhaseSource, error
 	if err != nil {
 		return nil, fmt.Errorf("load saved run %q: %w", runName, err)
 	}
+	if !fileExists(ObligationModelPath(runDir)) {
+		return nil, fmt.Errorf("saved run %q is missing canonical %s", runName, ObligationModelPath(runDir))
+	}
+	if !fileExists(AssurancePlanPath(runDir)) {
+		return nil, fmt.Errorf("saved run %q is missing canonical %s", runName, AssurancePlanPath(runDir))
+	}
 	if _, err := RequireSavedRunIntake(runDir); err != nil {
 		return nil, fmt.Errorf("load saved run %q intake: %w", runName, err)
 	}

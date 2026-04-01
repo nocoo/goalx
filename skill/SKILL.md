@@ -81,7 +81,7 @@ Use this by default unless the user explicitly asks for config-first control.
 - `goalx tell` = durable redirect to master or session
 - `goalx recover --run NAME` = relaunch the same stopped or stranded run in place
 - `goalx budget` = same-run budget inspection and mutation
-- `goalx verify` = record acceptance facts, not completion verdict
+- `goalx verify` = record assurance evidence, not completion verdict
 - `goalx result` = read the current result surfaces
 - `goalx save` = export a durable saved run for later continuation
 
@@ -289,7 +289,7 @@ goalx save
 Keep these truths straight:
 
 - GoalX records facts; agents make judgments
-- `goalx verify` records exit code and output; it does not auto-declare success
+- `goalx verify` records evidence for the selected lane (`required` by default); it does not auto-declare success
 - `goalx result` reads the canonical final summary surface, not arbitrary in-progress reports
 - transport delivery is not the same thing as task completion
 - local-first control and durable state are the public release contract

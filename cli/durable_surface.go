@@ -15,8 +15,9 @@ const (
 	DurableSurfaceWriteModeAppend  DurableSurfaceWriteMode = "append"
 
 	DurableSurfaceObjectiveContract DurableSurfaceName = "objective-contract"
-	DurableSurfaceGoal              DurableSurfaceName = "goal"
-	DurableSurfaceAcceptance        DurableSurfaceName = "acceptance"
+	DurableSurfaceObligationModel   DurableSurfaceName = "obligation-model"
+	DurableSurfaceCognitionState    DurableSurfaceName = "cognition-state"
+	DurableSurfaceAssurancePlan     DurableSurfaceName = "assurance-plan"
 	DurableSurfaceCoordination      DurableSurfaceName = "coordination"
 	DurableSurfaceStatus            DurableSurfaceName = "status"
 	DurableSurfaceSuccessModel      DurableSurfaceName = "success-model"
@@ -25,7 +26,10 @@ const (
 	DurableSurfaceDomainPack        DurableSurfaceName = "domain-pack"
 	DurableSurfaceCompilerInput     DurableSurfaceName = "compiler-input"
 	DurableSurfaceCompilerReport    DurableSurfaceName = "compiler-report"
-	DurableSurfaceGoalLog           DurableSurfaceName = "goal-log"
+	DurableSurfaceImpactState       DurableSurfaceName = "impact-state"
+	DurableSurfaceFreshnessState    DurableSurfaceName = "freshness-state"
+	DurableSurfaceObligationLog     DurableSurfaceName = "obligation-log"
+	DurableSurfaceEvidenceLog       DurableSurfaceName = "evidence-log"
 	DurableSurfaceExperiments       DurableSurfaceName = "experiments"
 	DurableSurfaceInterventionLog   DurableSurfaceName = "intervention-log"
 	DurableSurfaceSummary           DurableSurfaceName = "summary"
@@ -53,20 +57,20 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Immutable extracted user-clause contract for this run.",
-			Example:         `{"objective_hash":"sha256:demo","state":"locked","clauses":[{"id":"ucl-1","text":"Live trading works end to end on the live service.","kind":"delivery","source_excerpt":"所有功能端到端真实可用","required_surfaces":["goal"],"approval_required_for_drop":true},{"id":"ucl-2","text":"Playwright user journey passes on the live service.","kind":"verification","source_excerpt":"Playwright 用户旅程测试全部通过（真实服务）","required_surfaces":["goal","acceptance"],"approval_required_for_drop":true}]}`,
+			Example:         `{"objective_hash":"sha256:demo","state":"locked","clauses":[{"id":"ucl-1","text":"Live trading works end to end on the live service.","kind":"delivery","source_excerpt":"所有功能端到端真实可用","required_surfaces":["obligation"],"approval_required_for_drop":true},{"id":"ucl-2","text":"Playwright user journey passes on the live service.","kind":"verification","source_excerpt":"Playwright 用户旅程测试全部通过（真实服务）","required_surfaces":["obligation","assurance"],"approval_required_for_drop":true}]}`,
 			FieldNotes: []string{
 				"`objective-contract` is immutable once `state` becomes `locked`.",
 				"Each clause must keep a stable `id`, `text`, and `source_excerpt`.",
 				"`kind` must stay within delivery|quality_bar|verification|guardrail|operating_rule.",
-				"`required_surfaces` must stay within goal|acceptance.",
+				"`required_surfaces` must stay within obligation|assurance.",
 				"The framework enforces coverage integrity, not semantic satisfaction.",
 			},
 			FrameworkOwnedFields: []string{"`version`", "`created_at`", "`locked_at`"},
 		},
 		Path: ObjectiveContractPath,
 	},
-	DurableSurfaceGoal: {
-		Name:               DurableSurfaceGoal,
+	DurableSurfaceObligationModel: {
+		Name:               DurableSurfaceObligationModel,
 		Class:              DurableSurfaceClassStructuredState,
 		WriteMode:          DurableSurfaceWriteModeReplace,
 		Strict:             true,
@@ -74,23 +78,20 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
-			Summary:         "Current mutable goal boundary with required outcomes and optional improvements.",
-			Example:         `{"required":[{"id":"req-1","text":"Live trading works end to end on the live service with operator-visible state transitions.","source":"user","role":"outcome","state":"open"},{"id":"req-2","text":"Live trading has durable API and browser evidence on the live service.","source":"master","role":"proof","state":"open"}],"optional":[{"id":"opt-1","text":"Improve latency on the live trading dashboard.","source":"master","role":"guardrail","state":"open"}]}`,
+			Summary:         "Canonical mutable obligation boundary for the run, separate from execution decomposition and verification records.",
+			Example:         `{"objective_contract_hash":"sha256:objective","required":[{"id":"obl-first-run","text":"A first-time operator can launch a run successfully.","kind":"outcome","covers_clauses":["ucl-first-run"],"assurance_required":true}],"optional":[],"guardrails":[{"id":"obl-no-corruption","text":"The run must not corrupt durable state.","kind":"guardrail","covers_clauses":["ucl-no-corruption"]}]}`,
 			FieldNotes: []string{
-				"`required` is the canonical current-goal boundary.",
-				"Every goal item must include explicit `source` and `role` fields.",
-				"`role` must stay within outcome|enabler|proof|guardrail.",
-				"Describe what must be true, not just how proof will be gathered.",
-				"`proof` obligations do not replace missing `outcome` or `enabler` obligations.",
-				"`state` must stay within open|claimed|waived.",
-				"`waived` only counts with explicit user approval on the item.",
+				"`required` is the canonical mutable obligation boundary.",
+				"`kind` must stay within outcome|enabler|proof|guardrail.",
+				"Each obligation must include stable `id`, `text`, and `covers_clauses`.",
+				"`assurance_required` records whether real assurance coverage is required.",
 			},
 			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
 		},
-		Path: GoalPath,
+		Path: ObligationModelPath,
 	},
-	DurableSurfaceAcceptance: {
-		Name:               DurableSurfaceAcceptance,
+	DurableSurfaceCognitionState: {
+		Name:               DurableSurfaceCognitionState,
 		Class:              DurableSurfaceClassStructuredState,
 		WriteMode:          DurableSurfaceWriteModeReplace,
 		Strict:             true,
@@ -98,18 +99,38 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
-			Summary:         "Verification check surface and latest raw acceptance results.",
-			Example:         `{"goal_version":1,"checks":[{"id":"chk-build","label":"Go build and test","command":"go build ./... && go test ./... && go vet ./...","covers":["ucl-guardrail"],"state":"active"},{"id":"chk-playwright","label":"Live service user journey","command":"pnpm exec playwright test","covers":["ucl-verify"],"state":"active"}]}`,
+			Summary:         "Worktree-scoped cognition provider facts including invocation kind, capabilities, and freshness anchors.",
+			Example:         `{"scopes":[{"scope":"run-root","worktree_path":"/abs/path","providers":[{"name":"repo-native","invocation_kind":"builtin","available":true,"head_revision":"def456","capabilities":["file_inventory","file_search","file_read","git_diff"]},{"name":"gitnexus","invocation_kind":"binary","available":true,"version":"1.5.0","indexed_revision":"abc123","head_revision":"def456","stale_commits":2,"capabilities":["query","context","impact","detect_changes","processes"]}]}]}`,
 			FieldNotes: []string{
-				"`checks` is the current verification contract for `goalx verify`.",
-				"Each check must have stable `id` and `state` fields.",
-				"`state` must stay within active|waived.",
-				"`waived` checks require explicit `approval_ref`.",
-				"Writing acceptance resets framework-owned raw verification results.",
+				"`scopes` is the canonical list of worktree cognition snapshots.",
+				"`providers` records optional provider facts without semantic judgment.",
+				"`invocation_kind` must stay explicit: builtin|binary|npx|mcp|none.",
+				"`capabilities` is required for every provider entry.",
 			},
-			FrameworkOwnedFields: []string{"`version`", "`updated_at`", "`last_result`"},
+			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
 		},
-		Path: AcceptanceStatePath,
+		Path: CognitionStatePath,
+	},
+	DurableSurfaceAssurancePlan: {
+		Name:               DurableSurfaceAssurancePlan,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Scenario-based external assurance strategy covering obligations, harnesses, oracles, evidence, and gate policy.",
+			Example:         `{"obligation_refs":["obl-first-run"],"scenarios":[{"id":"scenario-cli-first-run","covers_obligations":["obl-first-run"],"harness":{"kind":"cli","command":"goalx run \"demo goal\""},"oracle":{"kind":"compound","checks":[{"kind":"exit_code","equals":"0"}]},"evidence":[{"kind":"stdout"},{"kind":"timing"}],"gate_policy":{"verify_lane":"required","required_cognition_tier":"repo-native","closeout":"required","merge":"required"}}]}`,
+			FieldNotes: []string{
+				"`scenarios` is the canonical scenario list.",
+				"Each scenario must cover one or more obligations through `covers_obligations`.",
+				"`required_cognition_tier` must stay within none|repo-native|graph.",
+				"`verify_lane` must stay within quick|required|full when present.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
+		},
+		Path: AssurancePlanPath,
 	},
 	DurableSurfaceCoordination: {
 		Name:               DurableSurfaceCoordination,
@@ -163,7 +184,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Compiled success-model surface defining required quality dimensions, anti-goals, and structural closeout requirements for this run.",
-			Example:         `{"objective_contract_hash":"sha256:objective","goal_hash":"sha256:goal","dimensions":[{"id":"dim-product-clarity","kind":"quality","text":"Operators can orient within seconds.","required":true,"failure_modes":["correct_but_unclear"]}],"anti_goals":[{"id":"anti-proof-only","text":"Do not treat proof-only success as sufficient."}],"closeout_requirements":["quality_debt_zero"]}`,
+			Example:         `{"objective_contract_hash":"sha256:objective","obligation_model_hash":"sha256:obligation","dimensions":[{"id":"dim-product-clarity","kind":"quality","text":"Operators can orient within seconds.","required":true,"failure_modes":["correct_but_unclear"]}],"anti_goals":[{"id":"anti-proof-only","text":"Do not treat proof-only success as sufficient."}],"closeout_requirements":["quality_debt_zero"]}`,
 			FieldNotes: []string{
 				"`dimensions` is the canonical success-dimension list for the run.",
 				"Each dimension must include stable `id`, `kind`, and `text` fields.",
@@ -184,7 +205,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Compiled proof-plan surface defining what proof forms structurally cover each success dimension.",
-			Example:         `{"items":[{"id":"proof-correctness","covers_dimensions":["dim-correctness"],"kind":"acceptance_check","required":true,"source_surface":"acceptance"},{"id":"proof-product-clarity-visual","covers_dimensions":["dim-product-clarity"],"kind":"visual_evidence","required":true,"source_surface":"artifact"}]}`,
+			Example:         `{"items":[{"id":"proof-correctness","covers_dimensions":["dim-correctness"],"kind":"assurance_check","required":true,"source_surface":"assurance"},{"id":"proof-product-clarity-visual","covers_dimensions":["dim-product-clarity"],"kind":"visual_evidence","required":true,"source_surface":"artifact"}]}`,
 			FieldNotes: []string{
 				"Each item must cover one or more success dimensions through `covers_dimensions`.",
 				"`kind` describes the required proof form, not the semantic verdict.",
@@ -243,7 +264,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Frozen run-scoped snapshot of the compiler inputs used to build the success plane.",
-			Example:         `{"objective_contract_ref":"objective-contract.json","goal_ref":"goal.json","memory_query_ref":"control/memory-query.json","memory_context_ref":"control/memory-context.json","policy_source_refs":["AGENTS.md"],"selected_prior_refs":["mem_success_1"],"source_slots":[{"slot":"repo_policy","refs":["AGENTS.md"]},{"slot":"learned_success_priors","refs":["mem_success_1"]},{"slot":"run_context","refs":["control/memory-context.json"]}]}`,
+			Example:         `{"objective_contract_ref":"objective-contract.json","obligation_model_ref":"obligation-model.json","memory_query_ref":"control/memory-query.json","memory_context_ref":"control/memory-context.json","policy_source_refs":["AGENTS.md"],"selected_prior_refs":["mem_success_1"],"source_slots":[{"slot":"repo_policy","refs":["AGENTS.md"]},{"slot":"learned_success_priors","refs":["mem_success_1"]},{"slot":"run_context","refs":["control/memory-context.json"]}]}`,
 			FieldNotes: []string{
 				"`compiler-input` freezes the exact durable input graph used for this run compilation.",
 				"`source_slots` is restricted to repo_policy|learned_success_priors|run_context.",
@@ -273,8 +294,48 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		},
 		Path: CompilerReportPath,
 	},
-	DurableSurfaceGoalLog: {
-		Name:               DurableSurfaceGoalLog,
+	DurableSurfaceImpactState: {
+		Name:               DurableSurfaceImpactState,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Latest code-change observation for one scope, including baseline/head revisions and resolved touchpoints.",
+			Example:         `{"scope":"run-root","baseline_revision":"abc123","head_revision":"def456","resolver_kind":"repo-native","changed_files":["cli/start.go"],"changed_symbols":["cli.Start"],"changed_processes":["run_bootstrap"]}`,
+			FieldNotes: []string{
+				"`resolver_kind` must stay explicit: repo-native|gitnexus|file_only|none.",
+				"`baseline_revision` and `head_revision` are required.",
+				"`changed_files`, `changed_symbols`, and `changed_processes` are factual observations, not verdicts.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
+		},
+		Path: ImpactStatePath,
+	},
+	DurableSurfaceFreshnessState: {
+		Name:               DurableSurfaceFreshnessState,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Freshness facts for cognition providers and recorded scenario evidence.",
+			Example:         `{"cognition":[{"scope":"run-root","provider":"repo-native","state":"fresh"}],"evidence":[{"scenario_id":"scenario-cli-first-run","latest_revision":"abc123","current_revision":"def456","state":"stale","reason":"changed_process_overlap=run_bootstrap"}]}`,
+			FieldNotes: []string{
+				"`state` must stay within fresh|stale|unknown|not_applicable.",
+				"`cognition` records provider freshness facts.",
+				"`evidence` records scenario evidence freshness facts.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
+		},
+		Path: FreshnessStatePath,
+	},
+	DurableSurfaceObligationLog: {
+		Name:               DurableSurfaceObligationLog,
 		Class:              DurableSurfaceClassEventLog,
 		WriteMode:          DurableSurfaceWriteModeAppend,
 		Strict:             true,
@@ -282,17 +343,38 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSONL,
-			Summary:         "Append-only goal boundary and coverage change events. The framework serializes the canonical JSONL envelope.",
-			Example:         `{"goal_version":2,"decision":"initial_boundary_shape_selection","boundary_shapes_compared":["user_restated_boundary","obligation_grammar_boundary","verification_only_boundary"],"chosen_shape":"obligation_grammar_boundary","reason":"The goal requires delivered product outcomes plus proof and guardrails, so a proof-only boundary would shrink the run incorrectly."}`,
+			Summary:         "Append-only obligation boundary events. The framework serializes the canonical JSONL envelope.",
+			Example:         `{"obligation_model_version":2,"decision":"initial_obligation_boundary","chosen_shape":"obligation-model","reason":"Required outcomes, guardrails, and assurance lanes need separate canonical ownership."}`,
 			FieldNotes: []string{
 				"`--kind` and `--actor` are required on the write command.",
 				"`--body-file` must contain one JSON object representing the event body.",
 				"The framework writes the canonical JSONL envelope and timestamp.",
 			},
 			FrameworkOwnedFields: []string{"storage envelope `version`", "storage envelope `at`", "storage envelope `kind`", "storage envelope `actor`"},
-			AllowedKinds:         []string{"decision", "checkpoint", "blocker", "handoff", "closeout", "note", "update"},
+			AllowedKinds:         []string{"decision", "checkpoint", "waiver", "closeout", "update"},
 		},
-		Path: GoalLogPath,
+		Path: ObligationLogPath,
+	},
+	DurableSurfaceEvidenceLog: {
+		Name:               DurableSurfaceEvidenceLog,
+		Class:              DurableSurfaceClassEventLog,
+		WriteMode:          DurableSurfaceWriteModeAppend,
+		Strict:             true,
+		FrameworkReadsBody: false,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSONL,
+			Summary:         "Append-only scenario evidence events for assurance runs and judge/signoff recordings.",
+			Example:         `{"scenario_id":"scenario-cli-first-run","scope":"run-root","revision":"def456","harness_kind":"cli","oracle_result":{"exit_code":0},"artifact_refs":["reports/assurance/scenario-cli-first-run/stdout.txt"]}`,
+			FieldNotes: []string{
+				"`--kind` and `--actor` are required on the write command.",
+				"`scenario_id` and `harness_kind` are required in the body.",
+				"The framework stores the canonical JSONL envelope; closeout interpretation remains agent-owned.",
+			},
+			FrameworkOwnedFields: []string{"storage envelope `version`", "storage envelope `at`", "storage envelope `kind`", "storage envelope `actor`"},
+			AllowedKinds:         []string{"scenario.executed", "judge.recorded", "signoff.recorded"},
+		},
+		Path: EvidenceLogPath,
 	},
 	DurableSurfaceExperiments: {
 		Name:               DurableSurfaceExperiments,
@@ -325,7 +407,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSONL,
 			Summary:         "Append-only intervention event log for high-value user or master redirects that may later generate success-delta proposals.",
-			Example:         `{"message":"Do not stop at route cutover only.","before":{"goal_hash":"sha256:goal","status_hash":"sha256:status","coordination_hash":"sha256:coordination","success_model_hash":"sha256:success"},"affected_targets":["session-3","req-p4-web-cockpit"]}`,
+			Example:         `{"message":"Do not stop at route cutover only.","before":{"obligation_model_hash":"sha256:obligation","status_hash":"sha256:status","coordination_hash":"sha256:coordination","success_model_hash":"sha256:success"},"affected_targets":["session-3","req-p4-web-cockpit"]}`,
 			FieldNotes: []string{
 				"`--kind` and `--actor` are required on the write command.",
 				"`message` captures the intervention text; richer evidence remains in linked reports or memory proposals.",
