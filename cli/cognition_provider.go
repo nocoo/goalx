@@ -5,16 +5,20 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const gitNexusPinnedVersion = "1.5.0"
 
 var lookPathFunc = exec.LookPath
-var gitNexusProbeFunc = probeGitNexusInvocation
+var gitNexusStatusFunc = loadGitNexusStatus
+var gitNexusAnalyzeFunc = runGitNexusAnalyze
+var gitNexusAnalyzeExecFunc = executeGitNexusAnalyze
 
 type CognitionProvider interface {
 	Name() string
 	Discover(scopePath string) (CognitionProviderState, error)
+	Refresh(scopePath string) (CognitionProviderState, error)
 }
 
 type repoNativeCognitionProvider struct{}
@@ -54,10 +58,16 @@ func (repoNativeCognitionProvider) Discover(scopePath string) (CognitionProvider
 		Name:           "repo-native",
 		InvocationKind: "builtin",
 		Available:      true,
+		IndexState:     "fresh",
 		RepoRoot:       repoRoot,
 		HeadRevision:   headRevision,
 		Capabilities:   []string{"file_inventory", "file_search", "file_read", "git_diff"},
+		CheckedAt:      time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+func (provider repoNativeCognitionProvider) Refresh(scopePath string) (CognitionProviderState, error) {
+	return provider.Discover(scopePath)
 }
 
 func (gitNexusCognitionProvider) Discover(scopePath string) (CognitionProviderState, error) {
@@ -65,41 +75,131 @@ func (gitNexusCognitionProvider) Discover(scopePath string) (CognitionProviderSt
 	headRevision, _ := gitRevisionIfAvailable(scopePath, "HEAD")
 	storagePath := filepath.Join(scopePath, ".gitnexus")
 	if _, err := lookPathFunc("gitnexus"); err == nil {
-		available := gitNexusProbeFunc("binary", scopePath) == nil
-		return CognitionProviderState{
-			Name:           "gitnexus",
-			InvocationKind: "binary",
-			Available:      available,
-			Command:        "gitnexus",
-			RepoRoot:       repoRoot,
-			StoragePath:    storagePath,
-			HeadRevision:   headRevision,
-			Capabilities:   []string{"query", "context", "impact", "detect_changes", "processes"},
-		}, nil
+		return discoverGitNexusProviderState("binary", scopePath, repoRoot, storagePath, headRevision), nil
 	}
 	if _, err := lookPathFunc("npx"); err == nil {
-		available := gitNexusProbeFunc("npx", scopePath) == nil
-		return CognitionProviderState{
-			Name:           "gitnexus",
-			InvocationKind: "npx",
-			Available:      available,
-			Command:        "npx -y gitnexus@" + gitNexusPinnedVersion,
-			Version:        gitNexusPinnedVersion,
-			RepoRoot:       repoRoot,
-			StoragePath:    storagePath,
-			HeadRevision:   headRevision,
-			Capabilities:   []string{"query", "context", "impact", "detect_changes", "processes"},
-		}, nil
+		return discoverGitNexusProviderState("npx", scopePath, repoRoot, storagePath, headRevision), nil
 	}
 	return CognitionProviderState{
 		Name:           "gitnexus",
 		InvocationKind: "none",
 		Available:      false,
+		IndexState:     "unknown",
 		RepoRoot:       repoRoot,
 		StoragePath:    storagePath,
 		HeadRevision:   headRevision,
 		Capabilities:   []string{"query", "context", "impact", "detect_changes", "processes"},
+		CheckedAt:      time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+func (provider gitNexusCognitionProvider) Refresh(scopePath string) (CognitionProviderState, error) {
+	state, err := provider.Discover(scopePath)
+	if err != nil {
+		return state, err
+	}
+	if !state.Available {
+		return state, nil
+	}
+	switch state.IndexState {
+	case "missing", "stale":
+		if err := gitNexusAnalyzeFunc(state.InvocationKind, scopePath); err != nil {
+			state.LastRefreshError = err.Error()
+			return state, nil
+		}
+		return provider.Discover(scopePath)
+	default:
+		return state, nil
+	}
+}
+
+func discoverGitNexusProviderState(invocationKind, scopePath, repoRoot, storagePath, headRevision string) CognitionProviderState {
+	state := CognitionProviderState{
+		Name:           "gitnexus",
+		InvocationKind: strings.TrimSpace(invocationKind),
+		Available:      false,
+		RepoRoot:       strings.TrimSpace(repoRoot),
+		StoragePath:    strings.TrimSpace(storagePath),
+		HeadRevision:   strings.TrimSpace(headRevision),
+		Capabilities:   []string{"query", "context", "impact", "detect_changes", "processes"},
+		IndexState:     "unknown",
+		CheckedAt:      time.Now().UTC().Format(time.RFC3339),
+	}
+	switch state.InvocationKind {
+	case "binary":
+		state.Command = "gitnexus"
+	case "npx":
+		state.Command = "npx -y gitnexus@" + gitNexusPinnedVersion
+		state.Version = gitNexusPinnedVersion
+	}
+	if strings.TrimSpace(state.RepoRoot) != "" {
+		state.RegistryName = filepath.Base(state.RepoRoot)
+	}
+	output, err := gitNexusStatusFunc(state.InvocationKind, scopePath)
+	if err != nil {
+		state.LastRefreshError = err.Error()
+		return state
+	}
+	state.Available = true
+	applyGitNexusStatus(&state, output)
+	return state
+}
+
+func applyGitNexusStatus(state *CognitionProviderState, output string) {
+	if state == nil {
+		return
+	}
+	text := strings.TrimSpace(output)
+	if text == "" {
+		state.IndexState = "unknown"
+		return
+	}
+	if strings.Contains(text, "Repository not indexed.") || strings.Contains(text, "stale KuzuDB index") {
+		state.IndexState = "missing"
+		return
+	}
+	shortIndexed := ""
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "Repository:"):
+			if repoRoot := strings.TrimSpace(strings.TrimPrefix(line, "Repository:")); repoRoot != "" {
+				state.RepoRoot = repoRoot
+				state.RegistryName = filepath.Base(repoRoot)
+			}
+		case strings.HasPrefix(line, "Indexed commit:"):
+			shortIndexed = strings.TrimSpace(strings.TrimPrefix(line, "Indexed commit:"))
+		case strings.HasPrefix(line, "Current commit:"):
+			if current := strings.TrimSpace(strings.TrimPrefix(line, "Current commit:")); current != "" && state.HeadRevision == "" {
+				state.HeadRevision = current
+			}
+		case strings.HasPrefix(line, "Status:"):
+			statusText := strings.TrimSpace(strings.TrimPrefix(line, "Status:"))
+			switch {
+			case strings.Contains(statusText, "up-to-date"):
+				state.IndexState = "fresh"
+			case strings.Contains(statusText, "stale"):
+				state.IndexState = "stale"
+			default:
+				state.IndexState = "unknown"
+			}
+		}
+	}
+	if shortIndexed != "" {
+		if full, err := gitRevisionIfAvailable(state.RepoRoot, shortIndexed); err == nil && strings.TrimSpace(full) != "" {
+			state.IndexedRevision = strings.TrimSpace(full)
+		} else {
+			state.IndexedRevision = shortIndexed
+		}
+	}
+	if state.IndexState == "fresh" && state.IndexedRevision == "" && state.HeadRevision != "" {
+		state.IndexedRevision = state.HeadRevision
+	}
+	if state.IndexState == "stale" && state.IndexedRevision != "" && state.HeadRevision != "" {
+		if staleCommits, err := gitAheadCountIfAvailable(state.RepoRoot, state.IndexedRevision, state.HeadRevision); err == nil && staleCommits > 0 {
+			state.StaleCommits = staleCommits
+		}
+	}
 }
 
 func gitRevisionIfAvailable(worktreePath, rev string) (string, error) {
@@ -120,7 +220,30 @@ func gitRepoRootIfAvailable(worktreePath string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func probeGitNexusInvocation(invocationKind, scopePath string) error {
+func gitAheadCountIfAvailable(worktreePath, baseRevision, headRevision string) (int, error) {
+	if _, err := lookPathFunc("git"); err != nil {
+		return 0, err
+	}
+	worktreePath = strings.TrimSpace(worktreePath)
+	if worktreePath == "" {
+		return 0, fmt.Errorf("git ahead count worktree path is required")
+	}
+	out, err := exec.Command("git", "-C", worktreePath, "rev-list", "--count", strings.TrimSpace(baseRevision)+".."+strings.TrimSpace(headRevision)).CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("git rev-list --count %s..%s in %s: %w: %s", baseRevision, headRevision, worktreePath, err, out)
+	}
+	value := strings.TrimSpace(string(out))
+	if value == "" {
+		return 0, nil
+	}
+	var count int
+	if _, err := fmt.Sscanf(value, "%d", &count); err != nil {
+		return 0, fmt.Errorf("parse git ahead count %q: %w", value, err)
+	}
+	return count, nil
+}
+
+func loadGitNexusStatus(invocationKind, scopePath string) (string, error) {
 	var cmd *exec.Cmd
 	switch strings.TrimSpace(invocationKind) {
 	case "binary":
@@ -128,11 +251,35 @@ func probeGitNexusInvocation(invocationKind, scopePath string) error {
 	case "npx":
 		cmd = exec.Command("npx", "-y", "gitnexus@"+gitNexusPinnedVersion, "status")
 	default:
-		return fmt.Errorf("unknown gitnexus probe invocation_kind %q", invocationKind)
+		return "", fmt.Errorf("unknown gitnexus status invocation_kind %q", invocationKind)
+	}
+	cmd.Dir = scopePath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("gitnexus status via %s: %w: %s", invocationKind, err, strings.TrimSpace(string(out)))
+	}
+	return string(out), nil
+}
+
+func runGitNexusAnalyze(invocationKind, scopePath string) error {
+	return withGitNexusSideEffectGuard(scopePath, func() error {
+		return gitNexusAnalyzeExecFunc(invocationKind, scopePath)
+	})
+}
+
+func executeGitNexusAnalyze(invocationKind, scopePath string) error {
+	var cmd *exec.Cmd
+	switch strings.TrimSpace(invocationKind) {
+	case "binary":
+		cmd = exec.Command("gitnexus", "analyze", "--skip-agents-md", scopePath)
+	case "npx":
+		cmd = exec.Command("npx", "-y", "gitnexus@"+gitNexusPinnedVersion, "analyze", "--skip-agents-md", scopePath)
+	default:
+		return fmt.Errorf("unknown gitnexus analyze invocation_kind %q", invocationKind)
 	}
 	cmd.Dir = scopePath
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("probe gitnexus via %s: %w: %s", invocationKind, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("gitnexus analyze via %s: %w: %s", invocationKind, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

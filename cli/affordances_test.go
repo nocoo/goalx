@@ -272,6 +272,132 @@ func TestBuildAffordancesIncludesBudgetCommand(t *testing.T) {
 	}
 }
 
+func TestBuildAffordancesIncludesRunnableGitNexusCommandsForMasterScope(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveCognitionState(CognitionStatePath(runDir), &CognitionState{
+		Version: 1,
+		Scopes: []CognitionScopeState{
+			{
+				Scope:        "run-root",
+				WorktreePath: RunWorktreePath(runDir),
+				Providers: []CognitionProviderState{
+					{Name: "repo-native", InvocationKind: "builtin", Available: true, IndexState: "fresh", Capabilities: []string{"git_diff"}},
+					{Name: "gitnexus", InvocationKind: "binary", Available: true, Command: "gitnexus", IndexState: "fresh", Capabilities: []string{"query", "context", "impact"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCognitionState: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "master")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	joined := strings.Join(collectAffordanceCommands(doc), "\n")
+	for _, want := range []string{
+		"cd " + shellQuote(RunWorktreePath(runDir)) + " && gitnexus status",
+		"cd " + shellQuote(RunWorktreePath(runDir)) + ` && gitnexus query "concept"`,
+		"cd " + shellQuote(RunWorktreePath(runDir)) + " && gitnexus context symbolName",
+		"cd " + shellQuote(RunWorktreePath(runDir)) + " && gitnexus impact symbolName --direction upstream",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("affordance commands missing %q:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "detect_changes") {
+		t.Fatalf("affordances should not expose MCP-only detect_changes as a direct command:\n%s", joined)
+	}
+	if strings.Contains(joined, "gitnexus analyze") {
+		t.Fatalf("affordances should not expose raw gitnexus analyze because GoalX must guard provider side effects:\n%s", joined)
+	}
+}
+
+func TestBuildAffordancesUsesSessionScopeForGitNexusWorkerCommands(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	seedGuidanceSessionFixture(t, runDir, cfg)
+	sessionPath := WorktreePath(runDir, cfg.Name, 1)
+	if err := SaveCognitionState(CognitionStatePath(runDir), &CognitionState{
+		Version: 1,
+		Scopes: []CognitionScopeState{
+			{
+				Scope:        "run-root",
+				WorktreePath: RunWorktreePath(runDir),
+				Providers: []CognitionProviderState{
+					{Name: "repo-native", InvocationKind: "builtin", Available: true, IndexState: "fresh", Capabilities: []string{"git_diff"}},
+					{Name: "gitnexus", InvocationKind: "binary", Available: true, Command: "gitnexus", IndexState: "fresh", Capabilities: []string{"query", "context", "impact"}},
+				},
+			},
+			{
+				Scope:        "session-1",
+				WorktreePath: sessionPath,
+				Providers: []CognitionProviderState{
+					{Name: "repo-native", InvocationKind: "builtin", Available: true, IndexState: "fresh", Capabilities: []string{"git_diff"}},
+					{Name: "gitnexus", InvocationKind: "binary", Available: true, Command: "gitnexus", IndexState: "fresh", Capabilities: []string{"query", "context", "impact"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCognitionState: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "session-1")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	joined := strings.Join(collectAffordanceCommands(doc), "\n")
+	if !strings.Contains(joined, "cd "+shellQuote(sessionPath)+" && gitnexus status") {
+		t.Fatalf("session cognition commands should use the session worktree:\n%s", joined)
+	}
+	if strings.Contains(joined, "cd "+shellQuote(RunWorktreePath(runDir))+" && gitnexus status") {
+		t.Fatalf("session cognition commands should not default to run-root when session scope exists:\n%s", joined)
+	}
+}
+
+func TestBuildAffordancesFallsBackToRunRootForSharedWorkerScope(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+	if err := SaveCognitionState(CognitionStatePath(runDir), &CognitionState{
+		Version: 1,
+		Scopes: []CognitionScopeState{
+			{
+				Scope:        "run-root",
+				WorktreePath: RunWorktreePath(runDir),
+				Providers: []CognitionProviderState{
+					{Name: "repo-native", InvocationKind: "builtin", Available: true, IndexState: "fresh", Capabilities: []string{"git_diff"}},
+					{Name: "gitnexus", InvocationKind: "binary", Available: true, Command: "gitnexus", IndexState: "fresh", Capabilities: []string{"query", "context", "impact"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCognitionState: %v", err)
+	}
+
+	doc, err := BuildAffordances(repo, cfg.Name, runDir, "session-1")
+	if err != nil {
+		t.Fatalf("BuildAffordances: %v", err)
+	}
+
+	joined := strings.Join(collectAffordanceCommands(doc), "\n")
+	if !strings.Contains(joined, "cd "+shellQuote(RunWorktreePath(runDir))+" && gitnexus status") {
+		t.Fatalf("shared worker should fall back to run-root cognition scope:\n%s", joined)
+	}
+}
+
+func collectAffordanceCommands(doc *AffordancesDocument) []string {
+	if doc == nil {
+		return nil
+	}
+	out := make([]string, 0, len(doc.Items))
+	for _, item := range doc.Items {
+		if item.Command != "" {
+			out = append(out, item.Command)
+		}
+	}
+	return out
+}
+
 func TestBuildAffordancesIncludesEvolveExperimentCommandsAndFacts(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

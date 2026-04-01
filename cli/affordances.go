@@ -250,8 +250,8 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		)
 	}
 	if index != nil {
-		if item := buildCognitionAffordance(index); item != nil {
-			doc.Items = append(doc.Items, *item)
+		if items := buildCognitionAffordances(index, normalizedTarget); len(items) > 0 {
+			doc.Items = append(doc.Items, items...)
 		}
 		if facts, err := experimentAffordanceFacts(runDir); err != nil {
 			return nil, err
@@ -338,14 +338,15 @@ func buildCloseoutAffordanceFacts(index *ContextIndex) []string {
 	return facts
 }
 
-func buildCognitionAffordance(index *ContextIndex) *AffordanceItem {
+func buildCognitionAffordances(index *ContextIndex, target string) []AffordanceItem {
 	if index == nil || len(index.CognitionScopes) == 0 {
 		return nil
 	}
-	item := &AffordanceItem{
+	items := []AffordanceItem{}
+	item := AffordanceItem{
 		ID:      "cognition",
 		Kind:    "fact",
-		Summary: "Available code cognition providers and invocation paths for this run scope.",
+		Summary: "Available code cognition providers and current graph freshness facts for this run scope.",
 		Paths:   []string{index.ContextIndexPath},
 	}
 	for _, scope := range index.CognitionScopes {
@@ -354,10 +355,99 @@ func buildCognitionAffordance(index *ContextIndex) *AffordanceItem {
 			if provider.Version != "" {
 				fact += " version=" + provider.Version
 			}
+			if provider.IndexState != "" {
+				fact += " index_state=" + provider.IndexState
+			}
 			item.Facts = append(item.Facts, fact)
 		}
 	}
-	return item
+	items = append(items, item)
+
+	scope := cognitionScopeForTarget(index.CognitionScopes, target)
+	if scope == nil {
+		return items
+	}
+	for _, provider := range scope.Providers {
+		if provider.Name != "gitnexus" || !provider.Available {
+			continue
+		}
+		if commands := buildGitNexusAffordanceItems(*scope, provider); len(commands) > 0 {
+			items = append(items, commands...)
+		}
+	}
+	return items
+}
+
+func cognitionScopeForTarget(scopes []CognitionScopeState, target string) *CognitionScopeState {
+	scopeName := "run-root"
+	allowRunRootFallback := false
+	switch normalized := normalizedAffordanceTarget(target); {
+	case normalized == "":
+		scopeName = "run-root"
+	case normalized == "master":
+		scopeName = "run-root"
+	case strings.HasPrefix(normalized, "session-"):
+		scopeName = normalized
+		allowRunRootFallback = true
+	}
+	for i := range scopes {
+		if scopes[i].Scope == scopeName {
+			return &scopes[i]
+		}
+	}
+	if allowRunRootFallback {
+		for i := range scopes {
+			if scopes[i].Scope == "run-root" {
+				return &scopes[i]
+			}
+		}
+	}
+	return nil
+}
+
+func buildGitNexusAffordanceItems(scope CognitionScopeState, provider CognitionProviderState) []AffordanceItem {
+	worktreePath := strings.TrimSpace(scope.WorktreePath)
+	commandPrefix := strings.TrimSpace(provider.Command)
+	if worktreePath == "" || commandPrefix == "" {
+		return nil
+	}
+	cwdPrefix := "cd " + shellQuote(worktreePath) + " && "
+	items := []AffordanceItem{
+		{
+			ID:      "cognition-status",
+			Kind:    "context",
+			Summary: "Read GitNexus index freshness for the selected cognition scope.",
+			Command: cwdPrefix + commandPrefix + " status",
+			Paths:   []string{worktreePath},
+		},
+	}
+	if provider.IndexState != "fresh" {
+		return items
+	}
+	items = append(items,
+		AffordanceItem{
+			ID:      "cognition-query",
+			Kind:    "context",
+			Summary: "Use GitNexus process-grouped search for architecture or feature lookup in the selected scope.",
+			Command: cwdPrefix + commandPrefix + ` query "concept"`,
+			Paths:   []string{worktreePath},
+		},
+		AffordanceItem{
+			ID:      "cognition-context",
+			Kind:    "context",
+			Summary: "Use GitNexus symbol context for callers, callees, and process participation in the selected scope.",
+			Command: cwdPrefix + commandPrefix + " context symbolName",
+			Paths:   []string{worktreePath},
+		},
+		AffordanceItem{
+			ID:      "cognition-impact",
+			Kind:    "context",
+			Summary: "Use GitNexus blast-radius analysis before editing a symbol in the selected scope.",
+			Command: cwdPrefix + commandPrefix + " impact symbolName --direction upstream",
+			Paths:   []string{worktreePath},
+		},
+	)
+	return items
 }
 
 func buildCompilerDoctrineFacts(index *ContextIndex) []string {

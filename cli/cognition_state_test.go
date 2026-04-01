@@ -20,8 +20,26 @@ func TestSaveCognitionStateRoundTrip(t *testing.T) {
 						Name:           "repo-native",
 						InvocationKind: "builtin",
 						Available:      true,
+						IndexState:     "fresh",
 						HeadRevision:   "def456",
 						Capabilities:   []string{"file_search", "git_diff"},
+					},
+					{
+						Name:             "gitnexus",
+						InvocationKind:   "binary",
+						Available:        true,
+						Command:          "gitnexus",
+						Version:          "1.5.0",
+						RepoRoot:         "/abs/run-root",
+						StoragePath:      "/abs/run-root/.gitnexus",
+						RegistryName:     "demo-repo",
+						IndexState:       "stale",
+						IndexedRevision:  "abc123",
+						HeadRevision:     "def456",
+						StaleCommits:     2,
+						LastRefreshError: "status parse warning",
+						Capabilities:     []string{"query", "context", "impact"},
+						CheckedAt:        "2026-04-01T00:00:00Z",
 					},
 				},
 			},
@@ -38,8 +56,12 @@ func TestSaveCognitionStateRoundTrip(t *testing.T) {
 	if loaded == nil {
 		t.Fatal("LoadCognitionState returned nil state")
 	}
-	if len(loaded.Scopes) != 1 || len(loaded.Scopes[0].Providers) != 1 {
-		t.Fatalf("scopes = %#v, want one scope with one provider", loaded.Scopes)
+	if len(loaded.Scopes) != 1 || len(loaded.Scopes[0].Providers) != 2 {
+		t.Fatalf("scopes = %#v, want one scope with two providers", loaded.Scopes)
+	}
+	got := loaded.Scopes[0].Providers[1]
+	if got.IndexState != "stale" || got.RegistryName != "demo-repo" || got.LastRefreshError == "" {
+		t.Fatalf("gitnexus provider = %+v, want enriched provider state facts", got)
 	}
 }
 
@@ -69,5 +91,36 @@ func TestLoadCognitionStateRejectsProviderWithoutCapabilities(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "capabilities") {
 		t.Fatalf("LoadCognitionState error = %v, want capabilities hint", err)
+	}
+}
+
+func TestLoadCognitionStateRejectsInvalidIndexState(t *testing.T) {
+	path := CognitionStatePath(t.TempDir())
+	if err := os.WriteFile(path, []byte(`{
+  "version": 1,
+  "scopes": [
+    {
+      "scope": "run-root",
+      "providers": [
+        {
+          "name": "gitnexus",
+          "invocation_kind": "binary",
+          "available": true,
+          "index_state": "ready-ish",
+          "capabilities": ["query"]
+        }
+      ]
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	_, err := LoadCognitionState(path)
+	if err == nil {
+		t.Fatal("LoadCognitionState should reject invalid index_state")
+	}
+	if !strings.Contains(err.Error(), "index_state") {
+		t.Fatalf("LoadCognitionState error = %v, want index_state hint", err)
 	}
 }

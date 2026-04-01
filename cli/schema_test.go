@@ -90,6 +90,9 @@ func TestSchemaPrintsCognitionStateContract(t *testing.T) {
 		"# GoalX Schema: cognition-state",
 		`"providers": [`,
 		`"invocation_kind": "builtin"`,
+		`"index_state": "fresh"`,
+		`"registry_name": "demo-repo"`,
+		`"last_refresh_error": "status parse warning"`,
 		`"capabilities": [`,
 		"goalx durable write cognition-state --run NAME --body-file /abs/path.json",
 	} {

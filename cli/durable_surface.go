@@ -99,12 +99,13 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 		Schema: DurableSurfaceSchemaSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
-			Summary:         "Worktree-scoped cognition provider facts including invocation kind, capabilities, and freshness anchors.",
-			Example:         `{"scopes":[{"scope":"run-root","worktree_path":"/abs/path","providers":[{"name":"repo-native","invocation_kind":"builtin","available":true,"head_revision":"def456","capabilities":["file_inventory","file_search","file_read","git_diff"]},{"name":"gitnexus","invocation_kind":"binary","available":true,"version":"1.5.0","indexed_revision":"abc123","head_revision":"def456","stale_commits":2,"capabilities":["query","context","impact","detect_changes","processes"]}]}]}`,
+			Summary:         "Worktree-scoped cognition provider facts including invocation kind, index state, capabilities, and freshness anchors.",
+			Example:         `{"scopes":[{"scope":"run-root","worktree_path":"/abs/path","providers":[{"name":"repo-native","invocation_kind":"builtin","available":true,"index_state":"fresh","head_revision":"def456","capabilities":["file_inventory","file_search","file_read","git_diff"]},{"name":"gitnexus","invocation_kind":"binary","command":"gitnexus","available":true,"version":"1.5.0","registry_name":"demo-repo","index_state":"stale","indexed_revision":"abc123","head_revision":"def456","stale_commits":2,"last_refresh_error":"status parse warning","capabilities":["query","context","impact","processes"]}]}]}`,
 			FieldNotes: []string{
 				"`scopes` is the canonical list of worktree cognition snapshots.",
 				"`providers` records optional provider facts without semantic judgment.",
 				"`invocation_kind` must stay explicit: builtin|binary|npx|mcp|none.",
+				"`index_state` must stay explicit: missing|fresh|stale|unknown.",
 				"`capabilities` is required for every provider entry.",
 			},
 			FrameworkOwnedFields: []string{"`version`", "`updated_at`"},
