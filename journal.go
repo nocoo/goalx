@@ -40,6 +40,7 @@ type DispatchableSlice struct {
 	Mode            string   `json:"mode,omitempty"`
 	SuggestedOwner  string   `json:"suggested_owner,omitempty"`
 	SuggestedAction string   `json:"suggested_action,omitempty"`
+	CoversRequired  []string `json:"covers_required,omitempty"`
 	Evidence        []string `json:"evidence,omitempty"`
 }
 

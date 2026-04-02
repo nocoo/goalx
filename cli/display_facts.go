@@ -378,6 +378,19 @@ func formatControlGapAdvisories(facts *ControlGapFacts) []string {
 		}
 		advisories = append(advisories, strings.Join(parts, " "))
 	}
+	if facts.DispatchableParallelFrontier {
+		parts := []string{
+			"Control gap: dispatchable_parallel_frontier",
+			"dispatchable_required_ids=" + strings.Join(facts.DispatchableRequiredIDs, ","),
+		}
+		if len(facts.DispatchableSources) > 0 {
+			parts = append(parts, "dispatchable_sources="+strings.Join(facts.DispatchableSources, ","))
+		}
+		if len(facts.ReusableSessions) > 0 {
+			parts = append(parts, "reusable_sessions="+strings.Join(facts.ReusableSessions, ","))
+		}
+		advisories = append(advisories, strings.Join(parts, " "))
+	}
 	return advisories
 }
 
@@ -586,16 +599,25 @@ func formatRequiredFrontierAdvisory(runDir string, coverage RequiredCoverage, at
 		if !ok {
 			continue
 		}
-		owner := strings.TrimSpace(required.Owner)
-		if owner == "" {
+		owners := append([]string(nil), coverage.LaneCoverage[id]...)
+		if len(owners) == 0 {
 			continue
 		}
-		attentionFacts, hasAttention := attention[owner]
-		attentionState := strings.TrimSpace(attentionFacts.AttentionState)
-		if !requiredFrontierDetailNeeded(id, required, coverage, hasAttention && targetAttentionNeedsAction(attentionFacts)) {
+		attentionState := ""
+		hasAttention := false
+		for _, owner := range owners {
+			attentionFacts, ok := attention[owner]
+			if ok && targetAttentionNeedsAction(attentionFacts) {
+				hasAttention = true
+				if attentionState == "" {
+					attentionState = strings.TrimSpace(attentionFacts.AttentionState)
+				}
+			}
+		}
+		if !requiredFrontierDetailNeeded(id, required, coverage, hasAttention) {
 			continue
 		}
-		detail := id + " owner=" + owner + " execution_state=" + required.ExecutionState
+		detail := id + " owners=" + strings.Join(owners, ",") + " execution_state=" + required.ExecutionState
 		if blockedBy := strings.TrimSpace(required.BlockedBy); blockedBy != "" {
 			detail += " blocked_by=" + blockedBy
 		}
@@ -608,7 +630,7 @@ func formatRequiredFrontierAdvisory(runDir string, coverage RequiredCoverage, at
 		if containsString(coverage.PrematureBlockedRequiredIDs, id) {
 			detail += " premature_blocked=true"
 		}
-		if hasAttention && targetAttentionNeedsAction(attentionFacts) && attentionState != "" {
+		if hasAttention && attentionState != "" {
 			detail += " owner_attention=" + attentionState
 		}
 		parts = append(parts, detail)

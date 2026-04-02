@@ -535,7 +535,7 @@ func TestRefreshDisplayFactsRepairsCompletedRunDespiteQualityDebt(t *testing.T) 
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "outcome", Text: "ship cockpit", Required: true},
 		},
@@ -560,7 +560,7 @@ func TestRefreshDisplayFactsRepairsCompletedRunDespiteQualityDebt(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "generic"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"active_sessions":[],"updated_at":"2026-03-31T02:00:00Z"}`), 0o644); err != nil {

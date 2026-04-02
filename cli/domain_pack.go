@@ -13,7 +13,6 @@ import (
 type DomainPack struct {
 	Version       int             `json:"version"`
 	CompiledAt    string          `json:"compiled_at,omitempty"`
-	Domain        string          `json:"domain"`
 	Signals       []string        `json:"signals,omitempty"`
 	Slots         DomainPackSlots `json:"slots,omitempty"`
 	PriorEntryIDs []string        `json:"prior_entry_ids,omitempty"`
@@ -95,9 +94,6 @@ func validateDomainPackInput(pack *DomainPack) error {
 	if pack.Version <= 0 {
 		return fmt.Errorf("domain pack version must be positive")
 	}
-	if strings.TrimSpace(pack.Domain) == "" {
-		return fmt.Errorf("domain pack domain is required")
-	}
 	if hasDomainPackSlotData(pack.Slots.RepoPolicy) && strings.TrimSpace(pack.Slots.RepoPolicy.Source) == "" {
 		return fmt.Errorf("domain pack repo_policy slot source is required")
 	}
@@ -116,7 +112,6 @@ func normalizeDomainPack(pack *DomainPack) {
 		pack.Version = 1
 	}
 	pack.CompiledAt = strings.TrimSpace(pack.CompiledAt)
-	pack.Domain = strings.TrimSpace(pack.Domain)
 	pack.Signals = compactStrings(pack.Signals)
 	normalizeDomainPackSlot(&pack.Slots.RepoPolicy)
 	normalizeDomainPackSlot(&pack.Slots.LearnedSuccessPriors)

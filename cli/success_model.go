@@ -18,7 +18,6 @@ type SuccessModel struct {
 	ObligationModelHash   string             `json:"obligation_model_hash"`
 	Dimensions            []SuccessDimension `json:"dimensions"`
 	AntiGoals             []SuccessAntiGoal  `json:"anti_goals,omitempty"`
-	CloseoutRequirements  []string           `json:"closeout_requirements,omitempty"`
 }
 
 type SuccessDimension struct {
@@ -83,7 +82,6 @@ func parseSuccessModel(data []byte) (*SuccessModel, error) {
 		ObligationModelHash   string             `json:"obligation_model_hash"`
 		Dimensions            []SuccessDimension `json:"dimensions"`
 		AntiGoals             []SuccessAntiGoal  `json:"anti_goals,omitempty"`
-		CloseoutRequirements  []string           `json:"closeout_requirements,omitempty"`
 	}
 	var payload successModelCompat
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -102,7 +100,6 @@ func parseSuccessModel(data []byte) (*SuccessModel, error) {
 		ObligationModelHash:   strings.TrimSpace(payload.ObligationModelHash),
 		Dimensions:            payload.Dimensions,
 		AntiGoals:             payload.AntiGoals,
-		CloseoutRequirements:  payload.CloseoutRequirements,
 	}
 	if err := validateSuccessModelInput(&model); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceSuccessModel, err)
@@ -183,5 +180,4 @@ func normalizeSuccessModel(model *SuccessModel) {
 		model.AntiGoals[i].ID = strings.TrimSpace(model.AntiGoals[i].ID)
 		model.AntiGoals[i].Text = strings.TrimSpace(model.AntiGoals[i].Text)
 	}
-	model.CloseoutRequirements = compactStrings(model.CloseoutRequirements)
 }

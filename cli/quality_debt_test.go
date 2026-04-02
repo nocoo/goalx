@@ -21,7 +21,6 @@ func TestBuildQualityDebtDetectsStructuralGaps(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -31,6 +30,9 @@ func TestBuildQualityDebtDetectsStructuralGaps(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -50,7 +52,7 @@ func TestBuildQualityDebtDetectsStructuralGaps(t *testing.T) {
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "outcome", Text: "ship cockpit", Required: true},
 			{ID: "req-2", Kind: "outcome", Text: "ship research spine", Required: true},
@@ -78,7 +80,7 @@ func TestBuildQualityDebtDetectsStructuralGaps(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "generic"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 
@@ -120,7 +122,6 @@ func TestBuildQualityDebtReturnsZeroWhenSatisfied(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-critic",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -130,6 +131,9 @@ func TestBuildQualityDebtReturnsZeroWhenSatisfied(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-critic": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -147,7 +151,7 @@ func TestBuildQualityDebtReturnsZeroWhenSatisfied(t *testing.T) {
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "outcome", Text: "ship cockpit", Required: true},
 		},
@@ -172,7 +176,7 @@ func TestBuildQualityDebtReturnsZeroWhenSatisfied(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "generic"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 	if err := writeFileAtomic(SummaryPath(runDir), []byte("# Summary\n"), 0o644); err != nil {
@@ -220,7 +224,6 @@ func TestBuildQualityDebtDetectsRequiredEvidenceStaleAndGraphTierUnsatisfied(t *
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -231,13 +234,16 @@ func TestBuildQualityDebtDetectsRequiredEvidenceStaleAndGraphTierUnsatisfied(t *
 				},
 			},
 		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
+		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
 	}
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "outcome", Text: "ship cockpit", Required: true},
 		},
@@ -259,7 +265,7 @@ func TestBuildQualityDebtDetectsRequiredEvidenceStaleAndGraphTierUnsatisfied(t *
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "generic"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 	if err := SaveAssurancePlan(AssurancePlanPath(runDir), &AssurancePlan{

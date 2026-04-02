@@ -22,7 +22,6 @@ type CoordinationState struct {
 }
 
 type CoordinationRequiredItem struct {
-	Owner          string                       `json:"owner,omitempty"`
 	ExecutionState string                       `json:"execution_state,omitempty"`
 	BlockedBy      string                       `json:"blocked_by,omitempty"`
 	Surfaces       CoordinationRequiredSurfaces `json:"surfaces"`
@@ -40,6 +39,7 @@ type CoordinationRequiredSurfaces struct {
 type CoordinationSession struct {
 	State              string                    `json:"state,omitempty"`
 	Scope              string                    `json:"scope,omitempty"`
+	CoversRequired     []string                  `json:"covers_required,omitempty"`
 	DispatchableSlices []goalx.DispatchableSlice `json:"dispatchable_slices,omitempty"`
 	LastRound          int                       `json:"last_round,omitempty"`
 	UpdatedAt          string                    `json:"updated_at,omitempty"`
@@ -145,6 +145,21 @@ func normalizeCoordinationState(state *CoordinationState) {
 	if state.Sessions == nil {
 		state.Sessions = map[string]CoordinationSession{}
 	}
+	for name, session := range state.Sessions {
+		session.State = strings.TrimSpace(session.State)
+		session.Scope = strings.TrimSpace(session.Scope)
+		session.CoversRequired = compactStrings(session.CoversRequired)
+		for i := range session.DispatchableSlices {
+			session.DispatchableSlices[i].Title = strings.TrimSpace(session.DispatchableSlices[i].Title)
+			session.DispatchableSlices[i].Why = strings.TrimSpace(session.DispatchableSlices[i].Why)
+			session.DispatchableSlices[i].Mode = strings.TrimSpace(session.DispatchableSlices[i].Mode)
+			session.DispatchableSlices[i].SuggestedOwner = strings.TrimSpace(session.DispatchableSlices[i].SuggestedOwner)
+			session.DispatchableSlices[i].SuggestedAction = strings.TrimSpace(session.DispatchableSlices[i].SuggestedAction)
+			session.DispatchableSlices[i].CoversRequired = compactStrings(session.DispatchableSlices[i].CoversRequired)
+			session.DispatchableSlices[i].Evidence = compactStrings(session.DispatchableSlices[i].Evidence)
+		}
+		state.Sessions[name] = session
+	}
 }
 
 func validateCoordinationState(state *CoordinationState) error {
@@ -160,15 +175,29 @@ func validateCoordinationState(state *CoordinationState) error {
 			return err
 		}
 	}
+	for sessionName, session := range state.Sessions {
+		if strings.TrimSpace(sessionName) == "" {
+			return fmt.Errorf("coordination session key must be non-empty")
+		}
+		for _, requiredID := range session.CoversRequired {
+			if _, ok := state.Required[requiredID]; !ok {
+				return fmt.Errorf("coordination session %q covers unknown required id %q", sessionName, requiredID)
+			}
+		}
+		for _, slice := range session.DispatchableSlices {
+			for _, requiredID := range compactStrings(slice.CoversRequired) {
+				if _, ok := state.Required[requiredID]; !ok {
+					return fmt.Errorf("coordination session %q dispatchable slice %q covers unknown required id %q", sessionName, slice.Title, requiredID)
+				}
+			}
+		}
+	}
 	return nil
 }
 
 func validateCoordinationRequiredItem(reqID string, item CoordinationRequiredItem) error {
 	if strings.TrimSpace(reqID) == "" {
 		return fmt.Errorf("coordination required item id must be non-empty")
-	}
-	if strings.TrimSpace(item.Owner) == "" {
-		return fmt.Errorf("coordination required item %q missing owner", reqID)
 	}
 	switch item.ExecutionState {
 	case coordinationRequiredExecutionStateActive, coordinationRequiredExecutionStateProbing, coordinationRequiredExecutionStateWaiting, coordinationRequiredExecutionStateBlocked:

@@ -367,6 +367,7 @@ esac
 		filepath.Join(runDir, "proof-plan.json"),
 		filepath.Join(runDir, "workflow-plan.json"),
 		filepath.Join(runDir, "domain-pack.json"),
+		filepath.Join(runDir, "protocol-composition.json"),
 		filepath.Join(runDir, "compiler-input.json"),
 		filepath.Join(runDir, "obligation-log.jsonl"),
 		filepath.Join(runDir, "reports"),

@@ -25,7 +25,6 @@ func TestBuildControlGapFactsDetectsStatusDriftAndSerializedFrontier(t *testing.
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -36,7 +35,6 @@ func TestBuildControlGapFactsDetectsStatusDriftAndSerializedFrontier(t *testing.
 				},
 			},
 			"req-2": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -46,6 +44,9 @@ func TestBuildControlGapFactsDetectsStatusDriftAndSerializedFrontier(t *testing.
 					ExternalSystem: coordinationRequiredSurfacePending,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -114,7 +115,6 @@ func TestBuildControlGapFactsDetectsCoordinationStaleFromIntegrationUpdate(t *te
 		UpdatedAt: "2026-03-30T19:12:54Z",
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -124,6 +124,9 @@ func TestBuildControlGapFactsDetectsCoordinationStaleFromIntegrationUpdate(t *te
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -183,7 +186,6 @@ func TestBuildControlGapFactsDoesNotFlagSerializedFrontierWhenMultipleOwnersActi
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -194,7 +196,6 @@ func TestBuildControlGapFactsDoesNotFlagSerializedFrontierWhenMultipleOwnersActi
 				},
 			},
 			"req-2": {
-				Owner:          "session-2",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -204,6 +205,10 @@ func TestBuildControlGapFactsDoesNotFlagSerializedFrontierWhenMultipleOwnersActi
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
+			"session-2": {State: "idle", CoversRequired: []string{"req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -233,5 +238,72 @@ func TestBuildControlGapFactsDoesNotFlagSerializedFrontierWhenMultipleOwnersActi
 	}
 	if got, want := facts.ActiveRequiredOwners, []string{"session-1", "session-2"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("ActiveRequiredOwners = %v, want %v", got, want)
+	}
+}
+
+func TestBuildControlGapFactsDetectsDispatchableParallelFrontier(t *testing.T) {
+	_, runDir, _, _ := writeGuidanceRunFixture(t)
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
+		Required: []GoalItem{
+			{ID: "req-1", Text: "ship cockpit", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-2", Text: "ship research spine", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+			{ID: "req-3", Text: "ship operator trust", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Required: map[string]CoordinationRequiredItem{
+			"req-1": {
+				ExecutionState: coordinationRequiredExecutionStateProbing,
+				Surfaces:       CoordinationRequiredSurfaces{Repo: coordinationRequiredSurfaceActive, Runtime: coordinationRequiredSurfaceActive, RunArtifacts: coordinationRequiredSurfacePending, WebResearch: coordinationRequiredSurfacePending, ExternalSystem: coordinationRequiredSurfaceNotApplicable},
+			},
+			"req-2": {
+				ExecutionState: coordinationRequiredExecutionStateProbing,
+				Surfaces:       CoordinationRequiredSurfaces{Repo: coordinationRequiredSurfaceActive, Runtime: coordinationRequiredSurfacePending, RunArtifacts: coordinationRequiredSurfacePending, WebResearch: coordinationRequiredSurfacePending, ExternalSystem: coordinationRequiredSurfaceNotApplicable},
+			},
+			"req-3": {
+				ExecutionState: coordinationRequiredExecutionStateProbing,
+				Surfaces:       CoordinationRequiredSurfaces{Repo: coordinationRequiredSurfaceActive, Runtime: coordinationRequiredSurfacePending, RunArtifacts: coordinationRequiredSurfacePending, WebResearch: coordinationRequiredSurfacePending, ExternalSystem: coordinationRequiredSurfaceNotApplicable},
+			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {
+				State:          "active",
+				CoversRequired: []string{"req-1"},
+			},
+			"session-4": {
+				State: "parked",
+				DispatchableSlices: []goalx.DispatchableSlice{
+					{Title: "split req-2 lane", CoversRequired: []string{"req-2"}},
+					{Title: "split req-3 lane", CoversRequired: []string{"req-3"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	for _, session := range []SessionRuntimeState{
+		{Name: "session-5", State: "active", Mode: string(goalx.ModeWorker)},
+		{Name: "session-4", State: "parked", Mode: string(goalx.ModeWorker)},
+	} {
+		if err := UpsertSessionRuntimeState(runDir, session); err != nil {
+			t.Fatalf("UpsertSessionRuntimeState %s: %v", session.Name, err)
+		}
+	}
+
+	facts, err := BuildControlGapFacts(runDir)
+	if err != nil {
+		t.Fatalf("BuildControlGapFacts: %v", err)
+	}
+	if !facts.DispatchableParallelFrontier {
+		t.Fatalf("DispatchableParallelFrontier = false, want true: %+v", facts)
+	}
+	if got, want := facts.DispatchableRequiredIDs, []string{"req-2", "req-3"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("DispatchableRequiredIDs = %v, want %v", got, want)
+	}
+	if got, want := facts.DispatchableSources, []string{"session-4"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("DispatchableSources = %v, want %v", got, want)
 	}
 }

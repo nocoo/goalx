@@ -295,6 +295,27 @@ func TestSchemaPrintsWorkflowPlanContract(t *testing.T) {
 	}
 }
 
+func TestSchemaPrintsProtocolCompositionContract(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := Schema(t.TempDir(), []string{"protocol-composition"}); err != nil {
+			t.Fatalf("Schema: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"# GoalX Schema: protocol-composition",
+		`"philosophy": [`,
+		`"behavior_contract": [`,
+		`"source_slots": [`,
+		`"output_sources": [`,
+		"goalx durable write protocol-composition --run NAME --body-file /abs/path.json",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("schema output missing %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestSchemaPrintsCompilerInputContract(t *testing.T) {
 	out := captureStdout(t, func() {
 		if err := Schema(t.TempDir(), []string{"compiler-input"}); err != nil {

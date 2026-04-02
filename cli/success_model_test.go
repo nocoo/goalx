@@ -14,7 +14,7 @@ func TestSaveSuccessModelRoundTrip(t *testing.T) {
 		CompiledAt:            "2026-03-31T08:00:00Z",
 		CompilerVersion:       "smc-v1",
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{
 				ID:           "dim-product-clarity",
@@ -27,7 +27,6 @@ func TestSaveSuccessModelRoundTrip(t *testing.T) {
 		AntiGoals: []SuccessAntiGoal{
 			{ID: "anti-proof-only", Text: "Do not collapse into proof only."},
 		},
-		CloseoutRequirements: []string{"quality_debt_zero"},
 	}
 
 	if err := SaveSuccessModel(path, model); err != nil {

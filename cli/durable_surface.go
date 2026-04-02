@@ -14,27 +14,28 @@ const (
 	DurableSurfaceWriteModeReplace DurableSurfaceWriteMode = "replace"
 	DurableSurfaceWriteModeAppend  DurableSurfaceWriteMode = "append"
 
-	DurableSurfaceObjectiveContract DurableSurfaceName = "objective-contract"
-	DurableSurfaceObligationModel   DurableSurfaceName = "obligation-model"
-	DurableSurfaceCognitionState    DurableSurfaceName = "cognition-state"
-	DurableSurfaceAssurancePlan     DurableSurfaceName = "assurance-plan"
-	DurableSurfaceCoordination      DurableSurfaceName = "coordination"
-	DurableSurfaceStatus            DurableSurfaceName = "status"
-	DurableSurfaceSuccessModel      DurableSurfaceName = "success-model"
-	DurableSurfaceProofPlan         DurableSurfaceName = "proof-plan"
-	DurableSurfaceWorkflowPlan      DurableSurfaceName = "workflow-plan"
-	DurableSurfaceDomainPack        DurableSurfaceName = "domain-pack"
-	DurableSurfaceCompilerInput     DurableSurfaceName = "compiler-input"
-	DurableSurfaceCompilerReport    DurableSurfaceName = "compiler-report"
-	DurableSurfaceImpactState       DurableSurfaceName = "impact-state"
-	DurableSurfaceFreshnessState    DurableSurfaceName = "freshness-state"
-	DurableSurfaceResourceState     DurableSurfaceName = "resource-state"
-	DurableSurfaceObligationLog     DurableSurfaceName = "obligation-log"
-	DurableSurfaceEvidenceLog       DurableSurfaceName = "evidence-log"
-	DurableSurfaceExperiments       DurableSurfaceName = "experiments"
-	DurableSurfaceInterventionLog   DurableSurfaceName = "intervention-log"
-	DurableSurfaceSummary           DurableSurfaceName = "summary"
-	DurableSurfaceCompletionProof   DurableSurfaceName = "completion-proof"
+	DurableSurfaceObjectiveContract   DurableSurfaceName = "objective-contract"
+	DurableSurfaceObligationModel     DurableSurfaceName = "obligation-model"
+	DurableSurfaceCognitionState      DurableSurfaceName = "cognition-state"
+	DurableSurfaceAssurancePlan       DurableSurfaceName = "assurance-plan"
+	DurableSurfaceCoordination        DurableSurfaceName = "coordination"
+	DurableSurfaceStatus              DurableSurfaceName = "status"
+	DurableSurfaceSuccessModel        DurableSurfaceName = "success-model"
+	DurableSurfaceProofPlan           DurableSurfaceName = "proof-plan"
+	DurableSurfaceWorkflowPlan        DurableSurfaceName = "workflow-plan"
+	DurableSurfaceDomainPack          DurableSurfaceName = "domain-pack"
+	DurableSurfaceProtocolComposition DurableSurfaceName = "protocol-composition"
+	DurableSurfaceCompilerInput       DurableSurfaceName = "compiler-input"
+	DurableSurfaceCompilerReport      DurableSurfaceName = "compiler-report"
+	DurableSurfaceImpactState         DurableSurfaceName = "impact-state"
+	DurableSurfaceFreshnessState      DurableSurfaceName = "freshness-state"
+	DurableSurfaceResourceState       DurableSurfaceName = "resource-state"
+	DurableSurfaceObligationLog       DurableSurfaceName = "obligation-log"
+	DurableSurfaceEvidenceLog         DurableSurfaceName = "evidence-log"
+	DurableSurfaceExperiments         DurableSurfaceName = "experiments"
+	DurableSurfaceInterventionLog     DurableSurfaceName = "intervention-log"
+	DurableSurfaceSummary             DurableSurfaceName = "summary"
+	DurableSurfaceCompletionProof     DurableSurfaceName = "completion-proof"
 )
 
 type DurableSurfaceSpec struct {
@@ -146,10 +147,11 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Short master-written coordination digest for required-item frontier state and session scope.",
-			Example:         `{"plan_summary":["session-1 explores root cause"],"required":{"req-1":{"owner":"session-1","execution_state":"probing","surfaces":{"repo":"active","runtime":"pending","run_artifacts":"pending","web_research":"pending","external_system":"not_applicable"}}},"sessions":{"session-1":{"state":"active","scope":"trace unknown field source","last_round":1}},"decision":{"root_cause":"legacy schema drift","chosen_path":"single_source_contract","chosen_path_reason":"one concern one path"},"open_questions":[]}`,
+			Example:         `{"plan_summary":["session-1 explores root cause"],"required":{"req-1":{"execution_state":"probing","surfaces":{"repo":"active","runtime":"pending","run_artifacts":"pending","web_research":"pending","external_system":"not_applicable"}}},"sessions":{"session-1":{"state":"active","scope":"trace unknown field source","covers_required":["req-1"],"last_round":1}},"decision":{"root_cause":"legacy schema drift","chosen_path":"single_source_contract","chosen_path_reason":"one concern one path"},"open_questions":[]}`,
 			FieldNotes: []string{
 				"No legacy aliases are accepted for session grouping fields.",
 				"`required` is the canonical required-item frontier map.",
+				"`sessions.*.covers_required` is the canonical lane coverage map for open required work.",
 				"Coverage derives `premature_blocked` when a `blocked` item still has non-terminal machine surfaces.",
 				"Keep verbose reasoning in journals, not this digest.",
 			},
@@ -188,12 +190,11 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Compiled success-model surface defining required quality dimensions, anti-goals, and structural closeout requirements for this run.",
-			Example:         `{"objective_contract_hash":"sha256:objective","obligation_model_hash":"sha256:obligation","dimensions":[{"id":"dim-product-clarity","kind":"quality","text":"Operators can orient within seconds.","required":true,"failure_modes":["correct_but_unclear"]}],"anti_goals":[{"id":"anti-proof-only","text":"Do not treat proof-only success as sufficient."}],"closeout_requirements":["quality_debt_zero"]}`,
+			Example:         `{"objective_contract_hash":"sha256:objective","obligation_model_hash":"sha256:obligation","dimensions":[{"id":"dim-product-clarity","kind":"quality","text":"Operators can orient within seconds.","required":true,"failure_modes":["correct_but_unclear"]}],"anti_goals":[{"id":"anti-proof-only","text":"Do not treat proof-only success as sufficient."}]}`,
 			FieldNotes: []string{
 				"`dimensions` is the canonical success-dimension list for the run.",
 				"Each dimension must include stable `id`, `kind`, and `text` fields.",
 				"`anti_goals` records explicit anti-optimizations the runtime should keep visible.",
-				"`closeout_requirements` is structural, not semantic scoring.",
 			},
 			FrameworkOwnedFields: []string{"`version`", "`compiled_at`"},
 		},
@@ -248,7 +249,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Run-scoped composed snapshot of the repo policy, learned priors, and explicit run-context slots compiled into this run.",
-			Example:         `{"domain":"frontend_product","signals":["operator_console","quality_ambiguous"],"slots":{"repo_policy":{"source":"AGENTS.md","refs":["AGENTS.md"]},"learned_success_priors":{"entry_ids":["mem_success_1"]},"run_context":{"source":"control/memory-context.json","refs":["control/memory-context.json"]}},"prior_entry_ids":["mem_success_1"]}`,
+			Example:         `{"signals":["operator_console","quality_ambiguous"],"slots":{"repo_policy":{"source":"AGENTS.md","refs":["AGENTS.md"]},"learned_success_priors":{"entry_ids":["mem_success_1"]},"run_context":{"source":"control/memory-context.json","refs":["control/memory-context.json"]}},"prior_entry_ids":["mem_success_1"]}`,
 			FieldNotes: []string{
 				"`domain-pack` is a compiled run artifact, not canonical memory.",
 				"`slots` records which source class filled which composed pack slot.",
@@ -257,6 +258,26 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			FrameworkOwnedFields: []string{"`version`", "`compiled_at`"},
 		},
 		Path: DomainPackPath,
+	},
+	DurableSurfaceProtocolComposition: {
+		Name:               DurableSurfaceProtocolComposition,
+		Class:              DurableSurfaceClassStructuredState,
+		WriteMode:          DurableSurfaceWriteModeReplace,
+		Strict:             true,
+		FrameworkReadsBody: true,
+		Schema: DurableSurfaceSchemaSpec{
+			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
+			StorageFormat:   DurableSurfaceSchemaFormatJSON,
+			Summary:         "Compiled protocol doctrine for this run, including required workflow roles, gates, proof kinds, and source mappings.",
+			Example:         `{"philosophy":["durable_state_first"],"behavior_contract":["evidence_backed_completion"],"required_roles":["critic"],"required_gates":["critic_review_present"],"required_proof_kinds":["assurance_check"],"source_slots":[{"slot":"repo_policy","refs":["AGENTS.md"]}],"output_sources":[{"output":"required_roles","source_slot":"repo_policy","refs":["AGENTS.md"]}]}`,
+			FieldNotes: []string{
+				"`protocol-composition` is the compiled protocol contract consumed by rendering and guidance surfaces.",
+				"`source_slots` is restricted to repo_policy|learned_success_priors|run_context.",
+				"`output_sources` maps compiled protocol outputs back to source slots and refs.",
+			},
+			FrameworkOwnedFields: []string{"`version`", "`compiled_at`", "`compiler_version`"},
+		},
+		Path: ProtocolCompositionPath,
 	},
 	DurableSurfaceCompilerInput: {
 		Name:               DurableSurfaceCompilerInput,

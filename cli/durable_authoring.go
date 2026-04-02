@@ -44,7 +44,6 @@ type successModelAuthoringBody struct {
 	ObligationModelHash   string             `json:"obligation_model_hash"`
 	Dimensions            []SuccessDimension `json:"dimensions"`
 	AntiGoals             []SuccessAntiGoal  `json:"anti_goals,omitempty"`
-	CloseoutRequirements  []string           `json:"closeout_requirements,omitempty"`
 }
 
 type proofPlanAuthoringBody struct {
@@ -57,10 +56,20 @@ type workflowPlanAuthoringBody struct {
 }
 
 type domainPackAuthoringBody struct {
-	Domain        string          `json:"domain"`
 	Signals       []string        `json:"signals,omitempty"`
 	Slots         DomainPackSlots `json:"slots,omitempty"`
 	PriorEntryIDs []string        `json:"prior_entry_ids,omitempty"`
+}
+
+type protocolCompositionAuthoringBody struct {
+	Philosophy         []string                    `json:"philosophy,omitempty"`
+	BehaviorContract   []string                    `json:"behavior_contract,omitempty"`
+	RequiredRoles      []string                    `json:"required_roles,omitempty"`
+	RequiredGates      []string                    `json:"required_gates,omitempty"`
+	RequiredProofKinds []string                    `json:"required_proof_kinds,omitempty"`
+	SourceSlots        []ProtocolCompositionSlot   `json:"source_slots,omitempty"`
+	OutputSources      []ProtocolCompositionOutput `json:"output_sources,omitempty"`
+	SelectedPriorRefs  []string                    `json:"selected_prior_refs,omitempty"`
 }
 
 type compilerInputAuthoringBody struct {
@@ -236,6 +245,12 @@ func applyDurableStructuredMutation(runDir string, spec DurableSurfaceSpec, body
 				return err
 			}
 			return SaveDomainPack(path, pack)
+		case DurableSurfaceProtocolComposition:
+			state, err := parseProtocolCompositionAuthoringBody(body)
+			if err != nil {
+				return err
+			}
+			return SaveCompiledProtocolComposition(path, state)
 		case DurableSurfaceCompilerInput:
 			input, err := parseCompilerInputAuthoringBody(body)
 			if err != nil {
@@ -466,7 +481,6 @@ func parseSuccessModelAuthoringBody(data []byte) (*SuccessModel, error) {
 		ObligationModelHash:   body.ObligationModelHash,
 		Dimensions:            body.Dimensions,
 		AntiGoals:             body.AntiGoals,
-		CloseoutRequirements:  body.CloseoutRequirements,
 	}
 	if err := validateSuccessModelInput(model); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceSuccessModel, err)
@@ -515,7 +529,6 @@ func parseDomainPackAuthoringBody(data []byte) (*DomainPack, error) {
 	}
 	pack := &DomainPack{
 		Version:       1,
-		Domain:        body.Domain,
 		Signals:       body.Signals,
 		Slots:         body.Slots,
 		PriorEntryIDs: body.PriorEntryIDs,
@@ -525,6 +538,29 @@ func parseDomainPackAuthoringBody(data []byte) (*DomainPack, error) {
 	}
 	normalizeDomainPack(pack)
 	return pack, nil
+}
+
+func parseProtocolCompositionAuthoringBody(data []byte) (*CompiledProtocolComposition, error) {
+	var body protocolCompositionAuthoringBody
+	if err := decodeStrictJSON(data, &body); err != nil {
+		return nil, durableSchemaHintError(DurableSurfaceProtocolComposition, err)
+	}
+	state := &CompiledProtocolComposition{
+		Version:            1,
+		Philosophy:         body.Philosophy,
+		BehaviorContract:   body.BehaviorContract,
+		RequiredRoles:      body.RequiredRoles,
+		RequiredGates:      body.RequiredGates,
+		RequiredProofKinds: body.RequiredProofKinds,
+		SourceSlots:        body.SourceSlots,
+		OutputSources:      body.OutputSources,
+		SelectedPriorRefs:  body.SelectedPriorRefs,
+	}
+	if err := validateCompiledProtocolComposition(state); err != nil {
+		return nil, durableSchemaHintError(DurableSurfaceProtocolComposition, err)
+	}
+	normalizeCompiledProtocolComposition(state)
+	return state, nil
 }
 
 func parseCompilerInputAuthoringBody(data []byte) (*CompilerInput, error) {

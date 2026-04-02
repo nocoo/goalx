@@ -669,15 +669,16 @@ func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert
 		reusable := append([]string{}, coverage.IdleReusableSessions...)
 		reusable = append(reusable, coverage.ParkedReusableSessions...)
 		sort.Strings(reusable)
+		owners := append([]string(nil), coverage.LaneCoverage[id]...)
 		fingerprint := strings.Join([]string{
 			"master_orphaned",
 			id,
-			"owner=" + strings.TrimSpace(required.Owner),
+			"owners=" + strings.Join(owners, ","),
 			"execution_state=" + strings.TrimSpace(required.ExecutionState),
 			"reusable_sessions=" + strings.Join(reusable, ","),
 		}, "|")
 		key := "master_orphaned:" + id
-		body := fmt.Sprintf("Required frontier gap in active GoalX run; required=%s fact=master_orphaned owner=%s execution_state=%s", id, blankAsUnknown(required.Owner), blankAsUnknown(required.ExecutionState))
+		body := fmt.Sprintf("Required frontier gap in active GoalX run; required=%s fact=master_orphaned owners=%s execution_state=%s", id, blankAsUnknown(strings.Join(owners, ",")), blankAsUnknown(required.ExecutionState))
 		if len(reusable) > 0 {
 			body += " reusable_sessions=" + strings.Join(reusable, ",")
 		}
@@ -694,16 +695,17 @@ func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert
 			continue
 		}
 		nonTerminal := requiredFrontierNonTerminalSurfaces(required.Surfaces)
+		owners := append([]string(nil), coverage.LaneCoverage[id]...)
 		fingerprint := strings.Join([]string{
 			"premature_blocked",
 			id,
-			"owner=" + strings.TrimSpace(required.Owner),
+			"owners=" + strings.Join(owners, ","),
 			"execution_state=" + strings.TrimSpace(required.ExecutionState),
 			"blocked_by=" + strings.TrimSpace(required.BlockedBy),
 			"non_terminal_surfaces=" + strings.Join(nonTerminal, ","),
 		}, "|")
 		key := "premature_blocked:" + id
-		body := fmt.Sprintf("Required frontier gap in active GoalX run; required=%s fact=premature_blocked owner=%s execution_state=%s", id, blankAsUnknown(required.Owner), blankAsUnknown(required.ExecutionState))
+		body := fmt.Sprintf("Required frontier gap in active GoalX run; required=%s fact=premature_blocked owners=%s execution_state=%s", id, blankAsUnknown(strings.Join(owners, ",")), blankAsUnknown(required.ExecutionState))
 		if blockedBy := strings.TrimSpace(required.BlockedBy); blockedBy != "" {
 			body += " blocked_by=" + blockedBy
 		}
@@ -771,6 +773,29 @@ func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert
 			body := "Control gap in active GoalX run; fact=serialized_required_frontier"
 			body += " active_required_owners=" + strings.Join(controlGapFacts.ActiveRequiredOwners, ",")
 			body += fmt.Sprintf(" open_required_count=%d", controlGapFacts.OpenRequiredCount)
+			if len(controlGapFacts.ReusableSessions) > 0 {
+				body += " reusable_sessions=" + strings.Join(controlGapFacts.ReusableSessions, ",")
+			}
+			alerts = append(alerts, masterAlert{
+				Key:         key,
+				Fingerprint: fingerprint,
+				Body:        body,
+			})
+			current[key] = fingerprint
+		}
+		if controlGapFacts.DispatchableParallelFrontier {
+			key := "control_gap:dispatchable_parallel_frontier"
+			fingerprint := strings.Join([]string{
+				"dispatchable_parallel_frontier",
+				"dispatchable_required_ids=" + strings.Join(controlGapFacts.DispatchableRequiredIDs, ","),
+				"dispatchable_sources=" + strings.Join(controlGapFacts.DispatchableSources, ","),
+				"reusable_sessions=" + strings.Join(controlGapFacts.ReusableSessions, ","),
+			}, "|")
+			body := "Control gap in active GoalX run; fact=dispatchable_parallel_frontier"
+			body += " dispatchable_required_ids=" + strings.Join(controlGapFacts.DispatchableRequiredIDs, ",")
+			if len(controlGapFacts.DispatchableSources) > 0 {
+				body += " dispatchable_sources=" + strings.Join(controlGapFacts.DispatchableSources, ",")
+			}
 			if len(controlGapFacts.ReusableSessions) > 0 {
 				body += " reusable_sessions=" + strings.Join(controlGapFacts.ReusableSessions, ",")
 			}

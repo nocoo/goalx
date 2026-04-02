@@ -6,19 +6,20 @@ import (
 )
 
 type RequiredCoverage struct {
-	RequiredPresent             bool     `json:"required_present"`
-	OpenRequiredIDs             []string `json:"open_required_ids,omitempty"`
-	MappedRequiredIDs           []string `json:"mapped_required_ids,omitempty"`
-	UnmappedRequiredIDs         []string `json:"unmapped_required_ids,omitempty"`
-	SessionOwnerMissingIDs      []string `json:"session_owner_missing_ids,omitempty"`
-	MasterOwnedRequiredIDs      []string `json:"master_owned_required_ids,omitempty"`
-	MasterOrphanedRequiredIDs   []string `json:"master_orphaned_required_ids,omitempty"`
-	ProbingRequiredIDs          []string `json:"probing_required_ids,omitempty"`
-	WaitingRequiredIDs          []string `json:"waiting_required_ids,omitempty"`
-	BlockedRequiredIDs          []string `json:"blocked_required_ids,omitempty"`
-	PrematureBlockedRequiredIDs []string `json:"premature_blocked_required_ids,omitempty"`
-	IdleReusableSessions        []string `json:"idle_reusable_sessions,omitempty"`
-	ParkedReusableSessions      []string `json:"parked_reusable_sessions,omitempty"`
+	RequiredPresent             bool                `json:"required_present"`
+	OpenRequiredIDs             []string            `json:"open_required_ids,omitempty"`
+	MappedRequiredIDs           []string            `json:"mapped_required_ids,omitempty"`
+	UnmappedRequiredIDs         []string            `json:"unmapped_required_ids,omitempty"`
+	SessionOwnerMissingIDs      []string            `json:"session_owner_missing_ids,omitempty"`
+	MasterOwnedRequiredIDs      []string            `json:"master_owned_required_ids,omitempty"`
+	MasterOrphanedRequiredIDs   []string            `json:"master_orphaned_required_ids,omitempty"`
+	ProbingRequiredIDs          []string            `json:"probing_required_ids,omitempty"`
+	WaitingRequiredIDs          []string            `json:"waiting_required_ids,omitempty"`
+	BlockedRequiredIDs          []string            `json:"blocked_required_ids,omitempty"`
+	PrematureBlockedRequiredIDs []string            `json:"premature_blocked_required_ids,omitempty"`
+	IdleReusableSessions        []string            `json:"idle_reusable_sessions,omitempty"`
+	ParkedReusableSessions      []string            `json:"parked_reusable_sessions,omitempty"`
+	LaneCoverage                map[string][]string `json:"lane_coverage,omitempty"`
 }
 
 func BuildRequiredCoverage(runDir string) (RequiredCoverage, error) {
@@ -51,6 +52,7 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 		PrematureBlockedRequiredIDs: []string{},
 		IdleReusableSessions:        []string{},
 		ParkedReusableSessions:      []string{},
+		LaneCoverage:                map[string][]string{},
 	}
 	if goal != nil {
 		normalizeGoalState(goal)
@@ -93,10 +95,14 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 			coverage.UnmappedRequiredIDs = append(coverage.UnmappedRequiredIDs, item.ID)
 			continue
 		}
+		coveringLanes := requiredCoveringLanes(coord, item.ID)
+		if len(coveringLanes) == 0 {
+			coverage.UnmappedRequiredIDs = append(coverage.UnmappedRequiredIDs, item.ID)
+			continue
+		}
 		coverage.MappedRequiredIDs = append(coverage.MappedRequiredIDs, item.ID)
-		owner := strings.TrimSpace(required.Owner)
-		switch owner {
-		case "master":
+		coverage.LaneCoverage[item.ID] = append([]string(nil), coveringLanes...)
+		if containsString(coveringLanes, "master") {
 			coverage.MasterOwnedRequiredIDs = append(coverage.MasterOwnedRequiredIDs, item.ID)
 			if required.ExecutionState == coordinationRequiredExecutionStateProbing || required.ExecutionState == coordinationRequiredExecutionStateWaiting {
 				if !coverageHasActiveExecutionLane(sessionRoster, sessionState, coord) && (len(coverage.IdleReusableSessions) > 0 || len(coverage.ParkedReusableSessions) > 0) {
@@ -116,9 +122,12 @@ func buildRequiredCoverage(goal *GoalState, coord *CoordinationState, sessionSta
 				coverage.PrematureBlockedRequiredIDs = append(coverage.PrematureBlockedRequiredIDs, item.ID)
 			}
 		}
-		if isSessionOwnerToken(owner) {
-			if _, ok := sessionRoster[owner]; !ok {
-				coverage.SessionOwnerMissingIDs = append(coverage.SessionOwnerMissingIDs, item.ID)
+		for _, lane := range coveringLanes {
+			if isSessionOwnerToken(lane) {
+				if _, ok := sessionRoster[lane]; !ok {
+					coverage.SessionOwnerMissingIDs = append(coverage.SessionOwnerMissingIDs, item.ID)
+					break
+				}
 			}
 		}
 	}
@@ -182,17 +191,40 @@ func openRequiredOwnerSessions(goal *GoalState, coord *CoordinationState) map[st
 		if normalizeGoalItemState(item.State) != goalItemStateOpen {
 			continue
 		}
-		required, ok := coord.Required[item.ID]
-		if !ok {
+		if _, ok := coord.Required[item.ID]; !ok {
 			continue
 		}
-		owner := strings.TrimSpace(required.Owner)
-		if !isSessionOwnerToken(owner) {
-			continue
+		for _, lane := range requiredCoveringLanes(coord, item.ID) {
+			if !isSessionOwnerToken(lane) {
+				continue
+			}
+			owners[lane] = struct{}{}
 		}
-		owners[owner] = struct{}{}
 	}
 	return owners
+}
+
+func requiredCoveringLanes(coord *CoordinationState, requiredID string) []string {
+	if coord == nil || coord.Sessions == nil || strings.TrimSpace(requiredID) == "" {
+		return nil
+	}
+	laneSet := map[string]struct{}{}
+	for lane, session := range coord.Sessions {
+		for _, covered := range session.CoversRequired {
+			if strings.TrimSpace(covered) == strings.TrimSpace(requiredID) {
+				laneSet[strings.TrimSpace(lane)] = struct{}{}
+			}
+		}
+	}
+	if len(laneSet) == 0 {
+		return nil
+	}
+	lanes := make([]string, 0, len(laneSet))
+	for lane := range laneSet {
+		lanes = append(lanes, lane)
+	}
+	sort.Strings(lanes)
+	return lanes
 }
 
 func coverageHasActiveExecutionLane(sessionRoster map[string]struct{}, sessionState *SessionsRuntimeState, coord *CoordinationState) bool {

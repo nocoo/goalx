@@ -12,7 +12,7 @@ import (
 	goalx "github.com/vonbai/goalx"
 )
 
-const successCompilerVersion = "compiler-v2"
+const successCompilerVersion = "compiler-v3"
 
 type bootstrapCompilerSources struct {
 	Query            *MemoryQuery
@@ -70,7 +70,7 @@ func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, met
 	if err := SaveProofPlan(ProofPlanPath(runDir), proofPlan); err != nil {
 		return err
 	}
-	workflowPlan := compileBootstrapWorkflowPlan()
+	workflowPlan := compileBootstrapWorkflowPlan(cfg, meta, obligationModel, successModel)
 	if err := SaveWorkflowPlan(WorkflowPlanPath(runDir), workflowPlan); err != nil {
 		return err
 	}
@@ -81,7 +81,12 @@ func EnsureSuccessCompilation(projectRoot, runDir string, cfg *goalx.Config, met
 	if err := SaveDomainPack(DomainPackPath(runDir), domainPack); err != nil {
 		return err
 	}
-	if err := SaveCompilerReport(CompilerReportPath(runDir), compileBootstrapCompilerReport(compilerSources)); err != nil {
+	compilerReport := compileBootstrapCompilerReport(compilerSources)
+	if err := SaveCompilerReport(CompilerReportPath(runDir), compilerReport); err != nil {
+		return err
+	}
+	protocolComposition := compileBootstrapProtocolComposition(proofPlan, workflowPlan, compilerInput, compilerReport)
+	if err := SaveCompiledProtocolComposition(ProtocolCompositionPath(runDir), protocolComposition); err != nil {
 		return err
 	}
 	return nil
@@ -137,7 +142,7 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 		return false, err
 	}
 
-	if !fileExists(SuccessModelPath(runDir)) || !fileExists(ProofPlanPath(runDir)) || !fileExists(WorkflowPlanPath(runDir)) {
+	if !fileExists(SuccessModelPath(runDir)) || !fileExists(ProofPlanPath(runDir)) || !fileExists(WorkflowPlanPath(runDir)) || !fileExists(ProtocolCompositionPath(runDir)) {
 		if err := EnsureSuccessCompilation(projectRoot, runDir, cfg, meta); err != nil {
 			return false, err
 		}
@@ -150,18 +155,21 @@ func RefreshRunSuccessContext(projectRoot, runDir string, cfg *goalx.Config, met
 			return false, err
 		}
 		compilerInput := compileBootstrapCompilerInput(runDir, compilerSources)
-		if err := SaveCompilerInput(CompilerInputPath(runDir), compilerInput); err != nil {
-			return false, err
-		}
 		domainPack, err := compileBootstrapDomainPack(cfg, meta, compilerSources)
 		if err != nil {
 			return false, err
 		}
-		if err := SaveDomainPack(DomainPackPath(runDir), domainPack); err != nil {
+		afterContext, err := LoadMemoryContextFile(MemoryContextPath(runDir))
+		if err != nil {
 			return false, err
 		}
-		if err := SaveCompilerReport(CompilerReportPath(runDir), compileBootstrapCompilerReport(compilerSources)); err != nil {
-			return false, err
+		inputChanged := compilerInputSignature(beforeCompilerInput) != compilerInputSignature(compilerInput) ||
+			!stringSliceEqual(domainPackPriorIDs(beforeDomainPack), domainPackPriorIDs(domainPack)) ||
+			!stringSliceEqual(successPriorStatements(beforeContext), successPriorStatements(afterContext))
+		if inputChanged {
+			if err := EnsureSuccessCompilation(projectRoot, runDir, cfg, meta); err != nil {
+				return false, err
+			}
 		}
 	}
 
@@ -196,14 +204,6 @@ func compileBootstrapSuccessModel(cfg *goalx.Config, objectiveContract *Objectiv
 				Required: true,
 			},
 		},
-		CloseoutRequirements: []string{
-			"all_required_obligations_resolved",
-			"proof_plan_coverage_ready",
-			"workflow_gates_present",
-		},
-	}
-	if objectiveContract != nil && strings.TrimSpace(objectiveContract.ObjectiveHash) != "" {
-		model.CloseoutRequirements = append(model.CloseoutRequirements, "objective_contract_present")
 	}
 	if obligationModel != nil {
 		for _, item := range obligationModel.Required {
@@ -265,7 +265,7 @@ func compileBootstrapProofPlan(goalState *GoalState, obligationModel *Obligation
 			}
 			proofKind := "run_artifact"
 			sourceSurface := "summary"
-			if strings.TrimSpace(item.Kind) == "proof" {
+			if strings.TrimSpace(item.Kind) == "proof" || item.AssuranceRequired || assurancePlanCoversObligation(assurancePlan, item.ID) {
 				proofKind = "assurance_check"
 				sourceSurface = "assurance"
 			}
@@ -334,19 +334,38 @@ func compileBootstrapProofPlan(goalState *GoalState, obligationModel *Obligation
 	return plan
 }
 
-func compileBootstrapWorkflowPlan() *WorkflowPlan {
+func compileBootstrapWorkflowPlan(cfg *goalx.Config, meta *RunMetadata, obligationModel *ObligationModel, successModel *SuccessModel) *WorkflowPlan {
+	intent := runIntentDeliver
+	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
+		intent = strings.TrimSpace(meta.Intent)
+	}
+	requiresBuilder := workflowRequiresBuilder(intent, obligationModel)
+	requiresCritic := workflowRequiresCritic(intent, obligationModel, successModel, requiresBuilder)
+	requiresFinisher := workflowRequiresFinisher(intent, obligationModel, requiresBuilder)
+
+	roles := []WorkflowRoleRequirement{}
+	gates := []string{}
+	if requiresBuilder {
+		roles = append(roles, WorkflowRoleRequirement{ID: "builder", Required: true})
+		gates = append(gates, "builder_result_present")
+	}
+	if requiresCritic {
+		roles = append(roles, WorkflowRoleRequirement{ID: "critic", Required: true})
+		gates = append(gates, "critic_review_present")
+	}
+	if requiresFinisher {
+		roles = append(roles, WorkflowRoleRequirement{ID: "finisher", Required: true})
+		gates = append(gates, "finisher_pass_present")
+	}
+	if len(roles) == 0 {
+		roles = append(roles, WorkflowRoleRequirement{ID: "critic", Required: true})
+		gates = append(gates, "critic_review_present")
+	}
+
 	return &WorkflowPlan{
-		Version: 1,
-		RequiredRoles: []WorkflowRoleRequirement{
-			{ID: "builder", Required: true},
-			{ID: "critic", Required: true},
-			{ID: "finisher", Required: true},
-		},
-		Gates: []string{
-			"builder_result_present",
-			"critic_review_present",
-			"finisher_pass_present",
-		},
+		Version:       1,
+		RequiredRoles: roles,
+		Gates:         gates,
 	}
 }
 
@@ -460,12 +479,6 @@ func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *b
 	if sources != nil {
 		priorEntryIDs = append(priorEntryIDs, sources.PriorEntryIDs...)
 	}
-	domain := "generic"
-	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
-		domain = strings.TrimSpace(meta.Intent)
-	} else if cfg.Mode != "" {
-		domain = strings.ToLower(string(cfg.Mode))
-	}
 	signals := []string{firstNonEmpty(strings.TrimSpace(string(cfg.Mode)), "mode_unspecified")}
 	if meta != nil && strings.TrimSpace(meta.Intent) != "" {
 		signals = append(signals, "intent:"+strings.TrimSpace(meta.Intent))
@@ -484,7 +497,6 @@ func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *b
 	}
 	pack := &DomainPack{
 		Version:       1,
-		Domain:        domain,
 		Signals:       signals,
 		PriorEntryIDs: priorEntryIDs,
 	}
@@ -508,6 +520,146 @@ func compileBootstrapDomainPack(cfg *goalx.Config, meta *RunMetadata, sources *b
 		}
 	}
 	return pack, nil
+}
+
+func compileBootstrapProtocolComposition(proofPlan *ProofPlan, workflowPlan *WorkflowPlan, compilerInput *CompilerInput, compilerReport *CompilerReport) *CompiledProtocolComposition {
+	state := &CompiledProtocolComposition{
+		Version:         1,
+		CompilerVersion: successCompilerVersion,
+		Philosophy: compactStrings([]string{
+			"durable_state_first",
+			"dispatch_before_self_implementation",
+			"success_model_before_local_optimization",
+			"evidence_before_completion",
+			"localized_override_not_reset",
+			"thin_control_explicit_judgment",
+		}),
+		BehaviorContract: compactStrings([]string{
+			"compact_decisive_output",
+			"automatic_follow_through",
+			"durable_state_first_recovery",
+			"localized_override_semantics",
+			"evidence_backed_completion",
+			"workflow_gates_are_real",
+		}),
+	}
+	if workflowPlan != nil {
+		for _, role := range workflowPlan.RequiredRoles {
+			if role.Required {
+				state.RequiredRoles = append(state.RequiredRoles, role.ID)
+			}
+		}
+		state.RequiredGates = append(state.RequiredGates, workflowPlan.Gates...)
+	}
+	if proofPlan != nil {
+		seenProofKinds := make(map[string]struct{}, len(proofPlan.Items))
+		for _, item := range proofPlan.Items {
+			key := strings.TrimSpace(item.Kind)
+			if key == "" {
+				continue
+			}
+			if _, ok := seenProofKinds[key]; ok {
+				continue
+			}
+			seenProofKinds[key] = struct{}{}
+			state.RequiredProofKinds = append(state.RequiredProofKinds, key)
+		}
+	}
+	if compilerInput != nil {
+		for _, slot := range compilerInput.SourceSlots {
+			state.SourceSlots = append(state.SourceSlots, ProtocolCompositionSlot{
+				Slot: slot.Slot,
+				Refs: append([]string(nil), slot.Refs...),
+			})
+		}
+		state.SelectedPriorRefs = append([]string(nil), compilerInput.SelectedPriorRefs...)
+	}
+	if compilerReport != nil {
+		if len(compilerReport.SelectedPriorRefs) > 0 {
+			state.SelectedPriorRefs = append([]string(nil), compilerReport.SelectedPriorRefs...)
+		}
+		if len(state.SourceSlots) == 0 {
+			for _, slot := range compilerReport.AvailableSourceSlots {
+				state.SourceSlots = append(state.SourceSlots, ProtocolCompositionSlot{
+					Slot: slot.Slot,
+					Refs: append([]string(nil), slot.Refs...),
+				})
+			}
+		}
+		for _, output := range compilerReport.OutputSources {
+			state.OutputSources = append(state.OutputSources, ProtocolCompositionOutput{
+				Output:     output.Output,
+				SourceSlot: output.SourceSlot,
+				Refs:       append([]string(nil), output.Refs...),
+			})
+		}
+	}
+	return state
+}
+
+func workflowRequiresBuilder(intent string, obligationModel *ObligationModel) bool {
+	switch strings.TrimSpace(intent) {
+	case runIntentDeliver, runIntentImplement, runIntentEvolve:
+		return true
+	}
+	if obligationModel == nil {
+		return false
+	}
+	for _, item := range obligationModel.Required {
+		switch strings.TrimSpace(item.Kind) {
+		case "outcome", "enabler":
+			return true
+		}
+	}
+	return false
+}
+
+func workflowRequiresCritic(intent string, obligationModel *ObligationModel, successModel *SuccessModel, requiresBuilder bool) bool {
+	if requiresBuilder {
+		return true
+	}
+	if obligationModel != nil {
+		if len(obligationModel.Guardrails) > 0 {
+			return true
+		}
+		for _, item := range obligationModel.Required {
+			if item.AssuranceRequired || strings.TrimSpace(item.Kind) == "proof" {
+				return true
+			}
+		}
+	}
+	return successModel != nil && len(successModel.AntiGoals) > 0
+}
+
+func workflowRequiresFinisher(intent string, obligationModel *ObligationModel, requiresBuilder bool) bool {
+	switch strings.TrimSpace(intent) {
+	case runIntentDeliver, runIntentEvolve:
+		return requiresBuilder
+	}
+	if !requiresBuilder || obligationModel == nil {
+		return false
+	}
+	for _, item := range obligationModel.Required {
+		switch strings.TrimSpace(item.Kind) {
+		case "outcome", "enabler":
+			return true
+		}
+	}
+	return false
+}
+
+func assurancePlanCoversObligation(plan *AssurancePlan, obligationID string) bool {
+	if plan == nil || strings.TrimSpace(obligationID) == "" {
+		return false
+	}
+	for _, scenario := range plan.Scenarios {
+		for _, covered := range scenario.CoversObligations {
+			if strings.TrimSpace(covered) == strings.TrimSpace(obligationID) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func evaluateSuccessPriorCandidates(query MemoryQuery) ([]MemoryEntry, []CompilerRejectedPrior, error) {

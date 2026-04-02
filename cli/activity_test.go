@@ -286,7 +286,6 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-9",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -296,6 +295,9 @@ func TestBuildActivitySnapshotIncludesCoverageFacts(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-9": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)

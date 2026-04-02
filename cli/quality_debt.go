@@ -147,8 +147,8 @@ func dimensionOwned(dimensionID string, goalState *GoalState, coordination *Coor
 		return false
 	}
 	if coordination != nil {
-		if item, ok := coordination.Required[dimensionID]; ok {
-			if strings.TrimSpace(item.Owner) != "" {
+		if _, ok := coordination.Required[dimensionID]; ok {
+			if len(requiredCoveringLanes(coordination, dimensionID)) > 0 {
 				return true
 			}
 		}

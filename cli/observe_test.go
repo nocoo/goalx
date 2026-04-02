@@ -682,7 +682,6 @@ func TestObserveShowsExplicitCoverageFacts(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-9",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -692,6 +691,9 @@ func TestObserveShowsExplicitCoverageFacts(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-9": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -753,7 +755,6 @@ func TestObserveShowsBlockedRequiredFrontierAdvisory(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -763,6 +764,9 @@ func TestObserveShowsBlockedRequiredFrontierAdvisory(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -802,7 +806,7 @@ func TestObserveShowsBlockedRequiredFrontierAdvisory(t *testing.T) {
 		"### advisories",
 		"Target attention:",
 		"Required frontier:",
-		"req-1 owner=session-1 execution_state=probing owner_attention=transport_blocked",
+		"req-1 owners=session-1 execution_state=probing owner_attention=transport_blocked",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)
@@ -870,7 +874,6 @@ func TestObserveShowsBlockedRequiredFrontierDetailAdvisory(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -880,6 +883,9 @@ func TestObserveShowsBlockedRequiredFrontierDetailAdvisory(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -913,7 +919,7 @@ func TestObserveShowsBlockedRequiredFrontierDetailAdvisory(t *testing.T) {
 
 	for _, want := range []string{
 		"Required frontier:",
-		"req-1 owner=session-1",
+		"req-1 owners=session-1",
 		"execution_state=probing",
 		"owner_attention=transport_blocked",
 	} {
@@ -985,7 +991,6 @@ func TestObserveWarnsAboutMasterOrphanedAndPrematureBlockedFrontierFacts(t *test
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -996,7 +1001,6 @@ func TestObserveWarnsAboutMasterOrphanedAndPrematureBlockedFrontierFacts(t *test
 				},
 			},
 			"req-2": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateBlocked,
 				BlockedBy:      "claimed blocker before runtime exhausted",
 				Surfaces: CoordinationRequiredSurfaces{
@@ -1007,6 +1011,9 @@ func TestObserveWarnsAboutMasterOrphanedAndPrematureBlockedFrontierFacts(t *test
 					ExternalSystem: coordinationRequiredSurfaceUnreachable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"master": {State: "waiting", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -1028,8 +1035,8 @@ func TestObserveWarnsAboutMasterOrphanedAndPrematureBlockedFrontierFacts(t *test
 		"premature_blocked=req-2",
 		"reusable_sessions=session-4",
 		"Required frontier:",
-		"req-1 owner=master execution_state=probing",
-		"req-2 owner=master execution_state=blocked blocked_by=claimed blocker before runtime exhausted",
+		"req-1 owners=master execution_state=probing",
+		"req-2 owners=master execution_state=blocked blocked_by=claimed blocker before runtime exhausted",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("observe output missing %q:\n%s", want, out)
@@ -1055,7 +1062,6 @@ func TestObserveWarnsAboutControlGapFacts(t *testing.T) {
 		UpdatedAt: "2026-03-30T19:12:54Z",
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -1066,7 +1072,6 @@ func TestObserveWarnsAboutControlGapFacts(t *testing.T) {
 				},
 			},
 			"req-2": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -1076,6 +1081,9 @@ func TestObserveWarnsAboutControlGapFacts(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfacePending,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -1133,7 +1141,6 @@ func TestObserveWarnsAboutQualityDebt(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -1143,6 +1150,9 @@ func TestObserveWarnsAboutQualityDebt(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -1187,7 +1197,7 @@ func TestObserveWarnsAboutQualityDebt(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "generic"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 
@@ -1201,7 +1211,7 @@ func TestObserveWarnsAboutQualityDebt(t *testing.T) {
 		"### advisories",
 		"Quality debt:",
 		"success_dimension_unowned=req-2",
-		"proof_plan_gap=proof-report",
+		"proof_plan_gap=proof-obligation-req-1,proof-obligation-req-2,proof-summary-objective",
 		"critic_gate_missing",
 		"finisher_gate_missing",
 		"only_correctness_evidence_present",

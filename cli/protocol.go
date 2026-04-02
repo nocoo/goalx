@@ -104,14 +104,14 @@ type ProtocolComposition struct {
 }
 
 type ProtocolCompositionSlot struct {
-	Slot string
-	Refs []string
+	Slot string   `json:"slot"`
+	Refs []string `json:"refs,omitempty"`
 }
 
 type ProtocolCompositionOutput struct {
-	Output     string
-	SourceSlot string
-	Refs       []string
+	Output     string   `json:"output"`
+	SourceSlot string   `json:"source_slot"`
+	Refs       []string `json:"refs,omitempty"`
 }
 
 // SessionData is per-session info for the master protocol.
@@ -216,100 +216,14 @@ func buildProtocolComposition(runDir string, existing ProtocolComposition) (Prot
 	if composition.Enabled || strings.TrimSpace(runDir) == "" {
 		return composition, nil
 	}
-
-	successModel, err := LoadSuccessModel(SuccessModelPath(runDir))
+	state, err := LoadCompiledProtocolComposition(ProtocolCompositionPath(runDir))
 	if err != nil {
 		return composition, err
 	}
-	proofPlan, err := LoadProofPlan(ProofPlanPath(runDir))
-	if err != nil {
-		return composition, err
-	}
-	workflowPlan, err := LoadWorkflowPlan(WorkflowPlanPath(runDir))
-	if err != nil {
-		return composition, err
-	}
-	compilerInput, err := LoadCompilerInput(CompilerInputPath(runDir))
-	if err != nil {
-		return composition, err
-	}
-	compilerReport, err := LoadCompilerReport(CompilerReportPath(runDir))
-	if err != nil {
-		return composition, err
-	}
-	if successModel == nil && proofPlan == nil && workflowPlan == nil && compilerInput == nil && compilerReport == nil {
+	if state == nil {
 		return composition, nil
 	}
-
-	composition.Enabled = true
-	composition.Philosophy = compactStrings([]string{
-		"durable_state_first",
-		"dispatch_before_self_implementation",
-		"success_model_before_local_optimization",
-		"evidence_before_completion",
-		"localized_override_not_reset",
-		"thin_control_explicit_judgment",
-	})
-	composition.BehaviorContract = compactStrings([]string{
-		"compact_decisive_output",
-		"automatic_follow_through",
-		"durable_state_first_recovery",
-		"localized_override_semantics",
-		"evidence_backed_completion",
-		"workflow_gates_are_real",
-	})
-	if workflowPlan != nil {
-		for _, role := range workflowPlan.RequiredRoles {
-			if role.Required {
-				composition.RequiredRoles = append(composition.RequiredRoles, role.ID)
-			}
-		}
-		composition.RequiredGates = append(composition.RequiredGates, workflowPlan.Gates...)
-	}
-	if proofPlan != nil {
-		seenProofKinds := make(map[string]struct{}, len(proofPlan.Items))
-		for _, item := range proofPlan.Items {
-			key := strings.TrimSpace(item.Kind)
-			if key == "" {
-				continue
-			}
-			if _, ok := seenProofKinds[key]; ok {
-				continue
-			}
-			seenProofKinds[key] = struct{}{}
-			composition.RequiredProofKinds = append(composition.RequiredProofKinds, key)
-		}
-	}
-	if compilerInput != nil {
-		for _, slot := range compilerInput.SourceSlots {
-			composition.SourceSlots = append(composition.SourceSlots, ProtocolCompositionSlot{
-				Slot: slot.Slot,
-				Refs: append([]string(nil), slot.Refs...),
-			})
-		}
-		composition.SelectedPriorRefs = append(composition.SelectedPriorRefs, compilerInput.SelectedPriorRefs...)
-	}
-	if compilerReport != nil {
-		if len(compilerReport.SelectedPriorRefs) > 0 {
-			composition.SelectedPriorRefs = append([]string(nil), compilerReport.SelectedPriorRefs...)
-		}
-		if len(composition.SourceSlots) == 0 {
-			for _, slot := range compilerReport.AvailableSourceSlots {
-				composition.SourceSlots = append(composition.SourceSlots, ProtocolCompositionSlot{
-					Slot: slot.Slot,
-					Refs: append([]string(nil), slot.Refs...),
-				})
-			}
-		}
-		for _, output := range compilerReport.OutputSources {
-			composition.OutputSources = append(composition.OutputSources, ProtocolCompositionOutput{
-				Output:     output.Output,
-				SourceSlot: output.SourceSlot,
-				Refs:       append([]string(nil), output.Refs...),
-			})
-		}
-	}
-	return normalizeProtocolComposition(composition), nil
+	return protocolCompositionView(state), nil
 }
 
 func normalizeProtocolComposition(composition ProtocolComposition) ProtocolComposition {

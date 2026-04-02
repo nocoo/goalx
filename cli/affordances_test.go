@@ -657,6 +657,32 @@ func TestBuildAffordancesIncludesCompilerDoctrineFacts(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveCompilerReport: %v", err)
 	}
+	if err := SaveCompiledProtocolComposition(ProtocolCompositionPath(runDir), &CompiledProtocolComposition{
+		Version:         1,
+		CompilerVersion: successCompilerVersion,
+		Philosophy: []string{
+			"durable_state_first",
+			"dispatch_before_self_implementation",
+			"success_model_before_local_optimization",
+			"evidence_before_completion",
+			"localized_override_not_reset",
+			"thin_control_explicit_judgment",
+		},
+		BehaviorContract: []string{
+			"compact_decisive_output",
+			"automatic_follow_through",
+			"durable_state_first_recovery",
+			"localized_override_semantics",
+			"evidence_backed_completion",
+			"workflow_gates_are_real",
+		},
+		RequiredRoles:      []string{"builder", "critic", "finisher"},
+		RequiredGates:      []string{"builder_result_present", "critic_review_present", "finisher_pass_present"},
+		RequiredProofKinds: []string{"bootstrap_proof"},
+		SelectedPriorRefs:  []string{"prior/operator-cockpit"},
+	}); err != nil {
+		t.Fatalf("SaveCompiledProtocolComposition: %v", err)
+	}
 
 	doc, err := BuildAffordances(repo, cfg.Name, runDir, "master")
 	if err != nil {
@@ -689,6 +715,7 @@ func TestBuildAffordancesIncludesCompilerDoctrineFacts(t *testing.T) {
 		ProofPlanPath(runDir),
 		WorkflowPlanPath(runDir),
 		DomainPackPath(runDir),
+		ProtocolCompositionPath(runDir),
 		CompilerInputPath(runDir),
 		CompilerReportPath(runDir),
 		IntakePath(runDir),

@@ -12,55 +12,30 @@ import (
 func TestBuildProtocolCompositionLoadsCompilerArtifacts(t *testing.T) {
 	runDir := t.TempDir()
 
-	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
-		Version:               1,
-		ObjectiveContractHash: "obj-hash",
-		ObligationModelHash:              "obligation-hash",
-		Dimensions: []SuccessDimension{
-			{ID: "dim-objective", Kind: "objective", Text: "ship it", Required: true},
+	if err := SaveCompiledProtocolComposition(ProtocolCompositionPath(runDir), &CompiledProtocolComposition{
+		Version:         1,
+		CompilerVersion: successCompilerVersion,
+		Philosophy: []string{
+			"durable_state_first",
+			"localized_override_not_reset",
 		},
-	}); err != nil {
-		t.Fatalf("SaveSuccessModel: %v", err)
-	}
-	if err := SaveProofPlan(ProofPlanPath(runDir), &ProofPlan{
-		Version: 1,
-		Items: []ProofPlanItem{
-			{ID: "proof-1", CoversDimensions: []string{"dim-objective"}, Kind: "acceptance_check", Required: true, SourceSurface: "acceptance"},
-			{ID: "proof-2", CoversDimensions: []string{"dim-objective"}, Kind: "run_artifact", Required: true, SourceSurface: "summary"},
+		BehaviorContract: []string{
+			"compact_decisive_output",
+			"workflow_gates_are_real",
 		},
-	}); err != nil {
-		t.Fatalf("SaveProofPlan: %v", err)
-	}
-	if err := SaveWorkflowPlan(WorkflowPlanPath(runDir), &WorkflowPlan{
-		Version: 1,
-		RequiredRoles: []WorkflowRoleRequirement{
-			{ID: "builder", Required: true},
-			{ID: "critic", Required: true},
-		},
-		Gates: []string{"critic_pass", "finisher_pass"},
-	}); err != nil {
-		t.Fatalf("SaveWorkflowPlan: %v", err)
-	}
-	if err := SaveCompilerInput(CompilerInputPath(runDir), &CompilerInput{
-		Version:              1,
-		ObjectiveContractRef: "objective-contract.json",
-		ObligationModelRef:              "obligation-model.json",
-		SelectedPriorRefs:    []string{"prior/from-input"},
-		SourceSlots: []CompilerInputSlot{
+		RequiredRoles:      []string{"builder", "critic"},
+		RequiredGates:      []string{"critic_pass", "finisher_pass"},
+		RequiredProofKinds: []string{"acceptance_check", "run_artifact"},
+		SelectedPriorRefs:  []string{"prior/from-report"},
+		SourceSlots: []ProtocolCompositionSlot{
 			{Slot: CompilerInputSlotRepoPolicy, Refs: []string{"README.md"}},
 			{Slot: CompilerInputSlotLearnedSuccessPriors, Refs: []string{"memory/success-priors.jsonl"}},
 		},
-	}); err != nil {
-		t.Fatalf("SaveCompilerInput: %v", err)
-	}
-	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
-		Version:           1,
-		SelectedPriorRefs: []string{"prior/from-report"},
-		OutputSources: []CompilerOutputSource{
+		OutputSources: []ProtocolCompositionOutput{
 			{Output: "workflow-plan", SourceSlot: CompilerInputSlotLearnedSuccessPriors, Refs: []string{"memory/success-priors.jsonl"}},
 		},
 	}); err != nil {
-		t.Fatalf("SaveCompilerReport: %v", err)
+		t.Fatalf("SaveCompiledProtocolComposition: %v", err)
 	}
 
 	composition, err := buildProtocolComposition(runDir, ProtocolComposition{})
@@ -102,53 +77,23 @@ func TestBuildProtocolCompositionLoadsCompilerArtifacts(t *testing.T) {
 
 func TestRenderMasterProtocolIncludesCompilerComposedDoctrine(t *testing.T) {
 	runDir := t.TempDir()
-	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
-		Version:               1,
-		ObjectiveContractHash: "obj-hash",
-		ObligationModelHash:              "obligation-hash",
-		Dimensions: []SuccessDimension{
-			{ID: "dim-objective", Kind: "objective", Text: "ship it", Required: true},
+	if err := SaveCompiledProtocolComposition(ProtocolCompositionPath(runDir), &CompiledProtocolComposition{
+		Version:         1,
+		CompilerVersion: successCompilerVersion,
+		Philosophy: []string{
+			"durable_state_first",
 		},
-	}); err != nil {
-		t.Fatalf("SaveSuccessModel: %v", err)
-	}
-	if err := SaveProofPlan(ProofPlanPath(runDir), &ProofPlan{
-		Version: 1,
-		Items: []ProofPlanItem{
-			{ID: "proof-1", CoversDimensions: []string{"dim-objective"}, Kind: "run_artifact", Required: true, SourceSurface: "summary"},
+		BehaviorContract: []string{
+			"workflow_gates_are_real",
 		},
+		RequiredRoles:      []string{"builder", "critic", "finisher"},
+		RequiredGates:      []string{"critic_pass", "finisher_pass"},
+		SelectedPriorRefs:  []string{"prior/operator-cockpit"},
+		SourceSlots:        []ProtocolCompositionSlot{{Slot: CompilerInputSlotRepoPolicy, Refs: []string{"README.md"}}},
+		OutputSources:      []ProtocolCompositionOutput{{Output: "workflow-plan", SourceSlot: CompilerInputSlotRepoPolicy, Refs: []string{"README.md"}}},
+		RequiredProofKinds: []string{"run_artifact"},
 	}); err != nil {
-		t.Fatalf("SaveProofPlan: %v", err)
-	}
-	if err := SaveWorkflowPlan(WorkflowPlanPath(runDir), &WorkflowPlan{
-		Version: 1,
-		RequiredRoles: []WorkflowRoleRequirement{
-			{ID: "builder", Required: true},
-			{ID: "critic", Required: true},
-			{ID: "finisher", Required: true},
-		},
-		Gates: []string{"critic_pass", "finisher_pass"},
-	}); err != nil {
-		t.Fatalf("SaveWorkflowPlan: %v", err)
-	}
-	if err := SaveCompilerInput(CompilerInputPath(runDir), &CompilerInput{
-		Version:              1,
-		ObjectiveContractRef: "objective-contract.json",
-		ObligationModelRef:              "obligation-model.json",
-		SourceSlots: []CompilerInputSlot{
-			{Slot: CompilerInputSlotRepoPolicy, Refs: []string{"README.md"}},
-		},
-	}); err != nil {
-		t.Fatalf("SaveCompilerInput: %v", err)
-	}
-	if err := SaveCompilerReport(CompilerReportPath(runDir), &CompilerReport{
-		Version:           1,
-		SelectedPriorRefs: []string{"prior/operator-cockpit"},
-		OutputSources: []CompilerOutputSource{
-			{Output: "workflow-plan", SourceSlot: CompilerInputSlotRepoPolicy, Refs: []string{"README.md"}},
-		},
-	}); err != nil {
-		t.Fatalf("SaveCompilerReport: %v", err)
+		t.Fatalf("SaveCompiledProtocolComposition: %v", err)
 	}
 
 	data := ProtocolData{

@@ -175,6 +175,14 @@ func TestDurableCommandReplacesAdvertisedStructuredSurfaces(t *testing.T) {
 			},
 		},
 		{
+			name:    "protocol-composition",
+			surface: "protocol-composition",
+			parse: func(data []byte) error {
+				_, err := parseCompiledProtocolComposition(data)
+				return err
+			},
+		},
+		{
 			name:    "compiler-input",
 			surface: "compiler-input",
 			parse: func(data []byte) error {

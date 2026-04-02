@@ -17,7 +17,6 @@ func TestCoordinationStatePreservesExecutionStateAndDispatchableSlices(t *testin
   "version": 1,
   "required": {
     "req-1": {
-      "owner": "master",
       "execution_state": "waiting",
       "blocked_by": "need remote confirmation",
       "surfaces": {
@@ -34,12 +33,14 @@ func TestCoordinationStatePreservesExecutionStateAndDispatchableSlices(t *testin
     "session-1": {
       "state": "active",
       "scope": "inspect db retries",
+      "covers_required": ["req-1"],
       "dispatchable_slices": [
         {
           "title": "split retry triage",
           "why": "unblocks independent backend work",
           "mode": "develop",
-          "suggested_owner": "session-2"
+          "suggested_owner": "session-2",
+          "covers_required": ["req-1"]
         }
       ]
     }
@@ -73,6 +74,9 @@ func TestCoordinationStatePreservesExecutionStateAndDispatchableSlices(t *testin
 	got := loaded.Sessions["session-1"]
 	if got.State != "active" {
 		t.Fatalf("State = %q, want active", got.State)
+	}
+	if len(got.CoversRequired) != 1 || got.CoversRequired[0] != "req-1" {
+		t.Fatalf("CoversRequired = %v, want [req-1]", got.CoversRequired)
 	}
 	if len(got.DispatchableSlices) != 1 {
 		t.Fatalf("DispatchableSlices len = %d, want 1", len(got.DispatchableSlices))
@@ -137,7 +141,6 @@ func TestSaveCoordinationStatePreservesDigestFieldsVerbatim(t *testing.T) {
   "version": 1,
   "required": {
     "req-1": {
-      "owner": "master",
       "execution_state": "blocked",
       "blocked_by": "` + strings.Repeat("blocked because the remote deploy is still pending and we keep repeating the same analysis. ", 8) + `",
       "surfaces": {
@@ -152,7 +155,8 @@ func TestSaveCoordinationStatePreservesDigestFieldsVerbatim(t *testing.T) {
   "sessions": {
     "session-1": {
       "state": "active",
-      "scope": "  ` + strings.Repeat("root-cause narration ", 30) + `  "
+      "scope": "  ` + strings.Repeat("root-cause narration ", 30) + `  ",
+      "covers_required": ["req-1"]
     }
   },
   "decision": {
@@ -246,6 +250,43 @@ func TestLoadCoordinationStateRejectsLegacySessionSchema(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("LoadCoordinationState error = %v, want %q", err, want)
 		}
+	}
+}
+
+func TestLoadCoordinationStateRejectsLegacyRequiredOwnerField(t *testing.T) {
+	runDir := filepath.Join(t.TempDir(), "demo")
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+
+	legacy := `{
+  "version": 1,
+  "required": {
+    "req-1": {
+      "owner": "session-1",
+      "execution_state": "probing",
+      "surfaces": {
+        "repo": "active",
+        "runtime": "pending",
+        "run_artifacts": "pending",
+        "web_research": "pending",
+        "external_system": "not_applicable"
+      }
+    }
+  },
+  "sessions": {
+    "session-1": {
+      "state": "active",
+      "covers_required": ["req-1"]
+    }
+  }
+}`
+	if err := os.WriteFile(CoordinationPath(runDir), []byte(legacy), 0o644); err != nil {
+		t.Fatalf("write coordination state: %v", err)
+	}
+
+	if _, err := LoadCoordinationState(CoordinationPath(runDir)); err == nil {
+		t.Fatal("LoadCoordinationState should reject legacy required.owner field")
 	}
 }
 

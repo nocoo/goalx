@@ -23,6 +23,7 @@ func TestDurableSurfaceRegistryResolvesKnownSurfaces(t *testing.T) {
 		{name: "proof-plan", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ProofPlanPath(runDir)},
 		{name: "workflow-plan", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: WorkflowPlanPath(runDir)},
 		{name: "domain-pack", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: DomainPackPath(runDir)},
+		{name: "protocol-composition", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ProtocolCompositionPath(runDir)},
 		{name: "compiler-input", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: CompilerInputPath(runDir)},
 		{name: "compiler-report", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: CompilerReportPath(runDir)},
 		{name: "impact-state", class: DurableSurfaceClassStructuredState, writeMode: DurableSurfaceWriteModeReplace, strict: true, wantPath: ImpactStatePath(runDir)},

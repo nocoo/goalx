@@ -81,7 +81,7 @@ func BuildAffordances(projectRoot, runName, runDir, target string) (*Affordances
 		return nil, err
 	}
 	normalizedTarget := normalizedAffordanceTarget(target)
-	compilerDoctrinePaths := []string{SuccessModelPath(runDir), ProofPlanPath(runDir), WorkflowPlanPath(runDir), DomainPackPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)}
+	compilerDoctrinePaths := []string{SuccessModelPath(runDir), ProofPlanPath(runDir), WorkflowPlanPath(runDir), DomainPackPath(runDir), ProtocolCompositionPath(runDir), CompilerInputPath(runDir), CompilerReportPath(runDir)}
 	if fileExists(IntakePath(runDir)) {
 		compilerDoctrinePaths = append(compilerDoctrinePaths, IntakePath(runDir))
 	}

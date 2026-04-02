@@ -70,7 +70,6 @@ func TestBuildRequiredCoverageOnlyCountsOpenRequiredItems(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "db-investigation",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -80,6 +79,9 @@ func TestBuildRequiredCoverageOnlyCountsOpenRequiredItems(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"master": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -113,7 +115,6 @@ func TestBuildRequiredCoverageDetectsMissingSessionOwner(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-9",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -123,6 +124,9 @@ func TestBuildRequiredCoverageDetectsMissingSessionOwner(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-9": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -153,7 +157,6 @@ func TestBuildRequiredCoverageDoesNotReuseOpenOwnerSessions(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateActive,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -165,7 +168,7 @@ func TestBuildRequiredCoverageDoesNotReuseOpenOwnerSessions(t *testing.T) {
 			},
 		},
 		Sessions: map[string]CoordinationSession{
-			"session-1": {State: "active"},
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -199,7 +202,6 @@ func TestBuildRequiredCoverageMarksMasterOrphanedRequiredWhenReusableSessionExis
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceExhausted,
@@ -211,6 +213,7 @@ func TestBuildRequiredCoverageMarksMasterOrphanedRequiredWhenReusableSessionExis
 			},
 		},
 		Sessions: map[string]CoordinationSession{
+			"master":    {State: "waiting", CoversRequired: []string{"req-1"}},
 			"session-1": {State: "parked"},
 		},
 	}); err != nil {
@@ -248,7 +251,6 @@ func TestBuildRequiredCoverageDoesNotMarkMasterOrphanedRequiredWhenActiveSession
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceExhausted,
@@ -260,6 +262,7 @@ func TestBuildRequiredCoverageDoesNotMarkMasterOrphanedRequiredWhenActiveSession
 			},
 		},
 		Sessions: map[string]CoordinationSession{
+			"master":    {State: "waiting", CoversRequired: []string{"req-1"}},
 			"session-1": {State: "active"},
 			"session-2": {State: "parked"},
 		},
@@ -296,7 +299,6 @@ func TestBuildRequiredCoverageClassifiesBlockedAndPrematureBlockedItems(t *testi
   "version": 1,
   "required": {
     "req-1": {
-      "owner": "master",
       "execution_state": "blocked",
       "blocked_by": "claimed blocker before runtime exhausted",
       "surfaces": {
@@ -308,7 +310,6 @@ func TestBuildRequiredCoverageClassifiesBlockedAndPrematureBlockedItems(t *testi
       }
     },
     "req-2": {
-      "owner": "master",
       "execution_state": "blocked",
       "blocked_by": "all machine surfaces exhausted",
       "surfaces": {
@@ -318,6 +319,12 @@ func TestBuildRequiredCoverageClassifiesBlockedAndPrematureBlockedItems(t *testi
         "web_research": "exhausted",
         "external_system": "unreachable"
       }
+    }
+  },
+  "sessions": {
+    "master": {
+      "state": "waiting",
+      "covers_required": ["req-1", "req-2"]
     }
   }
 }`

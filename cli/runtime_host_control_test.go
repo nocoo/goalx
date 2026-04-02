@@ -1787,7 +1787,6 @@ func TestRunRuntimeHostTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -1798,7 +1797,6 @@ func TestRunRuntimeHostTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 				},
 			},
 			"req-2": {
-				Owner:          "master",
 				ExecutionState: coordinationRequiredExecutionStateBlocked,
 				BlockedBy:      "claimed blocker before runtime exhausted",
 				Surfaces: CoordinationRequiredSurfaces{
@@ -1809,6 +1807,9 @@ func TestRunRuntimeHostTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfaceUnreachable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"master": {State: "waiting", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -1959,7 +1960,6 @@ func TestRunRuntimeHostTickRealertsRequiredFrontierWhenStateChanges(t *testing.T
 			Version: 1,
 			Required: map[string]CoordinationRequiredItem{
 				"req-1": {
-					Owner:          "master",
 					ExecutionState: state,
 					Surfaces: CoordinationRequiredSurfaces{
 						Repo:           coordinationRequiredSurfaceActive,
@@ -1969,6 +1969,9 @@ func TestRunRuntimeHostTickRealertsRequiredFrontierWhenStateChanges(t *testing.T
 						ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 					},
 				},
+			},
+			Sessions: map[string]CoordinationSession{
+				"master": {State: "waiting", CoversRequired: []string{"req-1"}},
 			},
 		}); err != nil {
 			t.Fatalf("SaveCoordinationState: %v", err)
@@ -2051,7 +2054,6 @@ func TestRunRuntimeHostTickAlertsControlGapFacts(t *testing.T) {
 		UpdatedAt: "2026-03-30T19:12:54Z",
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -2062,7 +2064,6 @@ func TestRunRuntimeHostTickAlertsControlGapFacts(t *testing.T) {
 				},
 			},
 			"req-2": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -2072,6 +2073,9 @@ func TestRunRuntimeHostTickAlertsControlGapFacts(t *testing.T) {
 					ExternalSystem: coordinationRequiredSurfacePending,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -2162,7 +2166,6 @@ func TestRunRuntimeHostTickRealertsControlGapWhenFingerprintChanges(t *testing.T
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -2173,7 +2176,6 @@ func TestRunRuntimeHostTickRealertsControlGapWhenFingerprintChanges(t *testing.T
 				},
 			},
 			"req-2": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -2183,6 +2185,9 @@ func TestRunRuntimeHostTickRealertsControlGapWhenFingerprintChanges(t *testing.T
 					ExternalSystem: coordinationRequiredSurfacePending,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1", "req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
@@ -2390,12 +2395,11 @@ func TestRunRuntimeHostTickAlertsQualityDebtAndEvolveManagementGap(t *testing.T)
 	if err := SaveSuccessModel(SuccessModelPath(runDir), &SuccessModel{
 		Version:               1,
 		ObjectiveContractHash: "sha256:objective",
-		ObligationModelHash:              "sha256:goal",
+		ObligationModelHash:   "sha256:goal",
 		Dimensions: []SuccessDimension{
 			{ID: "req-1", Kind: "goal_item", Text: "ship cockpit", Required: true},
 			{ID: "req-2", Kind: "goal_item", Text: "ship polish", Required: true},
 		},
-		CloseoutRequirements: []string{"quality_debt_zero"},
 	}); err != nil {
 		t.Fatalf("SaveSuccessModel: %v", err)
 	}
@@ -2418,7 +2422,7 @@ func TestRunRuntimeHostTickAlertsQualityDebtAndEvolveManagementGap(t *testing.T)
 	}); err != nil {
 		t.Fatalf("SaveWorkflowPlan: %v", err)
 	}
-	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1, Domain: "evolve"}); err != nil {
+	if err := SaveDomainPack(DomainPackPath(runDir), &DomainPack{Version: 1}); err != nil {
 		t.Fatalf("SaveDomainPack: %v", err)
 	}
 	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
@@ -2435,7 +2439,6 @@ func TestRunRuntimeHostTickAlertsQualityDebtAndEvolveManagementGap(t *testing.T)
 		UpdatedAt: "2026-03-31T10:05:00Z",
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-5",
 				ExecutionState: coordinationRequiredExecutionStateProbing,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceActive,
@@ -2445,6 +2448,9 @@ func TestRunRuntimeHostTickAlertsQualityDebtAndEvolveManagementGap(t *testing.T)
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-5": {State: "active", CoversRequired: []string{"req-1"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
