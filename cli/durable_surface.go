@@ -169,10 +169,10 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			AuthoringFormat: DurableSurfaceSchemaFormatJSON,
 			StorageFormat:   DurableSurfaceSchemaFormatJSON,
 			Summary:         "Master-written run progress facts for phase, remaining required work, and ownership.",
-			Example:         `{"phase":"working","required_remaining":0,"open_required_ids":["req-1"],"active_sessions":["session-1"],"keep_session":"session-2","last_verified_at":"2026-03-28T10:00:00Z"}`,
+			Example:         `{"phase":"stopped","required_remaining":0,"open_required_ids":[],"active_sessions":[],"keep_session":"session-2","last_verified_at":"2026-03-28T10:00:00Z"}`,
 			FieldNotes: []string{
 				"`required_remaining` is required and must be non-negative.",
-				"`phase` is restricted to working|review|complete.",
+				"`phase` is restricted to working|review|complete|stopped.",
 				"`open_required_ids` and `active_sessions` are optional factual snapshots when the master explicitly records them.",
 				"No recommendation or completion verdict fields are accepted.",
 			},

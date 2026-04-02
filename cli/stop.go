@@ -44,6 +44,11 @@ func Stop(projectRoot string, args []string) error {
 			_ = UpsertRunRuntimeState(rc.RunDir, *state)
 		}
 		_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
+		if finalLifecycle != "completed" {
+			if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "stop"}); err != nil {
+				return err
+			}
+		}
 		if finalLifecycle == "completed" {
 			fmt.Printf("Run '%s' completed (no tmux session).\n", rc.Name)
 		} else {
@@ -69,6 +74,11 @@ func Stop(projectRoot string, args []string) error {
 	}
 	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
 	_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
+	if finalLifecycle != "completed" {
+		if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "stop"}); err != nil {
+			return err
+		}
+	}
 	if finalLifecycle == "completed" {
 		fmt.Printf("Run '%s' completed (tmux session %s killed).\n", rc.Name, rc.TmuxSession)
 	} else {

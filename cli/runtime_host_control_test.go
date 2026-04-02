@@ -1761,6 +1761,75 @@ func TestRunRuntimeHostTickAlertsBlockedSessionAttentionOnce(t *testing.T) {
 	}
 }
 
+func TestRunRuntimeHostTickAuditsFactsRefreshOnlyWhenSemanticFactsChange(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	prevResourceReadFile := resourceReadFile
+	t.Cleanup(func() { resourceReadFile = prevResourceReadFile })
+	resourceReadFile = func(path string) ([]byte, error) {
+		switch path {
+		case "/proc/meminfo":
+			return []byte("MemTotal: 32768 kB\nMemAvailable: 20971520 kB\nSwapTotal: 16384 kB\nSwapFree: 16384 kB\n"), nil
+		case "/proc/sys/vm/swappiness":
+			return []byte("10\n"), nil
+		case "/proc/pressure/memory":
+			return []byte("some avg10=0.00 avg60=0 avg300=0 total=0\nfull avg10=0 avg60=0 avg300=0 total=0\n"), nil
+		case "/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.high", "/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.swap.current", "/sys/fs/cgroup/memory.swap.max":
+			return []byte("0\n"), nil
+		case "/sys/fs/cgroup/memory.events":
+			return []byte("low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n"), nil
+		}
+		if strings.HasSuffix(path, "/status") {
+			return []byte("Name:\tgoalx\nVmRSS:\t1024 kB\n"), nil
+		}
+		return nil, os.ErrNotExist
+	}
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("❯\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	installGuidanceFakeTmux(t, nil)
+
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick first: %v", err)
+	}
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick second: %v", err)
+	}
+
+	auditPath := filepath.Join(runDir, "runtime-host.log")
+	auditData, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatalf("read runtime-host audit log: %v", err)
+	}
+	if got := strings.Count(string(auditData), "facts_refresh changed="); got != 1 {
+		t.Fatalf("facts_refresh audit count after identical ticks = %d, want 1:\n%s", got, string(auditData))
+	}
+
+	if err := os.WriteFile(masterCapture, []byte("Messages to be submitted after next tool call\n"), 0o644); err != nil {
+		t.Fatalf("rewrite master capture: %v", err)
+	}
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick third: %v", err)
+	}
+
+	auditData, err = os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatalf("read runtime-host audit log after transport change: %v", err)
+	}
+	text := string(auditData)
+	if got := strings.Count(text, "facts_refresh changed="); got != 2 {
+		t.Fatalf("facts_refresh audit count after transport change = %d, want 2:\n%s", got, text)
+	}
+	if !strings.Contains(text, "facts_refresh changed=transport") {
+		t.Fatalf("runtime-host audit log missing transport facts refresh entry:\n%s", text)
+	}
+}
+
 func TestRunRuntimeHostTickAlertsRequiredFrontierGapsOnce(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

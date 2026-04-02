@@ -79,9 +79,14 @@ func waitForPIDFile(t *testing.T, path string) int {
 	for time.Now().Before(deadline) {
 		data, err := os.ReadFile(path)
 		if err == nil {
-			pid, convErr := strconv.Atoi(strings.TrimSpace(string(data)))
+			trimmed := strings.TrimSpace(string(data))
+			if trimmed == "" {
+				time.Sleep(25 * time.Millisecond)
+				continue
+			}
+			pid, convErr := strconv.Atoi(trimmed)
 			if convErr != nil {
-				t.Fatalf("parse pid %q: %v", strings.TrimSpace(string(data)), convErr)
+				t.Fatalf("parse pid %q: %v", trimmed, convErr)
 			}
 			if pid <= 0 {
 				t.Fatalf("pid = %d, want > 0", pid)
@@ -96,6 +101,21 @@ func waitForPIDFile(t *testing.T, path string) int {
 
 	t.Fatalf("pid file %s not created", path)
 	return 0
+}
+
+func TestWaitForPIDFileIgnoresTransientEmptyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "child.pid")
+	if err := os.WriteFile(path, []byte(""), 0o644); err != nil {
+		t.Fatalf("write empty pid file: %v", err)
+	}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = os.WriteFile(path, []byte("12345\n"), 0o644)
+	}()
+
+	if got := waitForPIDFile(t, path); got != 12345 {
+		t.Fatalf("waitForPIDFile = %d, want 12345", got)
+	}
 }
 
 func waitForProcessExit(t *testing.T, pid int) {

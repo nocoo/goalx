@@ -134,6 +134,129 @@ func TestObserveShowsSettlingStateDuringStartupGrace(t *testing.T) {
 	}
 }
 
+func TestObserveShowsStoppedTransportForStoppedRun(t *testing.T) {
+	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := "#!/bin/sh\ncase \"$1\" in\n  has-session)\n    exit 1\n    ;;\n  *)\n    exit 0\n    ;;\nesac\n"
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stopped",
+		UpdatedAt:       now.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    false,
+		StartedAt: now.Add(-time.Minute).Format(time.RFC3339),
+		StoppedAt: now.Format(time.RFC3339),
+		UpdatedAt: now.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"transport stopped (no tmux session)",
+		"master stopped",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{
+		"transport degraded",
+		"master session missing",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("observe output should not contain %q:\n%s", unwanted, out)
+		}
+	}
+}
+
+func TestObserveCollapsesStoppedRunStaleSemanticSurfacesIntoCloseoutAdvisory(t *testing.T) {
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := "#!/bin/sh\ncase \"$1\" in\n  has-session)\n    exit 1\n    ;;\n  *)\n    exit 0\n    ;;\nesac\n"
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stopped",
+		UpdatedAt:       now.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := SaveRunRuntimeState(RunRuntimeStatePath(runDir), &RunRuntimeState{
+		Version:   1,
+		Run:       cfg.Name,
+		Mode:      string(cfg.Mode),
+		Active:    false,
+		StartedAt: now.Add(-time.Minute).Format(time.RFC3339),
+		StoppedAt: now.Format(time.RFC3339),
+		UpdatedAt: now.Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveRunRuntimeState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"review","required_remaining":2,"active_sessions":["session-4"],"updated_at":"2026-03-28T10:10:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`)
+
+	out := captureStdout(t, func() {
+		if err := Observe(repo, []string{"--run", cfg.Name}); err != nil {
+			t.Fatalf("Observe: %v", err)
+		}
+	})
+
+	for _, want := range []string{
+		"Stopped with stale semantic surfaces:",
+		"status.phase=review",
+		"status.active_sessions=session-4",
+		"evolve.frontier_state=active",
+		"evolve.management_gap=review_without_managed_stop",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("observe output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{
+		"review_without_managed_stop:",
+		"Control gap: status_drift",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("observe output should not contain %q once stale semantic surfaces are collapsed:\n%s", unwanted, out)
+		}
+	}
+}
+
 func TestRefreshDisplayFactsWritesEvolveFactsOnlyForEvolveRun(t *testing.T) {
 	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
 	meta.Intent = runIntentEvolve

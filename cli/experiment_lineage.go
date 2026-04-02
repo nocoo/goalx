@@ -142,6 +142,31 @@ func appendExperimentIntegrated(runDir string, body ExperimentIntegratedBody) er
 	})
 }
 
+func appendEvolveStopped(runDir string, body EvolveStoppedBody) error {
+	body.ReasonCode = strings.TrimSpace(body.ReasonCode)
+	body.Reason = strings.TrimSpace(body.Reason)
+	body.BestExperimentID = strings.TrimSpace(body.BestExperimentID)
+	body.StoppedAt = strings.TrimSpace(body.StoppedAt)
+	if body.StoppedAt == "" {
+		body.StoppedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	payload, err := json.Marshal(evolveStoppedAuthoringBody{
+		ReasonCode:       body.ReasonCode,
+		Reason:           body.Reason,
+		BestExperimentID: body.BestExperimentID,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal evolve.stopped: %w", err)
+	}
+	return ApplyDurableMutation(runDir, DurableMutation{
+		Surface: DurableSurfaceExperiments,
+		Kind:    "evolve.stopped",
+		Actor:   "goalx",
+		At:      body.StoppedAt,
+		Body:    payload,
+	})
+}
+
 func initializeRootExperimentLineage(runDir, runWorktree, runName, intent string) error {
 	return initializeRootExperimentLineageWithBase(runDir, runWorktree, runName, intent, "", "")
 }

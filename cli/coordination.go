@@ -28,6 +28,24 @@ type CoordinationRequiredItem struct {
 	UpdatedAt      string                       `json:"updated_at,omitempty"`
 }
 
+type legacyCoordinationState struct {
+	Version       int                                       `json:"version"`
+	PlanSummary   []string                                  `json:"plan_summary,omitempty"`
+	Required      map[string]legacyCoordinationRequiredItem `json:"required,omitempty"`
+	Sessions      map[string]CoordinationSession            `json:"sessions,omitempty"`
+	Decision      *CoordinationDecision                     `json:"decision,omitempty"`
+	OpenQuestions []string                                  `json:"open_questions,omitempty"`
+	UpdatedAt     string                                    `json:"updated_at,omitempty"`
+}
+
+type legacyCoordinationRequiredItem struct {
+	Owner          string                       `json:"owner,omitempty"`
+	ExecutionState string                       `json:"execution_state,omitempty"`
+	BlockedBy      string                       `json:"blocked_by,omitempty"`
+	Surfaces       CoordinationRequiredSurfaces `json:"surfaces"`
+	UpdatedAt      string                       `json:"updated_at,omitempty"`
+}
+
 type CoordinationRequiredSurfaces struct {
 	Repo           string `json:"repo,omitempty"`
 	Runtime        string `json:"runtime,omitempty"`
@@ -123,9 +141,26 @@ func EnsureCoordinationState(runDir, objective string) (*CoordinationState, erro
 }
 
 func parseCoordinationState(data []byte) (*CoordinationState, error) {
-	var state CoordinationState
-	if err := decodeStrictJSON(data, &state); err != nil {
+	var legacy legacyCoordinationState
+	if err := decodeStrictJSON(data, &legacy); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceCoordination, err)
+	}
+	state := CoordinationState{
+		Version:       legacy.Version,
+		PlanSummary:   legacy.PlanSummary,
+		Required:      map[string]CoordinationRequiredItem{},
+		Sessions:      legacy.Sessions,
+		Decision:      legacy.Decision,
+		OpenQuestions: legacy.OpenQuestions,
+		UpdatedAt:     legacy.UpdatedAt,
+	}
+	for reqID, item := range legacy.Required {
+		state.Required[reqID] = CoordinationRequiredItem{
+			ExecutionState: item.ExecutionState,
+			BlockedBy:      item.BlockedBy,
+			Surfaces:       item.Surfaces,
+			UpdatedAt:      item.UpdatedAt,
+		}
 	}
 	if err := validateCoordinationState(&state); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceCoordination, err)

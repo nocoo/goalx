@@ -190,6 +190,29 @@ func TestHasDirtyWorktreeIgnoresCodexDir(t *testing.T) {
 	}
 }
 
+func TestSnapshotWorktreeStateIgnoresGitNexusDir(t *testing.T) {
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+
+	if err := os.MkdirAll(filepath.Join(repo, ".gitnexus"), 0o755); err != nil {
+		t.Fatalf("mkdir .gitnexus: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".gitnexus", "meta.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("write .gitnexus/meta.json: %v", err)
+	}
+
+	dirty, diffStat, err := snapshotWorktreeState(repo)
+	if err != nil {
+		t.Fatalf("snapshotWorktreeState: %v", err)
+	}
+	if dirty != 0 {
+		t.Fatalf("dirty = %d, want 0", dirty)
+	}
+	if diffStat != "" {
+		t.Fatalf("diffStat = %q, want empty", diffStat)
+	}
+}
+
 func TestEnsureProjectGoalxIgnoredOnlyIgnoresManualScratchConfig(t *testing.T) {
 	repo := initGitRepo(t)
 	writeAndCommit(t, repo, "base.txt", "base", "base commit")

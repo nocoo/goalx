@@ -27,6 +27,7 @@ Usage:
   goalx attach  [--run RUN] [window]  Attach to tmux session (default: master)
   goalx stop    [--run RUN]           Graceful shutdown
   goalx recover [--run RUN]           Recover and relaunch an existing run in place
+  goalx repair  [--run RUN] [--facts-only] Repair stopped-run semantic surfaces, or refresh computed facts only on any run
   goalx review  [--run RUN]           Compare all sessions
   goalx diff    [--run RUN] <a> [b]   Diff session code/reports
   goalx keep    [--run NAME] <session> Merge/preserve session
@@ -141,6 +142,8 @@ func runCommand(cwd, cmd string, args []string) error {
 		return cli.Stop(cwd, args)
 	case "recover":
 		return mainRecover(cwd, args)
+	case "repair":
+		return cli.Repair(cwd, args)
 	case "review":
 		return cli.Review(cwd, args)
 	case "diff":

@@ -3,7 +3,9 @@ package cli
 import "strings"
 
 type RunCloseoutFacts struct {
+	RunLifecycle                 string   `json:"run_lifecycle,omitempty"`
 	StatusPhase                  string   `json:"status_phase,omitempty"`
+	StatusActiveSessions         []string `json:"status_active_sessions,omitempty"`
 	SummaryExists                bool     `json:"summary_exists,omitempty"`
 	CompletionExists             bool     `json:"completion_exists,omitempty"`
 	MasterUnread                 int      `json:"master_unread,omitempty"`
@@ -30,6 +32,7 @@ type RunCloseoutFacts struct {
 	RequiredEvidenceStale        []string `json:"required_evidence_stale,omitempty"`
 	RequiredCognitionUnsatisfied []string `json:"required_cognition_unsatisfied,omitempty"`
 	ImpactResolutionUnknown      bool     `json:"impact_resolution_unknown,omitempty"`
+	StaleSemanticSurfaces        []string `json:"stale_semantic_surfaces,omitempty"`
 	Complete                     bool     `json:"complete,omitempty"`
 }
 
@@ -47,6 +50,7 @@ func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
 		return RunCloseoutFacts{}, err
 	}
 	facts := RunCloseoutFacts{
+		RunLifecycle:        runLifecycleLabel(runDir),
 		SummaryExists:      fileExists(SummaryPath(runDir)),
 		CompletionExists:   fileExists(CompletionStatePath(runDir)),
 		MasterUnread:       unreadControlInboxCount(MasterInboxPath(runDir), MasterCursorPath(runDir)),
@@ -57,6 +61,7 @@ func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
 	facts.SuccessPlanePresent = facts.SuccessModelExists || facts.ProofPlanExists || facts.WorkflowPlanExists
 	if status != nil {
 		facts.StatusPhase = strings.TrimSpace(status.Phase)
+		facts.StatusActiveSessions = append([]string(nil), status.ActiveSessions...)
 	}
 	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
 	if err != nil {
@@ -101,8 +106,44 @@ func BuildRunCloseoutFacts(runDir string) (RunCloseoutFacts, error) {
 		facts.RequiredCognitionUnsatisfied = append([]string(nil), debt.RequiredCognitionUnsatisfied...)
 		facts.ImpactResolutionUnknown = debt.ImpactResolutionUnknown
 	}
+	facts.StaleSemanticSurfaces = append(facts.StaleSemanticSurfaces, staleSemanticSurfaceFacts(facts)...)
 	facts.Complete = facts.StatusPhase == "complete" && facts.SummaryExists && facts.CompletionExists
 	return facts, nil
+}
+
+func (facts RunCloseoutFacts) HasStaleSemanticSurfaces() bool {
+	return len(facts.StaleSemanticSurfaces) > 0
+}
+
+func staleSemanticSurfaceFacts(facts RunCloseoutFacts) []string {
+	if facts.RunLifecycle != "stopped" && facts.RunLifecycle != "completed" && facts.RunLifecycle != "dropped" {
+		return nil
+	}
+	parts := make([]string, 0, 4)
+	if phase := strings.TrimSpace(facts.StatusPhase); phase != "" {
+		switch facts.RunLifecycle {
+		case "completed":
+			if phase != "complete" {
+				parts = append(parts, "status.phase="+phase)
+			}
+		default:
+			if phase != "stopped" && phase != "complete" {
+				parts = append(parts, "status.phase="+phase)
+			}
+		}
+	}
+	if len(facts.StatusActiveSessions) > 0 {
+		parts = append(parts, "status.active_sessions="+strings.Join(facts.StatusActiveSessions, ","))
+	}
+	if strings.TrimSpace(facts.RunIntent) == runIntentEvolve {
+		if frontier := strings.TrimSpace(facts.EvolveFrontierState); frontier != "" && frontier != EvolveFrontierStopped {
+			parts = append(parts, "evolve.frontier_state="+frontier)
+		}
+		if gap := strings.TrimSpace(facts.EvolveManagementGap); gap != "" {
+			parts = append(parts, "evolve.management_gap="+gap)
+		}
+	}
+	return parts
 }
 
 func (facts RunCloseoutFacts) ReadyToFinalize() bool {

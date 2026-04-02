@@ -226,6 +226,7 @@ func parsePorcelainPath(line string) string {
 func isAllowedLocalConfigPath(path string) bool {
 	return path == ".goalx" || strings.HasPrefix(path, ".goalx/") ||
 		path == ".goalx" || strings.HasPrefix(path, ".goalx/") ||
+		path == ".gitnexus" || strings.HasPrefix(path, ".gitnexus/") ||
 		path == ".claude" || strings.HasPrefix(path, ".claude/") ||
 		path == ".codex" || strings.HasPrefix(path, ".codex/")
 }

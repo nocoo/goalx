@@ -36,6 +36,22 @@ func TestLoadRunStatusRecordParsesCanonicalShape(t *testing.T) {
 	}
 }
 
+func TestLoadRunStatusRecordParsesStoppedPhase(t *testing.T) {
+	runDir := t.TempDir()
+	path := RunStatusPath(runDir)
+	data := `{"version":1,"phase":"stopped","required_remaining":0,"active_sessions":[]}`
+	if err := writeFileAtomic(path, []byte(data), 0o644); err != nil {
+		t.Fatalf("writeFileAtomic: %v", err)
+	}
+	record, err := LoadRunStatusRecord(path)
+	if err != nil {
+		t.Fatalf("LoadRunStatusRecord: %v", err)
+	}
+	if record.Phase != runStatusPhaseStopped {
+		t.Fatalf("phase = %q, want %q", record.Phase, runStatusPhaseStopped)
+	}
+}
+
 func TestLoadRunStatusRecordRejectsUnknownFields(t *testing.T) {
 	runDir := t.TempDir()
 	path := RunStatusPath(runDir)

@@ -68,7 +68,15 @@ func SaveDomainPack(path string, pack *DomainPack) error {
 }
 
 func parseDomainPack(data []byte) (*DomainPack, error) {
-	var pack DomainPack
+	type legacyDomainPack struct {
+		Version       int             `json:"version"`
+		CompiledAt    string          `json:"compiled_at,omitempty"`
+		Domain        string          `json:"domain,omitempty"`
+		Signals       []string        `json:"signals,omitempty"`
+		Slots         DomainPackSlots `json:"slots,omitempty"`
+		PriorEntryIDs []string        `json:"prior_entry_ids,omitempty"`
+	}
+	var pack legacyDomainPack
 	if len(strings.TrimSpace(string(data))) == 0 {
 		return nil, durableSchemaHintError(DurableSurfaceDomainPack, fmt.Errorf("domain pack is empty"))
 	}
@@ -80,11 +88,18 @@ func parseDomainPack(data []byte) (*DomainPack, error) {
 	if err := ensureJSONEOF(decoder); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceDomainPack, err)
 	}
-	if err := validateDomainPackInput(&pack); err != nil {
+	current := &DomainPack{
+		Version:       pack.Version,
+		CompiledAt:    pack.CompiledAt,
+		Signals:       pack.Signals,
+		Slots:         pack.Slots,
+		PriorEntryIDs: pack.PriorEntryIDs,
+	}
+	if err := validateDomainPackInput(current); err != nil {
 		return nil, durableSchemaHintError(DurableSurfaceDomainPack, err)
 	}
-	normalizeDomainPack(&pack)
-	return &pack, nil
+	normalizeDomainPack(current)
+	return current, nil
 }
 
 func validateDomainPackInput(pack *DomainPack) error {

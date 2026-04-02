@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -164,6 +165,10 @@ func runRuntimeHostTickWithWatcher(projectRoot, runName, runDir, runID string, e
 	if err != nil {
 		return err
 	}
+	beforeFacts, err := snapshotRuntimeHostRepairFacts(runDir)
+	if err != nil {
+		return err
+	}
 	tmuxSession := resolveRunTmuxSession(projectRoot, runDir, runName)
 	runState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
 	if err != nil {
@@ -250,7 +255,128 @@ func runRuntimeHostTickWithWatcher(projectRoot, runName, runDir, runID string, e
 	if err := runRuntimeHostMaintenanceCycle(projectRoot, runName, runDir, tmuxSession, cfg, interval, presence, watcher, controlState); err != nil {
 		return err
 	}
+	afterFacts, err := snapshotRuntimeHostRepairFacts(runDir)
+	if err != nil {
+		return err
+	}
+	if changed := changedRuntimeHostRepairFactSurfaces(beforeFacts, afterFacts); len(changed) > 0 {
+		appendAuditLog(runDir, "facts_refresh changed=%s", strings.Join(changed, ","))
+	}
 	return nil
+}
+
+type runtimeHostRepairFactsSnapshot struct {
+	Transport string
+	Worktree  string
+	Resource  string
+	Evolve    string
+}
+
+func snapshotRuntimeHostRepairFacts(runDir string) (runtimeHostRepairFactsSnapshot, error) {
+	transport, err := transportFactsSemanticFingerprint(runDir)
+	if err != nil {
+		return runtimeHostRepairFactsSnapshot{}, err
+	}
+	worktree, err := worktreeSnapshotSemanticFingerprint(runDir)
+	if err != nil {
+		return runtimeHostRepairFactsSnapshot{}, err
+	}
+	resource, err := resourceStateSemanticFingerprint(runDir)
+	if err != nil {
+		return runtimeHostRepairFactsSnapshot{}, err
+	}
+	evolve, err := evolveFactsSemanticFingerprint(runDir)
+	if err != nil {
+		return runtimeHostRepairFactsSnapshot{}, err
+	}
+	return runtimeHostRepairFactsSnapshot{
+		Transport: transport,
+		Worktree:  worktree,
+		Resource:  resource,
+		Evolve:    evolve,
+	}, nil
+}
+
+func changedRuntimeHostRepairFactSurfaces(before, after runtimeHostRepairFactsSnapshot) []string {
+	changed := make([]string, 0, 4)
+	if before.Transport != after.Transport {
+		changed = append(changed, "transport")
+	}
+	if before.Worktree != after.Worktree {
+		changed = append(changed, "worktree")
+	}
+	if before.Resource != after.Resource {
+		changed = append(changed, "resource")
+	}
+	if before.Evolve != after.Evolve {
+		changed = append(changed, "evolve")
+	}
+	return changed
+}
+
+func transportFactsSemanticFingerprint(runDir string) (string, error) {
+	facts, err := LoadTransportFacts(TransportFactsPath(runDir))
+	if err != nil || facts == nil {
+		return "", err
+	}
+	normalized := TransportFacts{
+		Version: 1,
+		Targets: map[string]TransportTargetFacts{},
+	}
+	for key, target := range facts.Targets {
+		target.LastSampleAt = ""
+		target.LastOutputAt = ""
+		target.LastSubmitAttemptAt = ""
+		target.LastTransportAcceptAt = ""
+		normalized.Targets[key] = target
+	}
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func worktreeSnapshotSemanticFingerprint(runDir string) (string, error) {
+	snapshot, err := LoadWorktreeSnapshot(WorktreeSnapshotPath(runDir))
+	if err != nil || snapshot == nil {
+		return "", err
+	}
+	normalized := *snapshot
+	normalized.CheckedAt = ""
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func resourceStateSemanticFingerprint(runDir string) (string, error) {
+	state, err := LoadResourceState(ResourceStatePath(runDir))
+	if err != nil || state == nil {
+		return "", err
+	}
+	normalized := *state
+	normalized.CheckedAt = ""
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func evolveFactsSemanticFingerprint(runDir string) (string, error) {
+	facts, err := LoadCurrentEvolveFacts(runDir)
+	if err != nil || facts == nil {
+		return "", err
+	}
+	normalized := *facts
+	normalized.UpdatedAt = ""
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func refreshActivityFacts(runDir, projectRoot, runName string) error {

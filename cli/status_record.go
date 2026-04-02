@@ -13,6 +13,7 @@ const (
 	runStatusPhaseWorking  = "working"
 	runStatusPhaseReview   = "review"
 	runStatusPhaseComplete = "complete"
+	runStatusPhaseStopped  = "stopped"
 )
 
 type RunStatusRecord struct {
@@ -90,7 +91,7 @@ func validateRunStatusRecord(record *RunStatusRecord) error {
 		return fmt.Errorf("run status record version must be positive")
 	}
 	switch strings.TrimSpace(record.Phase) {
-	case runStatusPhaseWorking, runStatusPhaseReview, runStatusPhaseComplete:
+	case runStatusPhaseWorking, runStatusPhaseReview, runStatusPhaseComplete, runStatusPhaseStopped:
 	default:
 		return fmt.Errorf("invalid run status phase %q", record.Phase)
 	}
@@ -153,6 +154,7 @@ func BuildRunStatusComparison(runDir string) (*RunStatusComparison, error) {
 		summary := SummarizeGoalState(goalState)
 		comparison.GoalRequiredRemaining = intPtr(summary.RequiredRemaining)
 		comparison.GoalRemainingRequiredIDs = goalRemainingRequiredIDs(goalState)
+		slices.Sort(comparison.GoalRemainingRequiredIDs)
 	}
 	sessionState, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
 	if err != nil {

@@ -339,6 +339,9 @@ func targetLossSummary(rc *RunContext) string {
 	if rc == nil {
 		return ""
 	}
+	if runLifecycleExpectedInactive(rc.RunDir) {
+		return ""
+	}
 	parts := make([]string, 0, 4)
 	if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
 		if label := targetPresenceMissingLabel("master", facts); label != "" {
@@ -363,6 +366,35 @@ func targetLossSummary(rc *RunContext) string {
 		parts = append(parts, "runtime host missing ("+runtimeHostFacts.State+")")
 	}
 	return strings.Join(parts, " | ")
+}
+
+func runLifecycleLabel(runDir string) string {
+	controlState, _ := LoadControlRunState(ControlRunStatePath(runDir))
+	runtimeState, _ := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
+	label := strings.TrimSpace(controlRunDisplayState(controlState))
+	if label != "" {
+		return label
+	}
+	if runtimeState != nil {
+		switch {
+		case runtimeState.Phase == "complete":
+			return "completed"
+		case runtimeState.StoppedAt != "":
+			return "stopped"
+		case runtimeState.Active:
+			return "running"
+		}
+	}
+	return ""
+}
+
+func runLifecycleExpectedInactive(runDir string) bool {
+	switch runLifecycleLabel(runDir) {
+	case "stopped", "completed", "dropped":
+		return true
+	default:
+		return false
+	}
 }
 
 func formatObjectiveIntegritySummary(runDir string) string {

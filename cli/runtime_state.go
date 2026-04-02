@@ -477,9 +477,18 @@ func snapshotWorktreeState(worktreePath string) (int, string, error) {
 	}
 	dirty := 0
 	for _, line := range strings.Split(strings.TrimSpace(string(statusOut)), "\n") {
-		if strings.TrimSpace(line) != "" {
-			dirty++
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
+		path := parsePorcelainPath(line)
+		if isAllowedLocalConfigPath(path) {
+			continue
+		}
+		dirty++
+	}
+	if dirty == 0 {
+		return 0, "", nil
 	}
 	diffOut, err := exec.Command("git", "-C", worktreePath, "diff", "--stat").CombinedOutput()
 	if err != nil {

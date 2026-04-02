@@ -253,7 +253,7 @@ func TestLoadCoordinationStateRejectsLegacySessionSchema(t *testing.T) {
 	}
 }
 
-func TestLoadCoordinationStateRejectsLegacyRequiredOwnerField(t *testing.T) {
+func TestLoadCoordinationStateAcceptsLegacyRequiredOwnerFieldAndDropsItOnSave(t *testing.T) {
 	runDir := filepath.Join(t.TempDir(), "demo")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
@@ -285,8 +285,19 @@ func TestLoadCoordinationStateRejectsLegacyRequiredOwnerField(t *testing.T) {
 		t.Fatalf("write coordination state: %v", err)
 	}
 
-	if _, err := LoadCoordinationState(CoordinationPath(runDir)); err == nil {
-		t.Fatal("LoadCoordinationState should reject legacy required.owner field")
+	state, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState should accept legacy required.owner field for read compatibility: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), state); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	saved, err := os.ReadFile(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("read saved coordination state: %v", err)
+	}
+	if strings.Contains(string(saved), `"owner"`) {
+		t.Fatalf("saved coordination state should drop legacy owner alias:\n%s", string(saved))
 	}
 }
 

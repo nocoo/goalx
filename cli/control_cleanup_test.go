@@ -302,6 +302,112 @@ esac
 	}
 }
 
+func TestStopRepairsStatusAndEvolveFrontierWhenStoppingEvolveRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := RegisterActiveRun(repo, cfg); err != nil {
+		t.Fatalf("RegisterActiveRun: %v", err)
+	}
+	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunMetadata: %v", err)
+	}
+	meta.Intent = runIntentEvolve
+	if err := SaveRunMetadata(RunMetadataPath(runDir), meta); err != nil {
+		t.Fatalf("SaveRunMetadata: %v", err)
+	}
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
+		Required: []GoalItem{
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("writeBoundaryFixture: %v", err)
+	}
+	requiredRemaining := 1
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseReview,
+		RequiredRemaining: &requiredRemaining,
+		OpenRequiredIDs:   []string{"req-1"},
+		ActiveSessions:    []string{"session-1"},
+		UpdatedAt:         "2026-03-28T10:10:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", Scope: "legacy active lane"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+	appendExperimentEventForTest(t, runDir, `{"version":1,"kind":"experiment.created","at":"2026-03-28T10:00:00Z","actor":"master","body":{"experiment_id":"exp-1","created_at":"2026-03-28T10:00:00Z"}}`)
+
+	_ = stubRuntimeSupervisor(t)
+
+	fakeBin := t.TempDir()
+	tmuxPath := filepath.Join(fakeBin, "tmux")
+	script := `#!/bin/sh
+case "$1" in
+  has-session)
+    exit 0
+    ;;
+  kill-session)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`
+	if err := os.WriteFile(tmuxPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake tmux: %v", err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := Stop(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunStatusRecord: %v", err)
+	}
+	if status.Phase != runStatusPhaseStopped {
+		t.Fatalf("status phase = %q, want %q", status.Phase, runStatusPhaseStopped)
+	}
+	if len(status.ActiveSessions) != 0 {
+		t.Fatalf("status active_sessions = %v, want empty", status.ActiveSessions)
+	}
+	coord, err := LoadCoordinationState(CoordinationPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadCoordinationState: %v", err)
+	}
+	if coord.Sessions["session-1"].State != "stopped" {
+		t.Fatalf("coordination session-1 state = %q, want stopped", coord.Sessions["session-1"].State)
+	}
+
+	facts, err := BuildEvolveFacts(runDir)
+	if err != nil {
+		t.Fatalf("BuildEvolveFacts: %v", err)
+	}
+	if facts.FrontierState != EvolveFrontierStopped {
+		t.Fatalf("frontier_state = %q, want %q", facts.FrontierState, EvolveFrontierStopped)
+	}
+	if facts.LastStopReasonCode != "user_redirected" {
+		t.Fatalf("last_stop_reason_code = %q, want user_redirected", facts.LastStopReasonCode)
+	}
+}
+
 func TestRefreshDisplayFactsRepairsCompletedRunAndCleansLeases(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

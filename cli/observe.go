@@ -56,6 +56,8 @@ func Observe(projectRoot string, args []string) error {
 		fmt.Println("### transport")
 		if startup.Launching() {
 			fmt.Printf("transport launching (%s)\n", startup.Phase)
+		} else if runLifecycleExpectedInactive(rc.RunDir) {
+			fmt.Printf("transport %s (no tmux session)\n", runLifecycleLabel(rc.RunDir))
 		} else {
 			fmt.Println("transport degraded (no tmux session)")
 		}
@@ -63,7 +65,9 @@ func Observe(projectRoot string, args []string) error {
 
 		fmt.Println("### master")
 		printObserveMasterQueue(rc.RunDir)
-		if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
+		if label := inactiveObserveTargetLabel(rc.RunDir, "master", nil); label != "" {
+			fmt.Println(label)
+		} else if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, "master"); err == nil {
 			if label := startupTargetObserveLabel("master", facts, startup); label != "" {
 				fmt.Println(label)
 			}
@@ -81,7 +85,9 @@ func Observe(projectRoot string, args []string) error {
 		for _, num := range sessionIndexes {
 			fmt.Printf("### %s\n", SessionName(num))
 			printObserveSessionQueue(rc.RunDir, rc.Config.Name, SessionName(num), sessionState)
-			if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, SessionName(num)); err == nil {
+			if label := inactiveObserveTargetLabel(rc.RunDir, SessionName(num), sessionState); label != "" {
+				fmt.Println(label)
+			} else if facts, err := LoadTargetPresenceFact(rc.RunDir, rc.TmuxSession, SessionName(num)); err == nil {
 				if label := startupTargetObserveLabel(SessionName(num), facts, startup); label != "" {
 					fmt.Println(label)
 				}
@@ -152,6 +158,28 @@ func Observe(projectRoot string, args []string) error {
 	}
 
 	return nil
+}
+
+func inactiveObserveTargetLabel(runDir, target string, sessionState *SessionsRuntimeState) string {
+	if !runLifecycleExpectedInactive(runDir) {
+		return ""
+	}
+	if target == "master" {
+		switch runLifecycleLabel(runDir) {
+		case "completed":
+			return "master completed"
+		case "dropped":
+			return "master dropped"
+		default:
+			return "master stopped"
+		}
+	}
+	if sessionState != nil && sessionState.Sessions != nil {
+		if session, ok := sessionState.Sessions[target]; ok && strings.TrimSpace(session.State) != "" {
+			return target + " " + strings.TrimSpace(session.State)
+		}
+	}
+	return target + " inactive"
 }
 
 func printObserveStatusSection(title, path string) {

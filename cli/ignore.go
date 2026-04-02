@@ -34,7 +34,12 @@ func EnsureProjectGoalxIgnored(projectRoot string) error {
 		return err
 	}
 	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
-	managed := []string{goalxExcludeBegin, ".goalx/goalx.yaml", goalxExcludeEnd}
+	managed := []string{
+		goalxExcludeBegin,
+		".goalx/goalx.yaml",
+		".gitnexus/",
+		goalxExcludeEnd,
+	}
 	out := make([]string, 0, len(lines)+len(managed))
 	skippingManaged := false
 	inserted := false

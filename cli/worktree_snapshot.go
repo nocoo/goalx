@@ -278,6 +278,9 @@ func gitUntrackedFiles(worktreePath string) ([]string, error) {
 		if file == "" {
 			continue
 		}
+		if isAllowedLocalConfigPath(file) {
+			continue
+		}
 		files = append(files, file)
 	}
 	sort.Strings(files)

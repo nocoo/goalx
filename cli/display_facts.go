@@ -239,6 +239,7 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 	if closeoutErr != nil {
 		closeoutFacts = RunCloseoutFacts{}
 	}
+	inactiveLifecycle := runLifecycleExpectedInactive(rc.RunDir)
 	summaryExists := closeoutFacts.SummaryExists
 	completionExists := closeoutFacts.CompletionExists
 	advisories := make([]runAdvisory, 0, 2)
@@ -246,6 +247,20 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 		advisories = append(advisories, runAdvisory{Severity: advisorySeverityBlocker, Group: "closeout", Message: fmt.Sprintf("Closeout artifacts missing: required_remaining=0 summary_exists=%t completion_proof_exists=%t", summaryExists, completionExists)})
 	} else if err != nil {
 		return nil, err
+	}
+	if closeoutFacts.HasStaleSemanticSurfaces() {
+		prefix := "Stopped"
+		switch closeoutFacts.RunLifecycle {
+		case "completed":
+			prefix = "Completed"
+		case "dropped":
+			prefix = "Dropped"
+		}
+		advisories = append(advisories, runAdvisory{
+			Severity: advisorySeverityWarning,
+			Group:    "closeout",
+			Message:  prefix + " with stale semantic surfaces: " + strings.Join(closeoutFacts.StaleSemanticSurfaces, " "),
+		})
 	}
 	statusComparison, err := BuildRunStatusComparison(rc.RunDir)
 	if err != nil {
@@ -257,7 +272,7 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 	if statusComparison != nil && statusComparison.StatusOpenRequiredIDsRecorded && !statusComparison.OpenRequiredIDsMatch {
 		advisories = append(advisories, runAdvisory{Severity: advisorySeverityWarning, Group: "status_drift", Message: fmt.Sprintf("Status drift: status_open_required_ids=%s boundary_remaining_ids=%s", strings.Join(statusComparison.StatusOpenRequiredIDs, ","), strings.Join(statusComparison.GoalRemainingRequiredIDs, ","))})
 	}
-	if statusComparison != nil && statusComparison.StatusActiveSessionsRecorded && !statusComparison.ActiveSessionsMatch {
+	if statusComparison != nil && statusComparison.StatusActiveSessionsRecorded && !statusComparison.ActiveSessionsMatch && !closeoutFacts.HasStaleSemanticSurfaces() {
 		advisories = append(advisories, runAdvisory{Severity: advisorySeverityWarning, Group: "status_drift", Message: fmt.Sprintf("Status drift: status_active_sessions=%s runtime_active_sessions=%s", strings.Join(statusComparison.StatusActiveSessions, ","), strings.Join(statusComparison.RuntimeActiveSessions, ","))})
 	}
 	if objective := formatObjectiveIntegritySummary(rc.RunDir); objective != "" {
@@ -282,8 +297,10 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 			}
 			advisories = append(advisories, runAdvisory{Severity: advisorySeverityUrgent, Group: "required_frontier", Message: "Required frontier facts: " + strings.Join(parts, " ")})
 		}
-		if targetAttention := formatTargetAttentionAdvisory(activity.Attention); targetAttention != "" {
-			advisories = append(advisories, runAdvisory{Severity: advisorySeverityUrgent, Group: "transport", Message: targetAttention})
+		if activity.Lifecycle.RunActive {
+			if targetAttention := formatTargetAttentionAdvisory(activity.Attention); targetAttention != "" {
+				advisories = append(advisories, runAdvisory{Severity: advisorySeverityUrgent, Group: "transport", Message: targetAttention})
+			}
 		}
 		if frontier := formatRequiredFrontierAdvisory(rc.RunDir, coverage, activity.Attention); frontier != "" {
 			advisories = append(advisories, runAdvisory{Severity: advisorySeverityDiagnostic, Group: "required_frontier", Message: frontier})
@@ -296,7 +313,7 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 	if err != nil {
 		return nil, err
 	}
-	if advisory := formatEvolveManagementAdvisory(evolveFacts, status); advisory != "" {
+	if advisory := formatEvolveManagementAdvisory(evolveFacts, status); advisory != "" && !closeoutFacts.HasStaleSemanticSurfaces() {
 		advisories = append(advisories, runAdvisory{Severity: advisorySeverityUrgent, Group: "evolve_management", Message: advisory})
 	}
 	controlGapFacts, err := BuildControlGapFacts(rc.RunDir)
@@ -304,6 +321,9 @@ func collectRunAdvisories(rc *RunContext) ([]runAdvisory, error) {
 		return nil, err
 	}
 	for _, advisory := range formatControlGapAdvisories(controlGapFacts) {
+		if inactiveLifecycle && closeoutFacts.HasStaleSemanticSurfaces() && strings.Contains(advisory, "Control gap: status_drift") {
+			continue
+		}
 		advisories = append(advisories, runAdvisory{Severity: advisorySeverityWarning, Group: "control_gap", Message: advisory})
 	}
 	qualityDebt, err := BuildQualityDebt(rc.RunDir)

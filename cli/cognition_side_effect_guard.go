@@ -25,6 +25,7 @@ func withGitNexusSideEffectGuard(scopePath string, fn func() error) error {
 	targets := []string{
 		filepath.Join(scopePath, "AGENTS.md"),
 		filepath.Join(scopePath, "CLAUDE.md"),
+		filepath.Join(scopePath, ".gitignore"),
 		filepath.Join(scopePath, ".claude", "skills", "gitnexus"),
 	}
 	snapshots := make([]guardedPathSnapshot, 0, len(targets))

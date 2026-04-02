@@ -87,6 +87,13 @@ func buildTargetAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessio
 func buildMasterAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessionState *SessionsRuntimeState, liveness *LivenessState, transportFacts *TransportFacts, now time.Time) TargetAttentionFacts {
 	inbox := readControlInboxState(MasterInboxPath(runDir), MasterCursorPath(runDir))
 	transport := latestAttentionTransportFacts(transportFacts, "master")
+	runtimeState := "active"
+	if snapshot != nil && !snapshot.Lifecycle.RunActive {
+		runtimeState = strings.TrimSpace(snapshot.Lifecycle.ControlState)
+		if runtimeState == "" {
+			runtimeState = "stopped"
+		}
+	}
 	facts := TargetAttentionFacts{
 		Target:                "master",
 		InboxLastID:           inbox.LastID,
@@ -97,7 +104,7 @@ func buildMasterAttentionFacts(runDir string, snapshot *ActivitySnapshot, sessio
 		LastTransportAcceptAt: transport.LastTransportAcceptAt,
 		DeliveryGraceExpired:  transportAcceptExpired(transport.LastTransportAcceptAt, now),
 		PresenceState:         attentionPresenceState(snapshot, "master"),
-		RuntimeState:          "active",
+		RuntimeState:          runtimeState,
 		LastOutputChangeAt:    attentionLastOutputChangeAt(snapshot, "master"),
 		OutputStaleMinutes:    attentionOutputStaleMinutes(snapshot, "master", now),
 	}
