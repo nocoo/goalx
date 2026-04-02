@@ -45,7 +45,7 @@ func Stop(projectRoot string, args []string) error {
 		}
 		_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
 		if finalLifecycle != "completed" {
-			if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "stop"}); err != nil {
+			if err := repairStoppedSemanticSurfaces(rc.RunDir, inactiveSemanticRepairOptions{Origin: "stop"}); err != nil {
 				return err
 			}
 		}
@@ -75,7 +75,7 @@ func Stop(projectRoot string, args []string) error {
 	_ = MarkRunInactive(rc.ProjectRoot, rc.Name)
 	_ = FinalizeControlRun(rc.RunDir, finalLifecycle)
 	if finalLifecycle != "completed" {
-		if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "stop"}); err != nil {
+		if err := repairStoppedSemanticSurfaces(rc.RunDir, inactiveSemanticRepairOptions{Origin: "stop"}); err != nil {
 			return err
 		}
 	}

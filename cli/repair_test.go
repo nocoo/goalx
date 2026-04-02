@@ -229,6 +229,50 @@ func TestRepairRejectsActiveRun(t *testing.T) {
 	}
 }
 
+func TestRepairRepairsStrandedRunAndRetiresReminders(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName := "repair-stranded"
+	runDir := writeRepairableStoppedRunFixture(t, repo, runName, "")
+
+	if err := SaveControlRunState(ControlRunStatePath(runDir), &ControlRunState{
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "stranded",
+		UpdatedAt:       time.Now().UTC().Format(time.RFC3339),
+	}); err != nil {
+		t.Fatalf("SaveControlRunState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"complete","required_remaining":0,"updated_at":"2026-03-28T10:10:00Z"}`), 0o644); err != nil {
+		t.Fatalf("write stale status: %v", err)
+	}
+	if _, err := QueueControlReminderWithEngine(runDir, "master-wake", "control-cycle", "gx-demo:master", "codex"); err != nil {
+		t.Fatalf("QueueControlReminderWithEngine: %v", err)
+	}
+
+	if err := Repair(repo, []string{"--run", runName}); err != nil {
+		t.Fatalf("Repair: %v", err)
+	}
+
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunStatusRecord: %v", err)
+	}
+	if status.Phase != runStatusPhaseStranded {
+		t.Fatalf("status phase = %q, want %q", status.Phase, runStatusPhaseStranded)
+	}
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders: %v", err)
+	}
+	if len(reminders.Items) != 1 || !reminders.Items[0].Suppressed {
+		t.Fatalf("reminders = %+v, want suppressed master reminder", reminders.Items)
+	}
+}
+
 func TestRepairFactsOnlyAllowsActiveRunAndRefreshesComputedFacts(t *testing.T) {
 	repo, runDir, cfg, _ := writeGuidanceRunFixture(t)
 	now := time.Now().UTC().Format(time.RFC3339)
