@@ -2200,6 +2200,145 @@ func TestRunRuntimeHostTickAlertsControlGapFacts(t *testing.T) {
 	}
 }
 
+func TestRunRuntimeHostTickDoesNotRealertStableStatusDriftOnTimestampOnlyChanges(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	installGuidanceFakeTmux(t, nil)
+
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
+		Required: []GoalItem{{ID: "req-1", Text: "ship cockpit", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":1,"open_required_ids":["req-mismatch"],"updated_at":"2026-03-30T19:12:54Z"}`), 0o644); err != nil {
+		t.Fatalf("write status record: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version: 1,
+		Required: map[string]CoordinationRequiredItem{
+			"req-1": {
+				ExecutionState: coordinationRequiredExecutionStateProbing,
+				Surfaces: CoordinationRequiredSurfaces{
+					Repo:           coordinationRequiredSurfaceActive,
+					Runtime:        coordinationRequiredSurfaceActive,
+					RunArtifacts:   coordinationRequiredSurfaceActive,
+					WebResearch:    coordinationRequiredSurfacePending,
+					ExternalSystem: coordinationRequiredSurfacePending,
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+
+	orig := sendAgentNudgeDetailedInRunFunc
+	defer func() { sendAgentNudgeDetailedInRunFunc = orig }()
+	sendAgentNudgeDetailedInRunFunc = func(_ string, target, engine string) (TransportDeliveryOutcome, error) {
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+	}
+
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick first: %v", err)
+	}
+	if err := os.WriteFile(RunStatusPath(runDir), []byte(`{"version":1,"phase":"working","required_remaining":1,"open_required_ids":["req-mismatch"],"updated_at":"2026-03-30T19:13:54Z"}`), 0o644); err != nil {
+		t.Fatalf("write second status record: %v", err)
+	}
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick second: %v", err)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), "fact=status_drift"); got != 1 {
+		t.Fatalf("status_drift alert count = %d, want 1:\n%s", got, string(inboxData))
+	}
+}
+
+func TestRunRuntimeHostTickDoesNotRealertStableCoordinationStaleOnTimestampOnlyChanges(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo, runDir, cfg, meta := writeGuidanceRunFixture(t)
+	masterCapture := filepath.Join(t.TempDir(), "master-pane.txt")
+	if err := os.WriteFile(masterCapture, []byte("master pane\n"), 0o644); err != nil {
+		t.Fatalf("write master capture: %v", err)
+	}
+	t.Setenv("TMUX_MASTER_CAPTURE", masterCapture)
+	installGuidanceFakeTmux(t, nil)
+
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
+		Required: []GoalItem{{ID: "req-1", Text: "ship cockpit", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen}},
+	}); err != nil {
+		t.Fatalf("SaveGoalState: %v", err)
+	}
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseWorking,
+		RequiredRemaining: intPtr(1),
+		OpenRequiredIDs:   []string{"req-1"},
+		UpdatedAt:         "2026-03-30T19:12:54Z",
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := SaveCoordinationState(CoordinationPath(runDir), &CoordinationState{
+		Version:   1,
+		UpdatedAt: "2026-03-30T19:12:54Z",
+		Required: map[string]CoordinationRequiredItem{
+			"req-1": {
+				ExecutionState: coordinationRequiredExecutionStateProbing,
+				Surfaces: CoordinationRequiredSurfaces{
+					Repo:           coordinationRequiredSurfaceActive,
+					Runtime:        coordinationRequiredSurfaceActive,
+					RunArtifacts:   coordinationRequiredSurfaceActive,
+					WebResearch:    coordinationRequiredSurfacePending,
+					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCoordinationState: %v", err)
+	}
+
+	orig := sendAgentNudgeDetailedInRunFunc
+	defer func() { sendAgentNudgeDetailedInRunFunc = orig }()
+	sendAgentNudgeDetailedInRunFunc = func(_ string, target, engine string) (TransportDeliveryOutcome, error) {
+		return TransportDeliveryOutcome{SubmitMode: "payload_enter", TransportState: "sent"}, nil
+	}
+
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick first: %v", err)
+	}
+	if err := SaveIntegrationState(IntegrationStatePath(runDir), &IntegrationState{
+		Version:             1,
+		CurrentExperimentID: "exp-2",
+		CurrentBranch:       "goalx/guidance-run/root",
+		CurrentCommit:       "abc123",
+		UpdatedAt:           "2026-03-31T01:06:35Z",
+	}); err != nil {
+		t.Fatalf("SaveIntegrationState second: %v", err)
+	}
+	if err := runRuntimeHostTick(repo, cfg.Name, runDir, meta.RunID, meta.Epoch, time.Minute, os.Getpid()); err != nil {
+		t.Fatalf("runRuntimeHostTick second: %v", err)
+	}
+
+	inboxData, err := os.ReadFile(MasterInboxPath(runDir))
+	if err != nil {
+		t.Fatalf("read master inbox: %v", err)
+	}
+	if got := strings.Count(string(inboxData), "fact=coordination_stale"); got != 1 {
+		t.Fatalf("coordination_stale alert count = %d, want 1:\n%s", got, string(inboxData))
+	}
+}
+
 func TestRunRuntimeHostTickRealertsControlGapWhenFingerprintChanges(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -116,7 +116,7 @@ func (facts RunCloseoutFacts) HasStaleSemanticSurfaces() bool {
 }
 
 func staleSemanticSurfaceFacts(facts RunCloseoutFacts) []string {
-	if facts.RunLifecycle != "stopped" && facts.RunLifecycle != "completed" && facts.RunLifecycle != "dropped" {
+	if facts.RunLifecycle != "stopped" && facts.RunLifecycle != "completed" && facts.RunLifecycle != "dropped" && facts.RunLifecycle != "stranded" {
 		return nil
 	}
 	parts := make([]string, 0, 4)
@@ -124,6 +124,10 @@ func staleSemanticSurfaceFacts(facts RunCloseoutFacts) []string {
 		switch facts.RunLifecycle {
 		case "completed":
 			if phase != "complete" {
+				parts = append(parts, "status.phase="+phase)
+			}
+		case "stranded":
+			if phase != "stranded" {
 				parts = append(parts, "status.phase="+phase)
 			}
 		default:

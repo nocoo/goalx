@@ -52,6 +52,22 @@ func TestLoadRunStatusRecordParsesStoppedPhase(t *testing.T) {
 	}
 }
 
+func TestLoadRunStatusRecordParsesStrandedPhase(t *testing.T) {
+	runDir := t.TempDir()
+	path := RunStatusPath(runDir)
+	data := `{"version":1,"phase":"stranded","required_remaining":1,"active_sessions":[]}`
+	if err := writeFileAtomic(path, []byte(data), 0o644); err != nil {
+		t.Fatalf("writeFileAtomic: %v", err)
+	}
+	record, err := LoadRunStatusRecord(path)
+	if err != nil {
+		t.Fatalf("LoadRunStatusRecord: %v", err)
+	}
+	if record.Phase != runStatusPhaseStranded {
+		t.Fatalf("phase = %q, want %q", record.Phase, runStatusPhaseStranded)
+	}
+}
+
 func TestLoadRunStatusRecordRejectsUnknownFields(t *testing.T) {
 	runDir := t.TempDir()
 	path := RunStatusPath(runDir)

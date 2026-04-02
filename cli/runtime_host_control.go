@@ -852,10 +852,7 @@ func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert
 	if controlGapFacts != nil {
 		if controlGapFacts.StatusDrift {
 			key := "control_gap:status_drift"
-			fingerprint := strings.Join([]string{
-				"status_drift",
-				"status_updated_at=" + strings.TrimSpace(controlGapFacts.StatusUpdatedAt),
-			}, "|")
+			fingerprint := "status_drift"
 			body := "Control gap in active GoalX run; fact=status_drift"
 			if controlGapFacts.StatusUpdatedAt != "" {
 				body += " status_updated_at=" + controlGapFacts.StatusUpdatedAt
@@ -869,11 +866,7 @@ func buildMasterAlerts(runDir string, activity *ActivitySnapshot) ([]masterAlert
 		}
 		if controlGapFacts.CoordinationStale {
 			key := "control_gap:coordination_stale"
-			fingerprint := strings.Join([]string{
-				"coordination_stale",
-				"coordination_updated_at=" + strings.TrimSpace(controlGapFacts.CoordinationUpdatedAt),
-				"latest_control_change_at=" + strings.TrimSpace(controlGapFacts.LatestControlChangeAt),
-			}, "|")
+			fingerprint := "coordination_stale"
 			body := "Control gap in active GoalX run; fact=coordination_stale"
 			if controlGapFacts.CoordinationUpdatedAt != "" {
 				body += " coordination_updated_at=" + controlGapFacts.CoordinationUpdatedAt

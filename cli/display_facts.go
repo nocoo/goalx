@@ -38,6 +38,11 @@ func refreshDisplayFacts(rc *RunContext) error {
 	if err := RefreshWorktreeSnapshot(rc.RunDir); err != nil {
 		return err
 	}
+	if rc.Config != nil {
+		if err := RefreshSessionRuntimeProjection(rc.RunDir, rc.Config.Name); err != nil {
+			return err
+		}
+	}
 	if err := RefreshResourceState(rc.RunDir); err != nil {
 		return err
 	}

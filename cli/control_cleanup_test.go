@@ -760,6 +760,24 @@ func TestRefreshDisplayFactsStrandsOpenRunWhenRuntimeHostStopped(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveRunRuntimeState: %v", err)
 	}
+	requiredRemaining := 1
+	if err := SaveRunStatusRecord(RunStatusPath(runDir), &RunStatusRecord{
+		Version:           1,
+		Phase:             runStatusPhaseWorking,
+		RequiredRemaining: &requiredRemaining,
+		OpenRequiredIDs:   []string{"req-1"},
+		ActiveSessions:    []string{"session-1"},
+		UpdatedAt:         "2026-03-31T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("SaveRunStatusRecord: %v", err)
+	}
+	if err := writeBoundaryFixture(t, runDir, &GoalState{
+		Required: []GoalItem{
+			{ID: "req-1", Text: "ship feature", Source: goalItemSourceUser, Role: goalItemRoleOutcome, State: goalItemStateOpen},
+		},
+	}); err != nil {
+		t.Fatalf("writeBoundaryFixture: %v", err)
+	}
 	if err := SaveRunHostState(RunHostStatePath(runDir), &RunHostState{
 		Version:   1,
 		Kind:      "runtime_host",
@@ -810,6 +828,22 @@ func TestRefreshDisplayFactsStrandsOpenRunWhenRuntimeHostStopped(t *testing.T) {
 	if controlState.GoalState != "open" || controlState.ContinuityState != "stranded" {
 		t.Fatalf("control state = %+v, want open/stranded", controlState)
 	}
+	status, err := LoadRunStatusRecord(RunStatusPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadRunStatusRecord: %v", err)
+	}
+	if status.Phase != runStatusPhaseStranded {
+		t.Fatalf("status phase = %q, want stranded", status.Phase)
+	}
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil {
+		t.Fatalf("LoadControlReminders: %v", err)
+	}
+	for _, item := range reminders.Items {
+		if !item.Suppressed {
+			t.Fatalf("inactive reminders should be suppressed after stranding: %+v", reminders.Items)
+		}
+	}
 	runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir))
 	if err != nil {
 		t.Fatalf("LoadRunRuntimeState: %v", err)
@@ -823,5 +857,50 @@ func TestRefreshDisplayFactsStrandsOpenRunWhenRuntimeHostStopped(t *testing.T) {
 	}
 	if _, ok := reg.ActiveRuns[runName]; ok {
 		t.Fatalf("run %q still registered active after stranding", runName)
+	}
+}
+
+func TestRefreshDisplayFactsRefreshesParkedSessionDirtyProjection(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "base.txt", "base", "base commit")
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	cfg, err := LoadRunSpec(runDir)
+	if err != nil {
+		t.Fatalf("LoadRunSpec: %v", err)
+	}
+	if err := EnsureControlState(runDir); err != nil {
+		t.Fatalf("EnsureControlState: %v", err)
+	}
+	if _, err := EnsureRuntimeState(runDir, cfg); err != nil {
+		t.Fatalf("EnsureRuntimeState: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:       "session-1",
+		State:      "parked",
+		Mode:       string(cfg.Mode),
+		DirtyFiles: 99,
+		DiffStat:   "stale dirty snapshot",
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	rc, err := buildRunContext(repo, runDir, runName)
+	if err != nil {
+		t.Fatalf("buildRunContext: %v", err)
+	}
+	if err := refreshDisplayFacts(rc); err != nil {
+		t.Fatalf("refreshDisplayFacts: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	sess := state.Sessions["session-1"]
+	if sess.DirtyFiles != 0 || sess.DiffStat != "" {
+		t.Fatalf("session-1 dirty snapshot = %+v, want cleared dirty facts", sess)
 	}
 }

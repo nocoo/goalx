@@ -2043,6 +2043,9 @@ func TestStatusShowsActiveIdleSessionAttention(t *testing.T) {
 	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{Name: "session-1", State: "idle", Mode: string(goalx.ModeWorker)}); err != nil {
 		t.Fatalf("UpsertSessionRuntimeState: %v", err)
 	}
+	if err := os.WriteFile(JournalPath(runDir, "session-1"), []byte("{\"round\":1,\"status\":\"idle\",\"desc\":\"awaiting master\"}\n"), 0o644); err != nil {
+		t.Fatalf("write session journal: %v", err)
+	}
 	if err := SaveLivenessState(runDir, &LivenessState{
 		CheckedAt: time.Now().UTC().Format(time.RFC3339),
 		Master:    LivenessEntry{Lease: "healthy", PIDAlive: true, HasWorktree: true},

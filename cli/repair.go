@@ -51,16 +51,16 @@ func Repair(projectRoot string, args []string) error {
 	if factsOnly {
 		return repairFactsOnlyRun(rc, true, "facts_only")
 	}
-	if runLifecycleLabel(rc.RunDir) != "stopped" {
-		return fmt.Errorf("goalx repair only repairs inactive runs with stopped lifecycle")
+	if !runLifecycleRepairable(runLifecycleLabel(rc.RunDir)) {
+		return fmt.Errorf("goalx repair only repairs inactive runs with stopped or stranded lifecycle")
 	}
-	if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "repair"}); err != nil {
+	if err := repairInactiveSemanticSurfaces(rc.RunDir, inactiveSemanticRepairOptions{Origin: "repair"}); err != nil {
 		return err
 	}
 	if err := repairFactsOnlyRun(rc, false, "semantic_and_facts"); err != nil {
 		return err
 	}
-	fmt.Printf("Repaired stopped semantic surfaces for run '%s'.\n", rc.Name)
+	fmt.Printf("Repaired inactive semantic surfaces for run '%s'.\n", rc.Name)
 	return nil
 }
 
@@ -83,7 +83,7 @@ func repairAllStoppedRuns(projectRoot string, factsOnly bool) error {
 				return err
 			}
 		} else {
-			if err := repairStoppedSemanticSurfaces(rc.RunDir, stoppedSemanticRepairOptions{Origin: "repair"}); err != nil {
+			if err := repairInactiveSemanticSurfaces(rc.RunDir, inactiveSemanticRepairOptions{Origin: "repair"}); err != nil {
 				return err
 			}
 			if err := repairFactsOnlyRun(rc, false, "semantic_and_facts"); err != nil {
@@ -98,6 +98,15 @@ func repairAllStoppedRuns(projectRoot string, factsOnly bool) error {
 		fmt.Printf("Repaired stopped semantic surfaces for %d runs.\n", repaired)
 	}
 	return nil
+}
+
+func runLifecycleRepairable(lifecycle string) bool {
+	switch strings.TrimSpace(lifecycle) {
+	case "stopped", "stranded":
+		return true
+	default:
+		return false
+	}
 }
 
 func repairFactsOnlyRun(rc *RunContext, announce bool, mode string) error {

@@ -50,6 +50,9 @@ func sessionStateWorktreePath(state *SessionsRuntimeState, sessionName string) (
 	if !ok {
 		return "", false
 	}
+	if session.WorktreePath == "" {
+		return "", false
+	}
 	return session.WorktreePath, true
 }
 

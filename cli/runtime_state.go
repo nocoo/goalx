@@ -333,7 +333,7 @@ func mergeSessionRuntimeState(dst *SessionRuntimeState, src SessionRuntimeState)
 	if src.BlockedBy != "" || src.State != "" {
 		dst.BlockedBy = src.BlockedBy
 	}
-	if src.DirtyFiles != 0 || src.DiffStat != "" {
+	if src.WorktreePath != "" || src.DirtyFiles != 0 || src.DiffStat != "" {
 		dst.DirtyFiles = src.DirtyFiles
 		dst.DiffStat = src.DiffStat
 	}

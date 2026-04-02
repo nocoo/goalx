@@ -172,7 +172,7 @@ var durableSurfaceRegistry = map[DurableSurfaceName]DurableSurfaceSpec{
 			Example:         `{"phase":"stopped","required_remaining":0,"open_required_ids":[],"active_sessions":[],"keep_session":"session-2","last_verified_at":"2026-03-28T10:00:00Z"}`,
 			FieldNotes: []string{
 				"`required_remaining` is required and must be non-negative.",
-				"`phase` is restricted to working|review|complete|stopped.",
+				"`phase` is restricted to working|review|complete|stopped|stranded.",
 				"`open_required_ids` and `active_sessions` are optional factual snapshots when the master explicitly records them.",
 				"No recommendation or completion verdict fields are accepted.",
 			},

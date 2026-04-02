@@ -6,15 +6,16 @@ import (
 	"time"
 )
 
-type stoppedSemanticRepairOptions struct {
-	Origin          string
-	At              string
-	EvolveReason    string
+type inactiveSemanticRepairOptions struct {
+	Origin           string
+	At               string
+	EvolveReason     string
 	EvolveReasonCode string
 }
 
-func repairStoppedSemanticSurfaces(runDir string, opts stoppedSemanticRepairOptions) error {
-	if strings.TrimSpace(runLifecycleLabel(runDir)) != "stopped" {
+func repairInactiveSemanticSurfaces(runDir string, opts inactiveSemanticRepairOptions) error {
+	lifecycle := strings.TrimSpace(runLifecycleLabel(runDir))
+	if !runLifecycleRepairable(lifecycle) {
 		return nil
 	}
 	now := strings.TrimSpace(opts.At)
@@ -25,19 +26,34 @@ func repairStoppedSemanticSurfaces(runDir string, opts stoppedSemanticRepairOpti
 	if runtimeState, err := LoadRunRuntimeState(RunRuntimeStatePath(runDir)); err == nil && runtimeState != nil && strings.TrimSpace(runtimeState.StoppedAt) != "" {
 		stoppedAt = strings.TrimSpace(runtimeState.StoppedAt)
 	}
-	if err := repairStoppedRunStatusRecord(runDir, now); err != nil {
+	if err := repairInactiveRunStatusRecord(runDir, lifecycle, now); err != nil {
 		return err
 	}
-	if err := repairStoppedCoordinationState(runDir, now); err != nil {
+	if err := repairInactiveCoordinationState(runDir, now); err != nil {
 		return err
 	}
-	if err := repairStoppedEvolveFrontier(runDir, stoppedAt, opts); err != nil {
+	if err := retireInactiveRunReminders(runDir); err != nil {
 		return err
+	}
+	if err := clearInactiveRunAlerts(runDir); err != nil {
+		return err
+	}
+	if lifecycle == "stopped" {
+		if err := repairStoppedEvolveFrontier(runDir, stoppedAt, opts); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func repairStoppedRunStatusRecord(runDir, updatedAt string) error {
+func repairStoppedSemanticSurfaces(runDir string, opts inactiveSemanticRepairOptions) error {
+	if strings.TrimSpace(runLifecycleLabel(runDir)) != "stopped" {
+		return nil
+	}
+	return repairInactiveSemanticSurfaces(runDir, opts)
+}
+
+func repairInactiveRunStatusRecord(runDir, lifecycle, updatedAt string) error {
 	record, err := LoadRunStatusRecord(RunStatusPath(runDir))
 	if err != nil || record == nil {
 		return err
@@ -55,9 +71,13 @@ func repairStoppedRunStatusRecord(runDir, updatedAt string) error {
 		requiredRemaining = *record.RequiredRemaining
 	}
 
+	wantPhase := runStatusPhaseStopped
+	if lifecycle == "stranded" {
+		wantPhase = runStatusPhaseStranded
+	}
 	changed := false
-	if record.Phase != runStatusPhaseStopped {
-		record.Phase = runStatusPhaseStopped
+	if record.Phase != wantPhase {
+		record.Phase = wantPhase
 		changed = true
 	}
 	if record.RequiredRemaining == nil || *record.RequiredRemaining != requiredRemaining {
@@ -79,7 +99,7 @@ func repairStoppedRunStatusRecord(runDir, updatedAt string) error {
 	return SaveRunStatusRecord(RunStatusPath(runDir), record)
 }
 
-func repairStoppedEvolveFrontier(runDir, stoppedAt string, opts stoppedSemanticRepairOptions) error {
+func repairStoppedEvolveFrontier(runDir, stoppedAt string, opts inactiveSemanticRepairOptions) error {
 	meta, err := LoadRunMetadata(RunMetadataPath(runDir))
 	if err != nil || meta == nil || strings.TrimSpace(meta.Intent) != runIntentEvolve {
 		return err
@@ -108,7 +128,7 @@ func repairStoppedEvolveFrontier(runDir, stoppedAt string, opts stoppedSemanticR
 	})
 }
 
-func repairStoppedCoordinationState(runDir, updatedAt string) error {
+func repairInactiveCoordinationState(runDir, updatedAt string) error {
 	coord, err := LoadCoordinationState(CoordinationPath(runDir))
 	if err != nil || coord == nil {
 		return err
@@ -139,4 +159,44 @@ func repairStoppedCoordinationState(runDir, updatedAt string) error {
 	}
 	coord.UpdatedAt = updatedAt
 	return SaveCoordinationState(CoordinationPath(runDir), coord)
+}
+
+func retireInactiveRunReminders(runDir string) error {
+	reminders, err := LoadControlReminders(ControlRemindersPath(runDir))
+	if err != nil || reminders == nil {
+		return err
+	}
+	changed := false
+	for i := range reminders.Items {
+		if reminders.Items[i].Suppressed || reminders.Items[i].ResolvedAt != "" {
+			continue
+		}
+		reminders.Items[i].Suppressed = true
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return SaveControlReminders(ControlRemindersPath(runDir), reminders)
+}
+
+func clearInactiveRunAlerts(runDir string) error {
+	state, err := LoadControlRunState(ControlRunStatePath(runDir))
+	if err != nil || state == nil {
+		return err
+	}
+	changed := false
+	if len(state.MasterAlerts) > 0 {
+		state.MasterAlerts = nil
+		changed = true
+	}
+	if len(state.ProviderDialogAlerts) > 0 {
+		state.ProviderDialogAlerts = nil
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	return SaveControlRunState(ControlRunStatePath(runDir), state)
 }

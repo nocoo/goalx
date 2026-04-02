@@ -14,6 +14,7 @@ const (
 	runStatusPhaseReview   = "review"
 	runStatusPhaseComplete = "complete"
 	runStatusPhaseStopped  = "stopped"
+	runStatusPhaseStranded = "stranded"
 )
 
 type RunStatusRecord struct {
@@ -91,7 +92,7 @@ func validateRunStatusRecord(record *RunStatusRecord) error {
 		return fmt.Errorf("run status record version must be positive")
 	}
 	switch strings.TrimSpace(record.Phase) {
-	case runStatusPhaseWorking, runStatusPhaseReview, runStatusPhaseComplete, runStatusPhaseStopped:
+	case runStatusPhaseWorking, runStatusPhaseReview, runStatusPhaseComplete, runStatusPhaseStopped, runStatusPhaseStranded:
 	default:
 		return fmt.Errorf("invalid run status phase %q", record.Phase)
 	}

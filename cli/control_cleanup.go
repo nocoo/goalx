@@ -38,7 +38,15 @@ func reconcileRunContinuityForRun(projectRoot, runName, runDir string) error {
 	if err != nil {
 		return err
 	}
-	if controlState == nil || strings.TrimSpace(controlState.ContinuityState) != "running" || host.Running {
+	if controlState == nil {
+		return nil
+	}
+	if strings.TrimSpace(controlState.ContinuityState) == "stranded" && !host.Running {
+		return repairInactiveSemanticSurfaces(runDir, inactiveSemanticRepairOptions{
+			Origin: "runtime_host_stranded",
+		})
+	}
+	if strings.TrimSpace(controlState.ContinuityState) != "running" || host.Running {
 		return nil
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -71,6 +79,12 @@ func reconcileRunContinuityForRun(projectRoot, runName, runDir string) error {
 		if err := MarkRunInactive(projectRoot, runName); err != nil {
 			return err
 		}
+	}
+	if err := repairInactiveSemanticSurfaces(runDir, inactiveSemanticRepairOptions{
+		Origin: "runtime_host_stranded",
+		At:     now,
+	}); err != nil {
+		return err
 	}
 	return nil
 }

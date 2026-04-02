@@ -136,6 +136,41 @@ func TestRefreshSessionRuntimeProjectionPreservesActiveStateWhenJournalHasNotAdv
 	}
 }
 
+func TestRefreshSessionRuntimeProjectionClearsStaleParkedDirtyFacts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:       "session-1",
+		State:      "parked",
+		Mode:       string(goalx.ModeWorker),
+		DirtyFiles: 42,
+		DiffStat:   "old stale diff",
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
+		t.Fatalf("RefreshSessionRuntimeProjection: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	sess := state.Sessions["session-1"]
+	if sess.DirtyFiles != 0 || sess.DiffStat != "" {
+		t.Fatalf("session-1 dirty snapshot = %+v, want cleared dirty facts", sess)
+	}
+	if sess.State != "parked" {
+		t.Fatalf("session-1 state = %q, want parked", sess.State)
+	}
+}
+
 func TestUpsertSessionRuntimeStatePreservesConcurrentEntries(t *testing.T) {
 	runDir := t.TempDir()
 
