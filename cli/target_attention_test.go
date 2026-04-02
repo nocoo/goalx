@@ -437,7 +437,6 @@ func TestBuildRequiredCoverageDoesNotCollapseTargetAttentionIntoFrontierFacts(t 
 		Version: 1,
 		Required: map[string]CoordinationRequiredItem{
 			"req-1": {
-				Owner:          "session-1",
 				ExecutionState: coordinationRequiredExecutionStateActive,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -448,7 +447,6 @@ func TestBuildRequiredCoverageDoesNotCollapseTargetAttentionIntoFrontierFacts(t 
 				},
 			},
 			"req-2": {
-				Owner:          "session-2",
 				ExecutionState: coordinationRequiredExecutionStateActive,
 				Surfaces: CoordinationRequiredSurfaces{
 					Repo:           coordinationRequiredSurfaceAvailable,
@@ -458,6 +456,10 @@ func TestBuildRequiredCoverageDoesNotCollapseTargetAttentionIntoFrontierFacts(t 
 					ExternalSystem: coordinationRequiredSurfaceNotApplicable,
 				},
 			},
+		},
+		Sessions: map[string]CoordinationSession{
+			"session-1": {State: "active", CoversRequired: []string{"req-1"}},
+			"session-2": {State: "active", CoversRequired: []string{"req-2"}},
 		},
 	}); err != nil {
 		t.Fatalf("SaveCoordinationState: %v", err)
