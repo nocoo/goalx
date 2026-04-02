@@ -11,11 +11,15 @@ import (
 
 func writeSavedRunFixture(t *testing.T, projectRoot, runName string, cfg goalx.Config, files map[string]string) {
 	t.Helper()
+	writeSavedRunFixtureAtDir(t, SavedRunDir(projectRoot, runName), cfg, files)
+}
+
+func writeSavedRunFixtureAtDir(t *testing.T, runDir string, cfg goalx.Config, files map[string]string) {
+	t.Helper()
 	if files == nil {
 		files = map[string]string{}
 	}
 
-	runDir := SavedRunDir(projectRoot, runName)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir run dir: %v", err)
 	}

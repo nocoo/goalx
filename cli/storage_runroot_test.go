@@ -20,9 +20,11 @@ func TestResolveSavedRunLocationUsesConfiguredSavedRoot(t *testing.T) {
 
 	// Create configured saved run root
 	configuredSavedDir := filepath.Join(projectRoot, "saved-runs", "my-run")
-	if err := os.MkdirAll(configuredSavedDir, 0o755); err != nil {
-		t.Fatalf("mkdir configured saved dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, configuredSavedDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect configured saved root",
+	}, nil)
 
 	cfg := &goalx.Config{SavedRunRoot: "./saved-runs"}
 	got, err := ResolveSavedRunLocationWithConfig(projectRoot, "my-run", cfg)
@@ -50,9 +52,11 @@ func TestResolveSavedRunLocationUsesProjectConfigByDefault(t *testing.T) {
 	}
 
 	savedDir := filepath.Join(projectRoot, "saved-runs", "my-run")
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir configured saved dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect project config saved root",
+	}, nil)
 
 	got, err := ResolveSavedRunLocation(projectRoot, "my-run")
 	if err != nil {
@@ -73,9 +77,11 @@ func TestResolveSavedRunLocationFallsBackToUserScopedWhenConfiguredEmpty(t *test
 	}
 
 	userScopedDir := SavedRunDir(projectRoot, "my-run")
-	if err := os.MkdirAll(userScopedDir, 0o755); err != nil {
-		t.Fatalf("mkdir user-scoped saved dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, userScopedDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect user scoped saved root",
+	}, nil)
 
 	cfg := &goalx.Config{} // SavedRunRoot is empty
 	got, err := ResolveSavedRunLocationWithConfig(projectRoot, "my-run", cfg)
@@ -100,9 +106,11 @@ func TestResolveSavedRunLocationFallsBackToLegacyProjectLocal(t *testing.T) {
 	}
 
 	legacyDir := LegacySavedRunDir(projectRoot, "my-run")
-	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir legacy saved dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, legacyDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect legacy saved root",
+	}, nil)
 
 	cfg := &goalx.Config{} // SavedRunRoot is empty
 	got, err := ResolveSavedRunLocationWithConfig(projectRoot, "my-run", cfg)
@@ -134,11 +142,21 @@ func TestResolveSavedRunLocationFallbackOrder(t *testing.T) {
 	cfg := &goalx.Config{SavedRunRoot: "./saved-runs"}
 
 	// When all exist, configured root wins
-	for _, dir := range []string{configuredDir, userScopedDir, legacyDir} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
-		}
-	}
+	writeSavedRunFixtureAtDir(t, configuredDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "configured saved root",
+	}, nil)
+	writeSavedRunFixtureAtDir(t, userScopedDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "user scoped saved root",
+	}, nil)
+	writeSavedRunFixtureAtDir(t, legacyDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "legacy saved root",
+	}, nil)
 
 	got, err := ResolveSavedRunLocationWithConfig(projectRoot, "my-run", cfg)
 	if err != nil {
@@ -173,6 +191,73 @@ func TestResolveSavedRunLocationFallbackOrder(t *testing.T) {
 	}
 }
 
+func TestResolveSavedRunLocationSkipsInvalidConfiguredSavedRunDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(projectRoot, 0o755); err != nil {
+		t.Fatalf("mkdir project root: %v", err)
+	}
+
+	configuredDir := filepath.Join(projectRoot, "saved-runs", "my-run")
+	userScopedDir := SavedRunDir(projectRoot, "my-run")
+	if err := os.MkdirAll(configuredDir, 0o755); err != nil {
+		t.Fatalf("mkdir configured dir: %v", err)
+	}
+	writeSavedRunFixtureAtDir(t, userScopedDir, goalx.Config{
+		Name:      "my-run",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect",
+	}, nil)
+
+	got, err := ResolveSavedRunLocationWithConfig(projectRoot, "my-run", &goalx.Config{SavedRunRoot: "./saved-runs"})
+	if err != nil {
+		t.Fatalf("ResolveSavedRunLocationWithConfig: %v", err)
+	}
+	if got.Dir != userScopedDir {
+		t.Errorf("Dir = %q, want fallback user-scoped %q", got.Dir, userScopedDir)
+	}
+}
+
+func TestLoadSavedPhaseSourceFallsBackWhenConfiguredSavedDirInvalid(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	projectRoot := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(filepath.Join(projectRoot, ".goalx"), 0o755); err != nil {
+		t.Fatalf("mkdir .goalx: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectRoot, ".goalx", "config.yaml"), []byte("saved_run_root: ./custom-saved\n"), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	invalidSavedDir := filepath.Join(projectRoot, "custom-saved", "demo")
+	if err := os.MkdirAll(invalidSavedDir, 0o755); err != nil {
+		t.Fatalf("mkdir invalid saved dir: %v", err)
+	}
+
+	validUserScopedDir := SavedRunDir(projectRoot, "demo")
+	cfg := goalx.Config{
+		Name:      "demo",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect",
+		Context:   goalx.ContextConfig{Files: []string{"report.md"}},
+		Target:    goalx.TargetConfig{Files: []string{"report.md"}},
+	}
+	writeSavedRunFixture(t, projectRoot, "demo", cfg, map[string]string{
+		"summary.md": "# summary\n",
+	})
+
+	source, err := loadSavedPhaseSource(projectRoot, "demo")
+	if err != nil {
+		t.Fatalf("loadSavedPhaseSource: %v", err)
+	}
+	if source.Dir != validUserScopedDir {
+		t.Errorf("Dir = %q, want fallback user-scoped %q", source.Dir, validUserScopedDir)
+	}
+}
+
 func TestListSavedRunLocationsIncludesConfiguredRoot(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -187,11 +272,21 @@ func TestListSavedRunLocationsIncludesConfiguredRoot(t *testing.T) {
 	userScopedDir := SavedRunDir(projectRoot, "run-2")
 	legacyDir := LegacySavedRunDir(projectRoot, "run-3")
 
-	for _, dir := range []string{configuredDir, userScopedDir, legacyDir} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", dir, err)
-		}
-	}
+	writeSavedRunFixtureAtDir(t, configuredDir, goalx.Config{
+		Name:      "run-1",
+		Mode:      goalx.ModeWorker,
+		Objective: "configured root listing",
+	}, nil)
+	writeSavedRunFixtureAtDir(t, userScopedDir, goalx.Config{
+		Name:      "run-2",
+		Mode:      goalx.ModeWorker,
+		Objective: "user scoped listing",
+	}, nil)
+	writeSavedRunFixtureAtDir(t, legacyDir, goalx.Config{
+		Name:      "run-3",
+		Mode:      goalx.ModeWorker,
+		Objective: "legacy listing",
+	}, nil)
 
 	cfg := &goalx.Config{SavedRunRoot: "./saved-runs"}
 	locations, err := ListSavedRunLocationsWithConfig(projectRoot, cfg)
@@ -229,11 +324,10 @@ func TestSaveWritesToConfiguredSavedRunRoot(t *testing.T) {
 	}
 
 	cfg := goalx.Config{
-		Name:          runName,
-		Mode:          goalx.ModeWorker,
-		Objective:     "inspect",
-		Parallel:      1,
-		SavedRunRoot:  "./custom-saved",
+		Name:         runName,
+		Mode:         goalx.ModeWorker,
+		Objective:    "inspect",
+		SavedRunRoot: "./custom-saved",
 		Target: goalx.TargetConfig{
 			Files: []string{"notes.md"},
 		},
@@ -277,29 +371,18 @@ func TestResultFindsSavedRunInConfiguredRoot(t *testing.T) {
 
 	// Create saved run in configured root
 	cfg := goalx.Config{
-		Name:          "demo",
-		Mode:          goalx.ModeWorker,
-		Objective:     "inspect",
-		SavedRunRoot:  "./custom-saved",
+		Name:         "demo",
+		Mode:         goalx.ModeWorker,
+		Objective:    "inspect",
+		SavedRunRoot: "./custom-saved",
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
 	}
 	savedDir := filepath.Join(projectRoot, "custom-saved", "demo")
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved dir: %v", err)
-	}
-
-	data, err := yaml.Marshal(&cfg)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(savedDir), data, 0o644); err != nil {
-		t.Fatalf("write run spec: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(savedDir, "summary.md"), []byte("# configured root summary\n"), 0o644); err != nil {
-		t.Fatalf("write summary: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, cfg, map[string]string{
+		"summary.md": "# configured root summary\n",
+	})
 
 	// Result should find the saved run from configured root when using config
 	// Note: Result command needs to load config to know about saved_run_root
@@ -321,10 +404,10 @@ func TestResultFallsBackFromConfiguredToUserScoped(t *testing.T) {
 
 	// Config specifies a saved_run_root, but run exists in user-scoped location
 	cfg := goalx.Config{
-		Name:          "demo",
-		Mode:          goalx.ModeWorker,
-		Objective:     "inspect",
-		SavedRunRoot:  "./custom-saved",
+		Name:         "demo",
+		Mode:         goalx.ModeWorker,
+		Objective:    "inspect",
+		SavedRunRoot: "./custom-saved",
 		Target: goalx.TargetConfig{
 			Files: []string{"report.md"},
 		},
@@ -332,20 +415,9 @@ func TestResultFallsBackFromConfiguredToUserScoped(t *testing.T) {
 
 	// Create saved run in user-scoped location (not configured location)
 	userScopedDir := SavedRunDir(projectRoot, "demo")
-	if err := os.MkdirAll(userScopedDir, 0o755); err != nil {
-		t.Fatalf("mkdir user-scoped dir: %v", err)
-	}
-
-	data, err := yaml.Marshal(&cfg)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(userScopedDir), data, 0o644); err != nil {
-		t.Fatalf("write run spec: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(userScopedDir, "summary.md"), []byte("# user-scoped summary\n"), 0o644); err != nil {
-		t.Fatalf("write summary: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, userScopedDir, cfg, map[string]string{
+		"summary.md": "# user-scoped summary\n",
+	})
 
 	// Resolver should find user-scoped run when configured location doesn't exist
 	location, err := ResolveSavedRunLocationWithConfig(projectRoot, "demo", &cfg)
@@ -370,10 +442,6 @@ func TestLoadSavedPhaseSourceUsesConfiguredSavedRoot(t *testing.T) {
 	}
 
 	savedDir := filepath.Join(projectRoot, "custom-saved", "demo")
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved dir: %v", err)
-	}
-
 	cfg := goalx.Config{
 		Name:      "demo",
 		Mode:      goalx.ModeWorker,
@@ -383,16 +451,9 @@ func TestLoadSavedPhaseSourceUsesConfiguredSavedRoot(t *testing.T) {
 		},
 		Target: goalx.TargetConfig{Files: []string{"report.md"}},
 	}
-	data, err := yaml.Marshal(&cfg)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(savedDir), data, 0o644); err != nil {
-		t.Fatalf("write saved run spec: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(savedDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
-		t.Fatalf("write summary: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, cfg, map[string]string{
+		"summary.md": "# summary\n",
+	})
 
 	source, err := loadSavedPhaseSource(projectRoot, "demo")
 	if err != nil {
@@ -430,16 +491,7 @@ func TestResolveSavedRunLocationFallsBackToRegistryAfterSavedRunRootConfigChange
 	layers.Config.Target = goalx.TargetConfig{Files: []string{"report.md"}}
 
 	savedDir := goalx.ResolveSavedRunDir(projectRoot, runName, &layers.Config)
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved dir: %v", err)
-	}
-	data, err := yaml.Marshal(&layers.Config)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(savedDir), data, 0o644); err != nil {
-		t.Fatalf("write run spec: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, layers.Config, nil)
 	if err := RegisterSavedRun(projectRoot, &layers.Config); err != nil {
 		t.Fatalf("RegisterSavedRun: %v", err)
 	}
@@ -481,16 +533,7 @@ func TestResolveSavedRunLocationListsRegistrySavedRunAfterSavedRunRootConfigChan
 	layers.Config.Target = goalx.TargetConfig{Files: []string{"report.md"}}
 
 	savedDir := goalx.ResolveSavedRunDir(projectRoot, runName, &layers.Config)
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved dir: %v", err)
-	}
-	data, err := yaml.Marshal(&layers.Config)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(savedDir), data, 0o644); err != nil {
-		t.Fatalf("write run spec: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, layers.Config, nil)
 	if err := RegisterSavedRun(projectRoot, &layers.Config); err != nil {
 		t.Fatalf("RegisterSavedRun: %v", err)
 	}
@@ -536,19 +579,9 @@ func TestLoadSavedPhaseSourceFallsBackToRegistryAfterSavedRunRootConfigChange(t 
 	layers.Config.Target = goalx.TargetConfig{Files: []string{"report.md"}}
 
 	savedDir := goalx.ResolveSavedRunDir(projectRoot, runName, &layers.Config)
-	if err := os.MkdirAll(savedDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved dir: %v", err)
-	}
-	data, err := yaml.Marshal(&layers.Config)
-	if err != nil {
-		t.Fatalf("marshal config: %v", err)
-	}
-	if err := os.WriteFile(RunSpecPath(savedDir), data, 0o644); err != nil {
-		t.Fatalf("write saved run spec: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(savedDir, "summary.md"), []byte("# summary\n"), 0o644); err != nil {
-		t.Fatalf("write summary: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, savedDir, layers.Config, map[string]string{
+		"summary.md": "# summary\n",
+	})
 	if err := RegisterSavedRun(projectRoot, &layers.Config); err != nil {
 		t.Fatalf("RegisterSavedRun: %v", err)
 	}

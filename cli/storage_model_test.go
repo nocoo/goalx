@@ -33,9 +33,11 @@ func TestStorageModelResolvesSavedRunFromUserScope(t *testing.T) {
 	}
 
 	runDir := SavedRunDir(projectRoot, "saved-research")
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatalf("mkdir saved run dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, runDir, goalx.Config{
+		Name:      "saved-research",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect saved run",
+	}, nil)
 
 	got, err := ResolveSavedRunLocation(projectRoot, "saved-research")
 	if err != nil {
@@ -60,9 +62,11 @@ func TestStorageModelResolvesLegacySavedRunAsFallback(t *testing.T) {
 	}
 
 	legacyDir := LegacySavedRunDir(projectRoot, "saved-research")
-	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
-		t.Fatalf("mkdir legacy saved run dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, legacyDir, goalx.Config{
+		Name:      "saved-research",
+		Mode:      goalx.ModeWorker,
+		Objective: "inspect legacy saved run",
+	}, nil)
 
 	got, err := ResolveSavedRunLocation(projectRoot, "saved-research")
 	if err != nil {

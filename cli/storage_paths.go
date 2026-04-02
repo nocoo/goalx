@@ -156,7 +156,9 @@ func ResolveSavedRunLocationWithConfig(projectRoot, runName string, cfg *goalx.C
 
 	for _, candidate := range candidates {
 		if info, err := os.Stat(candidate.Dir); err == nil && info.IsDir() {
-			return candidate, nil
+			if savedRunDirValid(candidate.Dir) {
+				return candidate, nil
+			}
 		} else if err != nil && !os.IsNotExist(err) {
 			return SavedRunLocation{}, err
 		}
@@ -165,7 +167,7 @@ func ResolveSavedRunLocationWithConfig(projectRoot, runName string, cfg *goalx.C
 		return SavedRunLocation{}, err
 	} else if ok && strings.TrimSpace(ref.Dir) != "" {
 		dir := filepath.Clean(ref.Dir)
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() && savedRunDirValid(dir) {
 			return SavedRunLocation{Name: runName, Dir: dir, Legacy: false}, nil
 		} else if err != nil && !os.IsNotExist(err) {
 			return SavedRunLocation{}, err
@@ -217,10 +219,14 @@ func ListSavedRunLocationsWithConfig(projectRoot string, cfg *goalx.Config) ([]S
 			if !entry.IsDir() || seen[entry.Name()] {
 				continue
 			}
+			dir := filepath.Join(root.dir, entry.Name())
+			if !savedRunDirValid(dir) {
+				continue
+			}
 			seen[entry.Name()] = true
 			locations = append(locations, SavedRunLocation{
 				Name:   entry.Name(),
-				Dir:    filepath.Join(root.dir, entry.Name()),
+				Dir:    dir,
 				Legacy: root.legacy,
 			})
 		}
@@ -236,7 +242,7 @@ func ListSavedRunLocationsWithConfig(projectRoot string, cfg *goalx.Config) ([]S
 			continue
 		}
 		dir = filepath.Clean(dir)
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() && savedRunDirValid(dir) {
 			seen[name] = true
 			locations = append(locations, SavedRunLocation{
 				Name:   name,
@@ -251,6 +257,11 @@ func ListSavedRunLocationsWithConfig(projectRoot string, cfg *goalx.Config) ([]S
 		return locations[i].Name < locations[j].Name
 	})
 	return locations, nil
+}
+
+func savedRunDirValid(dir string) bool {
+	_, err := LoadSavedRunSpec(dir)
+	return err == nil
 }
 
 func ResolveSavedRunLocation(projectRoot, runName string) (SavedRunLocation, error) {

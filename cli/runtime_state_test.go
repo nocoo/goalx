@@ -171,6 +171,41 @@ func TestRefreshSessionRuntimeProjectionClearsStaleParkedDirtyFacts(t *testing.T
 	}
 }
 
+func TestRefreshSessionRuntimeProjectionFallsBackWhenSessionWorktreePathEmpty(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	repo := initGitRepo(t)
+	writeAndCommit(t, repo, "README.md", "base", "base commit")
+
+	runName, runDir := writeLifecycleRunFixture(t, repo)
+	legacyWorktree := WorktreePath(runDir, runName, 1)
+	if err := os.WriteFile(filepath.Join(legacyWorktree, "tracked.txt"), []byte("dirty\n"), 0o644); err != nil {
+		t.Fatalf("write tracked file: %v", err)
+	}
+	if err := UpsertSessionRuntimeState(runDir, SessionRuntimeState{
+		Name:         "session-1",
+		State:        "parked",
+		Mode:         string(goalx.ModeWorker),
+		WorktreePath: "",
+	}); err != nil {
+		t.Fatalf("UpsertSessionRuntimeState: %v", err)
+	}
+
+	if err := RefreshSessionRuntimeProjection(runDir, runName); err != nil {
+		t.Fatalf("RefreshSessionRuntimeProjection: %v", err)
+	}
+
+	state, err := LoadSessionsRuntimeState(SessionsRuntimeStatePath(runDir))
+	if err != nil {
+		t.Fatalf("LoadSessionsRuntimeState: %v", err)
+	}
+	sess := state.Sessions["session-1"]
+	if sess.WorktreePath != legacyWorktree {
+		t.Fatalf("session-1 worktree_path = %q, want fallback %q", sess.WorktreePath, legacyWorktree)
+	}
+}
+
 func TestUpsertSessionRuntimeStatePreservesConcurrentEntries(t *testing.T) {
 	runDir := t.TempDir()
 

@@ -189,7 +189,6 @@ func TestCollectRunMemorySeedsIncludesSavedArtifacts(t *testing.T) {
 	}
 }
 
-func TestRuntimeHostRefreshesMemorySeedsWithoutCanonicalMutation(t *testing.T) {
 func TestCollectRunMemorySeedsIncludesConfiguredSavedArtifacts(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -241,8 +240,25 @@ func TestCollectRunMemorySeedsIncludesConfiguredSavedArtifacts(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ReportsDir(runDir), "repo-summary.md"), []byte("repo report\n"), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
-	if err := os.WriteFile(AcceptanceEvidencePath(runDir), []byte("gate ok\n"), 0o644); err != nil {
+	evidencePath := filepath.Join(runDir, "acceptance-last.txt")
+	if err := os.WriteFile(evidencePath, []byte("gate ok\n"), 0o644); err != nil {
 		t.Fatalf("write acceptance evidence: %v", err)
+	}
+	if err := writeAssuranceFixture(t, runDir, &AcceptanceState{
+		Version: 2,
+		Checks: []AcceptanceCheck{
+			{ID: "chk-1", Command: "printf 'gate ok\\n'", State: acceptanceCheckStateActive},
+		},
+		LastResult: AcceptanceResult{
+			CheckedAt:    "2026-03-27T08:00:00Z",
+			ExitCode:     intPtr(0),
+			EvidencePath: evidencePath,
+			CheckResults: []AcceptanceCheckResult{
+				{ID: "chk-1", Command: "printf 'gate ok\\n'", ExitCode: intPtr(0), EvidencePath: evidencePath},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("write assurance fixture: %v", err)
 	}
 	if err := Save(projectRoot, []string{"--run", runName}); err != nil {
 		t.Fatalf("Save: %v", err)

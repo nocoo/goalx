@@ -170,7 +170,9 @@ objective: test listing
 
 	// Create control state to mark it as active
 	controlState := &ControlRunState{
-		LifecycleState: "active",
+		Version:         1,
+		GoalState:       "open",
+		ContinuityState: "running",
 	}
 	if err := SaveControlRunState(ControlRunStatePath(runDir), controlState); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
@@ -316,7 +318,7 @@ run_root: ./.goalx/runs-a
 	if err := os.WriteFile(RunSpecPath(runDir), runSpec, 0o644); err != nil {
 		t.Fatalf("write run spec: %v", err)
 	}
-	controlState := &ControlRunState{LifecycleState: "active"}
+	controlState := &ControlRunState{Version: 1, GoalState: "open", ContinuityState: "running"}
 	if err := SaveControlRunState(ControlRunStatePath(runDir), controlState); err != nil {
 		t.Fatalf("SaveControlRunState: %v", err)
 	}

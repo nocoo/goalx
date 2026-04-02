@@ -487,9 +487,19 @@ func TestDropAcceptsLegacySavedRun(t *testing.T) {
 		t.Fatalf("write summary: %v", err)
 	}
 	legacySaveDir := LegacySavedRunDir(repo, runName)
-	if err := os.MkdirAll(legacySaveDir, 0o755); err != nil {
-		t.Fatalf("mkdir legacy save dir: %v", err)
-	}
+	writeSavedRunFixtureAtDir(t, legacySaveDir, goalx.Config{
+		Name:      runName,
+		Mode:      goalx.ModeWorker,
+		Objective: "demo",
+		Target: goalx.TargetConfig{
+			Files: []string{"report.md"},
+		},
+		LocalValidation: goalx.LocalValidationConfig{
+			Command: "test -f base.txt",
+		},
+	}, map[string]string{
+		"summary.md": "# summary\n",
+	})
 
 	if err := Drop(repo, []string{"--run", runName}); err != nil {
 		t.Fatalf("Drop: %v", err)

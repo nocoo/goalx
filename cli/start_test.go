@@ -601,7 +601,7 @@ func TestBootstrapStartScaffoldPublishesCanonicalLaunchingStateBeforeWorktree(t 
 		Objective: "ship feature",
 		Master:    goalx.MasterConfig{Engine: "codex", Model: "codex"},
 	}
-	state := newStartRunState(repo, cfg.Name)
+	state := newStartRunState(repo, cfg)
 
 	meta, err := bootstrapStartScaffold(repo, state, cfg, nil, &RunMetadata{Intent: runIntentEvolve}, "")
 	if err != nil {
