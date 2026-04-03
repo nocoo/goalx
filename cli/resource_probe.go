@@ -42,11 +42,11 @@ func ProbeLinuxResourceState() (*ResourceState, error) {
 }
 
 func RefreshResourceState(runDir string) error {
-	state, err := ProbeLinuxResourceState()
+	state, err := ProbePlatformResourceState()
 	if err != nil {
 		return err
 	}
-	processes, err := collectGoalXProcessFacts(runDir)
+	processes, err := collectPlatformProcessFacts(runDir)
 	if err != nil {
 		return err
 	}
