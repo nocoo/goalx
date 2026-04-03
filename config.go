@@ -149,7 +149,7 @@ type UserConfig struct {
 var BuiltinEngines = map[string]EngineConfig{
 	"claude-code": {
 		Description: "Deep reasoning and long-form research synthesis.",
-		Command:     "claude --model {model_id} --permission-mode auto",
+		Command:     "claude --permission-mode auto",
 		Prompt:      "Read {protocol} and follow it exactly.",
 		EffortMode:  "flag",
 		EffortFlag:  "--effort",
@@ -161,9 +161,7 @@ var BuiltinEngines = map[string]EngineConfig{
 			"max":     "max",
 		},
 		Models: map[string]string{
-			"opus":   "claude-opus-4-6",
-			"sonnet": "claude-sonnet-4-6",
-			"haiku":  "claude-haiku-4-5",
+			"default": "",
 		},
 	},
 	"codex": {
